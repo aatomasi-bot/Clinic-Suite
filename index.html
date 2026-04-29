@@ -780,13 +780,59 @@ input, select, textarea { font: inherit; }
   <div class="drawer-section">
     <div class="drawer-btn-list">
       <button class="drawer-btn" id="refreshBtnDrawer"><span class="drawer-btn-icon">🔄</span>Refresh Data</button>
+      <button class="drawer-btn" onclick="closeMenuDrawer();openModal('apiKeyModal')"><span class="drawer-btn-icon">🤖</span>Claude AI Key <span id="aiKeyStatus" style="margin-left:auto;font-size:11px;color:var(--text-3)">Not set</span></button>
     </div>
   </div>
 </div>
 
 <!-- Hidden file inputs -->
 <input type="file" id="csvFileInput" accept=".csv" style="display:none">
-<input type="file" id="pdfFileInput" accept=".pdf" style="display:none">
+<input type="file" id="pdfFileInput" accept=".pdf" multiple style="display:none">
+
+<!-- ===== PDF REVIEW MODAL ===== -->
+<div class="modal-overlay" id="pdfReviewModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">📄 PDF Extraction Review</div>
+        <div style="font-size:11px;color:var(--text-2);margin-top:2px" id="pdfReviewFilename"></div>
+      </div>
+      <button class="modal-close" onclick="closeModal('pdfReviewModal')">✕</button>
+    </div>
+    <div class="modal-body" id="pdfReviewBody"></div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('pdfReviewModal')">Cancel</button>
+      <button class="btn-primary" onclick="confirmPDFAndFill()">✓ Confirm &amp; Fill Form</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== CLAUDE API KEY MODAL ===== -->
+<div class="modal-overlay" id="apiKeyModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title">🤖 Claude AI Settings</div>
+      <button class="modal-close" onclick="closeModal('apiKeyModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:var(--teal-light);border:1px solid #B2DADA;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px;color:var(--teal-dark)">
+        <strong>Optional — Turbocharge PDF extraction with AI.</strong><br>
+        Without a key, smart regex is used. With a Claude API key, extraction is dramatically more accurate for complex/scanned forms.
+      </div>
+      <div class="form-group">
+        <label>Claude API Key</label>
+        <input type="password" id="claudeApiKeyInput" class="form-control" placeholder="sk-ant-api03-…" style="padding:10px 12px;font-family:monospace">
+      </div>
+      <p style="font-size:11px;color:var(--text-2);margin-top:-6px">Key is stored locally in your browser only — never sent anywhere except Anthropic's API.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-danger" onclick="clearApiKey()">Clear Key</button>
+      <button class="btn-primary" onclick="saveApiKey()">Save Key</button>
+    </div>
+  </div>
+</div>
 
 <!-- ===== PATIENT MODAL ===== -->
 <div class="modal-overlay" id="patientModal">
@@ -1313,7 +1359,12 @@ function renderCard(p, idx) {
   const addr = p['Address'] || '';
   const phoneBtn1 = ph1 ? `<button class="action-circle action-circle--phone js-call" data-phone="${esc(ph1)}" title="Call ${ph1}">📞</button>` : '';
   const phoneBtn2 = ph2 ? `<button class="action-circle action-circle--phone js-call" data-phone="${esc(ph2)}" title="Call ${ph2}" style="font-size:13px">📞₂</button>` : '';
-  const mapBtn  = addr ? `<button class="action-circle action-circle--map js-map" data-addr="${esc(addr)}" title="Directions">📍</button>` : '';
+  const mapBtn  = addr ? `<button class="action-circle action-circle--map js-map" data-addr="${esc(addr)}" title="Directions">
+    <svg viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="#EA4335"/>
+      <circle cx="12" cy="9" r="2.8" fill="white"/>
+    </svg>
+  </button>` : '';
 
   return `
 <div class="patient-card ${cardClass}" data-id="${p.id}" style="animation-delay:${animDelay}s">
@@ -1961,75 +2012,320 @@ function importCSVFile(file) {
   r.readAsText(file);
 }
 
-async function importPDFFile(file) {
-  if (!window.pdfjsLib) {
-    setLoading(true, 'Loading PDF reader…');
-    await new Promise((res,rej) => {
-      const s = document.createElement('script');
-      s.src = window.PDFJS_URL;
-      s.onload = res; s.onerror = rej;
-      document.head.appendChild(s);
-    });
-    window.pdfjsLib.GlobalWorkerOptions.workerSrc = window.PDFJS_WORKER;
-    setLoading(false);
+// ========== PDF EXTRACTION ENGINE ==========
+
+async function ensurePDFJS() {
+  if (window.pdfjsLib) return;
+  setLoading(true, 'Loading PDF engine…');
+  await new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = window.PDFJS_URL; s.onload = res; s.onerror = rej;
+    document.head.appendChild(s);
+  });
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc = window.PDFJS_WORKER;
+}
+
+async function extractPDFText(file) {
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  let text = '';
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const tc   = await page.getTextContent();
+    // Preserve line structure by tracking y-positions
+    const items = tc.items;
+    let lastY = null;
+    for (const item of items) {
+      const y = item.transform[5];
+      if (lastY !== null && Math.abs(y - lastY) > 5) text += '\n';
+      text += item.str + ' ';
+      lastY = y;
+    }
+    text += '\n--- PAGE BREAK ---\n';
   }
-  setLoading(true, 'Extracting PDF data…');
+  return text.trim();
+}
+
+// ── Claude AI extraction (requires API key in settings) ──
+async function extractWithClaude(fullText, apiKey) {
+  const prompt = `You are a medical document parser specialized in patient enrollment forms.
+
+Extract the following fields from this PDF text and return ONLY a valid JSON object — no prose, no markdown, no explanation.
+
+Required JSON structure:
+{
+  "patient_name": "",
+  "file_number": "",
+  "dose": "",
+  "address": "",
+  "phone_1": "",
+  "phone_2": "",
+  "date_of_injection": "",
+  "missing_fields": []
+}
+
+Extraction Rules:
+- patient_name: Full name from fields labeled "PATIENT NAME", "NOM DU PATIENT", or similar. Title-case the result.
+- file_number: From "FILE NUMBER", "PATIENT ID", "MEDICUM #", or any visible file reference. Prefer actual patient file number over pharmacy/clinic numbers.
+- dose: Must be exactly one of: "7.5", "22.5", "30", or "45" (numbers only, no units). Look for selected/checked checkboxes or circled values next to "mg", "1 month", "3 month", "4 month", "6 month".
+- address: Combine street + city + province/state + postal code into one clean string.
+- phone_1: Primary patient phone (labeled TELEPHONE, PHONE, TEL, HOME). Preserve original formatting (dashes, spaces, brackets).
+- phone_2: Secondary/alternate contact number if available. If none, use "".
+- date_of_injection: From "LAST INJECTION", "DATE OF INJECTION", or "INJECTION DUE DATE". Format as YYYY-MM-DD.
+- missing_fields: Array of field names that could not be found or were ambiguous.
+
+Critical:
+- IGNORE doctor, pharmacy, clinic, and fax numbers
+- IGNORE numbers preceded by "FAX", "TELECOPIEUR", "DR.", "MD", "PHARMACY", "CLINIC"
+- If a field is genuinely missing, use "" and add its name to missing_fields
+- Handle OCR artifacts like broken words, random spaces, and encoding issues
+
+PDF Text:
+${fullText.substring(0, 8000)}`;
+
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1000,
+      messages: [{ role: 'user', content: prompt }]
+    })
+  });
+  if (!resp.ok) throw new Error(`Claude API ${resp.status}: ${await resp.text()}`);
+  const data = await resp.json();
+  const raw  = data.content?.[0]?.text || '';
+  const clean = raw.replace(/```json|```/g, '').trim();
+  return JSON.parse(clean);
+}
+
+// ── Enhanced regex extraction (fallback) ──
+function extractWithRegex(fullText, filename) {
+  const text  = fullText;
+  const upper = text.toUpperCase();
+  const result = { patient_name:'', file_number:'', dose:'', address:'', phone_1:'', phone_2:'', date_of_injection:'', missing_fields:[] };
+
+  // ── Patient Name ──
+  const namePatterns = [
+    /PATIENT\s*NAME[\/\s]*NOM[^:\n]*[:\s]+([A-ZÀ-Ö][A-ZÀ-Öa-zà-ö\s\-']+[A-Za-z])/i,
+    /NOM\s*DU\s*PATIENT[^:\n]*[:\s]+([A-ZÀ-Ö][A-ZÀ-Öa-zà-ö\s\-']+[A-Za-z])/i,
+    /PATIENT\s*NAME[:\s]+([A-Z][A-Z\s\-']+)/i,
+    /NAME[:\s]+([A-Z][A-Z\s\-']{4,40})/,
+  ];
+  for (const pat of namePatterns) {
+    const m = text.match(pat);
+    if (m) { result.patient_name = m[1].trim().replace(/\s+/g,' '); break; }
+  }
+  if (!result.patient_name) result.missing_fields.push('patient_name');
+
+  // ── File Number ──
+  const filePatterns = [
+    /MEDICUM\s*#?\s*[:\s]+([A-Z0-9\-]+)/i,
+    /FILE\s*(?:NUMBER|NO|NUM|#)[:\s]+([A-Z0-9\-]+)/i,
+    /PATIENT\s*(?:ID|FILE|NUMBER)[:\s]+([A-Z0-9\-]+)/i,
+    /(?:DOSSIER|CHART)\s*(?:NO|NUMBER|#)[:\s]+([A-Z0-9\-]+)/i,
+    /(?:^|\s)([A-Z]{0,3}\d{5,8})(?:\s|$)/m,
+  ];
+  for (const pat of filePatterns) {
+    const m = text.match(pat);
+    if (m) { result.file_number = m[1].trim(); break; }
+  }
+  // Fallback: filename might contain the file number
+  if (!result.file_number) {
+    const fnMatch = filename.replace(/\.pdf$/i,'').match(/(\d{4,8})/);
+    if (fnMatch) result.file_number = fnMatch[1];
+  }
+  if (!result.file_number) result.missing_fields.push('file_number');
+
+  // ── Dose ──
+  const validDoses = [45, 30, 22.5, 7.5]; // descending to avoid 7.5 matching 22.5
+  for (const d of validDoses) {
+    const escaped = d.toString().replace('.', '\\.');
+    const re = new RegExp(`(?:☑|✓|✔|\\[x\\]|\\(x\\)|selected)?\\s*${escaped}\\s*mg`, 'i');
+    if (re.test(text)) { result.dose = d.toString(); break; }
+  }
+  // Also check for "month" labels
+  if (!result.dose) {
+    if (/6\s*month/i.test(text)) result.dose = '45';
+    else if (/4\s*month/i.test(text)) result.dose = '30';
+    else if (/3\s*month/i.test(text)) result.dose = '22.5';
+    else if (/1\s*month/i.test(text)) result.dose = '7.5';
+  }
+  if (!result.dose) result.missing_fields.push('dose');
+
+  // ── Address ──
+  const streetRe  = /(?:ADDRESS|ADRESSE|STREET)[\/\s]*(?:ADDRESS|ADRESSE)?[:\s]+([^\n,]{5,60})/i;
+  const cityRe    = /(?:CITY|VILLE)[:\s]+([A-ZÀ-Öa-zà-ö\s\-'\.]{2,40})/i;
+  const provRe    = /(?:PROVINCE|PROV|STATE)[:\s]+([A-Z]{2,3})/i;
+  const postalCAre = /\b([A-Z]\d[A-Z]\s?\d[A-Z]\d)\b/;
+  const postalUSre = /\b(\d{5}(?:-\d{4})?)\b/;
+  const streetM = text.match(streetRe);
+  const cityM   = text.match(cityRe);
+  const provM   = text.match(provRe);
+  const postM   = text.match(postalCAre) || text.match(postalUSre);
+  const parts   = [streetM?.[1]?.trim(), cityM?.[1]?.trim(), provM?.[1]?.trim(), postM?.[1]?.trim()].filter(Boolean);
+  if (parts.length >= 2) result.address = parts.join(', ');
+  if (!result.address) result.missing_fields.push('address');
+
+  // ── Phone Numbers ──
+  // Strip fax numbers first
+  const noFax = text.replace(/(?:FAX|TELECOPIEUR|TÉLÉCOPIEUR)[^\d]*[\d\s\-\(\)\.]{7,20}/gi, '');
+  // Strip doctor/pharmacy numbers
+  const noDoc = noFax.replace(/(?:DR\.?|PHARMACY|CLINIC|DOCTOR|MÉDECIN)[^\d]*[\d\s\-\(\)\.]{7,20}/gi, '');
+
+  const phoneRe = /(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g;
+  const labeledPhone1 = noDoc.match(/(?:TELEPHONE|PHONE|TEL|HOME|DOMICILE)[^\d]*(\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4})/i);
+  const labeledPhone2 = noDoc.match(/(?:CELL|MOBILE|ALTERNATE|SECONDARY|ALT|AUTRE)[^\d]*(\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4})/i);
+
+  if (labeledPhone1) result.phone_1 = labeledPhone1[1].trim();
+  if (labeledPhone2) result.phone_2 = labeledPhone2[1].trim();
+
+  // If labeled extraction failed, grab all phone numbers
+  if (!result.phone_1) {
+    const allPhones = [...noDoc.matchAll(phoneRe)].map(m => m[0].trim());
+    if (allPhones[0]) result.phone_1 = allPhones[0];
+    if (allPhones[1] && allPhones[1] !== allPhones[0]) result.phone_2 = allPhones[1];
+  }
+  if (!result.phone_1) result.missing_fields.push('phone_1');
+
+  // ── Date of Injection ──
+  const frMonths = {janvier:'01',fevrier:'02',février:'02',mars:'03',avril:'04',mai:'05',juin:'06',juillet:'07',aout:'08',août:'08',septembre:'09',octobre:'10',novembre:'11',decembre:'12',décembre:'12'};
+  const engMonths = {january:'01',february:'02',march:'03',april:'04',may:'05',june:'06',july:'07',august:'08',september:'09',october:'10',november:'11',december:'12',jan:'01',feb:'02',mar:'03',apr:'04',jun:'06',jul:'07',aug:'08',sep:'09',oct:'10',nov:'11',dec:'12'};
+
+  const dateContextRe = /(?:LAST\s*INJECTION|DATE\s*(?:OF|D[''E])\s*INJECTION|INJECTION\s*(?:DUE\s*)?DATE|DATE\s*DE\s*LA\s*(?:DERNIÈRE\s*)?INJECTION)[^\d]*(\d{1,2})[\/\-\s]+([A-Za-zéèû]+|\d{1,2})[\/\-\s]+(\d{2,4})/i;
+  const dateM = text.match(dateContextRe);
+  if (dateM) {
+    const [,d,m,y] = dateM;
+    const year = y.length === 2 ? '20'+y : y;
+    const mon = frMonths[m.toLowerCase()] || engMonths[m.toLowerCase()] || m.padStart(2,'0');
+    const isValid = !isNaN(Date.parse(`${year}-${mon}-${d.padStart(2,'0')}`));
+    if (isValid) result.date_of_injection = `${year}-${mon}-${d.padStart(2,'0')}`;
+  }
+
+  // ISO / numeric date fallback near injection context
+  if (!result.date_of_injection) {
+    const isoRe = /(?:LAST\s*INJECTION|INJECTION\s*DATE)[^\d]*(\d{4}[-\/]\d{2}[-\/]\d{2})/i;
+    const isoM  = text.match(isoRe);
+    if (isoM) result.date_of_injection = isoM[1].replace(/\//g,'-');
+  }
+  if (!result.date_of_injection) result.missing_fields.push('date_of_injection');
+
+  return result;
+}
+
+// ── Show PDF Review Modal ──
+function showPDFReview(extracted, filename) {
+  const missing = extracted.missing_fields || [];
+  const flag = f => missing.includes(f) ? ' style="border-color:#E05A5A;background:#FDEDED"' : '';
+  const flagLabel = f => missing.includes(f) ? ' <span style="color:#E05A5A;font-size:10px;font-weight:700">⚠ Not found</span>' : '';
+
+  document.getElementById('pdfReviewFilename').textContent = filename;
+  document.getElementById('pdfReviewBody').innerHTML = `
+    <div class="form-group"><label>Patient Name ${flagLabel('patient_name')}</label>
+      <input class="form-control" id="pr-name" value="${esc(extracted.patient_name)}"${flag('patient_name')}></div>
+    <div class="form-row-2">
+      <div class="form-group"><label>File Number ${flagLabel('file_number')}</label>
+        <input class="form-control" id="pr-file" value="${esc(extracted.file_number)}"${flag('file_number')}></div>
+      <div class="form-group"><label>Dose (mg) ${flagLabel('dose')}</label>
+        <select class="form-control" id="pr-dose"${flag('dose')}>
+          <option value="">— Select —</option>
+          ${['7.5','22.5','30','45'].map(d=>`<option value="${d}" ${extracted.dose===d?'selected':''}>${d} mg</option>`).join('')}
+        </select></div>
+    </div>
+    <div class="form-group"><label>Address ${flagLabel('address')}</label>
+      <input class="form-control" id="pr-addr" value="${esc(extracted.address)}"${flag('address')}></div>
+    <div class="form-row-2">
+      <div class="form-group"><label>Phone 1 ${flagLabel('phone_1')}</label>
+        <input class="form-control" id="pr-phone1" value="${esc(extracted.phone_1)}"${flag('phone_1')}></div>
+      <div class="form-group"><label>Phone 2</label>
+        <input class="form-control" id="pr-phone2" value="${esc(extracted.phone_2)}"></div>
+    </div>
+    <div class="form-group"><label>Date of Injection ${flagLabel('date_of_injection')}</label>
+      <input class="form-control" type="date" id="pr-date" value="${esc(extracted.date_of_injection)}"${flag('date_of_injection')}></div>
+    ${missing.length ? `<div style="background:#FEF3E8;border:1px solid #F5D0AA;border-radius:8px;padding:10px 12px;margin-top:4px;font-size:12px;color:#E5883A"><strong>⚠️ ${missing.length} field${missing.length>1?'s':''} not detected</strong> — please fill in the highlighted fields before saving.</div>` : `<div style="background:#E8F7F0;border:1px solid #B6DFC8;border-radius:8px;padding:10px 12px;margin-top:4px;font-size:12px;color:#3D9A6B"><strong>✓ All fields extracted</strong> — review and confirm.</div>`}
+  `;
+  openModal('pdfReviewModal');
+}
+
+function confirmPDFAndFill() {
+  const name  = document.getElementById('pr-name').value.trim();
+  const file  = document.getElementById('pr-file').value.trim();
+  const dose  = document.getElementById('pr-dose').value;
+  const addr  = document.getElementById('pr-addr').value.trim();
+  const ph1   = document.getElementById('pr-phone1').value.trim();
+  const ph2   = document.getElementById('pr-phone2').value.trim();
+  const date  = document.getElementById('pr-date').value;
+  if (!name || !file) { toast('Patient name and file number are required', 'warning'); return; }
+  closeModal('pdfReviewModal');
+  openAddModal();
+  document.getElementById('f-name').value   = name;
+  document.getElementById('f-file').value   = file;
+  document.getElementById('f-addr').value   = addr;
+  document.getElementById('f-phone1').value = ph1;
+  document.getElementById('f-phone2').value = ph2;
+  if (dose) document.getElementById('f-dose').value = dose;
+  if (date) { document.getElementById('f-appt').value = date + 'T09:00'; }
+  toast('Form pre-filled — review and save', 'success', '📄');
+}
+
+// ── Main entry point ──
+async function importPDFFile(file) {
   try {
-    const buf = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
-    let fullText = '';
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
-      const tc = await page.getTextContent();
-      fullText += tc.items.map(t=>t.str).join(' ') + '\n';
+    await ensurePDFJS();
+    setLoading(true, 'Reading PDF…');
+    const fullText = await extractPDFText(file);
+    setLoading(true, 'Extracting patient data…');
+
+    let extracted;
+    const apiKey = localStorage.getItem('claude_api_key');
+    if (apiKey) {
+      try {
+        toast('Using Claude AI for extraction…', '', '🤖');
+        extracted = await extractWithClaude(fullText, apiKey);
+      } catch(aiErr) {
+        console.warn('Claude API failed, falling back to regex:', aiErr);
+        toast('AI extraction failed — using smart fallback', 'warning');
+        extracted = extractWithRegex(fullText, file.name);
+      }
+    } else {
+      extracted = extractWithRegex(fullText, file.name);
     }
+
     setLoading(false);
-
-    let name=null, fileNo=null, dose=null, addr=null, phone1=null, phone2=null, injDate=null;
-
-    const nMatch = fullText.match(/PATIENT NAME[\/\s]*NOM[^A-Z]*([A-Z][A-Z\s]+[A-Z])/i);
-    if (nMatch) name = nMatch[1].trim().replace(/\s+/g,' ');
-
-    const fMatch = fullText.match(/MEDICUM\s*#[:\s]*(\d+)/i);
-    if (fMatch) fileNo = fMatch[1];
-
-    const dMatch = fullText.match(/(\d+\.?\d*)\s*mg/i);
-    if (dMatch && [7.5,22.5,30,45].includes(parseFloat(dMatch[1]))) dose = parseFloat(dMatch[1]).toString();
-
-    const street = fullText.match(/ADDRESS\/ADRESSE\s*([A-Za-z0-9\s,.'-]+)/i);
-    const city   = fullText.match(/CITY\/VILLE\s*([A-Za-zÀ-ÿ\s.'-]+)/i);
-    const postal = fullText.match(/\b([A-Z]\d[A-Z]\s?\d[A-Z]\d)\b/i);
-    const addrParts = [street?.[1]?.trim(), city?.[1]?.trim(), postal?.[1]?.trim()].filter(Boolean);
-    if (addrParts.length) addr = addrParts.join(', ').trim();
-
-    const p1 = fullText.match(/TELEPHONE[^\d]*(\d{3}\s?\d{3}\s?\d{4})/i);
-    if (p1) phone1 = p1[1].replace(/\s/g,'');
-
-    const p2 = fullText.match(/SECONDARY[^0-9]*(\d{3}\s?\d{3}\s?\d{4})/i);
-    if (p2) phone2 = p2[1].replace(/\s/g,'');
-
-    const months = {janvier:'01',février:'02',mars:'03',avril:'04',mai:'05',juin:'06',juillet:'07',août:'08',septembre:'09',octobre:'10',novembre:'11',décembre:'12'};
-    const iMatch = fullText.match(/injection[^\d]*(\d{1,2})\s+([A-Za-zéè]+)\s+(\d{4})/i);
-    if (iMatch && months[iMatch[2].toLowerCase()]) {
-      injDate = `${iMatch[3]}-${months[iMatch[2].toLowerCase()]}-${iMatch[1].padStart(2,'0')}`;
-    }
-
-    if (!name || !fileNo) { toast('Could not extract patient info from PDF', 'error'); return; }
-
-    // Pre-fill form
-    openAddModal();
-    document.getElementById('f-name').value = name;
-    document.getElementById('f-file').value = fileNo;
-    if (addr) document.getElementById('f-addr').value = addr;
-    if (phone1) document.getElementById('f-phone1').value = phone1;
-    if (phone2) document.getElementById('f-phone2').value = phone2;
-    if (dose) document.getElementById('f-dose').value = dose;
-    if (injDate) document.getElementById('f-appt').value = injDate + 'T09:00';
-    toast('PDF extracted — review and save', 'success', '📄');
+    showPDFReview(extracted, file.name);
   } catch(e) {
-    toast('PDF error: ' + e.message, 'error');
-  } finally {
     setLoading(false);
+    toast('PDF error: ' + e.message, 'error');
+  }
+}
+
+// ── Batch PDF processing ──
+async function importPDFBatch(files) {
+  const results = [];
+  for (let i = 0; i < files.length; i++) {
+    setLoading(true, `Processing PDF ${i+1} of ${files.length}…`);
+    try {
+      await ensurePDFJS();
+      const fullText = await extractPDFText(files[i]);
+      const apiKey   = localStorage.getItem('claude_api_key');
+      const extracted = apiKey ? await extractWithClaude(fullText, apiKey) : extractWithRegex(fullText, files[i].name);
+      results.push({ file: files[i].name, data: extracted, ok: true });
+    } catch(e) {
+      results.push({ file: files[i].name, error: e.message, ok: false });
+    }
+  }
+  setLoading(false);
+  // Show first result for review; batch summary in toast
+  if (results.length === 1) {
+    showPDFReview(results[0].data, results[0].file);
+  } else {
+    const ok = results.filter(r=>r.ok).length;
+    toast(`Processed ${ok}/${results.length} PDFs — showing first result`, ok===results.length?'success':'warning');
+    if (results[0].ok) showPDFReview(results[0].data, results[0].file);
   }
 }
 
@@ -2089,7 +2385,43 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('importCSVBtn').addEventListener('click', () => { closeMenuDrawer(); document.getElementById('csvFileInput').click(); });
   document.getElementById('importPDFBtn').addEventListener('click', () => { closeMenuDrawer(); document.getElementById('pdfFileInput').click(); });
   document.getElementById('csvFileInput').addEventListener('change', e => { if(e.target.files[0]) importCSVFile(e.target.files[0]); e.target.value=''; });
-  document.getElementById('pdfFileInput').addEventListener('change', e => { if(e.target.files[0]) importPDFFile(e.target.files[0]); e.target.value=''; });
+  document.getElementById('pdfFileInput').addEventListener('change', e => {
+    const files = [...e.target.files];
+    if (files.length === 1) importPDFFile(files[0]);
+    else if (files.length > 1) importPDFBatch(files);
+    e.target.value='';
+  });
+
+  // API key management
+  function saveApiKey() {
+    const k = document.getElementById('claudeApiKeyInput').value.trim();
+    if (!k) { toast('Enter a key first', 'warning'); return; }
+    localStorage.setItem('claude_api_key', k);
+    updateApiKeyStatus();
+    closeModal('apiKeyModal');
+    toast('Claude API key saved', 'success', '🤖');
+  }
+  function clearApiKey() {
+    localStorage.removeItem('claude_api_key');
+    document.getElementById('claudeApiKeyInput').value = '';
+    updateApiKeyStatus();
+    closeModal('apiKeyModal');
+    toast('API key cleared', '', '🗑');
+  }
+  function updateApiKeyStatus() {
+    const el = document.getElementById('aiKeyStatus');
+    if (!el) return;
+    const k = localStorage.getItem('claude_api_key');
+    el.textContent = k ? '✓ Active' : 'Not set';
+    el.style.color = k ? 'var(--green)' : 'var(--text-3)';
+  }
+  window.saveApiKey = saveApiKey;
+  window.clearApiKey = clearApiKey;
+  updateApiKeyStatus();
+  // Pre-fill API key input if already set
+  document.getElementById('apiKeyModal').addEventListener('click', e => { if(e.target===e.currentTarget) closeModal('apiKeyModal'); });
+  const existingKey = localStorage.getItem('claude_api_key');
+  if (existingKey) document.getElementById('claudeApiKeyInput').value = existingKey;
   document.getElementById('exportCSVBtn').addEventListener('click', () => { closeMenuDrawer(); exportCSV(); });
   document.getElementById('exportJSONBtn').addEventListener('click', () => { closeMenuDrawer(); exportJSON(); });
 
