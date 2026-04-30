@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -19,6 +20,7 @@
 <body>
 
 <!-- HEADER -->
+
 <header class="header">
   <div class="header__brand">
     <div class="header__icon">💉</div>
@@ -36,15 +38,18 @@
 </header>
 
 <!-- TOAST -->
+
 <div class="toast-container" id="toastContainer"></div>
 
 <!-- LOADING -->
+
 <div class="loading-overlay" id="loadingOverlay">
   <div class="spinner"></div>
   <p id="loadingMsg">Loading patients…</p>
 </div>
 
 <!-- SEARCH + TABS -->
+
 <div id="searchArea">
   <div class="search-bar">
     <div class="search-input-wrap">
@@ -64,9 +69,11 @@
 </div>
 
 <!-- PATIENT LIST -->
+
 <div id="mainContent"></div>
 
 <!-- DASHBOARD -->
+
 <div id="dashView" class="hidden">
   <div class="stats-grid">
     <div class="stat-card stat-card--teal">
@@ -110,6 +117,7 @@
 </div>
 
 <!-- REPORT VIEW -->
+
 <div id="reportView" class="hidden">
   <div class="report-controls">
     <h3>Custom Report</h3>
@@ -148,6 +156,7 @@
 </div>
 
 <!-- BOTTOM NAV -->
+
 <nav class="bottom-nav">
   <button class="nav-btn" data-view="dash" id="nav-dash">
     <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
@@ -171,6 +180,7 @@
 </nav>
 
 <!-- MENU DRAWER -->
+
 <div class="drawer-backdrop" id="drawerBackdrop"></div>
 <div class="drawer" id="menuDrawer">
   <div class="drawer-handle"></div>
@@ -202,10 +212,12 @@
 </div>
 
 <!-- HIDDEN FILE INPUTS -->
+
 <input type="file" id="csvFileInput" accept=".csv" style="display:none">
 <input type="file" id="pdfFileInput" accept=".pdf" multiple style="display:none">
 
 <!-- PDF REVIEW MODAL -->
+
 <div class="modal-overlay" id="pdfReviewModal">
   <div class="modal">
     <div class="modal-handle"></div>
@@ -225,6 +237,7 @@
 </div>
 
 <!-- CLAUDE API KEY MODAL -->
+
 <div class="modal-overlay" id="apiKeyModal">
   <div class="modal">
     <div class="modal-handle"></div>
@@ -251,6 +264,7 @@
 </div>
 
 <!-- PATIENT MODAL -->
+
 <div class="modal-overlay" id="patientModal">
   <div class="modal">
     <div class="modal-handle"></div>
@@ -324,12 +338,10 @@
             <label>Last Site</label>
             <select id="f-lastsite">
               <option value="">— None —</option>
-              <option value="Left Deltoid">Left Deltoid</option>
-              <option value="Right Deltoid">Right Deltoid</option>
-              <option value="Left Gluteal">Left Gluteal</option>
-              <option value="Right Gluteal">Right Gluteal</option>
-              <option value="Left Vastus">Left Vastus</option>
-              <option value="Right Vastus">Right Vastus</option>
+              <option value="Right Side">Right Side</option>
+              <option value="Left Side">Left Side</option>
+              <option value="Right Glute">Right Glute</option>
+              <option value="Left Glute">Left Glute</option>
             </select>
           </div>
           <div class="form-group">
@@ -361,6 +373,7 @@
 </div>
 
 <!-- INJECTION MODAL -->
+
 <div class="modal-overlay" id="injectionModal">
   <div class="modal">
     <div class="modal-handle"></div>
@@ -377,14 +390,10 @@
         <label>Injection Site *</label>
         <select id="injSiteSelect" class="form-control" style="padding:10px 12px">
           <option value="">— Select site —</option>
-          <option value="Left Deltoid">Left Deltoid</option>
-          <option value="Right Deltoid">Right Deltoid</option>
-          <option value="Left Gluteal">Left Gluteal</option>
-          <option value="Right Gluteal">Right Gluteal</option>
-          <option value="Left Vastus Lateralis">Left Vastus Lateralis</option>
-          <option value="Right Vastus Lateralis">Right Vastus Lateralis</option>
-          <option value="Left Ventrogluteal">Left Ventrogluteal</option>
-          <option value="Right Ventrogluteal">Right Ventrogluteal</option>
+          <option value="Right Side">Right Side</option>
+          <option value="Left Side">Left Side</option>
+          <option value="Right Glute">Right Glute</option>
+          <option value="Left Glute">Left Glute</option>
         </select>
       </div>
       <div class="form-group">
@@ -408,6 +417,7 @@
 </div>
 
 <!-- APPOINTMENT MODAL -->
+
 <div class="modal-overlay" id="apptModal">
   <div class="modal">
     <div class="modal-handle"></div>
@@ -434,6 +444,7 @@
 </div>
 
 <!-- CONFIRM SHEET -->
+
 <div class="drawer-backdrop" id="confirmBackdrop"></div>
 <div class="drawer" id="confirmSheet">
   <div class="drawer-handle"></div>
@@ -448,5 +459,6 @@
 </div>
 
 <script src="app.js" defer></script>
+
 </body>
 </html>
