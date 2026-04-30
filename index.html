@@ -2029,21 +2029,95 @@ async function extractPDFText(file) {
   const buf = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
   let text = '';
+  const styledItems = []; // collects text that is bold OR underlined = selected dose
+
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
-    const tc   = await page.getTextContent();
-    // Preserve line structure by tracking y-positions
-    const items = tc.items;
+
+    // ── Step 1: extract text items with positions ──
+    const tc = await page.getTextContent();
+    const textItems = [];
     let lastY = null;
-    for (const item of items) {
+
+    for (const item of tc.items) {
       const y = item.transform[5];
+      const x = item.transform[4];
       if (lastY !== null && Math.abs(y - lastY) > 5) text += '\n';
       text += item.str + ' ';
       lastY = y;
+      if (item.str.trim()) {
+        textItems.push({
+          str: item.str.trim(),
+          x, y,
+          w: item.width || 0,
+          bold: !!(item.fontName && /bold|heavy|black|-b$/i.test(item.fontName))
+        });
+      }
     }
+
+    // ── Step 2: find horizontal line segments = underlines ──
+    // PDF.js renders underlines as drawn paths, not font metadata.
+    // We walk the operator list, track moveTo/lineTo, and collect
+    // any horizontal lines (dy < 1.5, dx > 8) → those are underlines.
+    const underlineYs = [];
+    try {
+      const ops = await page.getOperatorList();
+      const { fnArray, argsArray } = ops;
+      let mx = 0, my = 0;
+
+      for (let j = 0; j < fnArray.length; j++) {
+        const fn   = fnArray[j];
+        const args = argsArray[j];
+
+        // moveTo (opcode 13)
+        if (fn === 13) {
+          mx = args[0]; my = args[1];
+
+        // lineTo (opcode 14)
+        } else if (fn === 14) {
+          const ex = args[0], ey = args[1];
+          const dx = ex - mx, dy = ey - my;
+          if (Math.abs(dy) < 1.5 && dx > 8) underlineYs.push(my);
+          mx = ex; my = ey;
+
+        // constructPath (opcode 91) — PDF.js v3 batches path ops here
+        } else if (fn === 91) {
+          const cmds   = args[0]; // array of cmd codes: 0=moveTo,1=lineTo,2=bezier,10=close
+          const coords = args[1]; // flat coord array
+          let ci = 0;
+          for (const cmd of cmds) {
+            if (cmd === 0) {                      // moveTo
+              mx = coords[ci++]; my = coords[ci++];
+            } else if (cmd === 1) {               // lineTo
+              const ex = coords[ci++], ey = coords[ci++];
+              const dx = ex - mx, dy = ey - my;
+              if (Math.abs(dy) < 1.5 && dx > 8) underlineYs.push(my);
+              mx = ex; my = ey;
+            } else if (cmd === 2) {               // bezierCurveTo (6 coords)
+              mx = coords[ci+4]; my = coords[ci+5]; ci += 6;
+            }
+            // cmd 10 = closePath: no coords
+          }
+        }
+      }
+    } catch(e) { /* operator list unavailable on some pages — graceful skip */ }
+
+    // ── Step 3: correlate underline y-positions with text items ──
+    // Underlines are drawn 2–8 units BELOW the text baseline (y decreases downward in PDF space)
+    for (const item of textItems) {
+      const isUnderlined = underlineYs.some(uy => {
+        const delta = item.y - uy; // positive = underline below text baseline
+        return delta > 0 && delta < 10;
+      });
+      if (item.bold || isUnderlined) {
+        styledItems.push(item.str);
+      }
+    }
+
     text += '\n--- PAGE BREAK ---\n';
   }
-  return text.trim();
+
+  return { text: text.trim(), boldItems: styledItems };
 }
 
 // ── Claude AI extraction (requires API key in settings) ──
@@ -2104,117 +2178,147 @@ ${fullText.substring(0, 8000)}`;
 }
 
 // ── Enhanced regex extraction (fallback) ──
-function extractWithRegex(fullText, filename) {
-  const text  = fullText;
-  const upper = text.toUpperCase();
+function extractWithRegex(textData, filename) {
+  const text      = typeof textData === 'string' ? textData : textData.text;
+  const boldItems = typeof textData === 'string' ? [] : (textData.boldItems || []);
   const result = { patient_name:'', file_number:'', dose:'', address:'', phone_1:'', phone_2:'', date_of_injection:'', missing_fields:[] };
 
-  // ── Patient Name ──
-  const namePatterns = [
-    /PATIENT\s*NAME[\/\s]*NOM[^:\n]*[:\s]+([A-ZÀ-Ö][A-ZÀ-Öa-zà-ö\s\-']+[A-Za-z])/i,
-    /NOM\s*DU\s*PATIENT[^:\n]*[:\s]+([A-ZÀ-Ö][A-ZÀ-Öa-zà-ö\s\-']+[A-Za-z])/i,
-    /PATIENT\s*NAME[:\s]+([A-Z][A-Z\s\-']+)/i,
-    /NAME[:\s]+([A-Z][A-Z\s\-']{4,40})/,
-  ];
-  for (const pat of namePatterns) {
-    const m = text.match(pat);
-    if (m) { result.patient_name = m[1].trim().replace(/\s+/g,' '); break; }
-  }
+  // ══ 1. PATIENT NAME ══
+  // Matches: "PATIENT NAME/NOM DU PATIENT   Yvon FORGET ***"
+  const nameM =
+    text.match(/PATIENT\s+NAME[^\n]*NOM\s+DU\s+PATIENT\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s\-\']{2,60}?)(?:\s*\*+)?\s*(?:\r?\n|$)/im) ||
+    text.match(/NOM\s+DU\s+PATIENT\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s\-\']{2,60}?)(?:\s*\*+)?(?:\r?\n|$)/im) ||
+    text.match(/PATIENT\s*NAME[^\n]*\n\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s\-\']{2,60}?)(?:\s*\*+)?(?:\r?\n|$)/im);
+  if (nameM) result.patient_name = nameM[1].replace(/\*+/g,'').trim().replace(/\s+/g,' ');
   if (!result.patient_name) result.missing_fields.push('patient_name');
 
-  // ── File Number ──
-  const filePatterns = [
-    /MEDICUM\s*#?\s*[:\s]+([A-Z0-9\-]+)/i,
-    /FILE\s*(?:NUMBER|NO|NUM|#)[:\s]+([A-Z0-9\-]+)/i,
-    /PATIENT\s*(?:ID|FILE|NUMBER)[:\s]+([A-Z0-9\-]+)/i,
-    /(?:DOSSIER|CHART)\s*(?:NO|NUMBER|#)[:\s]+([A-Z0-9\-]+)/i,
-    /(?:^|\s)([A-Z]{0,3}\d{5,8})(?:\s|$)/m,
-  ];
-  for (const pat of filePatterns) {
-    const m = text.match(pat);
-    if (m) { result.file_number = m[1].trim(); break; }
-  }
-  // Fallback: filename might contain the file number
-  if (!result.file_number) {
-    const fnMatch = filename.replace(/\.pdf$/i,'').match(/(\d{4,8})/);
-    if (fnMatch) result.file_number = fnMatch[1];
+  // ══ 2. FILE NUMBER ══
+  // Matches: "MEDICUM #: 20107"
+  const fileM =
+    text.match(/MEDICUM\s*#\s*[:\s]+([A-Z0-9\-]+)/i) ||
+    text.match(/FILE\s*(?:NUMBER|NO|NUM|#)\s*[:\s]+([A-Z0-9\-]+)/i) ||
+    text.match(/PATIENT\s*(?:ID|FILE|NUMBER)\s*[:\s]+([A-Z0-9\-]+)/i) ||
+    text.match(/(?:DOSSIER|CHART)\s*(?:NO|#)\s*[:\s]+([A-Z0-9\-]+)/i);
+  if (fileM) { result.file_number = fileM[1].trim(); }
+  else {
+    const fnNum = filename.replace(/\.pdf$/i,'').match(/(\d{4,8})/);
+    if (fnNum) result.file_number = fnNum[1];
   }
   if (!result.file_number) result.missing_fields.push('file_number');
 
-  // ── Dose ──
-  const validDoses = [45, 30, 22.5, 7.5]; // descending to avoid 7.5 matching 22.5
-  for (const d of validDoses) {
-    const escaped = d.toString().replace('.', '\\.');
-    const re = new RegExp(`(?:☑|✓|✔|\\[x\\]|\\(x\\)|selected)?\\s*${escaped}\\s*mg`, 'i');
-    if (re.test(text)) { result.dose = d.toString(); break; }
+  // ══ 3. DOSE ══
+  // Strategy A: bold PDF items (most reliable — selected dose is bold/underlined in form)
+  const doseMap = [
+    { val:'45',   re:[/45\s*mg/i,   /6[\s\-]m/i] },
+    { val:'30',   re:[/30\s*mg/i,   /4[\s\-]m/i] },
+    { val:'22.5', re:[/22\.5\s*mg/i,/3[\s\-]m/i] },
+    { val:'7.5',  re:[/7\.5\s*mg/i, /1[\s\-]m/i] },
+  ];
+  const boldLine = boldItems.join(' ');
+  for (const { val, re } of doseMap) {
+    if (re.some(r => r.test(boldLine))) { result.dose = val; break; }
   }
-  // Also check for "month" labels
+  // Strategy B: dose that appears more than once (selected option often repeated on form)
   if (!result.dose) {
-    if (/6\s*month/i.test(text)) result.dose = '45';
-    else if (/4\s*month/i.test(text)) result.dose = '30';
-    else if (/3\s*month/i.test(text)) result.dose = '22.5';
-    else if (/1\s*month/i.test(text)) result.dose = '7.5';
+    for (const { val, re } of doseMap) {
+      const count = re.reduce((n,r) => n + (text.match(new RegExp(r.source,'gi'))?.length||0), 0);
+      if (count > 1) { result.dose = val; break; }
+    }
+  }
+  // Strategy C: any match in text (last resort, least specific)
+  if (!result.dose) {
+    for (const { val, re } of doseMap) {
+      if (re.some(r => r.test(text))) { result.dose = val; break; }
+    }
   }
   if (!result.dose) result.missing_fields.push('dose');
 
-  // ── Address ──
-  const streetRe  = /(?:ADDRESS|ADRESSE|STREET)[\/\s]*(?:ADDRESS|ADRESSE)?[:\s]+([^\n,]{5,60})/i;
-  const cityRe    = /(?:CITY|VILLE)[:\s]+([A-ZÀ-Öa-zà-ö\s\-'\.]{2,40})/i;
-  const provRe    = /(?:PROVINCE|PROV|STATE)[:\s]+([A-Z]{2,3})/i;
-  const postalCAre = /\b([A-Z]\d[A-Z]\s?\d[A-Z]\d)\b/;
-  const postalUSre = /\b(\d{5}(?:-\d{4})?)\b/;
-  const streetM = text.match(streetRe);
-  const cityM   = text.match(cityRe);
-  const provM   = text.match(provRe);
-  const postM   = text.match(postalCAre) || text.match(postalUSre);
-  const parts   = [streetM?.[1]?.trim(), cityM?.[1]?.trim(), provM?.[1]?.trim(), postM?.[1]?.trim()].filter(Boolean);
-  if (parts.length >= 2) result.address = parts.join(', ');
+  // ══ 4. ADDRESS ══
+  // Form has separate ADDRESS/ADRESSE and CITY/VILLE rows
+  const streetM = text.match(/ADDRESS\s*[\/|]\s*ADRESSE\s+([^\n\r]+)/i) ||
+                  text.match(/ADDRESS[:\s]+([^\n\r]{5,80})/i);
+  const cityM   = text.match(/CITY\s*[\/|]\s*VILLE\s+([^\n\r]+)/i) ||
+                  text.match(/CITY[:\s]+([^\n\r]{2,60})/i);
+  const addrParts = [streetM?.[1]?.trim(), cityM?.[1]?.trim()].filter(Boolean);
+  if (addrParts.length) result.address = addrParts.join(', ').replace(/\s+/g,' ').trim();
   if (!result.address) result.missing_fields.push('address');
 
-  // ── Phone Numbers ──
-  // Strip fax numbers first
-  const noFax = text.replace(/(?:FAX|TELECOPIEUR|TÉLÉCOPIEUR)[^\d]*[\d\s\-\(\)\.]{7,20}/gi, '');
-  // Strip doctor/pharmacy numbers
-  const noDoc = noFax.replace(/(?:DR\.?|PHARMACY|CLINIC|DOCTOR|MÉDECIN)[^\d]*[\d\s\-\(\)\.]{7,20}/gi, '');
+  // ══ 5 & 6. PHONES ══
+  // Remove entire doctor / pharmacy / fax lines before scanning
+  const cleanText = text
+    .replace(/(?:FAX|TELECOPIEUR|TÉLÉCOPIEUR)[^\d\n]*[\d][\d\s\-\.\(\)]{6,}/gi, ' ')
+    .replace(/(?:PHARMACIE?|PHARMACY)[^\n]+\n?/gi, ' ')
+    .replace(/(?:DOCTOR|MÉDECIN|MEDECIN)[^\n]+\n?/gi, ' ')
+    .replace(/(?:DR\.?)[^\n]*\b\d{3}[\s\-\.]\d{3}[\s\-\.]\d{4}/gi, ' ');
 
-  const phoneRe = /(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g;
-  const labeledPhone1 = noDoc.match(/(?:TELEPHONE|PHONE|TEL|HOME|DOMICILE)[^\d]*(\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4})/i);
-  const labeledPhone2 = noDoc.match(/(?:CELL|MOBILE|ALTERNATE|SECONDARY|ALT|AUTRE)[^\d]*(\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4})/i);
+  // Phone 1: labeled TELEPHONE/TELEPHONE row
+  const ph1M = cleanText.match(/TELEPHONE\s*[\/|]\s*TELEPHONE\s+([\d][\d\s\-\.\(\)]+)/i) ||
+               cleanText.match(/TELEPHONE[:\s]+([\d][\d\s\-\.]{6,})/i);
+  if (ph1M) {
+    const m = ph1M[1].match(/(\d{3}[\s\-\.]?\d{3}[\s\-\.]?\d{4})/);
+    if (m) result.phone_1 = m[1].trim();
+  }
 
-  if (labeledPhone1) result.phone_1 = labeledPhone1[1].trim();
-  if (labeledPhone2) result.phone_2 = labeledPhone2[1].trim();
-
-  // If labeled extraction failed, grab all phone numbers
+  // Phone 2: SECONDARY CONTACT row — extract the last phone on that line (usually patient cell)
+  // e.g.  "(Wife) Claire Forget // patient's cell: 514 916-7340"
+  const secBlock = text.match(/SECONDARY\s*CONTACT[^#\n]*(?:#[^\n]*)?\n([^\n\r]+)/i) ||
+                   text.match(/CONTACT\s*SECONDAIRE[^\n]*\n([^\n\r]+)/i);
+  if (secBlock) {
+    const phones = [...secBlock[1].matchAll(/(\d{3}[\s\-\.]?\d{3}[\s\-\.]?\d{4})/g)];
+    if (phones.length) result.phone_2 = phones[phones.length-1][1].trim();
+  }
+  // Also try inline on same line as label (some forms put it there)
+  if (!result.phone_2) {
+    const secInline = text.match(/SECONDAIRE[^\n]*(\d{3}[\s\-\.]?\d{3}[\s\-\.]?\d{4})/i);
+    if (secInline) result.phone_2 = secInline[1].trim();
+  }
+  // Fallback: unique phones from cleaned text
   if (!result.phone_1) {
-    const allPhones = [...noDoc.matchAll(phoneRe)].map(m => m[0].trim());
-    if (allPhones[0]) result.phone_1 = allPhones[0];
-    if (allPhones[1] && allPhones[1] !== allPhones[0]) result.phone_2 = allPhones[1];
+    const all = [...cleanText.matchAll(/(\d{3}[\s\-\.]?\d{3}[\s\-\.]?\d{4})/g)]
+                  .map(m => m[1].trim()).filter((v,i,a) => a.indexOf(v)===i);
+    if (all[0]) result.phone_1 = all[0];
+    if (all[1]) result.phone_2 = all[1];
   }
   if (!result.phone_1) result.missing_fields.push('phone_1');
 
-  // ── Date of Injection ──
-  const frMonths = {janvier:'01',fevrier:'02',février:'02',mars:'03',avril:'04',mai:'05',juin:'06',juillet:'07',aout:'08',août:'08',septembre:'09',octobre:'10',novembre:'11',decembre:'12',décembre:'12'};
-  const engMonths = {january:'01',february:'02',march:'03',april:'04',may:'05',june:'06',july:'07',august:'08',september:'09',october:'10',november:'11',december:'12',jan:'01',feb:'02',mar:'03',apr:'04',jun:'06',jul:'07',aug:'08',sep:'09',oct:'10',nov:'11',dec:'12'};
-
-  const dateContextRe = /(?:LAST\s*INJECTION|DATE\s*(?:OF|D[''E])\s*INJECTION|INJECTION\s*(?:DUE\s*)?DATE|DATE\s*DE\s*LA\s*(?:DERNIÈRE\s*)?INJECTION)[^\d]*(\d{1,2})[\/\-\s]+([A-Za-zéèû]+|\d{1,2})[\/\-\s]+(\d{2,4})/i;
-  const dateM = text.match(dateContextRe);
-  if (dateM) {
-    const [,d,m,y] = dateM;
-    const year = y.length === 2 ? '20'+y : y;
-    const mon = frMonths[m.toLowerCase()] || engMonths[m.toLowerCase()] || m.padStart(2,'0');
-    const isValid = !isNaN(Date.parse(`${year}-${mon}-${d.padStart(2,'0')}`));
-    if (isValid) result.date_of_injection = `${year}-${mon}-${d.padStart(2,'0')}`;
-  }
-
-  // ISO / numeric date fallback near injection context
-  if (!result.date_of_injection) {
-    const isoRe = /(?:LAST\s*INJECTION|INJECTION\s*DATE)[^\d]*(\d{4}[-\/]\d{2}[-\/]\d{2})/i;
-    const isoM  = text.match(isoRe);
-    if (isoM) result.date_of_injection = isoM[1].replace(/\//g,'-');
+  // ══ 7. DATE OF INJECTION ══
+  // Form: "LAST INJECTION/DERNIERE INJECTION   01/18/2026"  (MM/DD/YYYY North American)
+  const datePatterns = [
+    /(?:LAST\s*INJECTION|DERNIERE\s*INJECTION)[^\d\n]*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i,
+    /(?:INJECTION\s*DUE\s*DAY|JOUR\s*DU)[^\d\n]*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i,
+    /(?:DATE\s*OF\s*INJECTION|DATE\s*D[\u2019e]\s*INJECTION)[^\d\n]*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i,
+    /(?:LAST\s*INJECTION|INJECTION)[^\d\n]*(\d{4}-\d{2}-\d{2})/i,
+  ];
+  for (const pat of datePatterns) {
+    const m = text.match(pat);
+    if (m) { result.date_of_injection = parseFlexDate(m[1]); if (result.date_of_injection) break; }
   }
   if (!result.date_of_injection) result.missing_fields.push('date_of_injection');
 
   return result;
+}
+
+// Parse date: MM/DD/YYYY  DD-MM-YYYY  YYYY-MM-DD  (2-digit year supported)
+function parseFlexDate(raw) {
+  if (!raw) return '';
+  const p = raw.split(/[\/\-]/);
+  if (p.length !== 3) return '';
+  let [a,b,c] = p.map(s=>s.trim());
+  // YYYY-MM-DD
+  if (a.length === 4) {
+    const iso = `${a}-${b.padStart(2,'0')}-${c.padStart(2,'0')}`;
+    return isNaN(Date.parse(iso)) ? '' : iso;
+  }
+  // x/x/YYYY  — North American form uses MM/DD/YYYY
+  if (c.length === 4) {
+    const [mm,dd] = parseInt(a) > 12 ? [b,a] : [a,b];
+    const iso = `${c}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`;
+    return isNaN(Date.parse(iso)) ? '' : iso;
+  }
+  // 2-digit year
+  if (c.length === 2) c = parseInt(c)>50 ? '19'+c : '20'+c;
+  const iso = `${c}-${a.padStart(2,'0')}-${b.padStart(2,'0')}`;
+  return isNaN(Date.parse(iso)) ? '' : iso;
 }
 
 // ── Show PDF Review Modal ──
@@ -2277,7 +2381,7 @@ async function importPDFFile(file) {
   try {
     await ensurePDFJS();
     setLoading(true, 'Reading PDF…');
-    const fullText = await extractPDFText(file);
+    const textData = await extractPDFText(file);
     setLoading(true, 'Extracting patient data…');
 
     let extracted;
@@ -2285,14 +2389,14 @@ async function importPDFFile(file) {
     if (apiKey) {
       try {
         toast('Using Claude AI for extraction…', '', '🤖');
-        extracted = await extractWithClaude(fullText, apiKey);
+        extracted = await extractWithClaude(textData.text, apiKey);
       } catch(aiErr) {
         console.warn('Claude API failed, falling back to regex:', aiErr);
         toast('AI extraction failed — using smart fallback', 'warning');
-        extracted = extractWithRegex(fullText, file.name);
+        extracted = extractWithRegex(textData, file.name);
       }
     } else {
-      extracted = extractWithRegex(fullText, file.name);
+      extracted = extractWithRegex(textData, file.name);
     }
 
     setLoading(false);
@@ -2312,7 +2416,7 @@ async function importPDFBatch(files) {
       await ensurePDFJS();
       const fullText = await extractPDFText(files[i]);
       const apiKey   = localStorage.getItem('claude_api_key');
-      const extracted = apiKey ? await extractWithClaude(fullText, apiKey) : extractWithRegex(fullText, files[i].name);
+      const extracted = apiKey ? await extractWithClaude(textData.text, apiKey) : extractWithRegex(textData, files[i].name);
       results.push({ file: files[i].name, data: extracted, ok: true });
     } catch(e) {
       results.push({ file: files[i].name, error: e.message, ok: false });
