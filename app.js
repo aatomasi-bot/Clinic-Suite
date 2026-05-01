@@ -1,0 +1,1605 @@
+// ========== CONFIG ==========
+const SUPABASE_URL = "https://wqlbmtjbjloxpvsbeqyb.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_gcyK2z_8lvbOgHNcJfdX1g_8QCWJ_Xi";
+const GOOGLE_SHEETS_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSYgD018ww2Mbkud6ZYmZHop7EXxcm_0Zl4V9bB2AaY4r4xXTWChAW6v-gUyjD4-2Qmg4H8O0kxryCf/pub?output=csv";
+
+const DOSE_TO_WEEKS = { '7.5': 4, '22.5': 12, '30': 16, '45': 24 };
+const AVATAR_COLORS = ['teal','orange','navy','purple','green'];
+
+// DB column mapping
+const COL = {
+  'Patient Name': 'patient_name',
+  'File Number': 'file_number',
+  'Address': 'address',
+  'Phone 1': 'phone1',
+  'Phone 2': 'phone2',
+  'Dose Prescribed': 'dose_prescribed',
+  'Total Doses': 'total_doses',
+  'Doses Remaining': 'doses_remaining',
+  'Previous Injection Site': 'previous_injection_site',
+  'Injection Site': 'injection_site',
+  'Due Date': 'due_date',
+  'Appointment Date & Time': 'appointment_date_time',
+  'Previous Injection Dates': 'previous_injection_dates',
+  'Assignment Type': 'assignment_type',
+  'Special Instructions': 'special_instructions',
+  'Adverse Effects Comments': 'adverse_effects_comments',
+  'File Status': 'file_status',
+  'Injection Administered': 'injection_administered',
+  'Appointment Confirmed': 'appointment_confirmed',
+  'Pending': 'pending',
+  'Archived': 'archived'
+};
+
+// State
+let _sb = null;
+let patients = [];
+let currentTab = 'today';
+let currentView = 'patients';
+let searchQuery = '';
+let editingId = null;
+let pendingInjectId = null;
+let pendingApptId = null;
+let confirmCallback = null;
+let apptConfirmedStatus = true;
+
+// ========== DATE UTILS ==========
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+function pad(n) { return String(n).padStart(2,'0'); }
+
+function addWeeks(dateStr, weeks) {
+  if (!dateStr) return todayStr();
+  const [y,m,d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, m-1, d);
+  dt.setDate(dt.getDate() + weeks*7);
+  return `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}`;
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return 'Not set';
+  const today = todayStr();
+  const [y,m,d] = dateStr.split('-').map(Number);
+  const diff = Math.round((new Date(y,m-1,d) - new Date()) / 86400000);
+  if (dateStr === today) return 'Due today';
+  if (diff === 1) return 'Due tomorrow';
+  if (diff > 0 && diff < 7) return `Due in ${diff} days`;
+  if (diff < 0) return `Overdue by ${Math.abs(diff)} day${Math.abs(diff)>1?'s':''}`;
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${months[m-1]} ${d}, ${y}`;
+}
+
+function formatDateFull(dateStr) {
+  if (!dateStr) return 'Not set';
+  const [y,m,d] = dateStr.split('-').map(Number);
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${months[m-1]} ${d}, ${y}`;
+}
+
+function formatDateTime(dtStr) {
+  if (!dtStr) return 'Not set';
+  try {
+    const dt = new Date(dtStr);
+    return dt.toLocaleString('en-US', { month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit', hour12:true });
+  } catch { return dtStr; }
+}
+
+function formatTimeOnly(dtStr) {
+  if (!dtStr) return '';
+  try {
+    const dt = new Date(dtStr);
+    return dt.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit', hour12:true });
+  } catch { return ''; }
+}
+
+// ========== TOAST ==========
+function toast(msg, type='', icon='') {
+  const wrap = document.getElementById('toastContainer');
+  const el = document.createElement('div');
+  el.className = `toast${type ? ' toast--'+type : ''}`;
+  el.innerHTML = `${icon || (type==='success'?'✓':type==='error'?'✗':type==='warning'?'⚠':'ℹ')} ${msg}`;
+  wrap.appendChild(el);
+  setTimeout(() => el.remove(), 3100);
+}
+
+// ========== LOADING ==========
+function setLoading(show, msg='Loading…') {
+  const el = document.getElementById('loadingOverlay');
+  const msgEl = document.getElementById('loadingMsg');
+  msgEl.textContent = msg;
+  if (show) el.classList.add('active'); else el.classList.remove('active');
+}
+
+// ========== SUPABASE ==========
+async function initSupabase() {
+  try {
+    _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    await _sb.from('patients').select('count', { count:'exact', head:true });
+    document.getElementById('syncDot').className = 'sync-dot connected';
+    return true;
+  } catch(e) {
+    console.error('Supabase init:', e);
+    document.getElementById('syncDot').className = 'sync-dot error';
+    toast('Could not connect to database', 'error');
+    return false;
+  }
+}
+
+async function loadPatients() {
+  if (!_sb) return;
+  setLoading(true, 'Loading patients…');
+  try {
+    const { data, error } = await _sb.from('patients').select('*').order('created_at', { ascending: false });
+    if (error) throw error;
+    patients = data.map(row => {
+      const p = { id: row.id };
+      for (const [k, v] of Object.entries(COL)) p[k] = row[v] ?? null;
+      return p;
+    });
+    updateTabCounts();
+    renderView();
+  } catch(e) {
+    toast('Failed to load: ' + e.message, 'error');
+  } finally {
+    setLoading(false);
+  }
+}
+
+async function dbInsert(p) {
+  const row = {};
+  for (const [k,v] of Object.entries(COL)) row[v] = p[k] ?? null;
+  const { error } = await _sb.from('patients').insert([row]);
+  if (error) throw error;
+}
+
+async function dbUpdate(id, p) {
+  const row = {};
+  for (const [k,v] of Object.entries(COL)) row[v] = p[k] ?? null;
+  const { error } = await _sb.from('patients').update(row).eq('id', id);
+  if (error) throw error;
+}
+
+async function dbDelete(id) {
+  const { error } = await _sb.from('patients').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// ========== AVATAR ==========
+function initials(name) {
+  if (!name) return '??';
+  const parts = name.trim().split(' ');
+  if (parts.length >= 2) return (parts[0][0] + parts[parts.length-1][0]).toUpperCase();
+  return name.substring(0,2).toUpperCase();
+}
+
+function avatarColor(name) {
+  if (!name) return 'teal';
+  let hash = 0;
+  for (let c of name) hash = ((hash << 5) - hash) + c.charCodeAt(0);
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
+// ========== FILTERING ==========
+function getDueCounts() {
+  const today = todayStr();
+  const counts = { today:0, scheduled:0, all:0, overdue:0, pending:0, archived:0 };
+  patients.forEach(p => {
+    if (p['Archived']) { counts.archived++; return; }
+    if (p['Pending']) { counts.pending++; return; }
+    const apptDate = p['Appointment Date & Time'] ? p['Appointment Date & Time'].split('T')[0] : null;
+    const confirmed = p['Appointment Confirmed'];
+    const isToday = apptDate === today;
+    const isFuture = apptDate && apptDate > today;
+    const overdue = apptDate && apptDate < today && confirmed && !p['Injection Administered'];
+    if (isToday && confirmed) counts.today++;
+    else if (isFuture && confirmed) counts.scheduled++;
+    else if (overdue) counts.overdue++;
+    else counts.all++;
+  });
+  return counts;
+}
+
+function updateTabCounts() {
+  const c = getDueCounts();
+  for (const [k,v] of Object.entries(c)) {
+    const el = document.getElementById('cnt-'+k);
+    if (el) el.textContent = v;
+  }
+  // Badge on dashboard nav
+  const badge = document.getElementById('badge-overdue');
+  if (badge) {
+    if (c.overdue > 0) { badge.textContent = c.overdue; badge.classList.remove('hidden'); }
+    else badge.classList.add('hidden');
+  }
+}
+
+function getFilteredPatients() {
+  const today = todayStr();
+  return patients.filter(p => {
+    if (p['Archived'] && currentTab !== 'archived') return false;
+    if (!p['Archived'] && currentTab === 'archived') return false;
+    if (p['Pending'] && currentTab !== 'pending') return false;
+    if (!p['Pending'] && currentTab === 'pending') return false;
+    if (currentTab === 'pending' || currentTab === 'archived') return true;
+
+    const apptDate = p['Appointment Date & Time'] ? p['Appointment Date & Time'].split('T')[0] : null;
+    const confirmed = !!p['Appointment Confirmed'];
+    const isToday = apptDate === today;
+    const isFuture = apptDate && apptDate > today;
+    const overdue = apptDate && apptDate < today && confirmed && !p['Injection Administered'];
+
+    if (currentTab === 'today') return isToday && confirmed;
+    if (currentTab === 'scheduled') return isFuture && confirmed;
+    if (currentTab === 'overdue') return !!overdue;
+    if (currentTab === 'all') return !isToday && !isFuture && !overdue && !confirmed;
+    return true;
+  }).filter(p => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (p['Patient Name']||'').toLowerCase().includes(q) ||
+           (p['File Number']||'').toLowerCase().includes(q) ||
+           (p['Address']||'').toLowerCase().includes(q);
+  }).sort((a,b) => (a['Due Date']||'').localeCompare(b['Due Date']||''));
+}
+
+// ========== RENDER ==========
+function renderView() {
+  if (currentView === 'dash') { renderDashboard(); return; }
+  if (currentView === 'report') { return; }
+  renderPatientList();
+}
+
+function renderPatientList() {
+  const el = document.getElementById('mainContent');
+  const filtered = getFilteredPatients();
+  if (!filtered.length) {
+    const msgs = {
+      today: { icon:'📅', title:'No appointments today', sub:'All clear for today.' },
+      scheduled: { icon:'🗓', title:'No scheduled appointments', sub:'No upcoming confirmed appointments.' },
+      all: { icon:'👥', title:'No active patients', sub:'Add a patient to get started.' },
+      overdue: { icon:'✅', title:'No overdue appointments', sub:'All appointments are up to date.' },
+      pending: { icon:'⏳', title:'No pending patients', sub:'Patients pending renewal will appear here.' },
+      archived: { icon:'🗄', title:'No archived patients', sub:'Archived patients will appear here.' },
+    };
+    const m = msgs[currentTab] || { icon:'👥', title:'No patients', sub:'' };
+    el.innerHTML = `<div class="empty-state"><div class="empty-state__icon">${m.icon}</div><div class="empty-state__title">${m.title}</div><p class="empty-state__sub">${m.sub}</p></div>`;
+    return;
+  }
+
+  const today = todayStr();
+  // Group by date
+  const groups = {};
+  filtered.forEach(p => {
+    const key = p['Due Date'] || 'Unknown';
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(p);
+  });
+
+  let html = '';
+  for (const date of Object.keys(groups).sort()) {
+    const isToday = date === today;
+    const isPast = date < today && date !== 'Unknown';
+    const sepClass = isToday ? 'date-sep--today' : (isPast ? 'date-sep--overdue' : '');
+    html += `<div class="date-sep ${sepClass}">
+      <span class="date-sep__label">${isToday ? 'TODAY' : formatDateFull(date).toUpperCase()}</span>
+      <span class="date-sep__badge">${groups[date].length}</span>
+    </div>`;
+    groups[date].forEach((p, i) => {
+      html += renderCard(p, i);
+    });
+  }
+  el.innerHTML = html;
+  attachCardEvents();
+}
+
+function renderCard(p, idx) {
+  const today = todayStr();
+  const total = parseInt(p['Total Doses']) || 4;
+  const left  = parseInt(p['Doses Remaining']) || 0;
+  const given = total - left;
+  const pct   = Math.round((given / total) * 100);
+  const dose  = p['Dose Prescribed'] || '';
+  const weeks = DOSE_TO_WEEKS[dose] || '?';
+  const apptDate = p['Appointment Date & Time'] ? p['Appointment Date & Time'].split('T')[0] : null;
+  const apptTime = p['Appointment Date & Time'] ? formatTimeOnly(p['Appointment Date & Time']) : '';
+  const confirmed = !!p['Appointment Confirmed'];
+  const overdue = apptDate && apptDate < today && confirmed && !p['Injection Administered'];
+  const dueStr = p['Due Date'];
+  const dueDisplay = formatDate(dueStr || '');
+  const dueClass = dueStr === today ? '' : (dueStr < today ? 'card-due--overdue' : 'card-due--future');
+  const name = p['Patient Name'] || 'Unknown';
+  const color = avatarColor(name);
+  const special = (p['Special Instructions'] || '').trim();
+  const cardClass = apptDate === today && confirmed ? 'patient-card--today' : (overdue ? 'patient-card--overdue' : (p['Pending'] ? 'patient-card--pending' : ''));
+  const animDelay = Math.min(idx * 0.04, 0.3);
+
+  // Phone buttons
+  const ph1 = p['Phone 1'] || '';
+  const ph2 = p['Phone 2'] || '';
+  const addr = p['Address'] || '';
+  const phoneBtn1 = ph1 ? `<button class="action-circle action-circle--phone js-call" data-phone="${esc(ph1)}" title="Call ${ph1}">📞</button>` : '';
+  const phoneBtn2 = ph2 ? `<button class="action-circle action-circle--phone js-call" data-phone="${esc(ph2)}" title="Call ${ph2}" style="font-size:13px">📞₂</button>` : '';
+  const mapSVG = `<svg viewBox="0 0 24 24" width="13" height="13" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0;margin-top:1px"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="#EA4335"/><circle cx="12" cy="9" r="2.8" fill="white"/></svg>`;
+  const mapBtn  = addr ? `<button class="action-circle action-circle--map js-map" data-addr="${esc(formatAddrForMaps(addr))}" title="Directions">
+    <svg viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="#EA4335"/>
+      <circle cx="12" cy="9" r="2.8" fill="white"/>
+    </svg>
+  </button>` : '';
+
+  return `
+<div class="patient-card ${cardClass}" data-id="${p.id}" style="animation-delay:${animDelay}s">
+  <div class="card-head">
+    <div class="card-avatar card-avatar--${color}">${initials(name)}</div>
+    <div class="card-info">
+      <div class="card-name-row">
+        <span class="card-name">${esc(name)}</span>
+        <span class="card-file">#${esc(p['File Number']||'')}</span>
+        ${dose ? `<span class="card-dose-badge">${dose} mg · ${weeks}w</span>` : ''}
+      </div>
+      <div class="card-meta">
+        <div class="card-due ${dueClass}">
+          <span>📅</span> ${dueDisplay}
+        </div>
+        ${addr ? `<div class="card-addr">${mapSVG}<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(formatAddrDisplay(addr))}</span></div>` : ''}
+        ${special ? `<div class="card-special"><span>⚠️</span> Special note</div>` : ''}
+      </div>
+    </div>
+  </div>
+  <div class="card-progress">
+    <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+    <div class="progress-label">${given}/${total} doses</div>
+  </div>
+  <div class="card-actions">
+    ${phoneBtn1}${phoneBtn2}${mapBtn}
+    <div class="action-spacer"></div>
+    <button class="record-btn js-inject" data-id="${p.id}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 2l4 4-10 10-6 2 2-6L18 2z"/><line x1="14" y1="6" x2="18" y2="10"/></svg>
+      Record
+    </button>
+    <button class="expand-btn js-expand">&#9660;</button>
+  </div>
+
+  <div class="card-expanded">
+    <div class="detail-grid">
+      ${(ph1||ph2) ? `<div class="detail-item detail-item--full">
+        <label>Phones</label>
+        <div class="phones-row">
+          ${ph1 ? `<a href="tel:${esc(ph1)}" class="phone-link">📞 ${esc(ph1)}</a>` : ''}
+          ${ph2 ? `<a href="tel:${esc(ph2)}" class="phone-link">📞 ${esc(ph2)}</a>` : ''}
+        </div>
+      </div>` : ''}
+      ${addr ? `<div class="detail-item detail-item--full"><label>Address</label><p>${esc(addr)}</p></div>` : ''}
+      <div class="detail-item"><label>Type</label><p>${esc(p['Assignment Type']||'Permanent')}</p></div>
+      <div class="detail-item"><label>Last Site</label><p>${esc(p['Injection Site'] || p['Previous Injection Site'] || 'Not recorded')}</p></div>
+      <div class="detail-item">
+        <label>Appt Time</label>
+        <p>${apptTime || 'Not set'}${confirmed && apptTime ? `<span class="confirmed-badge">✓ Confirmed</span>` : ''}</p>
+      </div>
+      <div class="detail-item"><label>Dose Interval</label><p>${dose ? `${dose}mg — every ${weeks} weeks` : 'Not set'}</p></div>
+      ${p['Previous Injection Dates'] ? `<div class="detail-item detail-item--full"><label>Injection History</label><p>${esc(p['Previous Injection Dates'])}</p></div>` : ''}
+      ${special ? `<div class="detail-item detail-item--full"><label>Instructions</label><p class="orange">${esc(special.substring(0,160))}${special.length>160?'…':''}</p></div>` : ''}
+      ${p['Adverse Effects Comments'] ? `<div class="detail-item detail-item--full"><label>Adverse Effects</label><p>${esc(p['Adverse Effects Comments'].substring(0,120))}</p></div>` : ''}
+    </div>
+    <div class="card-btn-row">
+      <button class="card-btn card-btn--edit js-edit" data-id="${p.id}">✏️ Details & Edit</button>
+      ${p['Pending'] || p['Archived'] ?
+        `<button class="card-btn card-btn--move js-move" data-id="${p.id}">⟳ Restore</button>` :
+        `<button class="card-btn card-btn--pending js-pending" data-id="${p.id}">⏳ Mark Pending</button>`}
+      ${p['Archived'] ? '' : `<button class="card-btn card-btn--archive js-archive" data-id="${p.id}" style="flex:0.7">🗄 Archive</button>`}
+    </div>
+    <div style="margin-top:8px;text-align:right">
+      <button class="card-btn card-btn--edit" style="flex:0;padding:6px 12px;font-size:11px" onclick="openApptModal(${p.id})">
+        📅 ${confirmed ? 'Edit Appointment' : 'Set Appointment'}
+      </button>
+    </div>
+  </div>
+</div>`;
+}
+
+function esc(s) {
+  if (!s) return '';
+  return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+// Move apt/unit to END: "40 Boul. Deguire, Apt: #3, Montréal, QC" → "40 Boul. Deguire, Montréal, QC, Apt. 3"
+function formatAddrDisplay(addr) {
+  if (!addr) return '';
+  // Match apt/suite/unit anywhere in the string
+  const aptRe = /,?\s*(?:Apt\.?|Appartement|Suite|Unit|App\.?)\s*:?\s*#?(\w+[-\w]*)/i;
+  const m = addr.match(aptRe);
+  if (!m) return addr;
+  const aptLabel = `Apt. ${m[1]}`;
+  const base = addr.replace(m[0], '').replace(/,\s*$/, '').trim();
+  return `${base}, ${aptLabel}`;
+}
+
+// For Google Maps query keep original (works better for geocoding)
+function formatAddrForMaps(addr) { return addr; }
+
+function attachCardEvents() {
+  // Expand/collapse
+  document.querySelectorAll('.js-expand').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const card = btn.closest('.patient-card');
+      card.classList.toggle('expanded');
+    });
+  });
+  // Click card header to expand
+  document.querySelectorAll('.card-head').forEach(head => {
+    head.addEventListener('click', e => {
+      if (e.target.tagName === 'BUTTON' || e.target.tagName === 'A') return;
+      const card = head.closest('.patient-card');
+      card.classList.toggle('expanded');
+    });
+  });
+  // Phone
+  document.querySelectorAll('.js-call').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      window.location.href = 'tel:' + btn.dataset.phone;
+    });
+  });
+  // Map
+  document.querySelectorAll('.js-map').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      window.open('https://maps.google.com/?q=' + encodeURIComponent(btn.dataset.addr));
+    });
+  });
+  // Inject
+  document.querySelectorAll('.js-inject').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      openInjectionModal(parseInt(btn.dataset.id));
+    });
+  });
+  // Edit
+  document.querySelectorAll('.js-edit').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      openEditModal(parseInt(btn.dataset.id));
+    });
+  });
+  // Pending
+  document.querySelectorAll('.js-pending').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      showConfirm('Mark as Pending?', 'Patient will be moved to the Pending tab.', () => markPending(parseInt(btn.dataset.id)));
+    });
+  });
+  // Archive
+  document.querySelectorAll('.js-archive').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      showConfirm('Archive Patient?', 'Patient will be archived. You can restore them anytime.', () => archivePatient(parseInt(btn.dataset.id)));
+    });
+  });
+  // Move/restore
+  document.querySelectorAll('.js-move').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      restorePatient(parseInt(btn.dataset.id));
+    });
+  });
+}
+
+// ========== DASHBOARD ==========
+function renderDashboard() {
+  const today = todayStr();
+  const active = patients.filter(p => !p['Archived']).length;
+  const dueToday = patients.filter(p => !p['Archived'] && p['Appointment Date & Time'] && p['Appointment Date & Time'].split('T')[0] === today && p['Appointment Confirmed']).length;
+  const overdue = patients.filter(p => {
+    if (p['Archived'] || p['Pending']) return false;
+    const d = p['Appointment Date & Time'] ? p['Appointment Date & Time'].split('T')[0] : null;
+    return d && d < today && p['Appointment Confirmed'] && !p['Injection Administered'];
+  }).length;
+  const pending = patients.filter(p => p['Pending'] && !p['Archived']).length;
+
+  document.getElementById('ds-active').textContent = active;
+  document.getElementById('ds-today').textContent = dueToday;
+  document.getElementById('ds-overdue').textContent = overdue;
+  document.getElementById('ds-pending').textContent = pending;
+
+  // Dose chart
+  const doseCounts = {};
+  patients.filter(p=>!p['Archived']).forEach(p => {
+    const d = p['Dose Prescribed'] || 'Unknown';
+    doseCounts[d] = (doseCounts[d]||0) + 1;
+  });
+  const maxCount = Math.max(...Object.values(doseCounts), 1);
+  let chartHtml = '';
+  const doseOrder = ['7.5','22.5','30','45'];
+  doseOrder.forEach(d => {
+    const c = doseCounts[d] || 0;
+    if (c === 0) return;
+    const pct = Math.round((c/maxCount)*100);
+    chartHtml += `<div class="dose-bar-row">
+      <div class="dose-bar-label">${d}mg</div>
+      <div class="dose-bar-track"><div class="dose-bar-fill" style="width:${pct}%"></div></div>
+      <div class="dose-bar-count">${c}</div>
+    </div>`;
+  });
+  document.getElementById('doseChart').innerHTML = chartHtml || '<p style="color:var(--text-2);font-size:13px">No data</p>';
+}
+
+// ========== INJECTION ==========
+function openInjectionModal(id) {
+  pendingInjectId = id;
+  const p = patients.find(p => p.id === id);
+  if (!p) return;
+  const total = parseInt(p['Total Doses']) || 4;
+  const left  = parseInt(p['Doses Remaining']) || 0;
+  document.getElementById('injPatientName').textContent = p['Patient Name'];
+  document.getElementById('injPatientInfo').textContent = `${p['Dose Prescribed']}mg — ${left} of ${total} doses remaining → next due in ${DOSE_TO_WEEKS[p['Dose Prescribed']] || 4} weeks`;
+  document.getElementById('injSiteSelect').value = '';
+  document.getElementById('injComments').value = '';
+  document.getElementById('injAdverse').value = '';
+  document.getElementById('injSpecial').value = '';
+  openModal('injectionModal');
+}
+
+async function performInjection() {
+  const site = document.getElementById('injSiteSelect').value;
+  if (!site) { toast('Please select an injection site', 'warning'); return; }
+
+  const id = pendingInjectId;
+  const p = patients.find(p => p.id === id);
+  if (!p) return;
+
+  const left = parseInt(p['Doses Remaining']) || 0;
+  if (left <= 0) { toast('No doses remaining!', 'error'); closeModal('injectionModal'); return; }
+
+  const today = todayStr();
+  const comments = document.getElementById('injComments').value.trim();
+  const adverse  = document.getElementById('injAdverse').value.trim();
+  const special  = document.getElementById('injSpecial').value.trim();
+
+  // Update injection history
+  let prevDates = p['Previous Injection Dates'] ? p['Previous Injection Dates'].split(',').map(s=>s.trim()).filter(Boolean) : [];
+  prevDates.push(today);
+  p['Previous Injection Dates'] = prevDates.join(', ');
+
+  // Rotate sites
+  if (p['Injection Site']) p['Previous Injection Site'] = p['Injection Site'];
+  p['Injection Site'] = site;
+
+  // Append notes
+  const tag = `[${today}]`;
+  if (adverse) p['Adverse Effects Comments'] = [(p['Adverse Effects Comments']||''), `${tag} ${adverse}`].filter(Boolean).join(' | ');
+  if (special || comments) p['Special Instructions'] = [(p['Special Instructions']||''), `${tag} ${[special, comments].filter(Boolean).join(' — ')}`].filter(Boolean).join(' | ');
+
+  const newLeft = left - 1;
+  p['Doses Remaining'] = newLeft;
+
+  // Calculate next due date
+  const apptDate = p['Appointment Date & Time'] ? p['Appointment Date & Time'].split('T')[0] : null;
+  const refDate = (p['Appointment Confirmed'] && apptDate && apptDate < today) ? apptDate : today;
+  p['Due Date'] = addWeeks(refDate, DOSE_TO_WEEKS[p['Dose Prescribed']] || 4);
+  p['Injection Administered'] = true;
+  p['Appointment Confirmed'] = false;
+  p['Appointment Date & Time'] = null;
+  p['Pending'] = (newLeft === 0);
+
+  setLoading(true, 'Recording injection…');
+  try {
+    await dbUpdate(id, p);
+    closeModal('injectionModal');
+    toast(`Injection recorded! ${newLeft} doses left. Next due: ${formatDateFull(p['Due Date'])}`, 'success', '💉');
+    await loadPatients();
+  } catch(e) {
+    toast('Error: ' + e.message, 'error');
+  } finally {
+    setLoading(false);
+  }
+}
+
+// ========== APPOINTMENT ==========
+function openApptModal(id) {
+  pendingApptId = id;
+  const p = patients.find(p => p.id === id);
+  if (!p) return;
+  document.getElementById('apptPatientName').textContent = `Setting appointment for ${p['Patient Name']}`;
+  document.getElementById('apptDateInput').value = p['Appointment Date & Time'] || '';
+  apptConfirmedStatus = true;
+  document.getElementById('apptStatusConfirmed').classList.add('selected');
+  document.getElementById('apptStatusTentative').classList.remove('selected');
+  openModal('apptModal');
+}
+
+async function saveAppt() {
+  const dt = document.getElementById('apptDateInput').value;
+  if (!dt) { toast('Please select a date and time', 'warning'); return; }
+  const id = pendingApptId;
+  const p = patients.find(p => p.id === id);
+  if (!p) return;
+  p['Appointment Date & Time'] = dt;
+  p['Appointment Confirmed'] = apptConfirmedStatus;
+  setLoading(true, 'Saving appointment…');
+  try {
+    await dbUpdate(id, p);
+    closeModal('apptModal');
+    toast(`Appointment ${apptConfirmedStatus ? 'confirmed' : 'set'} for ${p['Patient Name']}`, 'success', '📅');
+    await loadPatients();
+  } catch(e) {
+    toast('Error: ' + e.message, 'error');
+  } finally {
+    setLoading(false);
+  }
+}
+
+// ========== CRUD ==========
+async function markPending(id) {
+  const p = patients.find(p => p.id === id);
+  if (!p) return;
+  p['Pending'] = true;
+  setLoading(true);
+  try {
+    await dbUpdate(id, p);
+    toast('Patient marked as pending', '', '⏳');
+    await loadPatients();
+  } catch(e) { toast(e.message, 'error'); } finally { setLoading(false); }
+}
+
+async function archivePatient(id) {
+  const p = patients.find(p => p.id === id);
+  if (!p) return;
+  p['Archived'] = true;
+  setLoading(true);
+  try {
+    await dbUpdate(id, p);
+    toast('Patient archived', '', '🗄');
+    await loadPatients();
+  } catch(e) { toast(e.message, 'error'); } finally { setLoading(false); }
+}
+
+async function restorePatient(id) {
+  const p = patients.find(p => p.id === id);
+  if (!p) return;
+  p['Pending'] = false;
+  p['Archived'] = false;
+  setLoading(true);
+  try {
+    await dbUpdate(id, p);
+    toast('Patient restored to Active', 'success', '✓');
+    await loadPatients();
+  } catch(e) { toast(e.message, 'error'); } finally { setLoading(false); }
+}
+
+async function deletePatient(id) {
+  setLoading(true, 'Deleting…');
+  try {
+    await dbDelete(id);
+    toast('Patient deleted', '', '🗑');
+    closeModal('patientModal');
+    await loadPatients();
+  } catch(e) { toast(e.message, 'error'); } finally { setLoading(false); }
+}
+
+// ========== PATIENT FORM ==========
+function openAddModal() {
+  editingId = null;
+  document.getElementById('patientModalTitle').textContent = 'Add Patient';
+  document.getElementById('patientForm').reset();
+  document.getElementById('deletePatientBtn').classList.add('hidden');
+  document.getElementById('f-due').value = todayStr();
+  document.getElementById('f-total').value = 4;
+  document.getElementById('f-remaining').value = 4;
+  openModal('patientModal');
+}
+
+function openEditModal(id) {
+  const p = patients.find(p => p.id === id);
+  if (!p) return;
+  editingId = id;
+  document.getElementById('patientModalTitle').textContent = 'Edit Patient';
+  document.getElementById('f-name').value = p['Patient Name'] || '';
+  document.getElementById('f-file').value = p['File Number'] || '';
+  document.getElementById('f-type').value = p['Assignment Type'] || 'Permanent';
+  document.getElementById('f-addr').value = p['Address'] || '';
+  document.getElementById('f-phone1').value = p['Phone 1'] || '';
+  document.getElementById('f-phone2').value = p['Phone 2'] || '';
+  document.getElementById('f-dose').value = p['Dose Prescribed'] || '22.5';
+  document.getElementById('f-total').value = p['Total Doses'] || 4;
+  document.getElementById('f-remaining').value = p['Doses Remaining'] || 4;
+  document.getElementById('f-due').value = p['Due Date'] || '';
+  document.getElementById('f-lastsite').value = p['Injection Site'] || '';
+  document.getElementById('f-appt').value = p['Appointment Date & Time'] || '';
+  document.getElementById('f-prevdates').value = p['Previous Injection Dates'] || '';
+  document.getElementById('f-special').value = p['Special Instructions'] || '';
+  document.getElementById('f-adverse').value = p['Adverse Effects Comments'] || '';
+  document.getElementById('deletePatientBtn').classList.remove('hidden');
+  openModal('patientModal');
+}
+
+async function savePatient() {
+  const fn = document.getElementById('f-file').value.trim();
+  const name = document.getElementById('f-name').value.trim();
+  if (!fn || !name) { toast('Name and file number are required', 'warning'); return; }
+  if (!editingId && patients.find(p => p['File Number'] === fn)) {
+    toast('File number already exists', 'error'); return;
+  }
+  const data = {
+    'Patient Name': name,
+    'File Number': fn,
+    'Address': document.getElementById('f-addr').value,
+    'Phone 1': document.getElementById('f-phone1').value,
+    'Phone 2': document.getElementById('f-phone2').value,
+    'Dose Prescribed': document.getElementById('f-dose').value,
+    'Total Doses': document.getElementById('f-total').value,
+    'Doses Remaining': document.getElementById('f-remaining').value,
+    'Previous Injection Site': document.getElementById('f-lastsite').value,
+    'Injection Site': document.getElementById('f-lastsite').value,
+    'Due Date': document.getElementById('f-due').value,
+    'Appointment Date & Time': document.getElementById('f-appt').value || null,
+    'Previous Injection Dates': document.getElementById('f-prevdates').value,
+    'Assignment Type': document.getElementById('f-type').value,
+    'Special Instructions': document.getElementById('f-special').value,
+    'Adverse Effects Comments': document.getElementById('f-adverse').value,
+    'File Status': 'Active',
+    'Injection Administered': false,
+    'Appointment Confirmed': !!document.getElementById('f-appt').value,
+    'Pending': false,
+    'Archived': false
+  };
+  setLoading(true, editingId ? 'Updating patient…' : 'Adding patient…');
+  try {
+    if (editingId) await dbUpdate(editingId, data);
+    else await dbInsert(data);
+    closeModal('patientModal');
+    toast(editingId ? 'Patient updated' : 'Patient added!', 'success', '✓');
+    await loadPatients();
+  } catch(e) {
+    toast('Error: ' + e.message, 'error');
+  } finally {
+    setLoading(false);
+  }
+}
+
+// ========== MODAL HELPERS ==========
+function openModal(id) {
+  const el = document.getElementById(id);
+  el.classList.add('open');
+  el.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+function closeModal(id) {
+  const el = document.getElementById(id);
+  if (el) { el.classList.remove('open'); el.style.display = 'none'; }
+  document.body.style.overflow = '';
+}
+
+// ========== CONFIRM SHEET ==========
+function showConfirm(title, msg, cb) {
+  document.getElementById('confirmTitle').textContent = title;
+  document.getElementById('confirmMsg').textContent = msg;
+  confirmCallback = cb;
+  document.getElementById('confirmBackdrop').classList.add('open');
+  document.getElementById('confirmSheet').classList.add('open');
+}
+function closeConfirm() {
+  document.getElementById('confirmBackdrop').classList.remove('open');
+  document.getElementById('confirmSheet').classList.remove('open');
+  confirmCallback = null;
+}
+
+// ========== MENU DRAWER ==========
+function openMenuDrawer() {
+  document.getElementById('drawerBackdrop').classList.add('open');
+  document.getElementById('menuDrawer').classList.add('open');
+}
+function closeMenuDrawer() {
+  document.getElementById('drawerBackdrop').classList.remove('open');
+  document.getElementById('menuDrawer').classList.remove('open');
+}
+
+// ========== VIEW SWITCHING ==========
+function switchView(view) {
+  currentView = view;
+  const patientArea = document.getElementById('mainContent');
+  const dashView = document.getElementById('dashView');
+  const reportView = document.getElementById('reportView');
+  const searchArea = document.getElementById('searchArea');
+
+  patientArea.classList.add('hidden');
+  dashView.classList.add('hidden');
+  reportView.classList.add('hidden');
+
+  document.querySelectorAll('.nav-btn[data-view]').forEach(b => b.classList.remove('active'));
+  document.getElementById('nav-'+view)?.classList.add('active');
+
+  if (view === 'dash') {
+    dashView.classList.remove('hidden');
+    searchArea.classList.add('hidden');
+    renderDashboard();
+  } else if (view === 'report') {
+    reportView.classList.remove('hidden');
+    searchArea.classList.add('hidden');
+  } else {
+    patientArea.classList.remove('hidden');
+    searchArea.classList.remove('hidden');
+    renderPatientList();
+  }
+}
+
+function switchToTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.tab === tab);
+  });
+  switchView('patients');
+}
+
+// ========== REPORT ==========
+function generateReport() {
+  const field = document.getElementById('reportField').value;
+  const cond  = document.getElementById('reportCondition').value;
+  const val   = document.getElementById('reportValue').value.toLowerCase().trim();
+  const today = todayStr();
+
+  const filtered = patients.filter(p => {
+    let fv = '';
+    if (field === 'due_date') fv = p['Due Date'] || '';
+    else if (field === 'dose_prescribed') fv = p['Dose Prescribed'] || '';
+    else if (field === 'doses_remaining') fv = String(p['Doses Remaining'] || 0);
+    else if (field === 'assignment_type') fv = (p['Assignment Type']||'').toLowerCase();
+    else if (field === 'pending') fv = String(!!p['Pending']);
+
+    if (cond === 'equals') return fv.toLowerCase() === val;
+    if (cond === 'contains') return fv.toLowerCase().includes(val);
+    if (cond === 'greater') return parseFloat(fv) > parseFloat(val);
+    if (cond === 'less') return parseFloat(fv) < parseFloat(val);
+    return false;
+  });
+
+  const out = document.getElementById('reportOutput');
+  if (!filtered.length) {
+    out.innerHTML = `<div class="empty-state"><div class="empty-state__icon">🔍</div><div class="empty-state__title">No matches</div><p class="empty-state__sub">Try adjusting your filters.</p></div>`;
+    return;
+  }
+
+  let html = `<div style="background:var(--card);border-radius:var(--radius);padding:12px 14px;border:1.5px solid var(--border);margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
+    <span style="font-weight:700;font-size:14px">${filtered.length} patient${filtered.length!==1?'s':''} found</span>
+    <button onclick="exportReportCSV()" style="background:var(--teal);color:#fff;padding:6px 12px;border-radius:6px;font-size:12px;font-weight:700">📥 Export CSV</button>
+  </div>`;
+
+  filtered.forEach(p => {
+    const dose = p['Dose Prescribed'] || '';
+    const left = p['Doses Remaining'] || 0;
+    html += `<div class="report-item" onclick="openEditModal(${p.id})">
+      <div class="card-avatar card-avatar--${avatarColor(p['Patient Name']||'')} " style="width:36px;height:36px;border-radius:10px;font-size:12px;flex-shrink:0">${initials(p['Patient Name']||'')}</div>
+      <div style="flex:1">
+        <div class="report-item__name">${esc(p['Patient Name']||'')} <span style="font-weight:400;color:var(--text-2);font-size:12px">#${esc(p['File Number']||'')}</span></div>
+        <div class="report-item__detail">💊 ${dose}mg · ${left} doses left · Due: ${formatDateFull(p['Due Date']||'')}</div>
+      </div>
+      <span style="color:var(--text-3);font-size:18px">›</span>
+    </div>`;
+  });
+
+  out.innerHTML = html;
+  window._lastReport = filtered;
+}
+
+function exportReportCSV() {
+  if (!window._lastReport) return;
+  const hdrs = ['Patient Name','File Number','Phone 1','Address','Dose Prescribed','Doses Remaining','Due Date','Assignment Type'];
+  const rows = [hdrs.join(','), ...window._lastReport.map(p => hdrs.map(h => {
+    let v = String(p[h]||'');
+    if (v.includes(',')) v = `"${v}"`;
+    return v;
+  }).join(','))];
+  const blob = new Blob([rows.join('\n')], { type:'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `report_${todayStr()}.csv`;
+  a.click();
+}
+
+function quickReport(type) {
+  const map = {
+    dueToday:       { f:'due_date', c:'equals', v:todayStr() },
+    noRepeatsLeft:  { f:'doses_remaining', c:'equals', v:'0' },
+    pendingPatients:{ f:'pending', c:'equals', v:'true' },
+    tempPatients:   { f:'assignment_type', c:'equals', v:'temporary' },
+  };
+  const m = map[type]; if (!m) return;
+  document.getElementById('reportField').value = m.f;
+  document.getElementById('reportCondition').value = m.c;
+  document.getElementById('reportValue').value = m.v;
+  generateReport();
+}
+
+// ========== IMPORT / EXPORT ==========
+async function importGoogleSheets() {
+  closeMenuDrawer();
+  setLoading(true, 'Importing from Google Sheets…');
+  try {
+    const resp = await fetch(GOOGLE_SHEETS_CSV_URL);
+    const text = await resp.text();
+    const rows = text.split('\n');
+    const headers = rows[0].split(',').map(h => h.trim().replace(/"/g,''));
+    let added = 0, skipped = 0;
+    for (let i = 1; i < rows.length; i++) {
+      if (!rows[i].trim()) continue;
+      const vals = parseCSVRow(rows[i]);
+      const p = {};
+      headers.forEach((h,idx) => p[h] = vals[idx]||'');
+      if (!p['Patient Name']) continue;
+      if (patients.find(e => e['File Number'] === p['File Number'])) { skipped++; continue; }
+      await dbInsert({
+        'Patient Name': p['Patient Name'], 'File Number': p['File Number'],
+        'Address': p['Address']||'', 'Phone 1': p['Phone 1']||'', 'Phone 2': p['Phone 2']||'',
+        'Dose Prescribed': p['Dose Prescribed']||'7.5', 'Total Doses': p['Total Doses']||'4',
+        'Doses Remaining': p['Doses Remaining']||'4', 'Due Date': todayStr(),
+        'Assignment Type': 'Permanent', 'Special Instructions': '', 'Adverse Effects Comments': '',
+        'File Status': 'Active', 'Injection Administered': false, 'Appointment Confirmed': false,
+        'Pending': false, 'Archived': false
+      });
+      added++;
+    }
+    toast(`Imported ${added}, skipped ${skipped} duplicates`, 'success');
+    await loadPatients();
+  } catch(e) { toast('Import error: ' + e.message, 'error'); }
+  finally { setLoading(false); }
+}
+
+function parseCSVRow(row) {
+  const vals = []; let inQ = false, cur = '';
+  for (const ch of row) {
+    if (ch === '"') inQ = !inQ;
+    else if (ch === ',' && !inQ) { vals.push(cur.trim().replace(/^"|"$/g,'')); cur = ''; }
+    else cur += ch;
+  }
+  vals.push(cur.trim().replace(/^"|"$/g,''));
+  return vals;
+}
+
+function importCSVFile(file) {
+  const r = new FileReader();
+  r.onload = async e => {
+    const rows = e.target.result.split('\n');
+    const headers = rows[0].split(',').map(h=>h.trim().replace(/"/g,''));
+    let added = 0, skipped = 0;
+    setLoading(true, 'Importing CSV…');
+    try {
+      for (let i = 1; i < rows.length; i++) {
+        if (!rows[i].trim()) continue;
+        const vals = parseCSVRow(rows[i]);
+        const p = {};
+        headers.forEach((h,idx) => p[h]=vals[idx]||'');
+        if (!p['Patient Name']) continue;
+        if (patients.find(e=>e['File Number']===p['File Number'])) { skipped++; continue; }
+        await dbInsert({
+          'Patient Name': p['Patient Name'], 'File Number': p['File Number'],
+          'Address': p['Address']||'', 'Phone 1': p['Phone 1']||'', 'Phone 2': p['Phone 2']||'',
+          'Dose Prescribed': p['Dose Prescribed']||'7.5', 'Total Doses': p['Total Doses']||'4',
+          'Doses Remaining': p['Doses Remaining']||'4', 'Due Date': todayStr(),
+          'Assignment Type': p['Assignment Type']||'Permanent', 'Special Instructions': p['Special Instructions']||'',
+          'Adverse Effects Comments': '', 'File Status': 'Active',
+          'Injection Administered': false, 'Appointment Confirmed': false, 'Pending': false, 'Archived': false
+        });
+        added++;
+      }
+      toast(`Imported ${added}, skipped ${skipped}`, 'success');
+      await loadPatients();
+    } catch(e) { toast(e.message, 'error'); } finally { setLoading(false); }
+  };
+  r.readAsText(file);
+}
+
+// ========== PDF EXTRACTION ENGINE ==========
+
+async function ensurePDFJS() {
+  if (window.pdfjsLib) return;
+  setLoading(true, 'Loading PDF engine…');
+  await new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = window.PDFJS_URL; s.onload = res; s.onerror = rej;
+    document.head.appendChild(s);
+  });
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc = window.PDFJS_WORKER;
+}
+
+async function extractPDFText(file) {
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  let text = '';
+  const styledItems = []; // collects text that is bold OR underlined = selected dose
+
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+
+    // ── Step 1: extract text items with positions ──
+    const tc = await page.getTextContent();
+    const textItems = [];
+    let lastY = null;
+
+    for (const item of tc.items) {
+      const y = item.transform[5];
+      const x = item.transform[4];
+      if (lastY !== null && Math.abs(y - lastY) > 5) text += '\n';
+      text += item.str + ' ';
+      lastY = y;
+      if (item.str.trim()) {
+        textItems.push({
+          str: item.str.trim(),
+          x, y,
+          w: item.width || 0,
+          bold: !!(item.fontName && /bold|heavy|black|-b$/i.test(item.fontName))
+        });
+      }
+    }
+
+    // ── Step 2: find horizontal line segments = underlines ──
+    // PDF.js renders underlines as drawn paths, not font metadata.
+    // We walk the operator list, track moveTo/lineTo, and collect
+    // any horizontal lines (dy < 1.5, dx > 8) → those are underlines.
+    const underlineYs = [];
+    try {
+      const ops = await page.getOperatorList();
+      const { fnArray, argsArray } = ops;
+      let mx = 0, my = 0;
+
+      for (let j = 0; j < fnArray.length; j++) {
+        const fn   = fnArray[j];
+        const args = argsArray[j];
+
+        // moveTo (opcode 13)
+        if (fn === 13) {
+          mx = args[0]; my = args[1];
+
+        // lineTo (opcode 14)
+        } else if (fn === 14) {
+          const ex = args[0], ey = args[1];
+          const dx = ex - mx, dy = ey - my;
+          if (Math.abs(dy) < 1.5 && dx > 8) underlineYs.push(my);
+          mx = ex; my = ey;
+
+        // constructPath (opcode 91) — PDF.js v3 batches path ops here
+        } else if (fn === 91) {
+          const cmds   = args[0]; // array of cmd codes: 0=moveTo,1=lineTo,2=bezier,10=close
+          const coords = args[1]; // flat coord array
+          let ci = 0;
+          for (const cmd of cmds) {
+            if (cmd === 0) {                      // moveTo
+              mx = coords[ci++]; my = coords[ci++];
+            } else if (cmd === 1) {               // lineTo
+              const ex = coords[ci++], ey = coords[ci++];
+              const dx = ex - mx, dy = ey - my;
+              if (Math.abs(dy) < 1.5 && dx > 8) underlineYs.push(my);
+              mx = ex; my = ey;
+            } else if (cmd === 2) {               // bezierCurveTo (6 coords)
+              mx = coords[ci+4]; my = coords[ci+5]; ci += 6;
+            }
+            // cmd 10 = closePath: no coords
+          }
+        }
+      }
+    } catch(e) { /* operator list unavailable on some pages — graceful skip */ }
+
+    // ── Step 3: correlate underline y-positions with text items ──
+    // Underlines are drawn 2–8 units BELOW the text baseline (y decreases downward in PDF space)
+    for (const item of textItems) {
+      const isUnderlined = underlineYs.some(uy => {
+        const delta = item.y - uy; // positive = underline below text baseline
+        return delta > 0 && delta < 10;
+      });
+      if (item.bold || isUnderlined) {
+        styledItems.push(item.str);
+      }
+    }
+
+    text += '\n--- PAGE BREAK ---\n';
+  }
+
+  return { text: text.trim(), boldItems: styledItems };
+}
+
+// ── Claude AI extraction (requires API key in settings) ──
+async function extractWithClaude(fullText, apiKey) {
+  const prompt = `You are a medical document parser specialized in patient enrollment forms.
+
+Extract the following fields from this PDF text and return ONLY a valid JSON object — no prose, no markdown, no explanation.
+
+Required JSON structure:
+{
+  "patient_name": "",
+  "file_number": "",
+  "dose": "",
+  "address": "",
+  "phone_1": "",
+  "phone_2": "",
+  "date_of_injection": "",
+  "missing_fields": []
+}
+
+Extraction Rules:
+- patient_name: Full name from fields labeled "PATIENT NAME", "NOM DU PATIENT", or similar. Title-case the result.
+- file_number: From "FILE NUMBER", "PATIENT ID", "MEDICUM #", or any visible file reference. Prefer actual patient file number over pharmacy/clinic numbers.
+- dose: Must be exactly one of: "7.5", "22.5", "30", or "45" (numbers only, no units). Look for selected/checked checkboxes or circled values next to "mg", "1 month", "3 month", "4 month", "6 month".
+- address: Combine street + city + province/state + postal code into one clean string.
+- phone_1: Primary patient phone (labeled TELEPHONE, PHONE, TEL, HOME). Preserve original formatting (dashes, spaces, brackets).
+- phone_2: Secondary/alternate contact number if available. If none, use "".
+- date_of_injection: From "LAST INJECTION", "DATE OF INJECTION", or "INJECTION DUE DATE". Format as YYYY-MM-DD.
+- missing_fields: Array of field names that could not be found or were ambiguous.
+
+Critical:
+- IGNORE doctor, pharmacy, clinic, and fax numbers
+- IGNORE numbers preceded by "FAX", "TELECOPIEUR", "DR.", "MD", "PHARMACY", "CLINIC"
+- If a field is genuinely missing, use "" and add its name to missing_fields
+- Handle OCR artifacts like broken words, random spaces, and encoding issues
+
+PDF Text:
+${fullText.substring(0, 8000)}`;
+
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1000,
+      messages: [{ role: 'user', content: prompt }]
+    })
+  });
+  if (!resp.ok) throw new Error(`Claude API ${resp.status}: ${await resp.text()}`);
+  const data = await resp.json();
+  const raw  = data.content?.[0]?.text || '';
+  const clean = raw.replace(/```json|```/g, '').trim();
+  return JSON.parse(clean);
+}
+
+// ── Enhanced regex extraction (fallback) ──
+function extractWithRegex(textData, filename) {
+  const text      = typeof textData === 'string' ? textData : textData.text;
+  const boldItems = typeof textData === 'string' ? [] : (textData.boldItems || []);
+  const result = { patient_name:'', file_number:'', dose:'', address:'', phone_1:'', phone_2:'', date_of_injection:'', missing_fields:[] };
+
+  // ══ 1. PATIENT NAME ══
+  // Matches: "PATIENT NAME/NOM DU PATIENT   Yvon FORGET ***"
+  const nameM =
+    text.match(/PATIENT\s+NAME[^\n]*NOM\s+DU\s+PATIENT\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s\-\']{2,60}?)(?:\s*\*+)?\s*(?:\r?\n|$)/im) ||
+    text.match(/NOM\s+DU\s+PATIENT\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s\-\']{2,60}?)(?:\s*\*+)?(?:\r?\n|$)/im) ||
+    text.match(/PATIENT\s*NAME[^\n]*\n\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s\-\']{2,60}?)(?:\s*\*+)?(?:\r?\n|$)/im);
+  if (nameM) result.patient_name = nameM[1].replace(/\*+/g,'').trim().replace(/\s+/g,' ');
+  if (!result.patient_name) result.missing_fields.push('patient_name');
+
+  // ══ 2. FILE NUMBER ══
+  // Matches: "MEDICUM #: 20107"
+  const fileM =
+    text.match(/MEDICUM\s*#\s*[:\s]+([A-Z0-9\-]+)/i) ||
+    text.match(/FILE\s*(?:NUMBER|NO|NUM|#)\s*[:\s]+([A-Z0-9\-]+)/i) ||
+    text.match(/PATIENT\s*(?:ID|FILE|NUMBER)\s*[:\s]+([A-Z0-9\-]+)/i) ||
+    text.match(/(?:DOSSIER|CHART)\s*(?:NO|#)\s*[:\s]+([A-Z0-9\-]+)/i);
+  if (fileM) { result.file_number = fileM[1].trim(); }
+  else {
+    const fnNum = filename.replace(/\.pdf$/i,'').match(/(\d{4,8})/);
+    if (fnNum) result.file_number = fnNum[1];
+  }
+  if (!result.file_number) result.missing_fields.push('file_number');
+
+  // ══ 3. DOSE ══
+  // ══ DOSE DETECTION — 4-layer strategy ══
+  // Selected dose on Medicum form is BOLD + UNDERLINED.
+  // styledItems (boldItems) captures both bold font and underline strokes.
+  const doseMap = [
+    { val:'45',   re:[/45\s*mg/i,    /6[\s\-]m(?:\s|\(|$)/i] },
+    { val:'30',   re:[/30\s*mg/i,    /4[\s\-]m(?:\s|\(|$)/i] },
+    { val:'22.5', re:[/22\.5\s*mg/i, /3[\s\-]m(?:\s|\(|$)/i] },
+    { val:'7.5',  re:[/7\.5\s*mg/i,  /1[\s\-]m(?:\s|\(|$)/i] },
+  ];
+
+  // Layer 1 — check each styled item individually (handles fragmented tokens like "30mg" alone)
+  for (const item of boldItems) {
+    for (const { val, re } of doseMap) {
+      if (re.some(r => r.test(item))) { result.dose = val; break; }
+    }
+    if (result.dose) break;
+  }
+  // Layer 2 — joined boldLine (catches multi-token spans like "4-m (30mg)")
+  if (!result.dose) {
+    const boldLine = boldItems.join(' ');
+    for (const { val, re } of doseMap) {
+      if (re.some(r => r.test(boldLine))) { result.dose = val; break; }
+    }
+  }
+  // Layer 3 — isolation: strip the checkbox row, then find which dose
+  // still appears in the remaining text (selected dose repeats in header).
+  if (!result.dose) {
+    const doseRowRe = /1[\s\-]m\s*\(7\.5[^)]*\).*?6[\s\-]m\s*\(45[^)]*\)/i;
+    const rest = text.replace(doseRowRe, '');
+    for (const { val, re } of doseMap) {
+      if (re.some(r => r.test(rest))) { result.dose = val; break; }
+    }
+  }
+  // Layer 4 — line-frequency score: dose that appears on most distinct lines wins.
+  // (All 4 doses share the checkbox line; selected one appears on extra lines.)
+  if (!result.dose) {
+    const textLines = text.split('\n');
+    const scores = {};
+    for (const { val, re } of doseMap) {
+      scores[val] = textLines.filter(l => re.some(r => r.test(l))).length;
+    }
+    const best = Object.entries(scores).sort((a,b) => b[1]-a[1])[0];
+    if (best && best[1] > 0) result.dose = best[0];
+  }
+
+  if (!result.dose) result.missing_fields.push('dose');
+
+  // ══ 4. ADDRESS ══
+  // Form has separate ADDRESS/ADRESSE and CITY/VILLE rows
+  const streetM = text.match(/ADDRESS\s*[\/|]\s*ADRESSE\s+([^\n\r]+)/i) ||
+                  text.match(/ADDRESS[:\s]+([^\n\r]{5,80})/i);
+  const cityM   = text.match(/CITY\s*[\/|]\s*VILLE\s+([^\n\r]+)/i) ||
+                  text.match(/CITY[:\s]+([^\n\r]{2,60})/i);
+  const addrParts = [streetM?.[1]?.trim(), cityM?.[1]?.trim()].filter(Boolean);
+  if (addrParts.length) result.address = addrParts.join(', ').replace(/\s+/g,' ').trim();
+  if (!result.address) result.missing_fields.push('address');
+
+  // ══ 5 & 6. PHONES ══
+  // Remove entire doctor / pharmacy / fax lines before scanning
+  const cleanText = text
+    .replace(/(?:FAX|TELECOPIEUR|TÉLÉCOPIEUR)[^\d\n]*[\d][\d\s\-\.\(\)]{6,}/gi, ' ')
+    .replace(/(?:PHARMACIE?|PHARMACY)[^\n]+\n?/gi, ' ')
+    .replace(/(?:DOCTOR|MÉDECIN|MEDECIN)[^\n]+\n?/gi, ' ')
+    .replace(/(?:DR\.?)[^\n]*\b\d{3}[\s\-\.]\d{3}[\s\-\.]\d{4}/gi, ' ');
+
+  // Phone 1: labeled TELEPHONE/TELEPHONE row
+  const ph1M = cleanText.match(/TELEPHONE\s*[\/|]\s*TELEPHONE\s+([\d][\d\s\-\.\(\)]+)/i) ||
+               cleanText.match(/TELEPHONE[:\s]+([\d][\d\s\-\.]{6,})/i);
+  if (ph1M) {
+    const m = ph1M[1].match(/(\d{3}[\s\-\.]?\d{3}[\s\-\.]?\d{4})/);
+    if (m) result.phone_1 = m[1].trim();
+  }
+
+  // Phone 2: SECONDARY CONTACT — multi-strategy extraction
+  // Medicum form: label "SECONDARY CONTACT #/ # DE CONTACT\nSECONDAIRE"
+  // followed by "(Wife) Claire Forget // patient\'s cell: 514 916-7340"
+  // PDF table layout may put label+value on same y-row or split across lines.
+
+  // Priority 1: explicit "patient's cell" / "cellulaire du patient" label — most reliable
+  const cellM = text.match(/patient[\u2019\'s]*\s*cell(?:ulaire)?\s*:?\s*(\d{3}[\s\-\.]?\d{3}[\s\-\.]?\d{4})/i);
+  if (cellM) result.phone_2 = cellM[1].trim();
+
+  // Priority 2: entire SECONDARY CONTACT block (up to 300 chars after label)
+  // handles same-line AND next-line layouts from PDF table extraction
+  if (!result.phone_2) {
+    const secM = text.match(/SECONDARY\s*CONTACT[^\n]{0,120}\n?([^\n]{0,200})/i) ||
+                 text.match(/CONTACT\s*SECONDAIRE[^\n]{0,120}\n?([^\n]{0,200})/i) ||
+                 text.match(/SECONDAIRE[^\n]{0,200}/i);
+    if (secM) {
+      const block = secM[0] + (secM[1] || '');
+      // Collect all phone numbers in this block, excluding any that match phone_1
+      const allInBlock = [...block.matchAll(/(\d{3}[\s\-\.]?\d{3}[\s\-\.]?\d{4})/g)]
+                           .map(m => m[1].trim())
+                           .filter(p => p !== result.phone_1);
+      // Prefer the LAST number — it's usually "patient's cell" which comes at end of the note
+      if (allInBlock.length) result.phone_2 = allInBlock[allInBlock.length - 1];
+    }
+  }
+
+  // Priority 3: inline SECONDAIRE label on same text line
+  if (!result.phone_2) {
+    const inlineM = text.match(/SECONDAIRE[^\n]*(\d{3}[\s\-\.]?\d{3}[\s\-\.]?\d{4})/i);
+    if (inlineM && inlineM[1] !== result.phone_1) result.phone_2 = inlineM[1].trim();
+  }
+  // Fallback: unique phones from cleaned text
+  if (!result.phone_1) {
+    const all = [...cleanText.matchAll(/(\d{3}[\s\-\.]?\d{3}[\s\-\.]?\d{4})/g)]
+                  .map(m => m[1].trim()).filter((v,i,a) => a.indexOf(v)===i);
+    if (all[0]) result.phone_1 = all[0];
+    if (all[1]) result.phone_2 = all[1];
+  }
+  if (!result.phone_1) result.missing_fields.push('phone_1');
+
+  // ══ 7. DATE OF INJECTION ══
+  // Form: "LAST INJECTION/DERNIERE INJECTION   01/18/2026"  (MM/DD/YYYY North American)
+  const datePatterns = [
+    /(?:LAST\s*INJECTION|DERNIERE\s*INJECTION)[^\d\n]*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i,
+    /(?:INJECTION\s*DUE\s*DAY|JOUR\s*DU)[^\d\n]*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i,
+    /(?:DATE\s*OF\s*INJECTION|DATE\s*D[\u2019e]\s*INJECTION)[^\d\n]*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i,
+    /(?:LAST\s*INJECTION|INJECTION)[^\d\n]*(\d{4}-\d{2}-\d{2})/i,
+  ];
+  for (const pat of datePatterns) {
+    const m = text.match(pat);
+    if (m) { result.date_of_injection = parseFlexDate(m[1]); if (result.date_of_injection) break; }
+  }
+  if (!result.date_of_injection) result.missing_fields.push('date_of_injection');
+
+  return result;
+}
+
+// Parse date: MM/DD/YYYY  DD-MM-YYYY  YYYY-MM-DD  (2-digit year supported)
+function parseFlexDate(raw) {
+  if (!raw) return '';
+  const p = raw.split(/[\/\-]/);
+  if (p.length !== 3) return '';
+  let [a,b,c] = p.map(s=>s.trim());
+  // YYYY-MM-DD
+  if (a.length === 4) {
+    const iso = `${a}-${b.padStart(2,'0')}-${c.padStart(2,'0')}`;
+    return isNaN(Date.parse(iso)) ? '' : iso;
+  }
+  // x/x/YYYY  — North American form uses MM/DD/YYYY
+  if (c.length === 4) {
+    const [mm,dd] = parseInt(a) > 12 ? [b,a] : [a,b];
+    const iso = `${c}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`;
+    return isNaN(Date.parse(iso)) ? '' : iso;
+  }
+  // 2-digit year
+  if (c.length === 2) c = parseInt(c)>50 ? '19'+c : '20'+c;
+  const iso = `${c}-${a.padStart(2,'0')}-${b.padStart(2,'0')}`;
+  return isNaN(Date.parse(iso)) ? '' : iso;
+}
+
+// ── Show PDF Review Modal ──
+function showPDFReview(extracted, filename) {
+  const missing = extracted.missing_fields || [];
+  const flag = f => missing.includes(f) ? ' style="border-color:#E05A5A;background:#FDEDED"' : '';
+  const flagLabel = f => missing.includes(f) ? ' <span style="color:#E05A5A;font-size:10px;font-weight:700">⚠ Not found</span>' : '';
+
+  document.getElementById('pdfReviewFilename').textContent = filename;
+  document.getElementById('pdfReviewBody').innerHTML = `
+    <div class="form-group"><label>Patient Name ${flagLabel('patient_name')}</label>
+      <input class="form-control" id="pr-name" value="${esc(extracted.patient_name)}"${flag('patient_name')}></div>
+    <div class="form-row-2">
+      <div class="form-group"><label>File Number ${flagLabel('file_number')}</label>
+        <input class="form-control" id="pr-file" value="${esc(extracted.file_number)}"${flag('file_number')}></div>
+      <div class="form-group"><label>Dose (mg) ${flagLabel('dose')}</label>
+        <select class="form-control" id="pr-dose"${flag('dose')}>
+          <option value="">— Select —</option>
+          ${['7.5','22.5','30','45'].map(d=>`<option value="${d}" ${extracted.dose===d?'selected':''}>${d} mg</option>`).join('')}
+        </select></div>
+    </div>
+    <div class="form-group"><label>Address ${flagLabel('address')}</label>
+      <input class="form-control" id="pr-addr" value="${esc(extracted.address)}"${flag('address')}></div>
+    <div class="form-row-2">
+      <div class="form-group"><label>Phone 1 ${flagLabel('phone_1')}</label>
+        <input class="form-control" id="pr-phone1" value="${esc(extracted.phone_1)}"${flag('phone_1')}></div>
+      <div class="form-group"><label>Phone 2</label>
+        <input class="form-control" id="pr-phone2" value="${esc(extracted.phone_2)}"></div>
+    </div>
+    <div class="form-group"><label>Date of Injection ${flagLabel('date_of_injection')}</label>
+      <input class="form-control" type="date" id="pr-date" value="${esc(extracted.date_of_injection)}"${flag('date_of_injection')}></div>
+    ${missing.length ? `<div style="background:#FEF3E8;border:1px solid #F5D0AA;border-radius:8px;padding:10px 12px;margin-top:4px;font-size:12px;color:#E5883A"><strong>⚠️ ${missing.length} field${missing.length>1?'s':''} not detected</strong> — please fill in the highlighted fields before saving.</div>` : `<div style="background:#E8F7F0;border:1px solid #B6DFC8;border-radius:8px;padding:10px 12px;margin-top:4px;font-size:12px;color:#3D9A6B"><strong>✓ All fields extracted</strong> — review and confirm.</div>`}
+  `;
+  openModal('pdfReviewModal');
+}
+
+function confirmPDFAndFill() {
+  const name  = document.getElementById('pr-name').value.trim();
+  const file  = document.getElementById('pr-file').value.trim();
+  const dose  = document.getElementById('pr-dose').value;
+  const addr  = document.getElementById('pr-addr').value.trim();
+  const ph1   = document.getElementById('pr-phone1').value.trim();
+  const ph2   = document.getElementById('pr-phone2').value.trim();
+  const date  = document.getElementById('pr-date').value;
+  if (!name || !file) { toast('Patient name and file number are required', 'warning'); return; }
+  closeModal('pdfReviewModal');
+  openAddModal();
+  document.getElementById('f-name').value   = name;
+  document.getElementById('f-file').value   = file;
+  document.getElementById('f-addr').value   = addr;
+  document.getElementById('f-phone1').value = ph1;
+  document.getElementById('f-phone2').value = ph2;
+  if (dose) document.getElementById('f-dose').value = dose;
+  if (date) { document.getElementById('f-appt').value = date + 'T09:00'; }
+  toast('Form pre-filled — review and save', 'success', '📄');
+}
+
+// ── Main entry point ──
+async function importPDFFile(file) {
+  try {
+    await ensurePDFJS();
+    setLoading(true, 'Reading PDF…');
+    const textData = await extractPDFText(file);
+    setLoading(true, 'Extracting patient data…');
+
+    let extracted;
+    const apiKey = localStorage.getItem('claude_api_key');
+    if (apiKey) {
+      try {
+        toast('Using Claude AI for extraction…', '', '🤖');
+        extracted = await extractWithClaude(textData.text, apiKey);
+      } catch(aiErr) {
+        console.warn('Claude API failed, falling back to regex:', aiErr);
+        toast('AI extraction failed — using smart fallback', 'warning');
+        extracted = extractWithRegex(textData, file.name);
+      }
+    } else {
+      extracted = extractWithRegex(textData, file.name);
+    }
+
+    setLoading(false);
+    showPDFReview(extracted, file.name);
+  } catch(e) {
+    setLoading(false);
+    toast('PDF error: ' + e.message, 'error');
+  }
+}
+
+// ── Batch PDF processing ──
+async function importPDFBatch(files) {
+  const results = [];
+  for (let i = 0; i < files.length; i++) {
+    setLoading(true, `Processing PDF ${i+1} of ${files.length}…`);
+    try {
+      await ensurePDFJS();
+      const fullText = await extractPDFText(files[i]);
+      const apiKey   = localStorage.getItem('claude_api_key');
+      const extracted = apiKey ? await extractWithClaude(textData.text, apiKey) : extractWithRegex(textData, files[i].name);
+      results.push({ file: files[i].name, data: extracted, ok: true });
+    } catch(e) {
+      results.push({ file: files[i].name, error: e.message, ok: false });
+    }
+  }
+  setLoading(false);
+  // Show first result for review; batch summary in toast
+  if (results.length === 1) {
+    showPDFReview(results[0].data, results[0].file);
+  } else {
+    const ok = results.filter(r=>r.ok).length;
+    toast(`Processed ${ok}/${results.length} PDFs — showing first result`, ok===results.length?'success':'warning');
+    if (results[0].ok) showPDFReview(results[0].data, results[0].file);
+  }
+}
+
+function exportCSV() {
+  if (!patients.length) { toast('No patients to export', 'warning'); return; }
+  const hdrs = ['Patient Name','File Number','Address','Phone 1','Phone 2','Dose Prescribed','Total Doses','Doses Remaining','Due Date','Assignment Type','Special Instructions'];
+  const rows = [hdrs.join(','), ...patients.map(p => hdrs.map(h => {
+    let v = String(p[h]||'');
+    if (v.includes(',')) v = `"${v}"`;
+    return v;
+  }).join(','))];
+  const blob = new Blob([rows.join('\n')], { type:'text/csv' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = `patients_${todayStr()}.csv`; a.click();
+  toast(`Exported ${patients.length} patients`, 'success', '📤');
+}
+
+function exportJSON() {
+  const blob = new Blob([JSON.stringify(patients, null, 2)], { type:'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = `backup_${todayStr()}.json`; a.click();
+  toast(`Backup of ${patients.length} patients saved`, 'success', '💾');
+}
+
+// ========== INIT ==========
+document.addEventListener('DOMContentLoaded', async () => {
+  // Supabase
+  const ok = await initSupabase();
+  if (ok) await loadPatients();
+
+  // Nav
+  document.querySelectorAll('.nav-btn[data-view]').forEach(btn => {
+    btn.addEventListener('click', () => switchView(btn.dataset.view));
+  });
+  document.getElementById('nav-new').addEventListener('click', openAddModal);
+
+  // Tabs
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => switchToTab(btn.dataset.tab));
+  });
+
+  // Search
+  const si = document.getElementById('searchInput');
+  si.addEventListener('input', () => { searchQuery = si.value.toLowerCase(); if(currentView==='patients') renderPatientList(); });
+  document.getElementById('clearSearch').addEventListener('click', () => { si.value=''; searchQuery=''; if(currentView==='patients') renderPatientList(); });
+
+  // Refresh
+  document.getElementById('refreshBtn').addEventListener('click', loadPatients);
+  document.getElementById('refreshBtnDrawer')?.addEventListener('click', () => { closeMenuDrawer(); loadPatients(); });
+
+  // Menu
+  document.getElementById('menuBtn').addEventListener('click', openMenuDrawer);
+  document.getElementById('drawerBackdrop').addEventListener('click', closeMenuDrawer);
+
+  // Import/Export
+  document.getElementById('importGSBtn').addEventListener('click', importGoogleSheets);
+  document.getElementById('importCSVBtn').addEventListener('click', () => { closeMenuDrawer(); document.getElementById('csvFileInput').click(); });
+  document.getElementById('importPDFBtn').addEventListener('click', () => { closeMenuDrawer(); document.getElementById('pdfFileInput').click(); });
+  document.getElementById('csvFileInput').addEventListener('change', e => { if(e.target.files[0]) importCSVFile(e.target.files[0]); e.target.value=''; });
+  document.getElementById('pdfFileInput').addEventListener('change', e => {
+    const files = [...e.target.files];
+    if (files.length === 1) importPDFFile(files[0]);
+    else if (files.length > 1) importPDFBatch(files);
+    e.target.value='';
+  });
+
+  // API key management
+  function saveApiKey() {
+    const k = document.getElementById('claudeApiKeyInput').value.trim();
+    if (!k) { toast('Enter a key first', 'warning'); return; }
+    localStorage.setItem('claude_api_key', k);
+    updateApiKeyStatus();
+    closeModal('apiKeyModal');
+    toast('Claude API key saved', 'success', '🤖');
+  }
+  function clearApiKey() {
+    localStorage.removeItem('claude_api_key');
+    document.getElementById('claudeApiKeyInput').value = '';
+    updateApiKeyStatus();
+    closeModal('apiKeyModal');
+    toast('API key cleared', '', '🗑');
+  }
+  function updateApiKeyStatus() {
+    const el = document.getElementById('aiKeyStatus');
+    if (!el) return;
+    const k = localStorage.getItem('claude_api_key');
+    el.textContent = k ? '✓ Active' : 'Not set';
+    el.style.color = k ? 'var(--green)' : 'var(--text-3)';
+  }
+  window.saveApiKey = saveApiKey;
+  window.clearApiKey = clearApiKey;
+  updateApiKeyStatus();
+  // Pre-fill API key input if already set
+  document.getElementById('apiKeyModal').addEventListener('click', e => { if(e.target===e.currentTarget) closeModal('apiKeyModal'); });
+  const existingKey = localStorage.getItem('claude_api_key');
+  if (existingKey) document.getElementById('claudeApiKeyInput').value = existingKey;
+  document.getElementById('exportCSVBtn').addEventListener('click', () => { closeMenuDrawer(); exportCSV(); });
+  document.getElementById('exportJSONBtn').addEventListener('click', () => { closeMenuDrawer(); exportJSON(); });
+
+  // Patient modal
+  document.getElementById('patientModalClose').addEventListener('click', () => closeModal('patientModal'));
+  document.getElementById('patientModalCancel').addEventListener('click', () => closeModal('patientModal'));
+  document.getElementById('patientModalSave').addEventListener('click', savePatient);
+  document.getElementById('deletePatientBtn').addEventListener('click', () => {
+    if (!editingId) return;
+    showConfirm('Delete Patient?', 'This cannot be undone. All data for this patient will be permanently deleted.', () => deletePatient(editingId));
+  });
+  document.getElementById('patientModal').addEventListener('click', e => { if(e.target===e.currentTarget) closeModal('patientModal'); });
+
+  // Injection modal
+  document.getElementById('injectionModalClose').addEventListener('click', () => closeModal('injectionModal'));
+  document.getElementById('injCancelBtn').addEventListener('click', () => closeModal('injectionModal'));
+  document.getElementById('injConfirmBtn').addEventListener('click', performInjection);
+  document.getElementById('injectionModal').addEventListener('click', e => { if(e.target===e.currentTarget) closeModal('injectionModal'); });
+
+  // Appt modal
+  document.getElementById('apptModalClose').addEventListener('click', () => closeModal('apptModal'));
+  document.getElementById('apptCancelBtn').addEventListener('click', () => closeModal('apptModal'));
+  document.getElementById('apptSaveBtn').addEventListener('click', saveAppt);
+  document.getElementById('apptModal').addEventListener('click', e => { if(e.target===e.currentTarget) closeModal('apptModal'); });
+  document.getElementById('apptStatusConfirmed').addEventListener('click', () => {
+    apptConfirmedStatus = true;
+    document.getElementById('apptStatusConfirmed').classList.add('selected');
+    document.getElementById('apptStatusTentative').classList.remove('selected');
+  });
+  document.getElementById('apptStatusTentative').addEventListener('click', () => {
+    apptConfirmedStatus = false;
+    document.getElementById('apptStatusTentative').classList.add('selected');
+    document.getElementById('apptStatusConfirmed').classList.remove('selected');
+  });
+
+  // Confirm sheet
+  document.getElementById('confirmYes').addEventListener('click', () => { if(confirmCallback) confirmCallback(); closeConfirm(); });
+  document.getElementById('confirmNo').addEventListener('click', closeConfirm);
+  document.getElementById('confirmBackdrop').addEventListener('click', closeConfirm);
+
+  // Report
+  document.getElementById('generateReportBtn').addEventListener('click', generateReport);
+  document.querySelectorAll('.quick-report-btn').forEach(btn => {
+    btn.addEventListener('click', () => quickReport(btn.dataset.quick));
+  });
+
+  // Auto-update total doses when dose changes
+  document.getElementById('f-dose').addEventListener('change', function() {
+    const w = DOSE_TO_WEEKS[this.value] || 4;
+    // Update due date suggestion from today
+    document.getElementById('f-due').value = addWeeks(todayStr(), w);
+  });
+
+  // Expose for inline handlers
+  window.openEditModal = openEditModal;
+  window.openApptModal = openApptModal;
+  window.exportReportCSV = exportReportCSV;
+  window.switchToTab = switchToTab;
+  window.openMenuDrawer = openMenuDrawer;
+});// EOF
