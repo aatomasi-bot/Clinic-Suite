@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -45,58 +46,58 @@
 }
 
 /* ── ZONE PALETTE — up to 12 geo zones ── */
-.zone-0  { --zc: #2D8C8A; --zb: #E6F4F4; }
-.zone-1  { --zc: #E5883A; --zb: #FEF3E8; }
-.zone-2  { --zc: #7B68B6; --zb: #F0EEF9; }
-.zone-3  { --zc: #3D9A6B; --zb: #E8F7F0; }
-.zone-4  { --zc: #0EA5E9; --zb: #EFF8FE; }
-.zone-5  { --zc: #E11D48; --zb: #FFF0F3; }
-.zone-6  { --zc: #D97706; --zb: #FFFBEB; }
-.zone-7  { --zc: #8B5CF6; --zb: #F5F3FF; }
-.zone-8  { --zc: #059669; --zb: #ECFDF5; }
-.zone-9  { --zc: #DC2626; --zb: #FEF2F2; }
-.zone-10 { --zc: #0891B2; --zb: #ECFEFF; }
-.zone-11 { --zc: #C2410C; --zb: #FFF7ED; }
+.zone-0  { –zc: #2D8C8A; –zb: #E6F4F4; }
+.zone-1  { –zc: #E5883A; –zb: #FEF3E8; }
+.zone-2  { –zc: #7B68B6; –zb: #F0EEF9; }
+.zone-3  { –zc: #3D9A6B; –zb: #E8F7F0; }
+.zone-4  { –zc: #0EA5E9; –zb: #EFF8FE; }
+.zone-5  { –zc: #E11D48; –zb: #FFF0F3; }
+.zone-6  { –zc: #D97706; –zb: #FFFBEB; }
+.zone-7  { –zc: #8B5CF6; –zb: #F5F3FF; }
+.zone-8  { –zc: #059669; –zb: #ECFDF5; }
+.zone-9  { –zc: #DC2626; –zb: #FEF2F2; }
+.zone-10 { –zc: #0891B2; –zb: #ECFEFF; }
+.zone-11 { –zc: #C2410C; –zb: #FFF7ED; }
 
 *,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
 html { -webkit-text-size-adjust:100%; scroll-behavior:smooth; }
 body {
-  font-family:'DM Sans', -apple-system, sans-serif;
-  background: var(--bg);
-  color: var(--text);
-  min-height: 100vh;
-  padding-top: var(--hdr);
-  -webkit-font-smoothing: antialiased;
+font-family:‘DM Sans’, -apple-system, sans-serif;
+background: var(–bg);
+color: var(–text);
+min-height: 100vh;
+padding-top: var(–hdr);
+-webkit-font-smoothing: antialiased;
 }
 button { cursor:pointer; border:none; background:none; font:inherit; -webkit-tap-highlight-color:transparent; }
 input, select { font:inherit; }
 
 /* ── HEADER ── */
 .hdr {
-  position: fixed; top:0; left:0; right:0; z-index:100;
-  height: var(--hdr);
-  background: linear-gradient(90deg,#1B2638,#243047);
-  display: flex; align-items:center; justify-content:space-between;
-  padding: 0 1rem;
-  box-shadow: 0 2px 16px rgba(27,38,56,0.3);
+position: fixed; top:0; left:0; right:0; z-index:100;
+height: var(–hdr);
+background: linear-gradient(90deg,#1B2638,#243047);
+display: flex; align-items:center; justify-content:space-between;
+padding: 0 1rem;
+box-shadow: 0 2px 16px rgba(27,38,56,0.3);
 }
 .hdr__brand { display:flex; align-items:center; gap:10px; }
 .hdr__icon {
-  width:36px; height:36px; border-radius:9px;
-  background:linear-gradient(135deg,var(--teal),var(--teal-d));
-  display:flex; align-items:center; justify-content:center;
-  font-size:17px; box-shadow:0 2px 8px rgba(45,140,138,0.4);
+width:36px; height:36px; border-radius:9px;
+background:linear-gradient(135deg,var(–teal),var(–teal-d));
+display:flex; align-items:center; justify-content:center;
+font-size:17px; box-shadow:0 2px 8px rgba(45,140,138,0.4);
 }
 .hdr__title { color:#fff; font-size:15px; font-weight:800; letter-spacing:-0.3px; }
-.hdr__title span { color:var(--teal); }
+.hdr__title span { color:var(–teal); }
 .hdr__sub { color:#6B7A8F; font-size:9px; font-weight:600; letter-spacing:1.8px; text-transform:uppercase; }
 .hdr__back {
-  display:flex; align-items:center; gap:6px;
-  color:rgba(255,255,255,0.7); font-size:13px; font-weight:600;
-  padding:6px 10px; border-radius:7px;
-  background:rgba(255,255,255,0.08);
-  text-decoration:none;
-  transition: background var(--tr), color var(--tr);
+display:flex; align-items:center; gap:6px;
+color:rgba(255,255,255,0.7); font-size:13px; font-weight:600;
+padding:6px 10px; border-radius:7px;
+background:rgba(255,255,255,0.08);
+text-decoration:none;
+transition: background var(–tr), color var(–tr);
 }
 .hdr__back:hover { background:rgba(255,255,255,0.14); color:#fff; }
 
@@ -105,30 +106,30 @@ input, select { font:inherit; }
 
 /* ── CONTROL BAR ── */
 .control-bar {
-  background:var(--card); border-radius:var(--r); border:1.5px solid var(--border);
-  padding:1rem; margin-bottom:1rem; box-shadow:var(--shadow);
-  display:flex; flex-wrap:wrap; gap:0.75rem; align-items:flex-end;
+background:var(–card); border-radius:var(–r); border:1.5px solid var(–border);
+padding:1rem; margin-bottom:1rem; box-shadow:var(–shadow);
+display:flex; flex-wrap:wrap; gap:0.75rem; align-items:flex-end;
 }
 .ctrl-group { display:flex; flex-direction:column; gap:4px; min-width:140px; }
 .ctrl-group label {
-  font-size:10px; font-weight:700; letter-spacing:0.8px; text-transform:uppercase; color:var(--text-2);
+font-size:10px; font-weight:700; letter-spacing:0.8px; text-transform:uppercase; color:var(–text-2);
 }
 .ctrl-group input, .ctrl-group select {
-  padding:8px 10px; border:1.5px solid var(--border); border-radius:var(--r-sm);
-  font-size:13px; background:var(--bg); color:var(--text); outline:none;
-  transition:border-color var(--tr), box-shadow var(--tr);
+padding:8px 10px; border:1.5px solid var(–border); border-radius:var(–r-sm);
+font-size:13px; background:var(–bg); color:var(–text); outline:none;
+transition:border-color var(–tr), box-shadow var(–tr);
 }
 .ctrl-group input:focus, .ctrl-group select:focus {
-  border-color:var(--teal); background:#fff; box-shadow:0 0 0 3px rgba(45,140,138,0.15);
+border-color:var(–teal); background:#fff; box-shadow:0 0 0 3px rgba(45,140,138,0.15);
 }
 .ctrl-spacer { flex:1; }
 .btn-run {
-  display:flex; align-items:center; gap:8px;
-  padding:10px 20px; border-radius:var(--r-sm);
-  background:linear-gradient(135deg,var(--teal),var(--teal-d));
-  color:#fff; font-size:14px; font-weight:700;
-  box-shadow:0 3px 10px rgba(45,140,138,0.4);
-  transition:all var(--tr); white-space:nowrap;
+display:flex; align-items:center; gap:8px;
+padding:10px 20px; border-radius:var(–r-sm);
+background:linear-gradient(135deg,var(–teal),var(–teal-d));
+color:#fff; font-size:14px; font-weight:700;
+box-shadow:0 3px 10px rgba(45,140,138,0.4);
+transition:all var(–tr); white-space:nowrap;
 }
 .btn-run:hover { transform:translateY(-1px); box-shadow:0 5px 16px rgba(45,140,138,0.5); }
 .btn-run:active { transform:translateY(0); }
@@ -136,275 +137,344 @@ input, select { font:inherit; }
 
 /* ── STATS STRIP ── */
 .stats-strip {
-  display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:0.625rem;
-  margin-bottom:1rem;
+display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:0.625rem;
+margin-bottom:1rem;
 }
 .stat-pill {
-  background:var(--card); border-radius:var(--r); border:1.5px solid var(--border);
-  padding:0.75rem 1rem; box-shadow:var(--shadow); text-align:center;
+background:var(–card); border-radius:var(–r); border:1.5px solid var(–border);
+padding:0.75rem 1rem; box-shadow:var(–shadow); text-align:center;
 }
-.stat-pill__val { font-size:26px; font-weight:800; color:var(--teal-d); line-height:1; }
-.stat-pill__lbl { font-size:10px; font-weight:700; letter-spacing:0.7px; text-transform:uppercase; color:var(--text-2); margin-top:4px; }
+.stat-pill__val { font-size:26px; font-weight:800; color:var(–teal-d); line-height:1; }
+.stat-pill__lbl { font-size:10px; font-weight:700; letter-spacing:0.7px; text-transform:uppercase; color:var(–text-2); margin-top:4px; }
 
 /* ── ZONE LEGEND ── */
 .zone-legend {
-  background:var(--card); border-radius:var(--r); border:1.5px solid var(--border);
-  padding:0.75rem 1rem; margin-bottom:1rem; box-shadow:var(--shadow);
-  display:flex; flex-wrap:wrap; gap:0.5rem; align-items:center;
+background:var(–card); border-radius:var(–r); border:1.5px solid var(–border);
+padding:0.75rem 1rem; margin-bottom:1rem; box-shadow:var(–shadow);
+display:flex; flex-wrap:wrap; gap:0.5rem; align-items:center;
 }
-.zone-legend h4 { font-size:10px; font-weight:700; letter-spacing:0.8px; text-transform:uppercase; color:var(--text-2); width:100%; margin-bottom:2px; }
+.zone-legend h4 { font-size:10px; font-weight:700; letter-spacing:0.8px; text-transform:uppercase; color:var(–text-2); width:100%; margin-bottom:2px; }
 .zone-chip {
-  display:inline-flex; align-items:center; gap:5px;
-  padding:4px 10px; border-radius:20px;
-  font-size:11px; font-weight:700;
-  background:var(--zb); color:var(--zc);
-  border:1.5px solid currentColor;
+display:inline-flex; align-items:center; gap:5px;
+padding:4px 10px; border-radius:20px;
+font-size:11px; font-weight:700;
+background:var(–zb); color:var(–zc);
+border:1.5px solid currentColor;
 }
-.zone-chip__dot { width:7px; height:7px; border-radius:50%; background:var(--zc); }
+.zone-chip__dot { width:7px; height:7px; border-radius:50%; background:var(–zc); }
 
 /* ── WEEK NAVIGATOR ── */
 .week-nav {
-  display:flex; align-items:center; gap:0.5rem; margin-bottom:0.75rem;
+display:flex; align-items:center; gap:0.5rem; margin-bottom:0.75rem;
 }
 .week-nav h3 { flex:1; text-align:center; font-size:15px; font-weight:700; }
 .week-nav-btn {
-  width:34px; height:34px; border-radius:var(--r-sm);
-  border:1.5px solid var(--border); background:var(--card);
-  display:flex; align-items:center; justify-content:center;
-  font-size:16px; color:var(--text-2);
-  transition:all var(--tr);
+width:34px; height:34px; border-radius:var(–r-sm);
+border:1.5px solid var(–border); background:var(–card);
+display:flex; align-items:center; justify-content:center;
+font-size:16px; color:var(–text-2);
+transition:all var(–tr);
 }
-.week-nav-btn:hover { border-color:var(--teal); color:var(--teal); background:var(--teal-l); }
+.week-nav-btn:hover { border-color:var(–teal); color:var(–teal); background:var(–teal-l); }
 
 /* ── CALENDAR WEEK ── */
 .week-grid {
-  display:grid; grid-template-columns:repeat(7,1fr); gap:0.375rem;
-  margin-bottom:1rem;
+display:grid; grid-template-columns:repeat(7,1fr); gap:0.375rem;
+margin-bottom:1rem;
 }
 .day-cell {
-  background:var(--card); border-radius:var(--r-sm);
-  border:1.5px solid var(--border);
-  min-height:100px; padding:0.5rem;
-  cursor:pointer; transition:all var(--tr);
-  position:relative; overflow:hidden;
+background:var(–card); border-radius:var(–r-sm);
+border:1.5px solid var(–border);
+min-height:100px; padding:0.5rem;
+cursor:pointer; transition:all var(–tr);
+position:relative; overflow:hidden;
 }
-.day-cell:hover { border-color:var(--teal); box-shadow:var(--shadow-md); transform:translateY(-1px); }
-.day-cell.active { border-color:var(--teal); box-shadow:0 0 0 3px rgba(45,140,138,0.15); }
-.day-cell.today { background:linear-gradient(160deg,#fff,var(--teal-l)); }
+.day-cell:hover { border-color:var(–teal); box-shadow:var(–shadow-md); transform:translateY(-1px); }
+.day-cell.active { border-color:var(–teal); box-shadow:0 0 0 3px rgba(45,140,138,0.15); }
+.day-cell.today { background:linear-gradient(160deg,#fff,var(–teal-l)); }
 .day-cell.past { opacity:0.45; pointer-events:none; }
 .day-cell.empty { opacity:0.5; pointer-events:none; }
 .day-cell__hdr { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:4px; }
-.day-cell__name { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.6px; color:var(--text-2); }
-.day-cell__num { font-size:18px; font-weight:800; color:var(--text); line-height:1; }
+.day-cell__name { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.6px; color:var(–text-2); }
+.day-cell__num { font-size:18px; font-weight:800; color:var(–text); line-height:1; }
 .day-cell.today .day-cell__num {
-  color:#fff; background:var(--teal);
-  width:28px; height:28px; border-radius:50%;
-  display:flex; align-items:center; justify-content:center; font-size:13px;
+color:#fff; background:var(–teal);
+width:28px; height:28px; border-radius:50%;
+display:flex; align-items:center; justify-content:center; font-size:13px;
 }
 .day-cell__zones { display:flex; flex-direction:column; gap:3px; margin-top:4px; }
 .day-cell__zone-row {
-  display:flex; align-items:center; gap:4px;
-  padding:3px 6px; border-radius:6px;
-  font-size:10px; font-weight:700;
-  background:var(--zb); color:var(--zc);
+display:flex; align-items:center; gap:4px;
+padding:3px 6px; border-radius:6px;
+font-size:10px; font-weight:700;
+background:var(–zb); color:var(–zc);
 }
-.day-cell__zone-dot { width:6px; height:6px; border-radius:50%; background:var(--zc); flex-shrink:0; }
+.day-cell__zone-dot { width:6px; height:6px; border-radius:50%; background:var(–zc); flex-shrink:0; }
 .day-cell__count-badge {
-  position:absolute; bottom:5px; right:5px;
-  background:var(--teal); color:#fff;
-  border-radius:10px; padding:1px 6px;
-  font-size:10px; font-weight:700;
-  font-family:'DM Mono',monospace;
+position:absolute; bottom:5px; right:5px;
+background:var(–teal); color:#fff;
+border-radius:10px; padding:1px 6px;
+font-size:10px; font-weight:700;
+font-family:‘DM Mono’,monospace;
 }
 .day-cell__warning {
-  position:absolute; top:5px; right:5px;
-  background:var(--orange); color:#fff;
-  border-radius:10px; padding:1px 6px; font-size:9px; font-weight:700;
+position:absolute; top:5px; right:5px;
+background:var(–orange); color:#fff;
+border-radius:10px; padding:1px 6px; font-size:9px; font-weight:700;
 }
 
 /* ── DAY DETAIL PANEL ── */
 .detail-panel {
-  background:var(--card); border-radius:var(--r); border:1.5px solid var(--border);
-  box-shadow:var(--shadow-md); overflow:hidden; margin-bottom:1rem;
-  animation:slideDown 0.22s ease-in-out;
+background:var(–card); border-radius:var(–r); border:1.5px solid var(–border);
+box-shadow:var(–shadow-md); overflow:hidden; margin-bottom:1rem;
+animation:slideDown 0.22s ease-in-out;
 }
 @keyframes slideDown {
-  from { opacity:0; transform:translateY(-8px); }
-  to   { opacity:1; transform:translateY(0); }
+from { opacity:0; transform:translateY(-8px); }
+to   { opacity:1; transform:translateY(0); }
 }
 .detail-hdr {
-  padding:0.875rem 1rem; border-bottom:1px solid var(--border);
-  display:flex; align-items:center; justify-content:space-between;
-  background:linear-gradient(90deg,var(--navy),var(--navy-mid));
-  color:#fff;
+padding:0.875rem 1rem; border-bottom:1px solid var(–border);
+display:flex; align-items:center; justify-content:space-between;
+background:linear-gradient(90deg,var(–navy),var(–navy-mid));
+color:#fff;
 }
 .detail-hdr h3 { font-size:15px; font-weight:800; }
 .detail-hdr-meta { display:flex; align-items:center; gap:0.5rem; }
 .detail-badge {
-  padding:3px 9px; border-radius:20px;
-  font-size:11px; font-weight:700;
-  background:rgba(255,255,255,0.15); color:#fff;
+padding:3px 9px; border-radius:20px;
+font-size:11px; font-weight:700;
+background:rgba(255,255,255,0.15); color:#fff;
 }
-.detail-badge--green { background:rgba(61,154,107,0.3); color:#6EE7B7; }
-.detail-badge--orange { background:rgba(229,136,58,0.3); color:#FCD34D; }
-.detail-actions { display:flex; gap:0.5rem; padding:0.75rem 1rem; border-bottom:1px solid var(--border); flex-wrap:wrap; }
+.detail-badge–green { background:rgba(61,154,107,0.3); color:#6EE7B7; }
+.detail-badge–orange { background:rgba(229,136,58,0.3); color:#FCD34D; }
+.detail-actions { display:flex; gap:0.5rem; padding:0.75rem 1rem; border-bottom:1px solid var(–border); flex-wrap:wrap; }
 .detail-action-btn {
-  display:flex; align-items:center; gap:5px;
-  padding:6px 12px; border-radius:var(--r-sm);
-  border:1.5px solid var(--border); background:var(--bg);
-  font-size:12px; font-weight:600; color:var(--text);
-  transition:all var(--tr);
+display:flex; align-items:center; gap:5px;
+padding:6px 12px; border-radius:var(–r-sm);
+border:1.5px solid var(–border); background:var(–bg);
+font-size:12px; font-weight:600; color:var(–text);
+transition:all var(–tr);
 }
-.detail-action-btn:hover { border-color:var(--teal); color:var(--teal-d); background:var(--teal-l); }
-.detail-action-btn--primary {
-  background:linear-gradient(135deg,var(--teal),var(--teal-d)); color:#fff; border-color:var(--teal-d);
-  box-shadow:0 2px 8px rgba(45,140,138,0.3);
+.detail-action-btn:hover { border-color:var(–teal); color:var(–teal-d); background:var(–teal-l); }
+.detail-action-btn–primary {
+background:linear-gradient(135deg,var(–teal),var(–teal-d)); color:#fff; border-color:var(–teal-d);
+box-shadow:0 2px 8px rgba(45,140,138,0.3);
 }
-.detail-action-btn--primary:hover { color:#fff; box-shadow:0 4px 14px rgba(45,140,138,0.45); transform:translateY(-1px); }
+.detail-action-btn–primary:hover { color:#fff; box-shadow:0 4px 14px rgba(45,140,138,0.45); transform:translateY(-1px); }
 
 /* Route sections */
-.route-section { padding:0.75rem 1rem; border-bottom:1px solid var(--border); }
+.route-section { padding:0.75rem 1rem; border-bottom:1px solid var(–border); }
 .route-section:last-child { border-bottom:none; }
 .route-section__hdr {
-  display:flex; align-items:center; gap:8px; margin-bottom:0.5rem;
+display:flex; align-items:center; gap:8px; margin-bottom:0.5rem;
 }
-.route-section__hdr h4 { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; color:var(--text-2); flex:1; }
+.route-section__hdr h4 { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; color:var(–text-2); flex:1; }
 .zone-tag {
-  display:inline-flex; align-items:center; gap:4px;
-  padding:3px 10px; border-radius:20px;
-  font-size:11px; font-weight:700;
-  background:var(--zb); color:var(--zc); border:1px solid currentColor;
+display:inline-flex; align-items:center; gap:4px;
+padding:3px 10px; border-radius:20px;
+font-size:11px; font-weight:700;
+background:var(–zb); color:var(–zc); border:1px solid currentColor;
 }
 .route-km {
-  display:flex; align-items:center; gap:4px;
-  font-size:11px; font-weight:600; color:var(--text-2);
-  font-family:'DM Mono',monospace;
+display:flex; align-items:center; gap:4px;
+font-size:11px; font-weight:600; color:var(–text-2);
+font-family:‘DM Mono’,monospace;
 }
 
 /* Patient route rows */
 .patient-route-list { display:flex; flex-direction:column; gap:4px; }
 .patient-row {
-  display:flex; align-items:center; gap:10px;
-  padding:8px 10px; border-radius:var(--r-sm);
-  border:1px solid var(--border); background:var(--bg);
-  transition:all var(--tr); cursor:default;
+display:flex; align-items:center; gap:10px;
+padding:8px 10px; border-radius:var(–r-sm);
+border:1.5px solid var(–border); background:var(–bg);
+transition:all var(–tr); cursor:pointer; user-select:none;
 }
-.patient-row:hover { background:var(--teal-l); border-color:#B2DADA; }
+.patient-row:hover { background:var(–teal-l); border-color:#B2DADA; }
+.patient-row.selected { background:var(–teal-l); border-color:var(–teal); }
+.patient-row.dragging { opacity:0.4; transform:scale(0.98); }
+.patient-row.drag-over { border-color:var(–orange); background:var(–orange-bg); }
+
+/* Checkbox */
+.row-check {
+width:18px; height:18px; border-radius:4px; flex-shrink:0;
+border:2px solid var(–border); background:#fff;
+display:flex; align-items:center; justify-content:center;
+transition:all 0.15s; color:var(–teal);
+font-size:11px; font-weight:800;
+}
+.patient-row.selected .row-check { border-color:var(–teal); background:var(–teal); color:#fff; }
+
+/* Drag handle */
+.drag-handle {
+color:var(–text-3); font-size:14px; cursor:grab; padding:0 2px;
+flex-shrink:0; line-height:1;
+}
+.drag-handle:active { cursor:grabbing; }
+
+/* Selection toolbar */
+.sel-toolbar {
+position:sticky; bottom:0; left:0; right:0;
+background:var(–navy); color:#fff;
+padding:10px 16px; display:flex; align-items:center; gap:10px;
+border-radius:var(–r) var(–r) 0 0;
+box-shadow:0 -4px 20px rgba(27,38,56,0.3);
+transform:translateY(100%); transition:transform 0.3s ease;
+z-index:50;
+}
+.sel-toolbar.visible { transform:translateY(0); }
+.sel-toolbar__count { font-size:14px; font-weight:700; flex:1; }
+.sel-btn {
+padding:8px 14px; border-radius:var(–r-sm); font-size:12px; font-weight:700;
+border:none; cursor:pointer; transition:all 0.15s;
+}
+.sel-btn–optimize { background:linear-gradient(135deg,var(–teal),var(–teal-d)); color:#fff; }
+.sel-btn–maps     { background:linear-gradient(135deg,#4285F4,#1a56c4); color:#fff; }
+.sel-btn–clear    { background:rgba(255,255,255,0.15); color:#fff; }
+.sel-btn–session  { background:linear-gradient(135deg,var(–green),#2A7050); color:#fff; }
+
+/* Session batch panel */
+.session-panel {
+background:var(–card); border-radius:var(–r); border:1.5px solid #B2DADA;
+box-shadow:var(–shadow-lg); margin-bottom:10px; overflow:hidden;
+}
+.session-panel__hdr {
+padding:10px 14px; background:linear-gradient(90deg,var(–teal),var(–teal-d));
+color:#fff; display:flex; align-items:center; justify-content:space-between;
+}
+.session-panel__hdr h4 { font-size:14px; font-weight:800; }
+.session-body { padding:10px; }
+.session-patient-row {
+display:flex; align-items:center; gap:10px;
+padding:8px 10px; border-radius:var(–r-sm);
+border:1.5px solid var(–border); background:var(–bg);
+margin-bottom:6px; cursor:grab;
+}
+.session-patient-row:active { cursor:grabbing; }
+.session-patient-row.drag-over { border-color:var(–orange); background:var(–orange-bg); }
+.visit-order-badge {
+width:24px; height:24px; border-radius:50%;
+background:var(–teal); color:#fff;
+display:flex; align-items:center; justify-content:center;
+font-size:11px; font-weight:800; flex-shrink:0;
+}
 .route-num {
-  width:22px; height:22px; border-radius:50%;
-  background:var(--zc); color:#fff;
-  display:flex; align-items:center; justify-content:center;
-  font-size:10px; font-weight:800; flex-shrink:0;
-  font-family:'DM Mono',monospace;
+width:22px; height:22px; border-radius:50%;
+background:var(–zc); color:#fff;
+display:flex; align-items:center; justify-content:center;
+font-size:10px; font-weight:800; flex-shrink:0;
+font-family:‘DM Mono’,monospace;
 }
 .patient-row__name { font-size:13px; font-weight:700; flex:1; min-width:0; }
-.patient-row__file { font-size:11px; color:var(--text-2); font-weight:500; }
-.patient-row__addr { font-size:11px; color:var(--text-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:2; }
-.patient-row__postal { font-size:11px; font-weight:600; color:var(--text); font-family:'DM Mono',monospace; background:var(--border); padding:2px 6px; border-radius:4px; flex-shrink:0; }
-.patient-row__dose { font-size:10px; font-weight:700; color:var(--teal-d); background:var(--teal-l); padding:2px 7px; border-radius:10px; flex-shrink:0; }
-.patient-row__window { font-size:10px; color:var(--text-2); font-family:'DM Mono',monospace; flex-shrink:0; }
+.patient-row__file { font-size:11px; color:var(–text-2); font-weight:500; }
+.patient-row__addr { font-size:11px; color:var(–text-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:2; }
+.patient-row__postal { font-size:11px; font-weight:600; color:var(–text); font-family:‘DM Mono’,monospace; background:var(–border); padding:2px 6px; border-radius:4px; flex-shrink:0; }
+.patient-row__dose { font-size:10px; font-weight:700; color:var(–teal-d); background:var(–teal-l); padding:2px 7px; border-radius:10px; flex-shrink:0; }
+.patient-row__window { font-size:10px; color:var(–text-2); font-family:‘DM Mono’,monospace; flex-shrink:0; }
 .patient-row__urgency { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
-.urgency-tight { background:var(--red); }
-.urgency-normal { background:var(--green); }
-.urgency-flexible { background:var(--teal); }
+.urgency-tight { background:var(–red); }
+.urgency-normal { background:var(–green); }
+.urgency-flexible { background:var(–teal); }
 
 /* Route connector line */
 .route-connector {
-  display:flex; align-items:center; gap:8px; padding:2px 10px 2px 20px;
+display:flex; align-items:center; gap:8px; padding:2px 10px 2px 20px;
 }
-.route-connector__line { flex:1; height:1px; border-top:1.5px dashed var(--border); }
-.route-connector__km { font-size:10px; color:var(--text-3); font-family:'DM Mono',monospace; }
+.route-connector__line { flex:1; height:1px; border-top:1.5px dashed var(–border); }
+.route-connector__km { font-size:10px; color:var(–text-3); font-family:‘DM Mono’,monospace; }
 
 /* EV Range bar */
 .ev-bar { padding:0.75rem 1rem; background:linear-gradient(90deg,#f0f9ff,#e0f2fe); border-top:1px solid #BAE6FD; }
 .ev-bar__hdr { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
 .ev-bar__title { font-size:11px; font-weight:700; color:#0369A1; text-transform:uppercase; letter-spacing:0.6px; }
-.ev-bar__km { font-size:12px; font-weight:700; color:#0369A1; font-family:'DM Mono',monospace; }
+.ev-bar__km { font-size:12px; font-weight:700; color:#0369A1; font-family:‘DM Mono’,monospace; }
 .ev-track { height:8px; background:#BAE6FD; border-radius:99px; overflow:hidden; }
 .ev-fill { height:100%; background:linear-gradient(90deg,#0EA5E9,#0369A1); border-radius:99px; transition:width 0.5s ease-in-out; }
 
 /* ── UNSCHEDULED PANEL ── */
 .unscheduled-panel {
-  background:var(--card); border-radius:var(--r); border:1.5px solid var(--border);
-  margin-bottom:1rem; box-shadow:var(--shadow); overflow:hidden;
+background:var(–card); border-radius:var(–r); border:1.5px solid var(–border);
+margin-bottom:1rem; box-shadow:var(–shadow); overflow:hidden;
 }
 .unscheduled-panel__hdr {
-  padding:0.75rem 1rem; background:linear-gradient(90deg,var(--red-bg),#fff);
-  border-bottom:1px solid var(--border); display:flex; align-items:center; gap:8px;
+padding:0.75rem 1rem; background:linear-gradient(90deg,var(–red-bg),#fff);
+border-bottom:1px solid var(–border); display:flex; align-items:center; gap:8px;
 }
-.unscheduled-panel__hdr h3 { font-size:13px; font-weight:700; color:var(--red); flex:1; }
+.unscheduled-panel__hdr h3 { font-size:13px; font-weight:700; color:var(–red); flex:1; }
 .unscheduled-list { padding:0.75rem; display:flex; flex-direction:column; gap:4px; }
 .unscheduled-row {
-  display:flex; align-items:center; gap:10px;
-  padding:7px 10px; border-radius:var(--r-sm);
-  border:1px solid #F0C0C0; background:var(--red-bg);
+display:flex; align-items:center; gap:10px;
+padding:7px 10px; border-radius:var(–r-sm);
+border:1px solid #F0C0C0; background:var(–red-bg);
 }
-.unscheduled-row__name { font-size:13px; font-weight:700; flex:1; color:var(--red); }
-.unscheduled-row__reason { font-size:11px; color:var(--text-2); }
-.unscheduled-row__due { font-size:11px; font-family:'DM Mono',monospace; color:var(--text-2); }
+.unscheduled-row__name { font-size:13px; font-weight:700; flex:1; color:var(–red); }
+.unscheduled-row__reason { font-size:11px; color:var(–text-2); }
+.unscheduled-row__due { font-size:11px; font-family:‘DM Mono’,monospace; color:var(–text-2); }
 
 /* ── EMPTY / LOADING ── */
 .empty-state { text-align:center; padding:3rem 1.5rem; }
 .empty-state__icon { font-size:3.5rem; margin-bottom:1rem; }
 .empty-state__title { font-size:18px; font-weight:800; margin-bottom:6px; }
-.empty-state__sub { font-size:13px; color:var(--text-2); max-width:340px; margin:0 auto; }
+.empty-state__sub { font-size:13px; color:var(–text-2); max-width:340px; margin:0 auto; }
 .loading-wrap { display:flex; align-items:center; justify-content:center; gap:10px; padding:2rem; }
-.spinner { width:28px; height:28px; border-radius:50%; border:3px solid var(--border); border-top-color:var(--teal); animation:spin 0.8s linear infinite; }
+.spinner { width:28px; height:28px; border-radius:50%; border:3px solid var(–border); border-top-color:var(–teal); animation:spin 0.8s linear infinite; }
 @keyframes spin { to { transform:rotate(360deg); } }
 
 /* ── TOAST ── */
 .toast-wrap {
-  position:fixed; top:calc(var(--hdr) + 8px); left:50%; transform:translateX(-50%);
-  z-index:9999; pointer-events:none; width:calc(100% - 2rem); max-width:380px;
+position:fixed; top:calc(var(–hdr) + 8px); left:50%; transform:translateX(-50%);
+z-index:9999; pointer-events:none; width:calc(100% - 2rem); max-width:380px;
 }
 .toast {
-  background:var(--navy); color:#fff; border-radius:var(--r-sm);
-  padding:10px 14px; font-size:13px; font-weight:600;
-  display:flex; align-items:center; gap:8px;
-  box-shadow:var(--shadow-lg); pointer-events:all;
-  animation:toastIn 0.3s ease, toastOut 0.3s ease 2.7s forwards;
+background:var(–navy); color:#fff; border-radius:var(–r-sm);
+padding:10px 14px; font-size:13px; font-weight:600;
+display:flex; align-items:center; gap:8px;
+box-shadow:var(–shadow-lg); pointer-events:all;
+animation:toastIn 0.3s ease, toastOut 0.3s ease 2.7s forwards;
 }
-.toast--ok  { background:linear-gradient(135deg,var(--green),#2A7050); }
-.toast--err { background:linear-gradient(135deg,var(--red),#B04040); }
+.toast–ok  { background:linear-gradient(135deg,var(–green),#2A7050); }
+.toast–err { background:linear-gradient(135deg,var(–red),#B04040); }
 @keyframes toastIn  { from{opacity:0;transform:translateY(-12px) scale(0.95)} to{opacity:1;transform:translateY(0) scale(1)} }
 @keyframes toastOut { from{opacity:1} to{opacity:0;transform:translateY(-8px)} }
 
 /* ── EXPORT MODAL ── */
 .modal-overlay { position:fixed; inset:0; background:rgba(27,38,56,0.55); z-index:300; display:none; align-items:flex-end; justify-content:center; backdrop-filter:blur(3px); }
 .modal-overlay.open { display:flex; }
-.modal { width:100%; max-width:480px; background:var(--card); border-radius:20px 20px 0 0; max-height:70vh; overflow-y:auto; padding:0 0 24px; animation:slideUp 0.3s ease; box-shadow:0 -8px 40px rgba(27,38,56,0.2); }
+.modal { width:100%; max-width:480px; background:var(–card); border-radius:20px 20px 0 0; max-height:70vh; overflow-y:auto; padding:0 0 24px; animation:slideUp 0.3s ease; box-shadow:0 -8px 40px rgba(27,38,56,0.2); }
 @keyframes slideUp { from{transform:translateY(40px);opacity:0} to{transform:translateY(0);opacity:1} }
-.modal__handle { width:36px; height:4px; background:var(--border); border-radius:2px; margin:10px auto 14px; }
-.modal__title { font-size:17px; font-weight:800; padding:0 20px 12px; border-bottom:1px solid var(--border); }
+.modal__handle { width:36px; height:4px; background:var(–border); border-radius:2px; margin:10px auto 14px; }
+.modal__title { font-size:17px; font-weight:800; padding:0 20px 12px; border-bottom:1px solid var(–border); }
 .modal__body { padding:16px 20px; }
 .export-option {
-  display:flex; align-items:center; gap:12px;
-  padding:12px 14px; border-radius:var(--r-sm);
-  border:1.5px solid var(--border); background:var(--bg);
-  margin-bottom:8px; cursor:pointer; transition:all var(--tr);
+display:flex; align-items:center; gap:12px;
+padding:12px 14px; border-radius:var(–r-sm);
+border:1.5px solid var(–border); background:var(–bg);
+margin-bottom:8px; cursor:pointer; transition:all var(–tr);
 }
-.export-option:hover { border-color:var(--teal); background:var(--teal-l); color:var(--teal-d); }
+.export-option:hover { border-color:var(–teal); background:var(–teal-l); color:var(–teal-d); }
 .export-option__icon { font-size:22px; }
 .export-option__text strong { display:block; font-size:14px; font-weight:700; }
-.export-option__text span { font-size:12px; color:var(--text-2); }
+.export-option__text span { font-size:12px; color:var(–text-2); }
 
 /* ── MISC ── */
 .hidden { display:none !important; }
 @media (max-width:640px) {
-  .week-grid { grid-template-columns:repeat(7,1fr); gap:2px; }
-  .day-cell { min-height:70px; padding:4px; }
-  .day-cell__num { font-size:14px; }
-  .day-cell__zones { display:none; }
-  .stats-strip { grid-template-columns:repeat(2,1fr); }
-  .control-bar { flex-direction:column; }
-  .ctrl-group { min-width:unset; width:100%; }
-  .patient-row__addr, .patient-row__window { display:none; }
+.week-grid { grid-template-columns:repeat(7,1fr); gap:2px; }
+.day-cell { min-height:70px; padding:4px; }
+.day-cell__num { font-size:14px; }
+.day-cell__zones { display:none; }
+.stats-strip { grid-template-columns:repeat(2,1fr); }
+.control-bar { flex-direction:column; }
+.ctrl-group { min-width:unset; width:100%; }
+.patient-row__addr, .patient-row__window { display:none; }
 }
 </style>
+
 </head>
 <body>
 
 <!-- HEADER -->
+
 <header class="hdr">
   <div class="hdr__brand">
     <div class="hdr__icon">🗺️</div>
@@ -421,6 +491,7 @@ input, select { font:inherit; }
 <div class="page">
 
   <!-- CONTROL BAR -->
+
   <div class="control-bar">
     <div class="ctrl-group">
       <label>Schedule Starting From</label>
@@ -474,6 +545,7 @@ input, select { font:inherit; }
   </div>
 
   <!-- STATS STRIP -->
+
   <div class="stats-strip" id="statsStrip" style="display:none">
     <div class="stat-pill">
       <div class="stat-pill__val" id="st-patients">0</div>
@@ -502,11 +574,13 @@ input, select { font:inherit; }
   </div>
 
   <!-- ZONE LEGEND -->
+
   <div class="zone-legend hidden" id="zoneLegend">
     <h4>Geographic Zones</h4>
   </div>
 
   <!-- INITIAL STATE -->
+
   <div class="empty-state" id="emptyState">
     <div class="empty-state__icon">📍</div>
     <div class="empty-state__title">Ready to Schedule</div>
@@ -514,19 +588,36 @@ input, select { font:inherit; }
   </div>
 
   <!-- LOADING -->
+
   <div class="loading-wrap hidden" id="loadingWrap">
     <div class="spinner"></div>
     <span style="font-size:14px;color:var(--text-2)" id="loadingMsg">Loading patients…</span>
   </div>
 
   <!-- CALENDAR + DETAIL (rendered by JS) -->
+
   <div id="calendarWrap" class="hidden"></div>
   <div id="detailWrap"></div>
   <div id="unscheduledWrap"></div>
 
+<!-- SELECTION TOOLBAR -->
+
+<div class="sel-toolbar" id="selToolbar">
+  <div class="sel-toolbar__count" id="selCount">0 selected</div>
+  <button class="sel-btn sel-btn--clear" id="selClearBtn">✕ Clear</button>
+  <button class="sel-btn sel-btn--session" id="selSessionBtn">📅 Create Session</button>
+  <button class="sel-btn sel-btn--maps" id="selMapsBtn">🗺️ Maps</button>
+  <button class="sel-btn sel-btn--optimize" id="selOptimizeBtn">⚡ Optimize Route</button>
+</div>
+
+<!-- SESSION BATCH PANEL -->
+
+<div id="sessionPanelWrap" style="display:none;padding:0 0 10px"></div>
+
 </div>
 
 <!-- EXPORT MODAL -->
+
 <div class="modal-overlay" id="exportModal">
   <div class="modal">
     <div class="modal__handle"></div>
@@ -640,6 +731,9 @@ const COL = {
 // ══ STATE ══
 let sb = null;
 let allPatients = [];
+let selectedPatientIds = new Set();  // IDs of checked patients
+let sessionPatients    = [];         // current batch session (ordered)
+let dragSrcEl          = null;       // drag-and-drop source element
 let schedule = [];       // [{date, zones:[{name,zoneIdx,patients:[]}]}]
 let unscheduled = [];
 let selectedDay = null;
@@ -1097,11 +1191,26 @@ function renderDetail(day){
       </div>
     </div>`;
 
-  // Route zones
+  // ── Selection toolbar controls ──
+  html += `<div style="padding:8px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+    <button onclick="selectAllInDay()" style="padding:5px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--bg);font-size:11px;font-weight:700;cursor:pointer">☑ Select All</button>
+    <button onclick="clearSelection()" style="padding:5px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--bg);font-size:11px;font-weight:700;cursor:pointer">☐ Clear</button>
+    <span style="font-size:11px;color:var(--text-2);flex:1">Click a patient to select · Drag ⋮⋮ to reorder</span>
+  </div>`;
+
+  // Route zones — sorted by due date within zone, group headers per due date
   let stopNum = 1;
   day.zones.forEach(zone=>{
     const zi = getZoneIdx(zone.name);
     const zoneKm = Math.round(zone.patients.length * (ZONE_KM_SPACING[zone.name]||2.0));
+
+    // Sort patients by due date ascending within zone
+    const sorted = [...zone.patients].sort((a,b)=>(a.due||'').localeCompare(b.due||''));
+
+    // Group by due date for visual separators
+    const dueGroups = {};
+    sorted.forEach(p=>{ (dueGroups[p.due||'Unknown']=dueGroups[p.due||'Unknown']||[]).push(p); });
+
     html += `
     <div class="route-section">
       <div class="route-section__hdr">
@@ -1111,27 +1220,34 @@ function renderDetail(day){
         </span>
         <span class="route-km">~${zoneKm} km within zone</span>
       </div>
-      <div class="patient-route-list">`;
+      <div class="patient-route-list" id="routeList_${zone.name.replace(/\s+/g,'_')}">`;
 
-    zone.patients.forEach((p,i)=>{
-      const urgency = getUrgency(p, day.date);
-      const daysLeft = daysBetween(day.date, p.winEnd);
-      html += `
-        <div class="patient-row">
-          <div class="route-num zone-${zi%12}" style="background:var(--zc);color:#fff">${stopNum++}</div>
-          <div style="flex-shrink:0">
-            <div class="patient-row__name">${esc(p['Patient Name']||'')}</div>
-            <div class="patient-row__file">#${esc(p['File Number']||'')}</div>
-          </div>
-          <div class="patient-row__addr">${esc(formatAddrDisplay(p['Address']||''))}</div>
-          <div class="patient-row__postal">${esc(p.postal||'')}</div>
-          <div class="patient-row__dose">${esc(p['Dose Prescribed']||'')}mg</div>
-          <div class="patient-row__window">Due ${formatDateShort(p.due)}<br>±${WINDOW_DAYS}d</div>
-          <div class="patient-row__urgency ${urgency==='tight'?'urgency-tight':urgency==='normal'?'urgency-normal':'urgency-flexible'}" title="${urgency}"></div>
-        </div>`;
-      if(i < zone.patients.length-1){
-        html += `<div class="route-connector"><div class="route-connector__line"></div><div class="route-connector__km">~${ZONE_KM_SPACING[zone.name]||2} km</div><div class="route-connector__line"></div></div>`;
-      }
+    Object.entries(dueGroups).sort(([a],[b])=>a.localeCompare(b)).forEach(([dueDate, pats])=>{
+      // Due date separator
+      html += `<div style="display:flex;align-items:center;gap:6px;padding:6px 4px 3px;margin-top:4px">
+        <span style="font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--text-3)">DUE: ${formatDateShort(dueDate)}</span>
+        <div style="flex:1;height:1px;background:var(--border)"></div>
+        <span style="font-size:9px;font-weight:700;color:var(--text-3)">${pats.length}</span>
+      </div>`;
+
+      pats.forEach((p)=>{
+        const isSelected = selectedPatientIds.has(p.id);
+        const stop = stopNum++;
+        html += `
+          <div class="patient-row${isSelected?' selected':''}" data-pid="${p.id}" data-zone="${zone.name}">
+            <div class="drag-handle" draggable="true" data-pid="${p.id}">⋮⋮</div>
+            <div class="row-check">${isSelected?'✓':''}</div>
+            <div class="route-num zone-${zi%12}" style="background:var(--zc);color:#fff;flex-shrink:0">${stop}</div>
+            <div style="flex:1;min-width:0">
+              <div class="patient-row__name">${esc(p['Patient Name']||'')}</div>
+              <div class="patient-row__file">#${esc(p['File Number']||'')}</div>
+              <div class="patient-row__addr">${esc(formatAddrDisplay(p['Address']||''))}</div>
+            </div>
+          </div>`;
+        if(pats.indexOf(p) < pats.length-1){
+          html += `<div class="route-connector"><div class="route-connector__line"></div><div class="route-connector__km">~${ZONE_KM_SPACING[zone.name]||2} km</div><div class="route-connector__line"></div></div>`;
+        }
+      });
     });
 
     html += `</div></div>`;
@@ -1306,6 +1422,7 @@ function printDay(day){
     .legend{margin-top:14px;font-size:11px;color:#64748B}
     @media print{body{padding:0}}
   </style></head><body>
+
   <h1>📍 Route Sheet — ${formatDateLong(day.date)}</h1>
   <div class="meta">${day.total} patients · Est. ${km} km · Zones: ${day.zones.map(z=>z.name).join(', ')}</div>
   <table>
@@ -1318,106 +1435,281 @@ function printDay(day){
 }
 
 function openMapsRoute(day){
-  // Build Google Maps waypoint URL
-  const all = day.zones.flatMap(z=>z.patients);
-  if(!all.length) return;
-  const waypoints = all.slice(0,-1).map(p=>encodeURIComponent(p['Address']||'')).join('|');
-  const dest = encodeURIComponent(all[all.length-1]['Address']||'');
-  const url = `https://www.google.com/maps/dir/?api=1&destination=${dest}&waypoints=${waypoints}&travelmode=driving`;
-  window.open(url,'_blank');
+// Build Google Maps waypoint URL
+const all = day.zones.flatMap(z=>z.patients);
+if(!all.length) return;
+const waypoints = all.slice(0,-1).map(p=>encodeURIComponent(p[‘Address’]||’’)).join(’|’);
+const dest = encodeURIComponent(all[all.length-1][‘Address’]||’’);
+const url = `https://www.google.com/maps/dir/?api=1&destination=${dest}&waypoints=${waypoints}&travelmode=driving`;
+window.open(url,’_blank’);
 }
 
 function downloadBlob(content, type, filename){
-  const blob = new Blob([content],{type});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = filename;
-  a.click();
+const blob = new Blob([content],{type});
+const a = document.createElement(‘a’);
+a.href = URL.createObjectURL(blob);
+a.download = filename;
+a.click();
 }
 
 // ══ MAIN RUN ══
 async function run(){
-  const btn = document.getElementById('runBtn');
-  btn.disabled = true;
-  setLoading(true,'Loading patients from Supabase…');
-  zoneList = [];
-  document.getElementById('calendarWrap').classList.add('hidden');
-  document.getElementById('detailWrap').innerHTML='';
-  document.getElementById('unscheduledWrap').innerHTML='';
-  document.getElementById('zoneLegend').classList.add('hidden');
-  document.getElementById('statsStrip').style.display='none';
-  selectedDay = null; activeDayEl = null;
+const btn = document.getElementById(‘runBtn’);
+btn.disabled = true;
+setLoading(true,‘Loading patients from Supabase…’);
+zoneList = [];
+document.getElementById(‘calendarWrap’).classList.add(‘hidden’);
+document.getElementById(‘detailWrap’).innerHTML=’’;
+document.getElementById(‘unscheduledWrap’).innerHTML=’’;
+document.getElementById(‘zoneLegend’).classList.add(‘hidden’);
+document.getElementById(‘statsStrip’).style.display=‘none’;
+selectedDay = null; activeDayEl = null;
 
-  try {
-    allPatients = await loadPatients();
-    setLoading(true,`Scheduling ${allPatients.length} patients…`);
+try {
+allPatients = await loadPatients();
+setLoading(true,`Scheduling ${allPatients.length} patients…`);
 
-    const startDate   = document.getElementById('startDate').value || todayStr();
-    const weeksAhead  = parseInt(document.getElementById('weeksAhead').value) || 6;
-    const maxPerDay   = parseInt(document.getElementById('maxPerDay').value) || 14;
-    const minPerDay   = parseInt(document.getElementById('minPerDay').value) || 10;
-    const workDaysMask = document.getElementById('workDays').value;
-    const endDate     = addDays(startDate, weeksAhead*7);
+```
+const startDate   = document.getElementById('startDate').value || todayStr();
+const weeksAhead  = parseInt(document.getElementById('weeksAhead').value) || 6;
+const maxPerDay   = parseInt(document.getElementById('maxPerDay').value) || 14;
+const minPerDay   = parseInt(document.getElementById('minPerDay').value) || 10;
+const workDaysMask = document.getElementById('workDays').value;
+const endDate     = addDays(startDate, weeksAhead*7);
 
-    currentWeekAnchor = startDate;
+currentWeekAnchor = startDate;
 
-    const result = buildSchedule(allPatients, { startDate, endDate, maxPerDay, minPerDay, workDaysMask });
-    schedule = result.scheduledDays;
-    unscheduled = result.unscheduled;
+const result = buildSchedule(allPatients, { startDate, endDate, maxPerDay, minPerDay, workDaysMask });
+schedule = result.scheduledDays;
+unscheduled = result.unscheduled;
 
-    setLoading(false);
-    document.getElementById('emptyState').classList.add('hidden');
+setLoading(false);
+document.getElementById('emptyState').classList.add('hidden');
 
-    if(!allPatients.length){
-      document.getElementById('emptyState').classList.remove('hidden');
-      document.getElementById('emptyState').querySelector('.empty-state__icon').textContent='📭';
-      document.getElementById('emptyState').querySelector('.empty-state__title').textContent='No patients found in database';
-      document.getElementById('emptyState').querySelector('.empty-state__sub').innerHTML=
-        'Make sure your patients have a <strong>Due Date</strong> set and are not Archived or Pending.<br><br>' +
-        '<strong>Example:</strong> Patient due <em>Jul 23, 2026</em> → eligible window is <em>Jul 20–26</em>.<br>' +
-        'The scheduler groups Laval patients together, Montreal patients together, etc.<br>' +
-        'Try extending the <strong>Weeks to Plan</strong> range.';
-      return;
-    }
+if(!allPatients.length){
+  document.getElementById('emptyState').classList.remove('hidden');
+  document.getElementById('emptyState').querySelector('.empty-state__icon').textContent='📭';
+  document.getElementById('emptyState').querySelector('.empty-state__title').textContent='No patients found in database';
+  document.getElementById('emptyState').querySelector('.empty-state__sub').innerHTML=
+    'Make sure your patients have a <strong>Due Date</strong> set and are not Archived or Pending.<br><br>' +
+    '<strong>Example:</strong> Patient due <em>Jul 23, 2026</em> → eligible window is <em>Jul 20–26</em>.<br>' +
+    'The scheduler groups Laval patients together, Montreal patients together, etc.<br>' +
+    'Try extending the <strong>Weeks to Plan</strong> range.';
+  return;
+}
 
-    if(schedule.length === 0){
-      document.getElementById('emptyState').classList.remove('hidden');
-      document.getElementById('emptyState').querySelector('.empty-state__icon').textContent='🗓️';
-      document.getElementById('emptyState').querySelector('.empty-state__title').textContent='No schedulable windows found';
-      document.getElementById('emptyState').querySelector('.empty-state__sub').innerHTML=
-        `Loaded <strong>${allPatients.length} patients</strong> but none have due dates within the selected planning period.<br><br>` +
-        `<strong>Try:</strong> Extend weeks to plan, or change the start date to an earlier date that covers your patients' due dates.`;
-      return;
-    }
+if(schedule.length === 0){
+  document.getElementById('emptyState').classList.remove('hidden');
+  document.getElementById('emptyState').querySelector('.empty-state__icon').textContent='🗓️';
+  document.getElementById('emptyState').querySelector('.empty-state__title').textContent='No schedulable windows found';
+  document.getElementById('emptyState').querySelector('.empty-state__sub').innerHTML=
+    `Loaded <strong>${allPatients.length} patients</strong> but none have due dates within the selected planning period.<br><br>` +
+    `<strong>Try:</strong> Extend weeks to plan, or change the start date to an earlier date that covers your patients' due dates.`;
+  return;
+}
 
-    renderCalendar(schedule);
-    renderUnscheduled(unscheduled);
-    renderZoneLegend();
-    renderStats(schedule, unscheduled, allPatients);
+renderCalendar(schedule);
+renderUnscheduled(unscheduled);
+renderZoneLegend();
+renderStats(schedule, unscheduled, allPatients);
 
-    toast(`✓ Scheduled ${allPatients.length - unscheduled.length} patients across ${schedule.length} days`,'ok');
-  } catch(e){
-    setLoading(false);
-    toast('Error: '+e.message,'err');
-    console.error(e);
-  } finally {
-    btn.disabled=false;
-  }
+toast(`✓ Scheduled ${allPatients.length - unscheduled.length} patients across ${schedule.length} days`,'ok');
+```
+
+} catch(e){
+setLoading(false);
+toast(’Error: ’+e.message,‘err’);
+console.error(e);
+} finally {
+btn.disabled=false;
+}
+}
+
+// ══ SELECTION ENGINE ══
+
+function togglePatient(pid) {
+if (selectedPatientIds.has(pid)) selectedPatientIds.delete(pid);
+else selectedPatientIds.add(pid);
+updateSelectionUI();
+if (selectedDay) renderDetail(selectedDay);  // re-render with updated checkboxes
+}
+
+function selectAllInDay() {
+if (!selectedDay) return;
+selectedDay.zones.flatMap(z=>z.patients).forEach(p=>selectedPatientIds.add(p.id));
+updateSelectionUI();
+renderDetail(selectedDay);
+}
+
+function clearSelection() {
+selectedPatientIds.clear();
+updateSelectionUI();
+if (selectedDay) renderDetail(selectedDay);
+}
+
+function updateSelectionUI() {
+const n = selectedPatientIds.size;
+const toolbar = document.getElementById(‘selToolbar’);
+const count   = document.getElementById(‘selCount’);
+if (n > 0) { toolbar.classList.add(‘visible’); count.textContent = `${n} patient${n>1?'s':''} selected`; }
+else         toolbar.classList.remove(‘visible’);
+}
+
+function getSelectedPatients() {
+if (!allPatients.length) return [];
+return allPatients.filter(p => selectedPatientIds.has(p.id));
+}
+
+// ── OPTIMIZE ROUTE for selected patients only ──
+function optimizeSelectedRoute() {
+const sel = getSelectedPatients();
+if (!sel.length) { toast(‘Select at least one patient first’,‘warning’); return; }
+
+// Sort by postal code (geographic sweep)
+const sorted = […sel].sort((a,b)=>{
+const az = getZoneName(a[‘Address’]||’’, ‘’);
+const bz = getZoneName(b[‘Address’]||’’, ‘’);
+const dA = ZONE_FROM_BASE[az]||20;
+const dB = ZONE_FROM_BASE[bz]||20;
+if (dA !== dB) return dA - dB;
+return (getPostalCode(a[‘Address’]||’’)).localeCompare(getPostalCode(b[‘Address’]||’’));
+});
+
+// Render optimized route in a panel
+const wrap = document.getElementById(‘sessionPanelWrap’);
+wrap.style.display = ‘block’;
+let rows = sorted.map((p,i) => {
+const addr = formatAddrDisplay(p[‘Address’]||’’);
+const postal = getPostalCode(p[‘Address’]||’’);
+return `<div class="session-patient-row" draggable="true" data-pid="${p.id}" data-idx="${i}" ondragstart="onSessionDragStart(event)" ondragover="onSessionDragOver(event)"  ondrop="onSessionDrop(event)" ondragleave="onSessionDragLeave(event)"> <div class="drag-handle">⋮⋮</div> <div class="visit-order-badge">${i+1}</div> <div style="flex:1;min-width:0"> <div style="font-weight:700;font-size:13px">${esc(p['Patient Name']||'')}</div> <div style="font-size:11px;color:var(--text-2)">#${esc(p['File Number']||'')} · ${esc(addr)}</div> </div> <span style="font-size:10px;font-family:monospace;background:var(--border);padding:2px 6px;border-radius:4px">${postal}</span> </div>`;
+}).join(’’);
+
+const km = sorted.length > 1 ? Math.round(sorted.length * 1.8 + 15) : 5;
+wrap.innerHTML = `<div class="session-panel">
+<div class="session-panel__hdr">
+<h4>⚡ Optimized Route — ${sorted.length} patients (~${km} km)</h4>
+<div style="display:flex;gap:6px">
+<button class="sel-btn sel-btn--maps" style="font-size:11px;padding:5px 10px" onclick="openMapsForSelected()">🗺️ Open Maps</button>
+<button class="sel-btn sel-btn--session" style="font-size:11px;padding:5px 10px" onclick="saveSessionOrder()">💾 Save Order</button>
+<button class="sel-btn sel-btn--clear" style="font-size:11px;padding:5px 10px;background:rgba(224,90,90,0.3)" onclick="closeSession()">✕</button>
+</div>
+</div>
+<div class="session-body" id="sessionBody">${rows}</div>
+
+  </div>`;
+
+sessionPatients = sorted;
+toast(`Route optimized — ${sorted.length} patients ordered by zone + postal code`,‘ok’);
+}
+
+// ── CREATE SESSION (batch appointment) ──
+function createSession() {
+const sel = getSelectedPatients();
+if (!sel.length) { toast(‘Select patients first’,‘warning’); return; }
+sessionPatients = […sel];
+optimizeSelectedRoute();
+toast(`Session created — drag to reorder visit sequence`,‘ok’);
+}
+
+function closeSession() {
+document.getElementById(‘sessionPanelWrap’).style.display = ‘none’;
+sessionPatients = [];
+}
+
+function saveSessionOrder() {
+if (!sessionPatients.length) return;
+// Assign appointment times 30-min apart starting 9:00 AM for the selected day
+const date = selectedDay ? selectedDay.date : todayStr();
+const saves = sessionPatients.map(async (p, i) => {
+const h   = 9 + Math.floor(i * 0.5);
+const m   = (i % 2) === 0 ? ‘00’ : ‘30’;
+const dt  = `${date}T${String(h).padStart(2,'0')}:${m}`;
+const row = {};
+for(const [k,v] of Object.entries(COL)) row[v] = p[k]??null;
+row.appointment_date_time = dt;
+row.appointment_confirmed = true;
+const { error } = await sb.from(‘patients’).update(row).eq(‘id’, p.id);
+if (error) throw error;
+});
+Promise.all(saves)
+.then(() => { toast(`✓ Session saved — ${sessionPatients.length} appointments set from 9:00 AM`,‘ok’); })
+.catch(e  => toast(’Save error: ’+e.message,‘error’));
+}
+
+function openMapsForSelected() {
+const sel = sessionPatients.length ? sessionPatients : getSelectedPatients();
+if (!sel.length) return;
+const pts = sel.map(p=>encodeURIComponent(p[‘Address’]||’’)).filter(Boolean);
+if (!pts.length) { toast(‘No addresses found’,‘warning’); return; }
+const dest = pts[pts.length-1];
+const waypts = pts.slice(0,-1).join(’|’);
+const url = `https://www.google.com/maps/dir/?api=1&destination=${dest}&waypoints=${waypts}&travelmode=driving`;
+window.open(url,’_blank’);
+}
+
+// ── DRAG AND DROP — Session reordering ──
+function onSessionDragStart(e) {
+dragSrcEl = e.currentTarget;
+e.dataTransfer.effectAllowed = ‘move’;
+e.dataTransfer.setData(‘text/plain’, e.currentTarget.dataset.idx);
+setTimeout(()=>e.currentTarget.classList.add(‘dragging’), 0);
+}
+function onSessionDragOver(e) { e.preventDefault(); e.currentTarget.classList.add(‘drag-over’); }
+function onSessionDragLeave(e){ e.currentTarget.classList.remove(‘drag-over’); }
+function onSessionDrop(e) {
+e.preventDefault();
+const target = e.currentTarget;
+target.classList.remove(‘drag-over’);
+if (!dragSrcEl || dragSrcEl === target) return;
+const fromIdx = parseInt(dragSrcEl.dataset.idx);
+const toIdx   = parseInt(target.dataset.idx);
+const moved   = sessionPatients.splice(fromIdx, 1)[0];
+sessionPatients.splice(toIdx, 0, moved);
+// Re-render session body
+optimizeSelectedRoute();  // re-draws with new order
 }
 
 // ══ INIT ══
-document.addEventListener('DOMContentLoaded',async()=>{
-  // Set default start date to today
-  document.getElementById('startDate').value = todayStr();
+document.addEventListener(‘DOMContentLoaded’,async()=>{
+// Set default start date to today
+document.getElementById(‘startDate’).value = todayStr();
 
-  await initDB();
+await initDB();
 
-  document.getElementById('runBtn').addEventListener('click', run);
+document.getElementById(‘runBtn’).addEventListener(‘click’, run);
 
-  // Add link from main app
-  const backLink = document.querySelector('.hdr__back');
-  if(backLink) backLink.href = 'index.html';
+// Add link from main app
+const backLink = document.querySelector(’.hdr__back’);
+if(backLink) backLink.href = ‘index.html’;
+
+// Selection toolbar buttons
+document.getElementById(‘selClearBtn’)?.addEventListener(‘click’, clearSelection);
+document.getElementById(‘selOptimizeBtn’)?.addEventListener(‘click’, optimizeSelectedRoute);
+document.getElementById(‘selSessionBtn’)?.addEventListener(‘click’, createSession);
+document.getElementById(‘selMapsBtn’)?.addEventListener(‘click’, openMapsForSelected);
+
+// Patient row click-to-select (event delegation on detail panel)
+document.getElementById(‘detailWrap’).addEventListener(‘click’, e => {
+const row = e.target.closest(’.patient-row[data-pid]’);
+if (!row) return;
+const pid = parseInt(row.dataset.pid);
+if (!isNaN(pid)) togglePatient(pid);
+});
+
+// Expose for inline handlers
+window.selectAllInDay     = selectAllInDay;
+window.clearSelection     = clearSelection;
+window.optimizeSelectedRoute = optimizeSelectedRoute;
+window.createSession      = createSession;
+window.closeSession       = closeSession;
+window.saveSessionOrder   = saveSessionOrder;
+window.openMapsForSelected= openMapsForSelected;
+window.onSessionDragStart = onSessionDragStart;
+window.onSessionDragOver  = onSessionDragOver;
+window.onSessionDragLeave = onSessionDragLeave;
+window.onSessionDrop      = onSessionDrop;
 });
 </script>
+
 </body>
 </html>
