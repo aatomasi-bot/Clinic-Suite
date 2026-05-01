@@ -340,6 +340,42 @@ input, select, textarea { font: inherit; }
   background: linear-gradient(160deg, #fff 0%, #F7F9FC 100%);
 }
 
+/* CPP card — radial orange glow from top-right, fades before data */
+.patient-card--cpp {
+  border-right: 2px solid rgba(229,136,58,0.4);
+  border-top: 1.5px solid rgba(229,136,58,0.3);
+  position: relative;
+  overflow: hidden;
+}
+.patient-card--cpp::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 65%;
+  height: 72%;
+  background:
+    radial-gradient(
+      ellipse 85% 80% at 100% 0%,
+      rgba(229,136,58,0.55)  0%,
+      rgba(229,136,58,0.32) 22%,
+      rgba(229,136,58,0.14) 45%,
+      rgba(229,136,58,0.04) 65%,
+      transparent           80%
+    );
+  pointer-events: none;
+  z-index: 0;
+  border-radius: 0 var(--radius) 0 0;
+}
+/* Keep all card content above the gradient layer */
+.patient-card--cpp .card-head,
+.patient-card--cpp .card-progress,
+.patient-card--cpp .card-actions,
+.patient-card--cpp .card-expanded {
+  position: relative;
+  z-index: 1;
+}
+
 /* Card Header */
 .card-head {
   padding: 0.875rem 0.875rem 0.625rem;
@@ -701,6 +737,15 @@ input, select, textarea { font: inherit; }
   transition: transform var(--transition), box-shadow var(--transition-slow);
 }
 .stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.stat-card--link { cursor: pointer; position: relative; }
+.stat-card--link::after {
+  content: 'View →';
+  position: absolute; bottom: 0.5rem; right: 0.75rem;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.5px;
+  color: var(--text-3); text-transform: uppercase;
+  opacity: 0; transition: opacity 0.2s;
+}
+.stat-card--link:hover::after { opacity: 1; }
 .stat-card__label {
   font-size: 0.6875rem;
   font-weight: 700;
@@ -721,6 +766,8 @@ input, select, textarea { font: inherit; }
 .stat-card--red   { border-color: #F0C0C0; background: linear-gradient(135deg, #fff 0%, var(--red-bg) 100%); }
 .stat-card--navy  { border-color: #C0CCDC; background: linear-gradient(135deg, #fff 0%, #EEF3F9 100%); }
 .stat-card--teal .stat-card__value  { color: var(--teal-dark); }
+.stat-card--purple { border-color: #C4B8E8; background: linear-gradient(135deg, #fff 0%, #F0EEF9 100%); }
+.stat-card--purple .stat-card__value { color: #5B48A0; }
 .stat-card--orange .stat-card__value { color: var(--orange); }
 .stat-card--red .stat-card__value   { color: var(--red); }
 .stat-card__icon { font-size: 1.375rem; margin-bottom: 0.375rem; }
@@ -1217,7 +1264,7 @@ input, select, textarea { font: inherit; }
   body { padding-bottom: calc(var(--nav-h) + 1.5rem); }
   #mainContent { padding: 1rem 1rem 0; }
   #dashView, #reportView { padding: 1rem; }
-  .stats-grid { grid-template-columns: repeat(4, 1fr); }
+  .stats-grid { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
   .detail-grid { grid-template-columns: repeat(3, 1fr); }
   .card-head { padding: 1rem 1rem 0.75rem; }
   .card-actions { padding: 0 1rem 0.875rem; }
@@ -1422,6 +1469,7 @@ input, select, textarea { font: inherit; }
     <button class="tab-btn" data-tab="overdue">Overdue <span class="tab-count" id="cnt-overdue">0</span></button>
     <button class="tab-btn" data-tab="pending">Pending <span class="tab-count" id="cnt-pending">0</span></button>
     <button class="tab-btn" data-tab="archived">Archived <span class="tab-count" id="cnt-archived">0</span></button>
+    <button class="tab-btn" data-tab="cpp">CPP <span class="tab-count" id="cnt-cpp">0</span></button>
   </div>
 </div>
 
@@ -1431,29 +1479,35 @@ input, select, textarea { font: inherit; }
 <!-- DASHBOARD -->
 <div id="dashView" class="hidden">
   <div class="stats-grid">
-    <div class="stat-card stat-card--teal">
+    <div class="stat-card stat-card--teal stat-card--link" onclick="switchToTab('all')" title="View all active patients">
       <div class="stat-card__icon">💊</div>
       <div class="stat-card__label">Active Patients</div>
       <div class="stat-card__value" id="ds-active">0</div>
       <div class="stat-card__sub">Total in system</div>
     </div>
-    <div class="stat-card stat-card--orange">
+    <div class="stat-card stat-card--orange stat-card--link" onclick="switchToTab('today')" title="View today's appointments">
       <div class="stat-card__icon">📅</div>
       <div class="stat-card__label">Due Today</div>
       <div class="stat-card__value" id="ds-today">0</div>
-      <div class="stat-card__sub">Appointments</div>
+      <div class="stat-card__sub">Tap to view</div>
     </div>
-    <div class="stat-card stat-card--red">
+    <div class="stat-card stat-card--red stat-card--link" onclick="switchToTab('overdue')" title="View overdue patients">
       <div class="stat-card__icon">⚠️</div>
       <div class="stat-card__label">Overdue</div>
       <div class="stat-card__value" id="ds-overdue">0</div>
-      <div class="stat-card__sub">Need attention</div>
+      <div class="stat-card__sub">Tap to view</div>
     </div>
-    <div class="stat-card stat-card--navy">
+    <div class="stat-card stat-card--navy stat-card--link" onclick="switchToTab('pending')" title="View pending patients">
       <div class="stat-card__icon">⏳</div>
       <div class="stat-card__label">Pending Renewal</div>
       <div class="stat-card__value" id="ds-pending">0</div>
-      <div class="stat-card__sub">Low on doses</div>
+      <div class="stat-card__sub">Tap to view</div>
+    </div>
+    <div class="stat-card stat-card--purple stat-card--link" onclick="switchToTab('cpp')" title="View CPP patients">
+      <div class="stat-card__icon">🏥</div>
+      <div class="stat-card__label">CPP Patients</div>
+      <div class="stat-card__value" id="ds-cpp">0</div>
+      <div class="stat-card__sub">Tap to view</div>
     </div>
   </div>
   <div class="dose-chart" id="doseChartWrap">
@@ -1705,6 +1759,14 @@ input, select, textarea { font: inherit; }
           <label>Previous Injection Dates</label>
           <input type="text" id="f-prevdates" placeholder="2024-01-15, 2024-04-20">
         </div>
+        <div class="form-section-title">Classification</div>
+        <div class="form-group" style="display:flex;align-items:center;gap:10px;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg)">
+          <input type="checkbox" id="f-cpp" style="width:18px;height:18px;accent-color:var(--teal);cursor:pointer;flex-shrink:0">
+          <div>
+            <div style="font-size:13px;font-weight:700;color:var(--text)">CPP Patient</div>
+            <div style="font-size:11px;color:var(--text-2)">Mark as Chronic Pain Program patient</div>
+          </div>
+        </div>
         <div class="form-section-title">Notes</div>
         <div class="form-group">
           <label>Special Instructions</label>
@@ -1838,7 +1900,8 @@ const COL = {
   'Injection Administered': 'injection_administered',
   'Appointment Confirmed': 'appointment_confirmed',
   'Pending': 'pending',
-  'Archived': 'archived'
+  'Archived': 'archived',
+  'CPP Patient': 'cpp_patient'
 };
 
 // State
@@ -1994,10 +2057,12 @@ function avatarColor(name) {
 // ========== FILTERING ==========
 function getDueCounts() {
   const today = todayStr();
-  const counts = { today:0, scheduled:0, all:0, overdue:0, pending:0, archived:0 };
+  const counts = { today:0, scheduled:0, all:0, overdue:0, pending:0, archived:0, cpp:0 };
   patients.forEach(p => {
     if (p['Archived']) { counts.archived++; return; }
-    if (p['Pending']) { counts.pending++; return; }
+    if (p['Pending']) { counts.pending++; }
+    if (p['CPP Patient']) counts.cpp++;
+    if (p['Pending']) return;
     const apptDate = p['Appointment Date & Time'] ? p['Appointment Date & Time'].split('T')[0] : null;
     const confirmed = p['Appointment Confirmed'];
     const isToday = apptDate === today;
@@ -2030,6 +2095,7 @@ function getFilteredPatients() {
   return patients.filter(p => {
     if (p['Archived'] && currentTab !== 'archived') return false;
     if (!p['Archived'] && currentTab === 'archived') return false;
+    if (currentTab === 'cpp') return !!p['CPP Patient'] && !p['Archived'];
     if (p['Pending'] && currentTab !== 'pending') return false;
     if (!p['Pending'] && currentTab === 'pending') return false;
     if (currentTab === 'pending' || currentTab === 'archived') return true;
@@ -2072,6 +2138,7 @@ function renderPatientList() {
       overdue: { icon:'✅', title:'No overdue appointments', sub:'All appointments are up to date.' },
       pending: { icon:'⏳', title:'No pending patients', sub:'Patients pending renewal will appear here.' },
       archived: { icon:'🗄', title:'No archived patients', sub:'Archived patients will appear here.' },
+      cpp:      { icon:'🏥', title:'No CPP patients', sub:'Patients marked as CPP will appear here.' },
     };
     const m = msgs[currentTab] || { icon:'👥', title:'No patients', sub:'' };
     el.innerHTML = `<div class="empty-state"><div class="empty-state__icon">${m.icon}</div><div class="empty-state__title">${m.title}</div><p class="empty-state__sub">${m.sub}</p></div>`;
@@ -2123,6 +2190,7 @@ function renderCard(p, idx) {
   const color = avatarColor(name);
   const special = (p['Special Instructions'] || '').trim();
   const cardClass = apptDate === today && confirmed ? 'patient-card--today' : (overdue ? 'patient-card--overdue' : (p['Pending'] ? 'patient-card--pending' : ''));
+  const cppClass  = p['CPP Patient'] ? 'patient-card--cpp' : '';
   // Phone buttons
   const ph1 = p['Phone 1'] || '';
   const ph2 = p['Phone 2'] || '';
@@ -2138,7 +2206,7 @@ function renderCard(p, idx) {
   </button>` : '';
 
   return `
-<div class="patient-card ${cardClass}" data-id="${p.id}">
+<div class="patient-card ${cardClass} ${cppClass}" data-id="${p.id}">
   <div class="card-head">
     <div class="card-avatar card-avatar--${color}">${initials(name)}</div>
     <div class="card-info">
@@ -2146,6 +2214,7 @@ function renderCard(p, idx) {
         <span class="card-name">${esc(name)}</span>
         <span class="card-file">#${esc(p['File Number']||'')}</span>
         ${dose ? `<span class="card-dose-badge">${dose} mg · ${weeks}w</span>` : ''}
+        ${p['CPP Patient'] ? `<span style="background:#F0EEF9;color:#5B48A0;border:1px solid #C4B8E8;border-radius:20px;padding:2px 8px;font-size:10px;font-weight:700">🏥 CPP</span>` : ''}
       </div>
       <div class="card-meta">
         <div class="card-due ${dueClass}">
@@ -2306,11 +2375,13 @@ function renderDashboard() {
     return d && d < today && p['Appointment Confirmed'] && !p['Injection Administered'];
   }).length;
   const pending = patients.filter(p => p['Pending'] && !p['Archived']).length;
+  const cpp = patients.filter(p => !p['Archived'] && p['CPP Patient']).length;
 
   document.getElementById('ds-active').textContent = active;
   document.getElementById('ds-today').textContent = dueToday;
   document.getElementById('ds-overdue').textContent = overdue;
   document.getElementById('ds-pending').textContent = pending;
+  document.getElementById('ds-cpp').textContent = cpp;
 
   // Dose chart
   const doseCounts = {};
@@ -2493,6 +2564,7 @@ function openAddModal() {
   document.getElementById('patientModalTitle').textContent = 'Add Patient';
   document.getElementById('patientForm').reset();
   document.getElementById('deletePatientBtn').classList.add('hidden');
+  document.getElementById('f-cpp').checked = false;
   document.getElementById('f-due').value = todayStr();
   document.getElementById('f-total').value = 4;
   document.getElementById('f-remaining').value = 4;
@@ -2519,6 +2591,7 @@ function openEditModal(id) {
   document.getElementById('f-prevdates').value = p['Previous Injection Dates'] || '';
   document.getElementById('f-special').value = p['Special Instructions'] || '';
   document.getElementById('f-adverse').value = p['Adverse Effects Comments'] || '';
+  document.getElementById('f-cpp').checked = !!p['CPP Patient'];
   document.getElementById('deletePatientBtn').classList.remove('hidden');
   openModal('patientModal');
 }
@@ -2547,6 +2620,7 @@ async function savePatient() {
     'Assignment Type': document.getElementById('f-type').value,
     'Special Instructions': document.getElementById('f-special').value,
     'Adverse Effects Comments': document.getElementById('f-adverse').value,
+    'CPP Patient': document.getElementById('f-cpp').checked,
     'File Status': 'Active',
     'Injection Administered': false,
     'Appointment Confirmed': !!document.getElementById('f-appt').value,
