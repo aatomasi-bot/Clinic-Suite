@@ -2840,39 +2840,135 @@ function parseCSVRow(row) {
 }
 
 function importCSVFile(file) {
-  const r = new FileReader();
-  r.onload = async e => {
-    const rows = e.target.result.split('\n');
-    const headers = rows[0].split(',').map(h=>h.trim().replace(/"/g,''));
-    let added = 0, skipped = 0;
-    setLoading(true, 'Importing CSV…');
-    try {
-      for (let i = 1; i < rows.length; i++) {
-        if (!rows[i].trim()) continue;
-        const vals = parseCSVRow(rows[i]);
-        const p = {};
-        headers.forEach((h,idx) => p[h]=vals[idx]||'');
-        if (!p['Patient Name']) continue;
-        if (patients.find(e=>e['File Number']===p['File Number'])) { skipped++; continue; }
-        await dbInsert({
-          'Patient Name': p['Patient Name'], 'File Number': p['File Number'],
-          'Address': p['Address']||'', 'Phone 1': p['Phone 1']||'', 'Phone 2': p['Phone 2']||'',
-          'Dose Prescribed': p['Dose Prescribed']||'7.5', 'Total Doses': p['Total Doses']||'4',
-          'Doses Remaining': p['Doses Remaining']||'4', 'Due Date': todayStr(),
-          'Assignment Type': p['Assignment Type']||'Permanent', 'Special Instructions': p['Special Instructions']||'',
-          'Adverse Effects Comments': '', 'File Status': 'Active',
-          'Injection Administered': false, 'Appointment Confirmed': false, 'Pending': false, 'Archived': false
-        });
-        added++;
-      }
-      toast(`Imported ${added}, skipped ${skipped}`, 'success');
-      await loadPatients();
-    } catch(e) { toast(e.message, 'error'); } finally { setLoading(false); }
+
+  // ── Build reverse map: supabase_col_name → Display Name ──
+  const supabaseToDisplay = {};
+  for (const [display, supabase] of Object.entries(COL)) supabaseToDisplay[supabase] = display;
+  // Extra columns present in Supabase-export CSVs
+  const extraMap = {
+    'cpp_patient': 'CPP Patient', 'pending': 'Pending', 'archived': 'Archived',
+    'comments': 'Special Instructions', 'pendingreason': 'Special Instructions',
   };
-  r.readAsText(file);
+
+  // Resolve any header format (Supabase name, display name, or extra) → display name
+  function resolveHeader(h) {
+    const clean = h.trim().replace(/['"]/g, '');
+    if (supabaseToDisplay[clean]) return supabaseToDisplay[clean];  // supabase → display
+    if (COL[clean] !== undefined) return clean;                      // already display name
+    if (extraMap[clean.toLowerCase()]) return extraMap[clean.toLowerCase()]; // extra
+    return clean;
+  }
+
+  // "22.5 mg" / "45mg" / "22.5" → "22.5"
+  function cleanDose(val) {
+    if (!val) return '';
+    const m = String(val).match(/(\d+\.?\d*)/);
+    return m ? m[1] : '';
+  }
+
+  // "2026/04/29" or "2026-04-29" → "2026-04-29"
+  function cleanDate(val) {
+    if (!val) return '';
+    return String(val).trim().replace(/\//g, '-').split('T')[0];
+  }
+
+  // "TRUE" / "true" / "1" / "YES" → boolean
+  function cleanBool(val) {
+    if (typeof val === 'boolean') return val;
+    return ['true','1','yes'].includes(String(val).trim().toLowerCase());
+  }
+
+  function doImport(text) {
+    const rawRows = text.split(/\r?\n/);
+    // Parse headers — use full CSV parser to handle quoted headers
+    const rawHeaders = parseCSVRow(rawRows[0]);
+    const headers = rawHeaders.map(h => resolveHeader(h));
+
+    let added = 0, skipped = 0, failed = 0;
+    setLoading(true, 'Importing CSV…');
+
+    (async () => {
+      try {
+        for (let i = 1; i < rawRows.length; i++) {
+          const row = rawRows[i].trim();
+          if (!row) continue;
+
+          const vals = parseCSVRow(rawRows[i]);
+          const p = {};
+          headers.forEach((h, idx) => {
+            p[h] = (vals[idx] !== undefined ? vals[idx] : '').trim();
+          });
+
+          // Must have a name
+          const name = p['Patient Name'] || '';
+          if (!name) continue;
+
+          // Deduplicate by file number
+          const fileNum = (p['File Number'] || '').trim();
+          if (fileNum && patients.find(e => String(e['File Number']).trim() === fileNum)) {
+            skipped++; continue;
+          }
+
+          try {
+            await dbInsert({
+              'Patient Name':             name,
+              'File Number':              fileNum,
+              'Address':                  p['Address'] || '',
+              'Phone 1':                  p['Phone 1'] || '',
+              'Phone 2':                  p['Phone 2'] || '',
+              'Dose Prescribed':          cleanDose(p['Dose Prescribed']) || '22.5',
+              'Total Doses':              p['Total Doses'] || '4',
+              'Doses Remaining':          p['Doses Remaining'] || '4',
+              'Injection Site':           p['Injection Site'] || '',
+              'Previous Injection Site':  p['Previous Injection Site'] || '',
+              'Due Date':                 cleanDate(p['Due Date']) || todayStr(),
+              'Appointment Date & Time':  p['Appointment Date & Time']
+                                            ? cleanDate(p['Appointment Date & Time'])
+                                            : null,
+              'Previous Injection Dates': p['Previous Injection Dates'] || '',
+              'Assignment Type':          p['Assignment Type'] || 'Permanent',
+              'Special Instructions':     p['Special Instructions'] || '',
+              'Adverse Effects Comments': p['Adverse Effects Comments'] || '',
+              'File Status':              p['File Status'] || 'Active',
+              'Injection Administered':   cleanBool(p['Injection Administered']),
+              'Appointment Confirmed':    cleanBool(p['Appointment Confirmed']),
+              'Pending':                  cleanBool(p['Pending']),
+              'Archived':                 cleanBool(p['Archived']),
+              'CPP Patient':              cleanBool(p['CPP Patient']),
+            });
+            added++;
+          } catch(rowErr) {
+            console.warn(`Row ${i} (${name}) failed:`, rowErr.message);
+            failed++;
+          }
+        }
+
+        const parts = [`✓ Imported ${added} patients`];
+        if (skipped) parts.push(`${skipped} duplicates skipped`);
+        if (failed)  parts.push(`${failed} rows errored`);
+        toast(parts.join(' · '), added > 0 ? 'success' : 'warning');
+        await loadPatients();
+      } catch(e) {
+        toast('Import error: ' + e.message, 'error');
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }
+
+  // Try ISO-8859-1 first (handles é, è, à etc. in French patient data)
+  // then fall back to UTF-8 if needed
+  const r = new FileReader();
+  r.onload = e => doImport(e.target.result);
+  r.onerror = () => {
+    const r2 = new FileReader();
+    r2.onload = e => doImport(e.target.result);
+    r2.readAsText(file, 'UTF-8');
+  };
+  r.readAsText(file, 'ISO-8859-1');
 }
 
-// ========== PDF EXTRACTION ENGINE ==========
+
 
 async function ensurePDFJS() {
   if (window.pdfjsLib) return;
