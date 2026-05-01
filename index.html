@@ -1,0 +1,4185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1B2638">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>DosingTracker — Clinical Suite</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
+  <style>
+/* ============================================================
+   DosingTracker Clinical Suite — styles.css
+   UI/UX enhanced: smooth transitions, subtle gradients,
+   improved contrast, responsive layout.
+   No logic, behavior, or class structure was changed.
+   ============================================================ */
+
+/* ========== DESIGN TOKENS ========== */
+:root {
+  --teal:       #2D8C8A;
+  --teal-light: #E6F4F4;
+  --teal-dark:  #1E6665;
+  --navy:       #1B2638;
+  --navy-mid:   #243047;
+  --orange:     #E5883A;
+  --orange-bg:  #FEF3E8;
+  --red:        #E05A5A;
+  --red-bg:     #FDEDED;
+  --green:      #3D9A6B;
+  --green-bg:   #E8F7F0;
+  --amber:      #D97706;
+  --amber-bg:   #FFFBEB;
+  --bg:         #F2F4F8;
+  --card:       #FFFFFF;
+  --border:     #E4E8EF;
+  --text:       #1B2638;
+  --text-2:     #6B7A8F;
+  --text-3:     #A0ABBC;
+  --radius:     14px;
+  --radius-sm:  8px;
+  --shadow:     0 2px 12px rgba(27,38,56,0.09);
+  --shadow-md:  0 4px 20px rgba(27,38,56,0.12);
+  --shadow-lg:  0 8px 32px rgba(27,38,56,0.15);
+  --nav-h:      70px;
+  --header-h:   60px;
+  --search-area-h: 106px;  /* search bar ~55px + tabs ~50px + border 1px */
+  --transition: 200ms ease-in-out;
+  --transition-slow: 300ms ease-in-out;
+}
+
+/* ========== RESET ========== */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+}
+body {
+  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: linear-gradient(160deg, #EEF1F7 0%, #F2F4F8 60%);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  padding-top: var(--header-h);
+  padding-bottom: calc(var(--nav-h) + 1rem);
+}
+button {
+  cursor: pointer;
+  border: none;
+  background: none;
+  font: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+input, select, textarea { font: inherit; }
+
+/* ========== HEADER ========== */
+.header {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 100;
+  height: var(--header-h);
+  background: linear-gradient(90deg, #1B2638 0%, #243047 100%);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1rem;
+  box-shadow: 0 2px 16px rgba(27,38,56,0.25);
+  backdrop-filter: blur(8px);
+}
+.header__brand {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+.header__icon {
+  width: 2.375rem;
+  height: 2.375rem;
+  border-radius: 0.625rem;
+  background: linear-gradient(135deg, var(--teal) 0%, var(--teal-dark) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.125rem;
+  box-shadow: 0 2px 8px rgba(45,140,138,0.4);
+  transition: transform var(--transition);
+}
+.header__icon:hover { transform: scale(1.05); }
+.header__wordmark { line-height: 1.1; }
+.header__wordmark h1 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.3px;
+}
+.header__wordmark h1 span { color: var(--teal); }
+.header__wordmark p {
+  font-size: 0.5625rem;
+  font-weight: 600;
+  letter-spacing: 1.8px;
+  color: #6B7A8F;
+  text-transform: uppercase;
+}
+.header__right {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+.sync-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: #6B7A8F;
+  transition: background var(--transition-slow), box-shadow var(--transition-slow);
+}
+.sync-dot.connected {
+  background: var(--green);
+  box-shadow: 0 0 6px rgba(61,154,107,0.6);
+}
+.sync-dot.error {
+  background: var(--red);
+  box-shadow: 0 0 6px rgba(224,90,90,0.6);
+}
+.header__menu-btn {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  color: #fff;
+  transition: background var(--transition);
+}
+.header__menu-btn:hover { background: rgba(255,255,255,0.08); }
+.header__menu-btn span {
+  display: block;
+  width: 1.125rem;
+  height: 2px;
+  background: currentColor;
+  border-radius: 2px;
+  transition: transform var(--transition-slow);
+}
+
+/* ========== SEARCH BAR ========== */
+.search-bar {
+  position: static;  /* parent #searchArea is now fixed on mobile */
+  background: linear-gradient(90deg, #243047 0%, #1E293D 100%);
+  padding: 0.625rem 1rem;
+  display: flex;
+  gap: 0.5rem;
+}
+.search-input-wrap {
+  flex: 1;
+  position: relative;
+}
+.search-input-wrap input {
+  width: 100%;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: var(--radius-sm);
+  padding: 0.5625rem 2.25rem 0.5625rem 0.75rem;
+  color: #fff;
+  font-size: 0.875rem;
+  outline: none;
+  transition: border-color var(--transition), background var(--transition), box-shadow var(--transition);
+}
+.search-input-wrap input::placeholder { color: rgba(255,255,255,0.4); }
+.search-input-wrap input:focus {
+  border-color: var(--teal);
+  background: rgba(255,255,255,0.15);
+  box-shadow: 0 0 0 3px rgba(45,140,138,0.2);
+}
+.search-input-wrap .search-clear {
+  position: absolute;
+  right: 0.625rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: rgba(255,255,255,0.5);
+  font-size: 1rem;
+  display: none;
+  transition: color var(--transition);
+}
+.search-input-wrap input:not(:placeholder-shown) ~ .search-clear { display: block; }
+.search-clear:hover { color: rgba(255,255,255,0.8); }
+.search-bar__refresh {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: var(--radius-sm);
+  background: rgba(255,255,255,0.1);
+  color: #fff;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--transition), transform var(--transition);
+}
+.search-bar__refresh:hover { background: rgba(255,255,255,0.18); }
+.search-bar__refresh:active { transform: rotate(180deg); }
+
+/* ========== TABS ========== */
+.tabs {
+  display: flex;
+  overflow-x: auto;
+  gap: 0.375rem;
+  padding: 0.625rem 1rem;
+  background: linear-gradient(90deg, #243047 0%, #1E293D 100%);
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.tabs::-webkit-scrollbar { display: none; }
+.tab-btn {
+  flex-shrink: 0;
+  padding: 0.375rem 0.875rem;
+  border-radius: 1.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: rgba(255,255,255,0.5);
+  background: rgba(255,255,255,0.06);
+  border: 1px solid transparent;
+  transition: all var(--transition);
+  white-space: nowrap;
+}
+.tab-btn:hover { color: rgba(255,255,255,0.8); background: rgba(255,255,255,0.1); }
+.tab-btn .tab-count {
+  display: inline-block;
+  background: rgba(255,255,255,0.15);
+  border-radius: 0.625rem;
+  padding: 0 0.375rem;
+  margin-left: 0.25rem;
+  font-size: 0.625rem;
+  transition: background var(--transition);
+}
+.tab-btn.active {
+  color: #fff;
+  background: linear-gradient(135deg, var(--teal) 0%, var(--teal-dark) 100%);
+  border-color: var(--teal-dark);
+  box-shadow: 0 2px 8px rgba(45,140,138,0.35);
+}
+.tab-btn.active .tab-count { background: rgba(255,255,255,0.25); }
+
+/* ── Mobile: freeze entire search+tabs bar so it never scrolls away ──
+   position:fixed takes it out of flow; margin-top on #mainContent compensates */
+#searchArea {
+  position: fixed;
+  top: var(--header-h);
+  left: 0;
+  right: 0;
+  z-index: 89;
+  box-shadow: 0 4px 20px rgba(27,38,56,0.35);
+}
+
+/* ========== PATIENT LIST ========== */
+#mainContent {
+  padding: 0.75rem 0.75rem 0;
+  margin-top: var(--search-area-h);  /* clear fixed search+tabs bar */
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* ========== DATE SEPARATOR ========== */
+.date-sep {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.875rem 0.25rem 0.5rem;
+}
+.date-sep__label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+.date-sep__badge {
+  background: var(--border);
+  color: var(--text-2);
+  border-radius: 1.25rem;
+  padding: 1px 0.4375rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+.date-sep--today .date-sep__label { color: var(--orange); }
+.date-sep--today .date-sep__badge { background: var(--orange-bg); color: var(--orange); }
+.date-sep--overdue .date-sep__label { color: var(--red); }
+
+/* ========== PATIENT CARD ========== */
+.patient-card {
+  background: linear-gradient(160deg, #fff 0%, #FAFCFF 100%);
+  border-radius: var(--radius);
+  border: 1.5px solid var(--border);
+  margin-bottom: 0.625rem;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  transition: box-shadow var(--transition-slow), transform var(--transition);
+  animation: cardIn 0.22s ease-out;    /* NO fill-mode = no opacity:0 trap */
+  opacity: 1;                           /* always visible by default */
+}
+.patient-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+@keyframes cardIn {
+  from { opacity: 0.6; transform: translateY(6px); }
+  to   { opacity: 1;   transform: translateY(0);   }
+}
+/* ══ CARD STATUS GRADIENTS ══
+   All gradients radiate from TOP-LEFT corner, fading before data so content stays readable.
+   ::before pseudo-element covers top-left 65%×72%; all card content is z-index:1 above it. */
+
+/* Shared glow helper — applied to every status variant */
+.patient-card--today,
+.patient-card--overdue,
+.patient-card--scheduled,
+.patient-card--all,
+.patient-card--pending,
+.patient-card--archived,
+.patient-card--cpp {
+  position: relative;
+  overflow: hidden;
+}
+.patient-card--today::before,
+.patient-card--overdue::before,
+.patient-card--scheduled::before,
+.patient-card--all::before,
+.patient-card--pending::before,
+.patient-card--archived::before,
+.patient-card--cpp::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 65%; height: 72%;
+  pointer-events: none;
+  z-index: 0;
+  border-radius: var(--radius) 0 0 0;
+}
+.patient-card--today .card-head,    .patient-card--today .card-progress,
+.patient-card--today .card-actions, .patient-card--today .card-expanded,
+.patient-card--overdue .card-head,    .patient-card--overdue .card-progress,
+.patient-card--overdue .card-actions, .patient-card--overdue .card-expanded,
+.patient-card--scheduled .card-head,    .patient-card--scheduled .card-progress,
+.patient-card--scheduled .card-actions, .patient-card--scheduled .card-expanded,
+.patient-card--all .card-head,    .patient-card--all .card-progress,
+.patient-card--all .card-actions, .patient-card--all .card-expanded,
+.patient-card--pending .card-head,    .patient-card--pending .card-progress,
+.patient-card--pending .card-actions, .patient-card--pending .card-expanded,
+.patient-card--archived .card-head,    .patient-card--archived .card-progress,
+.patient-card--archived .card-actions, .patient-card--archived .card-expanded,
+.patient-card--cpp .card-head,    .patient-card--cpp .card-progress,
+.patient-card--cpp .card-actions, .patient-card--cpp .card-expanded {
+  position: relative;
+  z-index: 1;
+}
+
+/* TODAY — Green, 45° from top-left corner */
+.patient-card--today {
+  border-color: #A8DDB8;
+  border-left: 4px solid var(--green);
+}
+.patient-card--today::before {
+  background: radial-gradient(ellipse 85% 80% at 22% 28%,
+    rgba(61,154,107,0.52)  0%,
+    rgba(61,154,107,0.30) 22%,
+    rgba(61,154,107,0.13) 45%,
+    rgba(61,154,107,0.04) 65%,
+    transparent           80%);
+}
+
+/* OVERDUE — Amber/Yellow, 45° from top-left corner */
+.patient-card--overdue {
+  border-color: #F0D080;
+  border-left: 4px solid #D97706;
+}
+.patient-card--overdue::before {
+  background: radial-gradient(ellipse 85% 80% at 22% 28%,
+    rgba(217,119,6,0.52)  0%,
+    rgba(217,119,6,0.30) 22%,
+    rgba(217,119,6,0.13) 45%,
+    rgba(217,119,6,0.04) 65%,
+    transparent          80%);
+}
+
+/* SCHEDULED — Blue-grey, 45° from top-left corner */
+.patient-card--scheduled {
+  border-color: #A8B8D8;
+  border-left: 4px solid #607090;
+}
+.patient-card--scheduled::before {
+  background: radial-gradient(ellipse 85% 80% at 22% 28%,
+    rgba(96,112,144,0.48)  0%,
+    rgba(96,112,144,0.28) 22%,
+    rgba(96,112,144,0.12) 45%,
+    rgba(96,112,144,0.04) 65%,
+    transparent           80%);
+}
+
+/* ALL ACTIVE — Teal, 45° from top-left corner */
+.patient-card--all {
+  border-color: #B2DADA;
+  border-left: 4px solid var(--teal);
+}
+.patient-card--all::before {
+  background: radial-gradient(ellipse 85% 80% at 22% 28%,
+    rgba(45,140,138,0.50)  0%,
+    rgba(45,140,138,0.29) 22%,
+    rgba(45,140,138,0.12) 45%,
+    rgba(45,140,138,0.04) 65%,
+    transparent           80%);
+}
+
+/* PENDING — Red, 45° from top-left corner */
+.patient-card--pending {
+  border-color: #F0A0A0;
+  border-left: 4px solid var(--red);
+}
+.patient-card--pending::before {
+  background: radial-gradient(ellipse 85% 80% at 22% 28%,
+    rgba(224,90,90,0.50)  0%,
+    rgba(224,90,90,0.29) 22%,
+    rgba(224,90,90,0.12) 45%,
+    rgba(224,90,90,0.04) 65%,
+    transparent          80%);
+}
+
+/* ARCHIVED — Dark grey, 45° from top-left, 30% stronger coverage */
+.patient-card--archived {
+  border-color: #B0B8C4;
+  border-left: 4px solid #607080;
+}
+.patient-card--archived::before {
+  width: 75%; height: 80%;
+  background: radial-gradient(ellipse 90% 85% at 22% 28%,
+    rgba(60,70,85,0.68)  0%,
+    rgba(60,70,85,0.42) 22%,
+    rgba(60,70,85,0.18) 45%,
+    rgba(60,70,85,0.06) 65%,
+    transparent         80%);
+}
+
+/* CPP — Orange, 45° from top-right corner (distinctive) */
+.patient-card--cpp {
+  border-right: 2px solid rgba(229,136,58,0.4);
+  border-top:   1.5px solid rgba(229,136,58,0.3);
+}
+.patient-card--cpp::before {
+  top: 0; left: unset; right: 0;
+  border-radius: 0 var(--radius) 0 0;
+  background: radial-gradient(ellipse 85% 80% at 78% 28%,
+    rgba(229,136,58,0.55)  0%,
+    rgba(229,136,58,0.32) 22%,
+    rgba(229,136,58,0.14) 45%,
+    rgba(229,136,58,0.04) 65%,
+    transparent           80%);
+}
+
+/* Card Header */
+.card-head {
+  padding: 0.875rem 0.875rem 0.625rem;
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  cursor: pointer;
+}
+.card-avatar {
+  width: 2.625rem;
+  height: 2.625rem;
+  border-radius: 0.75rem;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  transition: transform var(--transition);
+}
+.patient-card:hover .card-avatar { transform: scale(1.04); }
+.card-avatar--teal   { background: linear-gradient(135deg, var(--teal), var(--teal-dark)); }
+.card-avatar--orange { background: linear-gradient(135deg, var(--orange), #C96B1A); }
+.card-avatar--navy   { background: linear-gradient(135deg, var(--navy), #0F1822); }
+.card-avatar--purple { background: linear-gradient(135deg, #7B68B6, #5A4F8A); }
+.card-avatar--green  { background: linear-gradient(135deg, var(--green), #2A7050); }
+
+.card-info { flex: 1; min-width: 0; }
+.card-name-row {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.25rem;
+}
+.card-name { font-size: 0.9375rem; font-weight: 700; color: var(--text); }
+.card-file { font-size: 0.75rem; color: var(--text-2); font-weight: 500; }
+.card-dose-badge {
+  padding: 2px 0.5625rem;
+  border-radius: 1.25rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  background: linear-gradient(135deg, var(--teal-light), #D0EEEE);
+  color: var(--teal-dark);
+  border: 1px solid #B2DADA;
+}
+.card-meta { display: flex; flex-direction: column; gap: 3px; }
+.card-due {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--orange);
+}
+.card-due--future { color: var(--text-2); }
+.card-due--overdue { color: var(--red); }
+.card-due--ok { color: var(--text-2); }
+.card-addr {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.75rem;
+  color: var(--text-2);
+}
+.card-special {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--orange);
+  margin-top: 2px;
+}
+
+/* Progress */
+.card-progress { padding: 0 0.875rem 0.625rem; }
+.progress-track {
+  height: 5px;
+  background: var(--border);
+  border-radius: 99px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--teal), var(--teal-dark));
+  border-radius: 99px;
+  transition: width 0.5s ease-in-out;
+}
+.progress-label {
+  font-size: 0.6875rem;
+  color: var(--text-2);
+  font-weight: 500;
+  text-align: right;
+  margin-top: 3px;
+}
+
+/* Card Action Row */
+.card-actions {
+  padding: 0 0.875rem 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.action-circle {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  border: 1.5px solid var(--border);
+  background: var(--card);
+  transition: all var(--transition);
+  flex-shrink: 0;
+}
+.action-circle--phone {
+  border-color: #B6DFC8;
+  background: linear-gradient(135deg, #fff, var(--green-bg));
+}
+.action-circle--map {
+  border-color: #B6D0EB;
+  background: linear-gradient(135deg, #fff, #EEF5FB);
+}
+.action-circle:hover { transform: scale(1.08); box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
+.action-circle:active { transform: scale(0.92); }
+.action-spacer { flex: 1; }
+.record-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  background: linear-gradient(135deg, var(--teal) 0%, var(--teal-dark) 100%);
+  color: #fff;
+  padding: 0.5625rem 1.125rem;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  transition: all var(--transition);
+  box-shadow: 0 3px 10px rgba(45,140,138,0.4);
+}
+.record-btn:hover {
+  box-shadow: 0 5px 16px rgba(45,140,138,0.5);
+  transform: translateY(-1px);
+}
+.record-btn:active { background: var(--teal-dark); transform: scale(0.97) translateY(0); }
+.record-btn svg { width: 0.875rem; height: 0.875rem; }
+.expand-btn {
+  width: 1.875rem;
+  height: 1.875rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-2);
+  font-size: 0.75rem;
+  transition: transform var(--transition-slow), background var(--transition);
+}
+.expand-btn:hover { background: var(--border); }
+.patient-card.expanded .expand-btn { transform: rotate(180deg); }
+
+/* Expanded Panel */
+.card-expanded {
+  display: none;
+  border-top: 1px solid var(--border);
+  padding: 0.875rem;
+  background: linear-gradient(160deg, #FAFBFD 0%, #F5F7FB 100%);
+  animation: expandIn 0.22s ease-in-out;
+}
+@keyframes expandIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.patient-card.expanded .card-expanded { display: block; }
+.detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.625rem 1rem;
+  margin-bottom: 0.875rem;
+}
+.detail-item label {
+  display: block;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-bottom: 2px;
+}
+.detail-item p { font-size: 0.8125rem; color: var(--text); font-weight: 500; }
+.detail-item--full { grid-column: 1 / -1; }
+.detail-item p.orange { color: var(--orange); }
+.confirmed-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: linear-gradient(135deg, var(--teal-light), #D0EEEE);
+  color: var(--teal-dark);
+  border-radius: 1.25rem;
+  padding: 2px 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  margin-left: 0.375rem;
+}
+.phones-row { display: flex; gap: 0.375rem; flex-wrap: wrap; }
+.phone-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--teal-dark);
+  font-weight: 600;
+  font-size: 0.8125rem;
+  text-decoration: none;
+  transition: color var(--transition);
+}
+.phone-link:hover { color: var(--teal); }
+
+/* Expanded Buttons */
+.card-btn-row { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.25rem; }
+.card-btn {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0.5625rem 0.625rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1.5px solid var(--border);
+  color: var(--text);
+  background: var(--card);
+  transition: all var(--transition);
+  white-space: nowrap;
+}
+.card-btn:hover { transform: translateY(-1px); box-shadow: var(--shadow); }
+.card-btn:active { transform: scale(0.96) translateY(0); }
+.card-btn--edit {
+  color: var(--teal-dark);
+  border-color: #B2DADA;
+  background: linear-gradient(135deg, #fff, var(--teal-light));
+}
+.card-btn--pending { color: #607090; border-color: #B0C4DE; background: linear-gradient(135deg, #fff, #EEF3F9); }
+.card-btn--archive { color: var(--text-2); border-color: var(--border); }
+.card-btn--move { color: var(--green); border-color: #B6DFC8; background: linear-gradient(135deg, #fff, var(--green-bg)); }
+.card-btn--delete { color: var(--red); border-color: #F0C0C0; background: linear-gradient(135deg, #fff, var(--red-bg)); }
+
+
+/* ── REPORT TABS ── */
+.rpt-tab {
+  padding: 8px 16px; border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border); background: var(--bg);
+  font-size: 12px; font-weight: 600; color: var(--text-2);
+  cursor: pointer; transition: all var(--transition);
+}
+.rpt-tab:hover { border-color: var(--teal); color: var(--teal-dark); }
+.rpt-tab--active {
+  background: linear-gradient(135deg, var(--teal), var(--teal-dark));
+  color: #fff; border-color: var(--teal-dark);
+  box-shadow: 0 2px 8px rgba(45,140,138,0.3);
+}
+
+/* ========== EMPTY STATE ========== */
+.empty-state {
+  text-align: center;
+  padding: 3rem 1.5rem;
+  animation: cardIn 0.3s ease-in-out;
+}
+.empty-state__icon { font-size: 3rem; margin-bottom: 0.75rem; }
+.empty-state__title { font-size: 1.0625rem; font-weight: 700; color: var(--text); margin-bottom: 0.375rem; }
+.empty-state__sub { font-size: 0.8125rem; color: var(--text-2); }
+
+/* ========== BOTTOM NAV ========== */
+.bottom-nav {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  z-index: 100;
+  height: var(--nav-h);
+  background: rgba(255,255,255,0.97);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  box-shadow: 0 -4px 24px rgba(27,38,56,0.1);
+  backdrop-filter: blur(10px);
+}
+.nav-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 100%;
+  color: var(--text-3);
+  transition: color var(--transition);
+  position: relative;
+  padding-bottom: 6px;
+}
+.nav-btn svg {
+  width: 1.375rem;
+  height: 1.375rem;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.8;
+  transition: transform var(--transition);
+}
+.nav-btn:hover svg { transform: translateY(-2px); }
+.nav-btn span { font-size: 0.625rem; font-weight: 600; }
+.nav-btn.active { color: var(--teal); }
+.nav-btn--new { color: #fff !important; }
+.nav-btn--new .nav-plus-wrap {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--teal) 0%, var(--teal-dark) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 14px rgba(45,140,138,0.45);
+  transition: transform var(--transition), box-shadow var(--transition);
+  margin-top: -0.5rem;
+}
+.nav-btn--new .nav-plus-wrap svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  stroke: #fff;
+  stroke-width: 2.5;
+}
+.nav-btn--new:hover .nav-plus-wrap { transform: scale(1.08) translateY(-2px); box-shadow: 0 6px 20px rgba(45,140,138,0.55); }
+.nav-btn--new:active .nav-plus-wrap { transform: scale(0.92); }
+.nav-btn--new span { color: var(--text-3); }
+.nav-badge {
+  position: absolute;
+  top: 0.5rem;
+  right: calc(50% - 1.125rem);
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  background: var(--red);
+  color: #fff;
+  font-size: 0.5625rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #fff;
+  animation: badgePop 0.3s ease-in-out;
+}
+@keyframes badgePop {
+  0%   { transform: scale(0); }
+  70%  { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+/* ========== DASHBOARD VIEW ========== */
+#dashView { padding: 0.75rem; margin-top: var(--search-area-h); }
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.625rem;
+  margin-bottom: 0.75rem;
+}
+.stat-card {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 1rem;
+  border: 1.5px solid var(--border);
+  box-shadow: var(--shadow);
+  transition: transform var(--transition), box-shadow var(--transition-slow);
+}
+.stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.stat-card--link { cursor: pointer; position: relative; }
+.stat-card--link::after {
+  content: 'View →';
+  position: absolute; bottom: 0.5rem; right: 0.75rem;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.5px;
+  color: var(--text-3); text-transform: uppercase;
+  opacity: 0; transition: opacity 0.2s;
+}
+.stat-card--link:hover::after { opacity: 1; }
+.stat-card__label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--text-2);
+  margin-bottom: 0.5rem;
+}
+.stat-card__value {
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--text);
+  line-height: 1;
+}
+.stat-card__sub { font-size: 0.75rem; color: var(--text-2); margin-top: 0.25rem; }
+.stat-card--teal  { border-color: #B2DADA; background: linear-gradient(135deg, #fff 0%, var(--teal-light) 100%); }
+.stat-card--orange { border-color: #F5D0AA; background: linear-gradient(135deg, #fff 0%, var(--orange-bg) 100%); }
+.stat-card--red   { border-color: #F0C0C0; background: linear-gradient(135deg, #fff 0%, var(--red-bg) 100%); }
+.stat-card--navy  { border-color: #C0CCDC; background: linear-gradient(135deg, #fff 0%, #EEF3F9 100%); }
+.stat-card--teal .stat-card__value  { color: var(--teal-dark); }
+.stat-card--purple { border-color: #C4B8E8; background: linear-gradient(135deg, #fff 0%, #F0EEF9 100%); }
+.stat-card--purple .stat-card__value { color: #5B48A0; }
+.stat-card--orange .stat-card__value { color: var(--orange); }
+.stat-card--red .stat-card__value   { color: var(--red); }
+.stat-card__icon { font-size: 1.375rem; margin-bottom: 0.375rem; }
+.dose-chart {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 1rem;
+  border: 1.5px solid var(--border);
+  box-shadow: var(--shadow);
+  margin-bottom: 0.75rem;
+}
+.dose-chart h3 {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--text-2);
+  margin-bottom: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+.dose-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.dose-bar-label { font-size: 0.75rem; font-weight: 600; color: var(--text); width: 2.75rem; flex-shrink: 0; }
+.dose-bar-track {
+  flex: 1;
+  height: 10px;
+  background: var(--border);
+  border-radius: 99px;
+  overflow: hidden;
+}
+.dose-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--teal), var(--teal-dark));
+  border-radius: 99px;
+  transition: width 0.6s ease-in-out;
+}
+.dose-bar-count { font-size: 0.75rem; font-weight: 600; color: var(--text-2); width: 1.375rem; text-align: right; flex-shrink: 0; }
+.quick-actions {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 1rem;
+  border: 1.5px solid var(--border);
+  box-shadow: var(--shadow);
+}
+.quick-actions h3 {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--text-2);
+  margin-bottom: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+.quick-action-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+.quick-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 0.75rem;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border);
+  background: linear-gradient(135deg, #fff, var(--bg));
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text);
+  transition: all var(--transition);
+}
+.quick-action-btn:hover { transform: translateY(-1px); box-shadow: var(--shadow); background: linear-gradient(135deg, var(--teal-light), #fff); color: var(--teal-dark); border-color: #B2DADA; }
+.quick-action-btn:active { transform: scale(0.96) translateY(0); }
+
+/* ========== REPORT VIEW ========== */
+#reportView { padding: 0.75rem; margin-top: var(--search-area-h); }
+.report-controls {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 0.875rem;
+  border: 1.5px solid var(--border);
+  margin-bottom: 0.75rem;
+  box-shadow: var(--shadow);
+}
+.report-controls h3 {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--text-2);
+  margin-bottom: 0.75rem;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+.form-row { margin-bottom: 0.625rem; }
+.form-label {
+  display: block;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--text-2);
+  margin-bottom: 0.25rem;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.form-control {
+  width: 100%;
+  padding: 0.5625rem 0.75rem;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  background: var(--bg);
+  color: var(--text);
+  outline: none;
+  transition: border-color var(--transition), box-shadow var(--transition), background var(--transition);
+}
+.form-control:focus {
+  border-color: var(--teal);
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(45,140,138,0.15);
+}
+.quick-report-btns { display: flex; gap: 0.375rem; flex-wrap: wrap; margin-bottom: 0.625rem; }
+.quick-report-btn {
+  padding: 0.375rem 0.75rem;
+  border-radius: 1.25rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  background: linear-gradient(135deg, var(--teal-light), #D0EEEE);
+  color: var(--teal-dark);
+  border: 1px solid #B2DADA;
+  transition: all var(--transition);
+}
+.quick-report-btn:hover { background: linear-gradient(135deg, #D0EEEE, var(--teal-light)); transform: translateY(-1px); }
+.run-report-btn {
+  width: 100%;
+  padding: 0.6875rem;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, var(--teal) 0%, var(--teal-dark) 100%);
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 700;
+  transition: all var(--transition);
+  box-shadow: 0 2px 8px rgba(45,140,138,0.3);
+}
+.run-report-btn:hover { box-shadow: 0 4px 14px rgba(45,140,138,0.45); transform: translateY(-1px); }
+.run-report-btn:active { background: var(--teal-dark); transform: translateY(0); }
+.report-item {
+  background: linear-gradient(135deg, #fff, var(--bg));
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 0.875rem;
+  border: 1px solid var(--border);
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.report-item:hover { transform: translateY(-1px); box-shadow: var(--shadow); border-color: #B2DADA; }
+.report-item__name { font-size: 0.875rem; font-weight: 700; }
+.report-item__detail { font-size: 0.75rem; color: var(--text-2); margin-top: 2px; }
+
+/* ========== DRAWER / BACKDROP ========== */
+.drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(27,38,56,0.5);
+  z-index: 200;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-slow);
+  backdrop-filter: blur(2px);
+}
+.drawer-backdrop.open { opacity: 1; pointer-events: all; }
+.drawer {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  z-index: 201;
+  background: linear-gradient(160deg, #fff 0%, #F8FAFC 100%);
+  border-radius: 1.25rem 1.25rem 0 0;
+  padding: 0 0 calc(env(safe-area-inset-bottom, 0px) + 1rem);
+  transform: translateY(100%);
+  transition: transform var(--transition-slow) cubic-bezier(0.34, 1.3, 0.64, 1);
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 -8px 32px rgba(27,38,56,0.15);
+}
+.drawer.open { transform: translateY(0); }
+.drawer-handle {
+  width: 2.25rem;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  margin: 0.625rem auto 0.875rem;
+}
+.drawer-title {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--text);
+  padding: 0 1.25rem 0.875rem;
+  border-bottom: 1px solid var(--border);
+}
+.drawer-section { padding: 0.875rem 1.25rem; border-bottom: 1px solid var(--border); }
+.drawer-section h4 {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--text-2);
+  margin-bottom: 0.625rem;
+}
+.drawer-btn-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.drawer-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0.875rem;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border);
+  background: linear-gradient(135deg, var(--bg), #fff);
+  color: var(--text);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-align: left;
+  transition: all var(--transition);
+}
+.drawer-btn:hover { background: linear-gradient(135deg, var(--teal-light), #fff); border-color: #B2DADA; color: var(--teal-dark); transform: translateX(2px); }
+.drawer-btn:active { transform: scale(0.98); }
+.drawer-btn .drawer-btn-icon { font-size: 1.25rem; width: 1.75rem; text-align: center; }
+
+/* ========== MODAL ========== */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(27,38,56,0.55);
+  z-index: 300;
+  display: none;
+  align-items: flex-end;
+  justify-content: center;
+  backdrop-filter: blur(3px);
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  width: 100%;
+  max-width: 540px;
+  background: linear-gradient(160deg, #fff 0%, #F8FAFC 100%);
+  border-radius: 1.25rem 1.25rem 0 0;
+  max-height: 92vh;
+  overflow-y: auto;
+  padding: 0 0 calc(env(safe-area-inset-bottom, 0px) + 1rem);
+  animation: slideUp 0.3s cubic-bezier(0.34, 1.1, 0.64, 1);
+  box-shadow: 0 -8px 40px rgba(27,38,56,0.2);
+}
+@keyframes slideUp {
+  from { transform: translateY(50px); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+.modal-handle {
+  width: 2.25rem;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  margin: 0.625rem auto 0;
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.875rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: rgba(255,255,255,0.95);
+  z-index: 1;
+  backdrop-filter: blur(8px);
+}
+.modal-title { font-size: 1.0625rem; font-weight: 800; }
+.modal-close {
+  width: 1.875rem;
+  height: 1.875rem;
+  border-radius: 50%;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.125rem;
+  color: var(--text-2);
+  transition: all var(--transition);
+}
+.modal-close:hover { background: var(--border); color: var(--text); }
+.modal-body { padding: 1rem 1.25rem; }
+.form-group { margin-bottom: 0.875rem; }
+.form-group label {
+  display: block;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-2);
+  margin-bottom: 5px;
+}
+.form-group input,
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  padding: 0.625rem 0.75rem;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  background: var(--bg);
+  color: var(--text);
+  outline: none;
+  transition: border-color var(--transition), background var(--transition), box-shadow var(--transition);
+}
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  border-color: var(--teal);
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(45,140,138,0.15);
+}
+.form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.625rem; }
+.form-group textarea { resize: vertical; min-height: 4.375rem; }
+.form-section-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin: 1.125rem 0 0.625rem;
+  padding-top: 0.875rem;
+  border-top: 1px solid var(--border);
+}
+.modal-footer {
+  padding: 0.75rem 1.25rem;
+  display: flex;
+  gap: 0.625rem;
+  border-top: 1px solid var(--border);
+  margin-top: 0.375rem;
+  position: sticky;
+  bottom: 0;
+  background: rgba(255,255,255,0.95);
+  backdrop-filter: blur(8px);
+}
+.btn-primary {
+  flex: 1;
+  padding: 0.75rem;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, var(--teal) 0%, var(--teal-dark) 100%);
+  color: #fff;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  transition: all var(--transition);
+  box-shadow: 0 2px 8px rgba(45,140,138,0.3);
+}
+.btn-primary:hover { box-shadow: 0 4px 14px rgba(45,140,138,0.45); transform: translateY(-1px); }
+.btn-primary:active { background: var(--teal-dark); transform: translateY(0); }
+.btn-secondary {
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.875rem;
+  font-weight: 600;
+  border: 1.5px solid var(--border);
+  transition: all var(--transition);
+}
+.btn-secondary:hover { background: var(--border); }
+.btn-danger {
+  padding: 0.75rem 0.875rem;
+  border-radius: var(--radius-sm);
+  background: var(--red-bg);
+  color: var(--red);
+  font-size: 0.875rem;
+  font-weight: 600;
+  border: 1.5px solid #F0C0C0;
+  transition: all var(--transition);
+}
+.btn-danger:hover { background: #FAD7D7; }
+
+/* Injection modal */
+.inj-info-box {
+  background: linear-gradient(135deg, var(--teal-light), #D0EEEE);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 0.875rem;
+  margin-bottom: 0.875rem;
+  border: 1px solid #B2DADA;
+}
+.inj-info-box h4 { font-size: 0.875rem; font-weight: 700; color: var(--teal-dark); }
+.inj-info-box p  { font-size: 0.75rem; color: var(--teal-dark); margin-top: 3px; }
+
+/* Appointment status */
+.appt-status-row { display: flex; gap: 0.5rem; margin-bottom: 0.875rem; }
+.appt-status-btn {
+  flex: 1;
+  padding: 0.5625rem;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-2);
+  background: var(--bg);
+  transition: all var(--transition);
+}
+.appt-status-btn:hover { border-color: var(--teal); color: var(--teal-dark); }
+.appt-status-btn.selected {
+  background: linear-gradient(135deg, var(--teal), var(--teal-dark));
+  color: #fff;
+  border-color: var(--teal);
+  box-shadow: 0 2px 8px rgba(45,140,138,0.3);
+}
+
+/* ========== TOAST ========== */
+.toast-container {
+  position: fixed;
+  top: calc(var(--header-h) + 0.5rem);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  pointer-events: none;
+  width: calc(100% - 2rem);
+  max-width: 25rem;
+}
+.toast {
+  background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 100%);
+  color: #fff;
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 1rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  box-shadow: var(--shadow-lg);
+  pointer-events: all;
+  animation: toastIn 0.3s ease-in-out, toastOut 0.3s ease-in-out 2.7s forwards;
+}
+.toast--success { background: linear-gradient(135deg, var(--green), #2A7050); }
+.toast--error   { background: linear-gradient(135deg, var(--red), #B04040); }
+.toast--warning { background: linear-gradient(135deg, var(--orange), #C06820); }
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(-14px) scale(0.95); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes toastOut {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(-10px); }
+}
+
+/* ========== LOADING ========== */
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(27,38,56,0.55);
+  z-index: 9998;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 0.875rem;
+  backdrop-filter: blur(3px);
+}
+.loading-overlay.active { display: flex; }
+.spinner {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 50%;
+  border: 3px solid rgba(255,255,255,0.2);
+  border-top-color: #fff;
+  animation: spin 0.8s linear infinite;
+}
+.loading-overlay p { color: #fff; font-size: 0.875rem; font-weight: 600; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ========== CONFIRM SHEET ========== */
+.confirm-sheet {
+  background: linear-gradient(160deg, #fff 0%, #F8FAFC 100%);
+  border-radius: 1.25rem 1.25rem 0 0;
+  padding: 1.5rem 1.25rem calc(env(safe-area-inset-bottom, 0px) + 1.25rem);
+  animation: slideUp 0.3s ease-in-out;
+}
+.confirm-sheet h3 { font-size: 1.0625rem; font-weight: 800; color: var(--text); margin-bottom: 0.375rem; }
+.confirm-sheet p  { font-size: 0.875rem; color: var(--text-2); margin-bottom: 1.25rem; }
+.confirm-btns { display: flex; flex-direction: column; gap: 0.5rem; }
+.confirm-btns button { padding: 0.8125rem; border-radius: var(--radius-sm); font-size: 0.9375rem; font-weight: 700; width: 100%; transition: all var(--transition); }
+
+/* ========== MISC ========== */
+.hidden { display: none !important; }
+.text-center { text-align: center; }
+.icon-sm { font-size: 0.8125rem; }
+
+/* ========== RESPONSIVE: TABLET & DESKTOP ========== */
+@media (min-width: 640px) {
+  body { padding-bottom: calc(var(--nav-h) + 1.5rem); }
+  #mainContent { padding: 1rem 1rem 0; margin-top: var(--search-area-h); }
+  #dashView, #reportView { padding: 1rem; }
+  .stats-grid { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
+  .detail-grid { grid-template-columns: repeat(3, 1fr); }
+  .card-head { padding: 1rem 1rem 0.75rem; }
+  .card-actions { padding: 0 1rem 0.875rem; }
+  .card-progress { padding: 0 1rem 0.75rem; }
+  .modal { max-width: 480px; }
+}
+
+@media (min-width: 960px) {
+  /* ── Reset mobile offsets ── */
+  body {
+    padding-top: 0;        /* header is in grid, not fixed */
+    padding-bottom: 0;     /* bottom-nav is in grid, not fixed */
+    height: 100vh;
+    overflow: hidden;
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    grid-template-rows: var(--header-h) 1fr auto;
+    /* Row 1 = header  |  Row 2 = sidebar+main  |  Row 3 = nav+main */
+  }
+
+  /* Header: in grid row 1, spans both columns, NOT fixed */
+  .header {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    position: static;      /* remove position:fixed on desktop */
+    height: var(--header-h);
+  }
+
+  /* Sidebar: override mobile fixed — becomes grid item on desktop */
+  #searchArea {
+    grid-column: 1;
+    grid-row: 2;
+    position: static;  /* override mobile fixed */
+    box-shadow: none;  /* no shadow in sidebar */
+    height: auto;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(180deg, var(--navy-mid) 0%, #1A2538 100%);
+    border-right: 1px solid rgba(255,255,255,0.06);
+  }
+  .search-bar {
+    position: static;      /* remove sticky on desktop */
+    flex-shrink: 0;
+  }
+  .tabs {
+    flex-direction: column;
+    border-bottom: none;
+    flex-shrink: 0;
+    padding-bottom: 0.5rem;
+  }
+  .tab-btn { border-radius: var(--radius-sm); }
+
+  /* Bottom nav: column 1 row 3 — sits below sidebar */
+  .bottom-nav {
+    grid-column: 1;
+    grid-row: 3;
+    position: static;      /* remove position:fixed on desktop */
+    height: auto;
+    width: auto;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-around;
+    padding: 0.5rem 0;
+    border-top: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    box-shadow: none;
+    background: rgba(255,255,255,0.98);
+    backdrop-filter: blur(10px);
+  }
+
+  /* + button on desktop: no floating above nav */
+  .nav-btn--new .nav-plus-wrap {
+    margin-top: 0;
+    width: 2.25rem;
+    height: 2.25rem;
+  }
+  .nav-btn--new .nav-plus-wrap svg {
+    width: 1.125rem;
+    height: 1.125rem;
+  }
+
+  /* Main content: column 2, spans rows 2 AND 3 so nav doesn't cut it */
+  #mainContent, #dashView, #reportView {
+    grid-column: 2;
+    grid-row: 2 / 4;       /* span rows 2 and 3 */
+    overflow-y: auto;
+    height: calc(100vh - var(--header-h));
+    padding-bottom: 1.5rem;
+    position: static;
+  }
+
+  /* Main views: no margin-top needed — sidebar layout handles positioning */
+  #dashView, #reportView { margin-top: 0; }
+
+  /* ── CRITICAL: Disable card entry animations on desktop ──
+     On mobile, cards animate in nicely as you scroll.
+     On desktop, all 34+ cards render simultaneously with cascading
+     animation starting state opacity:0. With fill-mode:both the cards
+     start at opacity:0. If anything interrupts the animation pipeline
+     (tab switch, re-render, reduced-motion) they stay permanently invisible.
+     Solution: kill the animation on desktop — cards appear instantly. ── */
+  .patient-card {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  /* Also reset date-sep animation if any */
+  .date-sep { animation: none !important; opacity: 1 !important; }
+
+  /* Safety net: cards must always have visible height */
+  .card-head    { min-height: 60px; }
+  .card-actions { min-height: 44px; }
+
+  #mainContent { margin-top: 0; }  /* grid handles positioning, not margin */
+
+  /* ══ ROOT CAUSE FIX ══
+     #mainContent has display:flex + flex-direction:column in base CSS.
+     On desktop it gets a fixed height from the grid. A height-constrained
+     flex column compresses ALL children to fit — 34 cards × 180px = 6000px
+     crammed into ~900px → each card gets ~26px, overflow:hidden clips content,
+     only 1.5px border shows. Fix: switch to display:block (normal stacking). */
+  #mainContent {
+    display: block !important;  /* override flex — cards stack in normal flow */
+    height: calc(100vh - var(--header-h));
+    overflow-y: auto;
+    overflow-x: hidden;
+    min-height: 0;
+    padding: 0.75rem 0.75rem 1.5rem;
+  }
+
+  /* Safety: prevent any flex compression on cards or separators */
+  .patient-card { flex-shrink: 0; }
+  .date-sep     { flex-shrink: 0; }
+
+} /* end @media 960px */
+
+/* High-DPI / Retina */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .progress-track, .dose-bar-track { transform: translateZ(0); }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Safe area insets (iPhone notch / Dynamic Island) */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .bottom-nav {
+    padding-bottom: env(safe-area-inset-bottom);
+    height: calc(var(--nav-h) + env(safe-area-inset-bottom));
+  }
+}
+
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script>
+    window.PDFJS_URL    = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    window.PDFJS_WORKER = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  </script>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="header__brand">
+    <div class="header__icon">💉</div>
+    <div class="header__wordmark">
+      <h1>Dosing<span>Tracker</span></h1>
+      <p>Clinical Suite</p>
+    </div>
+  </div>
+  <div class="header__right">
+    <div class="sync-dot" id="syncDot" title="Connection status"></div>
+    <button class="header__menu-btn" id="menuBtn" aria-label="Open menu">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</header>
+
+<!-- TOAST -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- LOADING -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="spinner"></div>
+  <p id="loadingMsg">Loading patients…</p>
+</div>
+
+<!-- SEARCH + TABS -->
+<div id="searchArea">
+  <div class="search-bar">
+    <div class="search-input-wrap">
+      <input type="search" id="searchInput" placeholder="Search name or file number…" autocomplete="off">
+      <button class="search-clear" id="clearSearch">✕</button>
+    </div>
+    <button class="search-bar__refresh" id="refreshBtn" title="Refresh">⟳</button>
+  </div>
+  <div class="tabs" id="tabBar">
+    <button class="tab-btn active" data-tab="today">Today <span class="tab-count" id="cnt-today">0</span></button>
+    <button class="tab-btn" data-tab="scheduled">Scheduled <span class="tab-count" id="cnt-scheduled">0</span></button>
+    <button class="tab-btn" data-tab="all">All Active <span class="tab-count" id="cnt-all">0</span></button>
+    <button class="tab-btn" data-tab="overdue">Overdue <span class="tab-count" id="cnt-overdue">0</span></button>
+    <button class="tab-btn" data-tab="pending">Pending <span class="tab-count" id="cnt-pending">0</span></button>
+    <button class="tab-btn" data-tab="archived">Archived <span class="tab-count" id="cnt-archived">0</span></button>
+    <button class="tab-btn" data-tab="cpp">CPP <span class="tab-count" id="cnt-cpp">0</span></button>
+  </div>
+</div>
+
+<!-- PATIENT LIST -->
+<div id="mainContent"></div>
+
+<!-- DASHBOARD -->
+<div id="dashView" class="hidden">
+  <div class="stats-grid">
+    <div class="stat-card stat-card--teal stat-card--link" onclick="switchToTab('all')" title="View all active patients">
+      <div class="stat-card__icon">💊</div>
+      <div class="stat-card__label">Active Patients</div>
+      <div class="stat-card__value" id="ds-active">0</div>
+      <div class="stat-card__sub">Total in system</div>
+    </div>
+    <div class="stat-card stat-card--orange stat-card--link" onclick="switchToTab('today')" title="View today's appointments">
+      <div class="stat-card__icon">📅</div>
+      <div class="stat-card__label">Due Today</div>
+      <div class="stat-card__value" id="ds-today">0</div>
+      <div class="stat-card__sub">Tap to view</div>
+    </div>
+    <div class="stat-card stat-card--red stat-card--link" onclick="switchToTab('overdue')" title="View overdue patients">
+      <div class="stat-card__icon">⚠️</div>
+      <div class="stat-card__label">Overdue</div>
+      <div class="stat-card__value" id="ds-overdue">0</div>
+      <div class="stat-card__sub">Tap to view</div>
+    </div>
+    <div class="stat-card stat-card--navy stat-card--link" onclick="switchToTab('pending')" title="View pending patients">
+      <div class="stat-card__icon">⏳</div>
+      <div class="stat-card__label">Pending Renewal</div>
+      <div class="stat-card__value" id="ds-pending">0</div>
+      <div class="stat-card__sub">Tap to view</div>
+    </div>
+    <div class="stat-card stat-card--purple stat-card--link" onclick="switchToTab('cpp')" title="View CPP patients">
+      <div class="stat-card__icon">🩺</div>
+      <div class="stat-card__label">CPP Patients</div>
+      <div class="stat-card__value" id="ds-cpp">0</div>
+      <div class="stat-card__sub">Tap to view</div>
+    </div>
+  </div>
+  <div class="dose-chart" id="doseChartWrap">
+    <h3>Patients by Dose</h3>
+    <div id="doseChart"></div>
+  </div>
+  <div class="quick-actions">
+    <h3>Quick Actions</h3>
+    <div class="quick-action-btns">
+      <button class="quick-action-btn" onclick="switchToTab('today')">📅 Due Today</button>
+      <button class="quick-action-btn" onclick="switchToTab('overdue')">⚠️ Overdue</button>
+      <button class="quick-action-btn" onclick="openMenuDrawer()">📥 Import Data</button>
+      <button class="quick-action-btn" onclick="openMenuDrawer()">📤 Export Data</button>
+    </div>
+  </div>
+</div>
+
+<!-- REPORT VIEW -->
+<div id="reportView" class="hidden">
+
+  <!-- Report type tabs -->
+  <div style="display:flex;gap:6px;padding:0 0 10px">
+    <button id="rptTabDaily" class="rpt-tab rpt-tab--active" onclick="switchReportTab('daily')">
+      📋 Daily Report
+    </button>
+    <button id="rptTabMonthly" class="rpt-tab" onclick="switchReportTab('monthly')">
+      📅 Monthly Due Report
+    </button>
+    <button id="rptTabCustom" class="rpt-tab" onclick="switchReportTab('custom')">
+      🔍 Custom Filter
+    </button>
+  </div>
+
+  <!-- DAILY controls -->
+  <div id="rptControlsDaily" class="report-controls">
+    <div style="font-size:11px;color:var(--text-2);margin-bottom:10px">
+      Shows patients whose injection was administered on the selected date.
+    </div>
+    <div class="form-row-2">
+      <div class="form-row">
+        <label class="form-label">Date</label>
+        <input class="form-control" type="date" id="rptDailyDate">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Status Filter</label>
+        <select class="form-control" id="rptDailyStatus">
+          <option value="all">All patients</option>
+          <option value="seen">Injection administered</option>
+          <option value="confirmed">Appointment confirmed</option>
+        </select>
+      </div>
+    </div>
+    <button class="run-report-btn" id="generateReportBtnDaily">🔍 Generate Daily Report</button>
+  </div>
+
+  <!-- MONTHLY controls -->
+  <div id="rptControlsMonthly" class="report-controls hidden">
+    <div style="font-size:11px;color:var(--text-2);margin-bottom:10px">
+      Shows all patients whose due date falls within the selected month.
+    </div>
+    <div class="form-row-2">
+      <div class="form-row">
+        <label class="form-label">Month</label>
+        <select class="form-control" id="rptMonth">
+          <option value="01">January</option><option value="02">February</option>
+          <option value="03">March</option><option value="04">April</option>
+          <option value="05" selected>May</option><option value="06">June</option>
+          <option value="07">July</option><option value="08">August</option>
+          <option value="09">September</option><option value="10">October</option>
+          <option value="11">November</option><option value="12">December</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Year</label>
+        <select class="form-control" id="rptYear">
+          <option value="2025">2025</option>
+          <option value="2026" selected>2026</option>
+          <option value="2027">2027</option>
+          <option value="2028">2028</option>
+        </select>
+      </div>
+    </div>
+    <button class="run-report-btn" onclick="generateMonthlyReport()">🔍 Generate Monthly Report</button>
+  </div>
+
+  <!-- CUSTOM controls -->
+  <div id="rptControlsCustom" class="report-controls hidden">
+    <div style="font-size:11px;background:var(--teal-light);border:1px solid #B2DADA;border-radius:6px;padding:8px 10px;color:var(--teal-dark);margin-bottom:10px">
+      Date range always filters by <strong>Due Date</strong>
+    </div>
+    <div class="quick-report-btns">
+      <button class="quick-report-btn" data-quick="dueToday">📅 Due Today</button>
+      <button class="quick-report-btn" data-quick="thisWeek">📅 This Week</button>
+      <button class="quick-report-btn" data-quick="nextMonth">📅 Next 30 Days</button>
+      <button class="quick-report-btn" data-quick="noRepeatsLeft">💊 No Doses Left</button>
+      <button class="quick-report-btn" data-quick="pendingPatients">⏳ Pending</button>
+      <button class="quick-report-btn" data-quick="cppPatients">🩺 CPP Only</button>
+      <button class="quick-report-btn" data-quick="tempPatients">📋 Temporary</button>
+    </div>
+    <div class="form-row-2">
+      <div class="form-row">
+        <label class="form-label">Due Date From</label>
+        <input class="form-control" type="date" id="reportDateFrom">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Due Date To</label>
+        <input class="form-control" type="date" id="reportDateTo">
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
+      <div class="form-row">
+        <label class="form-label">Also Filter By</label>
+        <select class="form-control" id="reportField">
+          <option value="none">— None —</option>
+          <option value="dose_prescribed">Dose</option>
+          <option value="doses_remaining">Doses Remaining</option>
+          <option value="assignment_type">Type</option>
+          <option value="pending">Pending</option>
+          <option value="cpp">CPP Patient</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Condition</label>
+        <select class="form-control" id="reportCondition">
+          <option value="equals">Equals</option>
+          <option value="contains">Contains</option>
+          <option value="greater">Greater than</option>
+          <option value="less">Less than</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Value</label>
+        <input class="form-control" type="text" id="reportValue" placeholder="e.g. 22.5">
+      </div>
+    </div>
+    <button class="run-report-btn" id="generateReportBtnCustom">🔍 Run Custom Report</button>
+  </div>
+
+  <!-- Export bar -->
+  <div id="reportExportBar" style="display:none;background:var(--card);border-radius:var(--radius);padding:10px 14px;border:1.5px solid var(--border);margin-bottom:10px;align-items:center;gap:8px;flex-wrap:wrap">
+    <span style="font-weight:700;font-size:14px" id="reportCount">0 patients</span>
+    <div style="flex:1"></div>
+    <button onclick="exportReportXLSX()" style="display:flex;align-items:center;gap:5px;padding:7px 14px;border-radius:7px;background:linear-gradient(135deg,#1D6F42,#1A5C37);color:#fff;font-size:12px;font-weight:700;border:none;cursor:pointer">📗 Excel</button>
+    <button onclick="exportReportCSV()" style="display:flex;align-items:center;gap:5px;padding:7px 14px;border-radius:7px;background:linear-gradient(135deg,var(--teal),var(--teal-dark));color:#fff;font-size:12px;font-weight:700;border:none;cursor:pointer">📋 CSV</button>
+    <button onclick="printReport()" style="display:flex;align-items:center;gap:5px;padding:7px 14px;border-radius:7px;background:var(--bg);color:var(--text);font-size:12px;font-weight:700;border:1.5px solid var(--border);cursor:pointer">🖨️ Print</button>
+  </div>
+
+  <div id="reportOutput"></div>
+</div>
+
+<!-- BOTTOM NAV -->
+<nav class="bottom-nav">
+  <button class="nav-btn" data-view="dash" id="nav-dash">
+    <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+    <span>Dashboard</span>
+    <span class="nav-badge hidden" id="badge-overdue"></span>
+  </button>
+  <button class="nav-btn active" data-view="patients" id="nav-patients">
+    <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    <span>Patients</span>
+  </button>
+  <button class="nav-btn nav-btn--new" id="nav-new">
+    <div class="nav-plus-wrap">
+      <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    </div>
+    <span>New</span>
+  </button>
+  <button class="nav-btn" data-view="report" id="nav-report">
+    <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+    <span>Reports</span>
+  </button>
+</nav>
+
+<!-- MENU DRAWER -->
+<div class="drawer-backdrop" id="drawerBackdrop"></div>
+<div class="drawer" id="menuDrawer">
+  <div class="drawer-handle"></div>
+  <div class="drawer-title">⚙️ Settings &amp; Data</div>
+  <div class="drawer-section">
+    <h4>Import</h4>
+    <div class="drawer-btn-list">
+      <button class="drawer-btn" id="importGSBtn"><span class="drawer-btn-icon">📊</span>Google Sheets Import</button>
+      <button class="drawer-btn" id="importCSVBtn"><span class="drawer-btn-icon">📋</span>CSV File</button>
+      <button class="drawer-btn" id="importPDFBtn"><span class="drawer-btn-icon">📄</span>PDF Prescription</button>
+    </div>
+  </div>
+  <div class="drawer-section">
+    <h4>Export</h4>
+    <div class="drawer-btn-list">
+      <button class="drawer-btn" id="exportCSVBtn"><span class="drawer-btn-icon">📤</span>Export to CSV</button>
+      <button class="drawer-btn" id="exportJSONBtn"><span class="drawer-btn-icon">💾</span>Backup (JSON)</button>
+    </div>
+  </div>
+  <div class="drawer-section">
+    <div class="drawer-btn-list">
+      <button class="drawer-btn" id="refreshBtnDrawer"><span class="drawer-btn-icon">🔄</span>Refresh Data</button>
+      <button class="drawer-btn" onclick="closeMenuDrawer();openModal('apiKeyModal')">
+        <span class="drawer-btn-icon">🤖</span>Claude AI Key
+        <span id="aiKeyStatus" style="margin-left:auto;font-size:11px;color:var(--text-3)">Not set</span>
+      </button>
+      <a class="drawer-btn" href="scheduler.html" style="text-decoration:none;color:inherit">
+        <span class="drawer-btn-icon">🗺️</span>Route Scheduler
+        <span style="margin-left:auto;font-size:10px;font-weight:700;background:var(--teal-light);color:var(--teal-dark);padding:2px 7px;border-radius:20px">New</span>
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- HIDDEN FILE INPUTS -->
+<input type="file" id="csvFileInput" accept=".csv" style="display:none">
+<input type="file" id="pdfFileInput" accept=".pdf" multiple style="display:none">
+
+<!-- PDF REVIEW MODAL -->
+<div class="modal-overlay" id="pdfReviewModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">📄 PDF Extraction Review</div>
+        <div style="font-size:11px;color:var(--text-2);margin-top:2px" id="pdfReviewFilename"></div>
+      </div>
+      <button class="modal-close" onclick="closeModal('pdfReviewModal')">✕</button>
+    </div>
+    <div class="modal-body" id="pdfReviewBody"></div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('pdfReviewModal')">Cancel</button>
+      <button class="btn-primary" onclick="confirmPDFAndFill()">✓ Confirm &amp; Fill Form</button>
+    </div>
+  </div>
+</div>
+
+<!-- CLAUDE API KEY MODAL -->
+<div class="modal-overlay" id="apiKeyModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title">🤖 Claude AI Settings</div>
+      <button class="modal-close" onclick="closeModal('apiKeyModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:var(--teal-light);border:1px solid #B2DADA;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px;color:var(--teal-dark)">
+        <strong>Optional — Turbocharge PDF extraction with AI.</strong><br>
+        Without a key, smart regex is used. With a Claude API key, extraction is dramatically more accurate for complex/scanned forms.
+      </div>
+      <div class="form-group">
+        <label>Claude API Key</label>
+        <input type="password" id="claudeApiKeyInput" class="form-control" placeholder="sk-ant-api03-…" style="padding:10px 12px;font-family:monospace">
+      </div>
+      <p style="font-size:11px;color:var(--text-2);margin-top:-6px">Key is stored locally in your browser only — never sent anywhere except Anthropic's API.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-danger" onclick="clearApiKey()">Clear Key</button>
+      <button class="btn-primary" onclick="saveApiKey()">Save Key</button>
+    </div>
+  </div>
+</div>
+
+<!-- PATIENT MODAL -->
+<div class="modal-overlay" id="patientModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title" id="patientModalTitle">Add Patient</div>
+      <button class="modal-close" id="patientModalClose">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="patientForm" autocomplete="off">
+        <div class="form-section-title" style="border-top:none;margin-top:0;padding-top:0">Patient Info</div>
+        <div class="form-group">
+          <label>Full Name *</label>
+          <input type="text" id="f-name" placeholder="Sarah Johnson" required>
+        </div>
+        <div class="form-row-2">
+          <div class="form-group">
+            <label>File Number *</label>
+            <input type="text" id="f-file" placeholder="PT-001" required>
+          </div>
+          <div class="form-group">
+            <label>Type</label>
+            <select id="f-type">
+              <option value="Permanent">Permanent</option>
+              <option value="Temporary">Temporary</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Address</label>
+          <input type="text" id="f-addr" placeholder="221 Baker St, Springfield, IL">
+        </div>
+        <div class="form-row-2">
+          <div class="form-group">
+            <label>Phone 1</label>
+            <input type="tel" id="f-phone1" placeholder="+1 555 123 4567">
+          </div>
+          <div class="form-group">
+            <label>Phone 2</label>
+            <input type="tel" id="f-phone2" placeholder="+1 555 987 1122">
+          </div>
+        </div>
+        <div class="form-section-title">Dosing</div>
+        <div class="form-row-2">
+          <div class="form-group">
+            <label>Dose (mg) *</label>
+            <select id="f-dose">
+              <option value="7.5">7.5 mg (4 weeks)</option>
+              <option value="22.5" selected>22.5 mg (12 weeks)</option>
+              <option value="30">30 mg (16 weeks)</option>
+              <option value="45">45 mg (24 weeks)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Total Doses</label>
+            <input type="number" id="f-total" value="4" min="1">
+          </div>
+        </div>
+        <div class="form-row-2">
+          <div class="form-group">
+            <label>Doses Remaining</label>
+            <input type="number" id="f-remaining" value="4" min="0">
+          </div>
+          <div class="form-group">
+            <label>Due Date</label>
+            <input type="date" id="f-due">
+          </div>
+        </div>
+        <div class="form-section-title">Injection</div>
+        <div class="form-row-2">
+          <div class="form-group">
+            <label>Last Site</label>
+            <select id="f-lastsite">
+              <option value="">— None —</option>
+              <option value="Right Side">Right Side</option>
+              <option value="Left Side">Left Side</option>
+              <option value="Right Glute">Right Glute</option>
+              <option value="Left Glute">Left Glute</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Appt Date &amp; Time</label>
+            <input type="datetime-local" id="f-appt">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Previous Injection Dates</label>
+          <input type="text" id="f-prevdates" placeholder="2024-01-15, 2024-04-20">
+        </div>
+        <div class="form-section-title">Classification</div>
+        <div class="form-group" style="display:flex;align-items:center;gap:10px;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg)">
+          <input type="checkbox" id="f-cpp" style="width:18px;height:18px;accent-color:var(--teal);cursor:pointer;flex-shrink:0">
+          <div>
+            <div style="font-size:13px;font-weight:700;color:var(--text)">CPP Patient</div>
+            <div style="font-size:11px;color:var(--text-2)">Mark as Chronic Pain Program patient</div>
+          </div>
+        </div>
+        <div class="form-section-title">Notes</div>
+        <div class="form-group">
+          <label>Special Instructions</label>
+          <textarea id="f-special" placeholder="e.g. Patient prefers morning appointments"></textarea>
+        </div>
+        <div class="form-group">
+          <label>Adverse Effects Notes</label>
+          <textarea id="f-adverse" placeholder="Any adverse effects or reactions…"></textarea>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-danger hidden" id="deletePatientBtn">🗑</button>
+      <button class="btn-secondary" id="patientModalCancel">Cancel</button>
+      <button class="btn-primary" id="patientModalSave">Save Patient</button>
+    </div>
+  </div>
+</div>
+
+<!-- INJECTION MODAL -->
+<div class="modal-overlay" id="injectionModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title">💉 Record Injection</div>
+      <button class="modal-close" id="injectionModalClose">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="inj-info-box">
+        <h4 id="injPatientName">—</h4>
+        <p id="injPatientInfo">—</p>
+      </div>
+      <div class="form-group">
+        <label>Injection Site *</label>
+        <select id="injSiteSelect" class="form-control" style="padding:10px 12px">
+          <option value="">— Select site —</option>
+          <option value="Right Side">Right Side</option>
+          <option value="Left Side">Left Side</option>
+          <option value="Right Glute">Right Glute</option>
+          <option value="Left Glute">Left Glute</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Session Notes / Comments</label>
+        <textarea id="injComments" placeholder="Any notes about this session…" style="min-height:60px"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Adverse Effects (if any)</label>
+        <textarea id="injAdverse" placeholder="Redness, swelling, patient reactions…" style="min-height:60px"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Special Instructions Update</label>
+        <textarea id="injSpecial" placeholder="Updated care instructions…" style="min-height:60px"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" id="injCancelBtn">Cancel</button>
+      <button class="btn-primary" id="injConfirmBtn">✓ Confirm Injection</button>
+    </div>
+  </div>
+</div>
+
+<!-- APPOINTMENT MODAL -->
+<div class="modal-overlay" id="apptModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title">📅 Appointment</div>
+      <button class="modal-close" id="apptModalClose">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:14px;color:var(--text-2);margin-bottom:14px" id="apptPatientName">Set appointment date and time.</p>
+      <div class="appt-status-row">
+        <button class="appt-status-btn selected" id="apptStatusConfirmed">✓ Confirmed</button>
+        <button class="appt-status-btn" id="apptStatusTentative">~ Tentative</button>
+      </div>
+      <div class="form-group">
+        <label>Date &amp; Time</label>
+        <input type="datetime-local" id="apptDateInput" class="form-control" style="padding:10px 12px">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" id="apptCancelBtn">Cancel</button>
+      <button class="btn-primary" id="apptSaveBtn">Save Appointment</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM SHEET -->
+<div class="drawer-backdrop" id="confirmBackdrop"></div>
+<div class="drawer" id="confirmSheet">
+  <div class="drawer-handle"></div>
+  <div class="confirm-sheet">
+    <h3 id="confirmTitle">Are you sure?</h3>
+    <p id="confirmMsg">This action cannot be undone.</p>
+    <div class="confirm-btns">
+      <button class="btn-danger" id="confirmYes">Confirm</button>
+      <button class="btn-secondary" id="confirmNo">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ========== CONFIG ==========
+const SUPABASE_URL = "https://wqlbmtjbjloxpvsbeqyb.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_gcyK2z_8lvbOgHNcJfdX1g_8QCWJ_Xi";
+const GOOGLE_SHEETS_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSYgD018ww2Mbkud6ZYmZHop7EXxcm_0Zl4V9bB2AaY4r4xXTWChAW6v-gUyjD4-2Qmg4H8O0kxryCf/pub?output=csv";
+
+const DOSE_TO_WEEKS = { '7.5': 4, '22.5': 12, '30': 16, '45': 24 };
+const AVATAR_COLORS = ['teal','orange','navy','purple','green'];
+
+// DB column mapping
+const COL = {
+  'Patient Name': 'patient_name',
+  'File Number': 'file_number',
+  'Address': 'address',
+  'Phone 1': 'phone1',
+  'Phone 2': 'phone2',
+  'Dose Prescribed': 'dose_prescribed',
+  'Total Doses': 'total_doses',
+  'Doses Remaining': 'doses_remaining',
+  'Previous Injection Site': 'previous_injection_site',
+  'Injection Site': 'injection_site',
+  'Due Date': 'due_date',
+  'Appointment Date & Time': 'appointment_date_time',
+  'Previous Injection Dates': 'previous_injection_dates',
+  'Assignment Type': 'assignment_type',
+  'Special Instructions': 'special_instructions',
+  'Adverse Effects Comments': 'adverse_effects_comments',
+  'File Status': 'file_status',
+  'Injection Administered': 'injection_administered',
+  'Appointment Confirmed': 'appointment_confirmed',
+  'Pending': 'pending',
+  'Archived': 'archived',
+  'CPP Patient': 'cpp_patient'
+};
+
+// State
+let _sb = null;
+let patients = [];
+let currentTab = 'today';
+let currentView = 'patients';
+let searchQuery = '';
+let editingId = null;
+let pendingInjectId = null;
+let pendingApptId = null;
+let confirmCallback = null;
+let apptConfirmedStatus = true;
+
+// ========== DATE UTILS ==========
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+function pad(n) { return String(n).padStart(2,'0'); }
+
+function addWeeks(dateStr, weeks) {
+  if (!dateStr) return todayStr();
+  const [y,m,d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, m-1, d);
+  dt.setDate(dt.getDate() + weeks*7);
+  return `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}`;
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return 'Not set';
+  const today = todayStr();
+  const [y,m,d] = dateStr.split('-').map(Number);
+  const diff = Math.round((new Date(y,m-1,d) - new Date()) / 86400000);
+  if (dateStr === today) return 'Due today';
+  if (diff === 1) return 'Due tomorrow';
+  if (diff > 0 && diff < 7) return `Due in ${diff} days`;
+  if (diff < 0) return `Overdue by ${Math.abs(diff)} day${Math.abs(diff)>1?'s':''}`;
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${months[m-1]} ${d}, ${y}`;
+}
+
+function formatDateFull(dateStr) {
+  if (!dateStr) return 'Not set';
+  const [y,m,d] = dateStr.split('-').map(Number);
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${months[m-1]} ${d}, ${y}`;
+}
+
+function formatDateTime(dtStr) {
+  if (!dtStr) return 'Not set';
+  try {
+    const dt = new Date(dtStr);
+    return dt.toLocaleString('en-US', { month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit', hour12:true });
+  } catch { return dtStr; }
+}
+
+function formatTimeOnly(dtStr) {
+  if (!dtStr) return '';
+  try {
+    const dt = new Date(dtStr);
+    return dt.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit', hour12:true });
+  } catch { return ''; }
+}
+
+// ========== TOAST ==========
+function toast(msg, type='', icon='') {
+  const wrap = document.getElementById('toastContainer');
+  const el = document.createElement('div');
+  el.className = `toast${type ? ' toast--'+type : ''}`;
+  el.innerHTML = `${icon || (type==='success'?'✓':type==='error'?'✗':type==='warning'?'⚠':'ℹ')} ${msg}`;
+  wrap.appendChild(el);
+  setTimeout(() => el.remove(), 3100);
+}
+
+// ========== LOADING ==========
+function setLoading(show, msg='Loading…') {
+  const el = document.getElementById('loadingOverlay');
+  const msgEl = document.getElementById('loadingMsg');
+  msgEl.textContent = msg;
+  if (show) el.classList.add('active'); else el.classList.remove('active');
+}
+
+// ========== SUPABASE ==========
+async function initSupabase() {
+  try {
+    // Guard: check SDK loaded
+    if (!window.supabase) {
+      throw new Error('Supabase SDK failed to load. Check your internet connection.');
+    }
+    _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    await _sb.from('patients').select('count', { count:'exact', head:true });
+    document.getElementById('syncDot').className = 'sync-dot connected';
+    return true;
+  } catch(e) {
+    console.error('Supabase init error:', e);
+    document.getElementById('syncDot').className = 'sync-dot error';
+
+    // Show a visible, actionable error in the main content area
+    const errMsg = e.message || String(e);
+    const isAuthErr = errMsg.includes('401') || errMsg.includes('403') || errMsg.includes('Invalid API key') || errMsg.includes('anon');
+    const isCORS    = errMsg.includes('CORS') || errMsg.includes('fetch') || errMsg.includes('network') || errMsg.includes('Failed to fetch');
+
+    let tip = '';
+    if (isAuthErr) tip = `<p>Your <strong>Supabase anon key</strong> may be in the wrong format. Go to Supabase → Project Settings → API and copy the <strong>anon public</strong> key (starts with <code>eyJ...</code>).</p>`;
+    else if (isCORS) tip = `<p>Your GitHub Pages domain is not whitelisted in Supabase. Go to Supabase → Project Settings → API → <strong>CORS Allowed Origins</strong> and add <code>https://aatomasi-bot.github.io</code></p>`;
+    else tip = `<p>Error: <code style="font-size:11px;background:#f5f5f5;padding:2px 4px;border-radius:3px">${errMsg.substring(0,200)}</code></p>`;
+
+    document.getElementById('mainContent').innerHTML = `
+      <div style="margin:16px;background:#fff;border-radius:14px;border:2px solid #E05A5A;padding:20px;box-shadow:0 4px 20px rgba(224,90,90,0.15)">
+        <div style="font-size:22px;margin-bottom:8px">⚠️</div>
+        <div style="font-size:16px;font-weight:800;color:#E05A5A;margin-bottom:8px">Cannot connect to database</div>
+        ${tip}
+        <div style="margin-top:14px;padding-top:14px;border-top:1px solid #f0d0d0">
+          <p style="font-size:12px;font-weight:700;color:#666;margin-bottom:8px">TO FIX — 3 steps:</p>
+          <ol style="font-size:12px;color:#444;padding-left:16px;line-height:1.9">
+            <li>Go to <strong>supabase.com</strong> → your project → <strong>Project Settings → API</strong></li>
+            <li>Copy the <strong>anon public</strong> key (the long <code>eyJ...</code> one)</li>
+            <li>In your <code>index.html</code>, replace the value of <code>SUPABASE_ANON_KEY</code> with that key</li>
+          </ol>
+          <div style="margin-top:12px;padding:8px 12px;background:#FEF3E8;border-radius:8px;border:1px solid #F5D0AA;font-size:12px;color:#E5883A">
+            <strong>Also add CORS:</strong> Supabase → Project Settings → API → CORS Allowed Origins → add <code>https://aatomasi-bot.github.io</code>
+          </div>
+        </div>
+        <button onclick="location.reload()" style="margin-top:14px;width:100%;padding:11px;border-radius:8px;background:linear-gradient(135deg,#2D8C8A,#1E6665);color:#fff;font-size:14px;font-weight:700;border:none;cursor:pointer">
+          🔄 Retry Connection
+        </button>
+      </div>`;
+    return false;
+  }
+}
+
+async function loadPatients() {
+  if (!_sb) return;
+  setLoading(true, 'Loading patients…');
+  try {
+    const { data, error } = await _sb.from('patients').select('*').order('created_at', { ascending: false });
+    if (error) throw error;
+    patients = data.map(row => {
+      const p = { id: row.id };
+      for (const [k, v] of Object.entries(COL)) p[k] = row[v] ?? null;
+      return p;
+    });
+    updateTabCounts();
+    renderView();
+  } catch(e) {
+    toast('Failed to load: ' + e.message, 'error');
+  } finally {
+    setLoading(false);
+  }
+}
+
+async function dbInsert(p) {
+  const row = {};
+  for (const [k,v] of Object.entries(COL)) row[v] = p[k] ?? null;
+  const { error } = await _sb.from('patients').insert([row]);
+  if (error) throw error;
+}
+
+async function dbUpdate(id, p) {
+  const row = {};
+  for (const [k,v] of Object.entries(COL)) row[v] = p[k] ?? null;
+  const { error } = await _sb.from('patients').update(row).eq('id', id);
+  if (error) throw error;
+}
+
+async function dbDelete(id) {
+  const { error } = await _sb.from('patients').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// ========== AVATAR ==========
+function initials(name) {
+  if (!name) return '??';
+  const parts = name.trim().split(' ');
+  if (parts.length >= 2) return (parts[0][0] + parts[parts.length-1][0]).toUpperCase();
+  return name.substring(0,2).toUpperCase();
+}
+
+function avatarColor(name) {
+  if (!name) return 'teal';
+  let hash = 0;
+  for (let c of name) hash = ((hash << 5) - hash) + c.charCodeAt(0);
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
+// ========== FILTERING ==========
+function getDueCounts() {
+  const today = todayStr();
+  const counts = { today:0, scheduled:0, all:0, overdue:0, pending:0, archived:0, cpp:0 };
+  patients.forEach(p => {
+    if (p['Archived']) { counts.archived++; return; }
+    if (p['Pending']) { counts.pending++; }
+    if (p['CPP Patient']) counts.cpp++;
+    if (p['Pending']) return;
+    const apptDate = p['Appointment Date & Time'] ? p['Appointment Date & Time'].split('T')[0] : null;
+    const confirmed = p['Appointment Confirmed'];
+    const isToday = apptDate === today;
+    const isFuture = apptDate && apptDate > today;
+    const overdue = apptDate && apptDate < today && confirmed && !p['Injection Administered'];
+    if (isToday && confirmed) counts.today++;
+    else if (isFuture && confirmed) counts.scheduled++;
+    else if (overdue) counts.overdue++;
+    else counts.all++;
+  });
+  return counts;
+}
+
+function updateTabCounts() {
+  const c = getDueCounts();
+  for (const [k,v] of Object.entries(c)) {
+    const el = document.getElementById('cnt-'+k);
+    if (el) el.textContent = v;
+  }
+  // Badge on dashboard nav
+  const badge = document.getElementById('badge-overdue');
+  if (badge) {
+    if (c.overdue > 0) { badge.textContent = c.overdue; badge.classList.remove('hidden'); }
+    else badge.classList.add('hidden');
+  }
+}
+
+function getFilteredPatients() {
+  const today = todayStr();
+  return patients.filter(p => {
+    if (p['Archived'] && currentTab !== 'archived') return false;
+    if (!p['Archived'] && currentTab === 'archived') return false;
+    if (currentTab === 'cpp') return !!p['CPP Patient'] && !p['Archived'];
+    if (p['Pending'] && currentTab !== 'pending') return false;
+    if (!p['Pending'] && currentTab === 'pending') return false;
+    if (currentTab === 'pending' || currentTab === 'archived') return true;
+
+    const apptDate = p['Appointment Date & Time'] ? p['Appointment Date & Time'].split('T')[0] : null;
+    const confirmed = !!p['Appointment Confirmed'];
+    const isToday = apptDate === today;
+    const isFuture = apptDate && apptDate > today;
+    const overdue = apptDate && apptDate < today && confirmed && !p['Injection Administered'];
+
+    if (currentTab === 'today') return isToday && confirmed;
+    if (currentTab === 'scheduled') return isFuture && confirmed;
+    if (currentTab === 'overdue') return !!overdue;
+    if (currentTab === 'all') return !isToday && !isFuture && !overdue && !confirmed;
+    return true;
+  }).filter(p => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (p['Patient Name']||'').toLowerCase().includes(q) ||
+           (p['File Number']||'').toLowerCase().includes(q) ||
+           (p['Address']||'').toLowerCase().includes(q);
+  }).sort((a, b) => {
+    const aConf = !!a['Appointment Confirmed'];
+    const bConf = !!b['Appointment Confirmed'];
+    const aAppt = a['Appointment Date & Time'] || '';
+    const bAppt = b['Appointment Date & Time'] || '';
+    const aDue  = a['Due Date'] || '';
+    const bDue  = b['Due Date'] || '';
+
+    // ── Priority 1: confirmed appointments always come first ──
+    if (aConf && !bConf) return -1;
+    if (!aConf && bConf) return 1;
+
+    // ── Priority 2: both confirmed → sort by appointment datetime (earliest first) ──
+    if (aConf && bConf) {
+      if (aAppt < bAppt) return -1;
+      if (aAppt > bAppt) return 1;
+      return 0;
+    }
+
+    // ── Priority 3: neither confirmed → sort by due date (earliest first) ──
+    return aDue.localeCompare(bDue);
+  });
+}
+
+// ========== RENDER ==========
+function renderView() {
+  if (currentView === 'dash') { renderDashboard(); return; }
+  if (currentView === 'report') { return; }
+  renderPatientList();
+}
+
+function renderPatientList() {
+  const el = document.getElementById('mainContent');
+  const filtered = getFilteredPatients();
+  if (!filtered.length) {
+    const msgs = {
+      today: { icon:'📅', title:'No appointments today', sub:'All clear for today.' },
+      scheduled: { icon:'🗓', title:'No scheduled appointments', sub:'No upcoming confirmed appointments.' },
+      all: { icon:'👥', title:'No active patients', sub:'Add a patient to get started.' },
+      overdue: { icon:'✅', title:'No overdue appointments', sub:'All appointments are up to date.' },
+      pending: { icon:'⏳', title:'No pending patients', sub:'Patients pending renewal will appear here.' },
+      archived: { icon:'🗄', title:'No archived patients', sub:'Archived patients will appear here.' },
+      cpp:      { icon:'🩺', title:'No CPP patients', sub:'Patients marked as CPP will appear here.' },
+    };
+    const m = msgs[currentTab] || { icon:'👥', title:'No patients', sub:'' };
+    el.innerHTML = `<div class="empty-state"><div class="empty-state__icon">${m.icon}</div><div class="empty-state__title">${m.title}</div><p class="empty-state__sub">${m.sub}</p></div>`;
+    return;
+  }
+
+  const today = todayStr();
+
+  // ── Split into two priority groups ──
+  const confirmed   = filtered.filter(p => !!p['Appointment Confirmed']);
+  const unconfirmed = filtered.filter(p => !p['Appointment Confirmed']);
+
+  // Group confirmed patients by appointment DATE (not due date)
+  const confGroups = {};
+  confirmed.forEach(p => {
+    const apptDT  = p['Appointment Date & Time'] || '';
+    const key     = apptDT ? apptDT.split('T')[0] : (p['Due Date'] || 'Unknown');
+    if (!confGroups[key]) confGroups[key] = [];
+    confGroups[key].push(p);
+  });
+
+  // Group unconfirmed patients by due date
+  const dueGroups = {};
+  unconfirmed.forEach(p => {
+    const key = p['Due Date'] || 'Unknown';
+    if (!dueGroups[key]) dueGroups[key] = [];
+    dueGroups[key].push(p);
+  });
+
+  let html = '';
+  let cardIdx = 0;
+
+  // ── Render confirmed group first ──
+  if (confirmed.length > 0) {
+    // Section header — only shown when there are also unconfirmed patients
+    if (unconfirmed.length > 0) {
+      html += `<div style="display:flex;align-items:center;gap:8px;padding:14px 4px 6px">
+        <span style="width:10px;height:10px;border-radius:50%;background:var(--teal);flex-shrink:0"></span>
+        <span style="font-size:11px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--teal-dark)">Confirmed Appointments</span>
+        <span style="background:var(--teal-light);color:var(--teal-dark);border-radius:20px;padding:1px 8px;font-size:11px;font-weight:700">${confirmed.length}</span>
+      </div>`;
+    }
+    for (const date of Object.keys(confGroups).sort()) {
+      const isToday = date === today;
+      const isPast  = date < today && date !== 'Unknown';
+      const sepClass = isToday ? 'date-sep--today' : (isPast ? 'date-sep--overdue' : '');
+      html += `<div class="date-sep ${sepClass}">
+        <span class="date-sep__label">${isToday ? 'TODAY' : formatDateFull(date).toUpperCase()}</span>
+        <span style="font-size:9px;font-weight:700;letter-spacing:0.5px;color:var(--teal);margin-left:2px">✓ APPT</span>
+        <span class="date-sep__badge">${confGroups[date].length}</span>
+      </div>`;
+      confGroups[date].forEach(p => { html += renderCard(p, cardIdx++); });
+    }
+  }
+
+  // ── Render unconfirmed group second ──
+  if (unconfirmed.length > 0) {
+    // Divider — only shown when there were also confirmed patients above
+    if (confirmed.length > 0) {
+      html += `<div style="display:flex;align-items:center;gap:8px;padding:18px 4px 6px">
+        <div style="flex:1;height:1px;background:var(--border)"></div>
+        <span style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-3)">By Due Date — No Appointment Set</span>
+        <span style="background:var(--border);color:var(--text-2);border-radius:20px;padding:1px 8px;font-size:11px;font-weight:700">${unconfirmed.length}</span>
+        <div style="flex:1;height:1px;background:var(--border)"></div>
+      </div>`;
+    }
+    for (const date of Object.keys(dueGroups).sort()) {
+      const isToday = date === today;
+      const isPast  = date < today && date !== 'Unknown';
+      const sepClass = isToday ? 'date-sep--today' : (isPast ? 'date-sep--overdue' : '');
+      html += `<div class="date-sep ${sepClass}">
+        <span class="date-sep__label">${isToday ? 'TODAY' : formatDateFull(date).toUpperCase()}</span>
+        <span class="date-sep__badge">${dueGroups[date].length}</span>
+      </div>`;
+      dueGroups[date].forEach(p => { html += renderCard(p, cardIdx++); });
+    }
+  }
+  el.innerHTML = html;
+  attachCardEvents();
+}
+
+function renderCard(p, idx) {
+  const today = todayStr();
+  const total = parseInt(p['Total Doses']) || 4;
+  const left  = parseInt(p['Doses Remaining']) || 0;
+  const given = total - left;
+  const pct   = Math.round((given / total) * 100);
+  const dose  = p['Dose Prescribed'] || '';
+  const weeks = DOSE_TO_WEEKS[dose] || '?';
+  const apptDate = p['Appointment Date & Time'] ? p['Appointment Date & Time'].split('T')[0] : null;
+  const apptTime = p['Appointment Date & Time'] ? formatTimeOnly(p['Appointment Date & Time']) : '';
+  const confirmed = !!p['Appointment Confirmed'];
+  const overdue = apptDate && apptDate < today && confirmed && !p['Injection Administered'];
+  const dueStr = p['Due Date'];
+  const dueDisplay = formatDate(dueStr || '');
+  const dueClass = dueStr === today ? '' : (dueStr < today ? 'card-due--overdue' : 'card-due--future');
+  const name = p['Patient Name'] || 'Unknown';
+  const color = avatarColor(name);
+  const special = (p['Special Instructions'] || '').trim();
+  // Determine gradient class based on patient status
+  let cardClass = '';
+  if (p['Archived'])                         cardClass = 'patient-card--archived';
+  else if (p['Pending'])                     cardClass = 'patient-card--pending';
+  else if (overdue)                          cardClass = 'patient-card--overdue';
+  else if (apptDate === today && confirmed)  cardClass = 'patient-card--today';
+  else if (apptDate && apptDate > today && confirmed) cardClass = 'patient-card--scheduled';
+  else if (currentTab === 'all')             cardClass = 'patient-card--all';
+  const cppClass  = p['CPP Patient'] ? 'patient-card--cpp' : '';
+  // Phone buttons
+  const ph1 = p['Phone 1'] || '';
+  const ph2 = p['Phone 2'] || '';
+  const addr = p['Address'] || '';
+  const phoneBtn1 = ph1 ? `<button class="action-circle action-circle--phone js-call" data-phone="${esc(ph1)}" title="Call ${ph1}">📞</button>` : '';
+  const phoneBtn2 = ph2 ? `<button class="action-circle action-circle--phone js-call" data-phone="${esc(ph2)}" title="Call ${ph2}" style="font-size:13px">📞₂</button>` : '';
+  const mapSVG = `<svg viewBox="0 0 24 24" width="13" height="13" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0;margin-top:1px"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="#EA4335"/><circle cx="12" cy="9" r="2.8" fill="white"/></svg>`;
+  const mapBtn  = addr ? `<button class="action-circle action-circle--map js-map" data-addr="${esc(formatAddrForMaps(addr))}" title="Directions">
+    <svg viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="#EA4335"/>
+      <circle cx="12" cy="9" r="2.8" fill="white"/>
+    </svg>
+  </button>` : '';
+
+  return `
+<div class="patient-card ${cardClass} ${cppClass}" data-id="${p.id}">
+  <div class="card-head">
+    <div class="card-avatar card-avatar--${color}">${initials(name)}</div>
+    <div class="card-info">
+      <div class="card-name-row">
+        <span class="card-name">${esc(name)}</span>
+        <span class="card-file">#${esc(p['File Number']||'')}</span>
+        ${dose ? `<span class="card-dose-badge">${dose} mg · ${weeks}w</span>` : ''}
+        ${p['CPP Patient'] ? `<span style="background:#F0EEF9;color:#5B48A0;border:1px solid #C4B8E8;border-radius:20px;padding:2px 8px;font-size:10px;font-weight:700">🩺 CPP</span>` : ''}
+      </div>
+      <div class="card-meta">
+        <div class="card-due ${dueClass}">
+          <span>📅</span> ${dueDisplay}
+        </div>
+        ${addr ? `<div class="card-addr">${mapSVG}<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(formatAddrDisplay(addr))}</span></div>` : ''}
+        ${special ? `<div class="card-special"><span>⚠️</span> Special note</div>` : ''}
+      </div>
+    </div>
+  </div>
+  <div class="card-progress">
+    <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+    <div class="progress-label">${given}/${total} doses</div>
+  </div>
+  <div class="card-actions">
+    ${phoneBtn1}${phoneBtn2}${mapBtn}
+    <div class="action-spacer"></div>
+    <button class="record-btn js-inject" data-id="${p.id}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 2l4 4-10 10-6 2 2-6L18 2z"/><line x1="14" y1="6" x2="18" y2="10"/></svg>
+      Record
+    </button>
+    <button class="expand-btn js-expand">&#9660;</button>
+  </div>
+
+  <div class="card-expanded">
+    <div class="detail-grid">
+      ${(ph1||ph2) ? `<div class="detail-item detail-item--full">
+        <label>Phones</label>
+        <div class="phones-row">
+          ${ph1 ? `<a href="tel:${esc(ph1)}" class="phone-link">📞 ${esc(ph1)}</a>` : ''}
+          ${ph2 ? `<a href="tel:${esc(ph2)}" class="phone-link">📞 ${esc(ph2)}</a>` : ''}
+        </div>
+      </div>` : ''}
+      ${addr ? `<div class="detail-item detail-item--full"><label>Address</label><p>${esc(addr)}</p></div>` : ''}
+      <div class="detail-item"><label>Type</label><p>${esc(p['Assignment Type']||'Permanent')}</p></div>
+      <div class="detail-item"><label>Last Site</label><p>${esc(p['Injection Site'] || p['Previous Injection Site'] || 'Not recorded')}</p></div>
+      <div class="detail-item">
+        <label>Appt Time</label>
+        <p>${apptTime || 'Not set'}${confirmed && apptTime ? `<span class="confirmed-badge">✓ Confirmed</span>` : ''}</p>
+      </div>
+      <div class="detail-item"><label>Dose Interval</label><p>${dose ? `${dose}mg — every ${weeks} weeks` : 'Not set'}</p></div>
+      ${p['Previous Injection Dates'] ? `<div class="detail-item detail-item--full"><label>Injection History</label><p>${esc(p['Previous Injection Dates'])}</p></div>` : ''}
+      ${special ? `<div class="detail-item detail-item--full"><label>Instructions</label><p class="orange">${esc(special.substring(0,160))}${special.length>160?'…':''}</p></div>` : ''}
+      ${p['Adverse Effects Comments'] ? `<div class="detail-item detail-item--full"><label>Adverse Effects</label><p>${esc(p['Adverse Effects Comments'].substring(0,120))}</p></div>` : ''}
+    </div>
+    <div class="card-btn-row">
+      <button class="card-btn card-btn--edit js-edit" data-id="${p.id}">✏️ Details & Edit</button>
+      ${p['Pending'] || p['Archived'] ?
+        `<button class="card-btn card-btn--move js-move" data-id="${p.id}">⟳ Restore</button>` :
+        `<button class="card-btn card-btn--pending js-pending" data-id="${p.id}">⏳ Mark Pending</button>`}
+      ${p['Archived'] ? '' : `<button class="card-btn card-btn--archive js-archive" data-id="${p.id}" style="flex:0.7">🗄 Archive</button>`}
+    </div>
+    <div style="margin-top:8px;text-align:right">
+      <button class="card-btn card-btn--edit" style="flex:0;padding:6px 12px;font-size:11px" onclick="openApptModal(${p.id})">
+        📅 ${confirmed ? 'Edit Appointment' : 'Set Appointment'}
+      </button>
+    </div>
+  </div>
+</div>`;
+}
+
+function esc(s) {
+  if (!s) return '';
+  return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+// Move apt/unit to END: "40 Boul. Deguire, Apt: #3, Montréal, QC" → "40 Boul. Deguire, Montréal, QC, Apt. 3"
+function formatAddrDisplay(addr) {
+  if (!addr) return '';
+  // Match apt/suite/unit anywhere in the string
+  const aptRe = /,?\s*(?:Apt\.?|Appartement|Suite|Unit|App\.?)\s*:?\s*#?(\w+[-\w]*)/i;
+  const m = addr.match(aptRe);
+  if (!m) return addr;
+  const aptLabel = `Apt. ${m[1]}`;
+  const base = addr.replace(m[0], '').replace(/,\s*$/, '').trim();
+  return `${base}, ${aptLabel}`;
+}
+
+// For Google Maps query keep original (works better for geocoding)
+function formatAddrForMaps(addr) { return addr; }
+
+function attachCardEvents() {
+  // Expand/collapse
+  document.querySelectorAll('.js-expand').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const card = btn.closest('.patient-card');
+      card.classList.toggle('expanded');
+    });
+  });
+  // Click card header to expand
+  document.querySelectorAll('.card-head').forEach(head => {
+    head.addEventListener('click', e => {
+      if (e.target.tagName === 'BUTTON' || e.target.tagName === 'A') return;
+      const card = head.closest('.patient-card');
+      card.classList.toggle('expanded');
+    });
+  });
+  // Phone
+  document.querySelectorAll('.js-call').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      window.location.href = 'tel:' + btn.dataset.phone;
+    });
+  });
+  // Map
+  document.querySelectorAll('.js-map').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      window.open('https://maps.google.com/?q=' + encodeURIComponent(btn.dataset.addr));
+    });
+  });
+  // Inject
+  document.querySelectorAll('.js-inject').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      openInjectionModal(parseInt(btn.dataset.id));
+    });
+  });
+  // Edit
+  document.querySelectorAll('.js-edit').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      openEditModal(parseInt(btn.dataset.id));
+    });
+  });
+  // Pending
+  document.querySelectorAll('.js-pending').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      showConfirm('Mark as Pending?', 'Patient will be moved to the Pending tab.', () => markPending(parseInt(btn.dataset.id)));
+    });
+  });
+  // Archive
+  document.querySelectorAll('.js-archive').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      showConfirm('Archive Patient?', 'Patient will be archived. You can restore them anytime.', () => archivePatient(parseInt(btn.dataset.id)));
+    });
+  });
+  // Move/restore
+  document.querySelectorAll('.js-move').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      restorePatient(parseInt(btn.dataset.id));
+    });
+  });
+}
+
+// ========== DASHBOARD ==========
+function renderDashboard() {
+  const today = todayStr();
+  const active = patients.filter(p => !p['Archived']).length;
+  const dueToday = patients.filter(p => !p['Archived'] && p['Appointment Date & Time'] && p['Appointment Date & Time'].split('T')[0] === today && p['Appointment Confirmed']).length;
+  const overdue = patients.filter(p => {
+    if (p['Archived'] || p['Pending']) return false;
+    const d = p['Appointment Date & Time'] ? p['Appointment Date & Time'].split('T')[0] : null;
+    return d && d < today && p['Appointment Confirmed'] && !p['Injection Administered'];
+  }).length;
+  const pending = patients.filter(p => p['Pending'] && !p['Archived']).length;
+  const cpp = patients.filter(p => !p['Archived'] && p['CPP Patient']).length;
+
+  document.getElementById('ds-active').textContent = active;
+  document.getElementById('ds-today').textContent = dueToday;
+  document.getElementById('ds-overdue').textContent = overdue;
+  document.getElementById('ds-pending').textContent = pending;
+  document.getElementById('ds-cpp').textContent = cpp;
+
+  // Dose chart
+  const doseCounts = {};
+  patients.filter(p=>!p['Archived']).forEach(p => {
+    const d = p['Dose Prescribed'] || 'Unknown';
+    doseCounts[d] = (doseCounts[d]||0) + 1;
+  });
+  const maxCount = Math.max(...Object.values(doseCounts), 1);
+  let chartHtml = '';
+  const doseOrder = ['7.5','22.5','30','45'];
+  doseOrder.forEach(d => {
+    const c = doseCounts[d] || 0;
+    if (c === 0) return;
+    const pct = Math.round((c/maxCount)*100);
+    chartHtml += `<div class="dose-bar-row">
+      <div class="dose-bar-label">${d}mg</div>
+      <div class="dose-bar-track"><div class="dose-bar-fill" style="width:${pct}%"></div></div>
+      <div class="dose-bar-count">${c}</div>
+    </div>`;
+  });
+  document.getElementById('doseChart').innerHTML = chartHtml || '<p style="color:var(--text-2);font-size:13px">No data</p>';
+}
+
+// ========== INJECTION ==========
+function openInjectionModal(id) {
+  pendingInjectId = id;
+  const p = patients.find(p => p.id === id);
+  if (!p) return;
+  const total = parseInt(p['Total Doses']) || 4;
+  const left  = parseInt(p['Doses Remaining']) || 0;
+  document.getElementById('injPatientName').textContent = p['Patient Name'];
+  document.getElementById('injPatientInfo').textContent = `${p['Dose Prescribed']}mg — ${left} of ${total} doses remaining → next due in ${DOSE_TO_WEEKS[p['Dose Prescribed']] || 4} weeks`;
+  document.getElementById('injSiteSelect').value = '';
+  document.getElementById('injComments').value = '';
+  document.getElementById('injAdverse').value = '';
+  document.getElementById('injSpecial').value = '';
+  openModal('injectionModal');
+}
+
+async function performInjection() {
+  const site = document.getElementById('injSiteSelect').value;
+  if (!site) { toast('Please select an injection site', 'warning'); return; }
+
+  const id = pendingInjectId;
+  const p = patients.find(p => p.id === id);
+  if (!p) return;
+
+  const left = parseInt(p['Doses Remaining']) || 0;
+  if (left <= 0) { toast('No doses remaining!', 'error'); closeModal('injectionModal'); return; }
+
+  const today = todayStr();
+  const comments = document.getElementById('injComments').value.trim();
+  const adverse  = document.getElementById('injAdverse').value.trim();
+  const special  = document.getElementById('injSpecial').value.trim();
+
+  // Update injection history
+  let prevDates = p['Previous Injection Dates'] ? p['Previous Injection Dates'].split(',').map(s=>s.trim()).filter(Boolean) : [];
+  prevDates.push(today);
+  p['Previous Injection Dates'] = prevDates.join(', ');
+
+  // Rotate sites
+  if (p['Injection Site']) p['Previous Injection Site'] = p['Injection Site'];
+  p['Injection Site'] = site;
+
+  // Append notes
+  const tag = `[${today}]`;
+  if (adverse) p['Adverse Effects Comments'] = [(p['Adverse Effects Comments']||''), `${tag} ${adverse}`].filter(Boolean).join(' | ');
+  if (special || comments) p['Special Instructions'] = [(p['Special Instructions']||''), `${tag} ${[special, comments].filter(Boolean).join(' — ')}`].filter(Boolean).join(' | ');
+
+  const newLeft = left - 1;
+  p['Doses Remaining'] = newLeft;
+
+  // Calculate next due date
+  const apptDate = p['Appointment Date & Time'] ? p['Appointment Date & Time'].split('T')[0] : null;
+  const refDate = (p['Appointment Confirmed'] && apptDate && apptDate < today) ? apptDate : today;
+  p['Due Date'] = addWeeks(refDate, DOSE_TO_WEEKS[p['Dose Prescribed']] || 4);
+  p['Injection Administered'] = true;
+  p['Appointment Confirmed'] = false;
+  p['Appointment Date & Time'] = null;
+  p['Pending'] = (newLeft === 0);
+
+  setLoading(true, 'Recording injection…');
+  try {
+    await dbUpdate(id, p);
+    closeModal('injectionModal');
+    toast(`Injection recorded! ${newLeft} doses left. Next due: ${formatDateFull(p['Due Date'])}`, 'success', '💉');
+    await loadPatients();
+  } catch(e) {
+    toast('Error: ' + e.message, 'error');
+  } finally {
+    setLoading(false);
+  }
+}
+
+// ========== APPOINTMENT ==========
+function openApptModal(id) {
+  pendingApptId = id;
+  const p = patients.find(p => p.id === id);
+  if (!p) return;
+  document.getElementById('apptPatientName').textContent = `Setting appointment for ${p['Patient Name']}`;
+  document.getElementById('apptDateInput').value = p['Appointment Date & Time'] || '';
+  apptConfirmedStatus = true;
+  document.getElementById('apptStatusConfirmed').classList.add('selected');
+  document.getElementById('apptStatusTentative').classList.remove('selected');
+  openModal('apptModal');
+}
+
+async function saveAppt() {
+  const dt = document.getElementById('apptDateInput').value;
+  if (!dt) { toast('Please select a date and time', 'warning'); return; }
+  const id = pendingApptId;
+  const p = patients.find(p => p.id === id);
+  if (!p) return;
+  p['Appointment Date & Time'] = dt;
+  p['Appointment Confirmed'] = apptConfirmedStatus;
+  setLoading(true, 'Saving appointment…');
+  try {
+    await dbUpdate(id, p);
+    closeModal('apptModal');
+    toast(`Appointment ${apptConfirmedStatus ? 'confirmed' : 'set'} for ${p['Patient Name']}`, 'success', '📅');
+    await loadPatients();
+  } catch(e) {
+    toast('Error: ' + e.message, 'error');
+  } finally {
+    setLoading(false);
+  }
+}
+
+// ========== CRUD ==========
+async function markPending(id) {
+  const p = patients.find(p => p.id === id);
+  if (!p) return;
+  p['Pending'] = true;
+  setLoading(true);
+  try {
+    await dbUpdate(id, p);
+    toast('Patient marked as pending', '', '⏳');
+    await loadPatients();
+  } catch(e) { toast(e.message, 'error'); } finally { setLoading(false); }
+}
+
+async function archivePatient(id) {
+  const p = patients.find(p => p.id === id);
+  if (!p) return;
+  p['Archived'] = true;
+  setLoading(true);
+  try {
+    await dbUpdate(id, p);
+    toast('Patient archived', '', '🗄');
+    await loadPatients();
+  } catch(e) { toast(e.message, 'error'); } finally { setLoading(false); }
+}
+
+async function restorePatient(id) {
+  const p = patients.find(p => p.id === id);
+  if (!p) return;
+  p['Pending'] = false;
+  p['Archived'] = false;
+  setLoading(true);
+  try {
+    await dbUpdate(id, p);
+    toast('Patient restored to Active', 'success', '✓');
+    await loadPatients();
+  } catch(e) { toast(e.message, 'error'); } finally { setLoading(false); }
+}
+
+async function deletePatient(id) {
+  setLoading(true, 'Deleting…');
+  try {
+    await dbDelete(id);
+    toast('Patient deleted', '', '🗑');
+    closeModal('patientModal');
+    await loadPatients();
+  } catch(e) { toast(e.message, 'error'); } finally { setLoading(false); }
+}
+
+// ========== PATIENT FORM ==========
+function openAddModal() {
+  editingId = null;
+  document.getElementById('patientModalTitle').textContent = 'Add Patient';
+  document.getElementById('patientForm').reset();
+  document.getElementById('deletePatientBtn').classList.add('hidden');
+  document.getElementById('f-cpp').checked = false;
+  document.getElementById('f-due').value = todayStr();
+  document.getElementById('f-total').value = 4;
+  document.getElementById('f-remaining').value = 4;
+  openModal('patientModal');
+}
+
+function openEditModal(id) {
+  const p = patients.find(p => p.id === id);
+  if (!p) return;
+  editingId = id;
+  document.getElementById('patientModalTitle').textContent = 'Edit Patient';
+  document.getElementById('f-name').value = p['Patient Name'] || '';
+  document.getElementById('f-file').value = p['File Number'] || '';
+  document.getElementById('f-type').value = p['Assignment Type'] || 'Permanent';
+  document.getElementById('f-addr').value = p['Address'] || '';
+  document.getElementById('f-phone1').value = p['Phone 1'] || '';
+  document.getElementById('f-phone2').value = p['Phone 2'] || '';
+  document.getElementById('f-dose').value = p['Dose Prescribed'] || '22.5';
+  document.getElementById('f-total').value = p['Total Doses'] || 4;
+  document.getElementById('f-remaining').value = p['Doses Remaining'] || 4;
+  document.getElementById('f-due').value = p['Due Date'] || '';
+  document.getElementById('f-lastsite').value = p['Injection Site'] || '';
+  document.getElementById('f-appt').value = p['Appointment Date & Time'] || '';
+  document.getElementById('f-prevdates').value = p['Previous Injection Dates'] || '';
+  document.getElementById('f-special').value = p['Special Instructions'] || '';
+  document.getElementById('f-adverse').value = p['Adverse Effects Comments'] || '';
+  document.getElementById('f-cpp').checked = !!p['CPP Patient'];
+  document.getElementById('deletePatientBtn').classList.remove('hidden');
+  openModal('patientModal');
+}
+
+async function savePatient() {
+  const fn = document.getElementById('f-file').value.trim();
+  const name = document.getElementById('f-name').value.trim();
+  if (!fn || !name) { toast('Name and file number are required', 'warning'); return; }
+  if (!editingId && patients.find(p => p['File Number'] === fn)) {
+    toast('File number already exists', 'error'); return;
+  }
+  const data = {
+    'Patient Name': name,
+    'File Number': fn,
+    'Address': document.getElementById('f-addr').value,
+    'Phone 1': document.getElementById('f-phone1').value,
+    'Phone 2': document.getElementById('f-phone2').value,
+    'Dose Prescribed': document.getElementById('f-dose').value,
+    'Total Doses': document.getElementById('f-total').value,
+    'Doses Remaining': document.getElementById('f-remaining').value,
+    'Previous Injection Site': document.getElementById('f-lastsite').value,
+    'Injection Site': document.getElementById('f-lastsite').value,
+    'Due Date': document.getElementById('f-due').value,
+    'Appointment Date & Time': document.getElementById('f-appt').value || null,
+    'Previous Injection Dates': document.getElementById('f-prevdates').value,
+    'Assignment Type': document.getElementById('f-type').value,
+    'Special Instructions': document.getElementById('f-special').value,
+    'Adverse Effects Comments': document.getElementById('f-adverse').value,
+    'CPP Patient': document.getElementById('f-cpp').checked,
+    'File Status': 'Active',
+    'Injection Administered': false,
+    'Appointment Confirmed': !!document.getElementById('f-appt').value,
+    'Pending': false,
+    'Archived': false
+  };
+  setLoading(true, editingId ? 'Updating patient…' : 'Adding patient…');
+  try {
+    if (editingId) await dbUpdate(editingId, data);
+    else await dbInsert(data);
+    closeModal('patientModal');
+    toast(editingId ? 'Patient updated' : 'Patient added!', 'success', '✓');
+    await loadPatients();
+  } catch(e) {
+    toast('Error: ' + e.message, 'error');
+  } finally {
+    setLoading(false);
+  }
+}
+
+// ========== MODAL HELPERS ==========
+function openModal(id) {
+  const el = document.getElementById(id);
+  el.classList.add('open');
+  el.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+function closeModal(id) {
+  const el = document.getElementById(id);
+  if (el) { el.classList.remove('open'); el.style.display = 'none'; }
+  document.body.style.overflow = '';
+}
+
+// ========== CONFIRM SHEET ==========
+function showConfirm(title, msg, cb) {
+  document.getElementById('confirmTitle').textContent = title;
+  document.getElementById('confirmMsg').textContent = msg;
+  confirmCallback = cb;
+  document.getElementById('confirmBackdrop').classList.add('open');
+  document.getElementById('confirmSheet').classList.add('open');
+}
+function closeConfirm() {
+  document.getElementById('confirmBackdrop').classList.remove('open');
+  document.getElementById('confirmSheet').classList.remove('open');
+  confirmCallback = null;
+}
+
+// ========== MENU DRAWER ==========
+function openMenuDrawer() {
+  document.getElementById('drawerBackdrop').classList.add('open');
+  document.getElementById('menuDrawer').classList.add('open');
+}
+function closeMenuDrawer() {
+  document.getElementById('drawerBackdrop').classList.remove('open');
+  document.getElementById('menuDrawer').classList.remove('open');
+}
+
+// ========== VIEW SWITCHING ==========
+function switchView(view) {
+  currentView = view;
+  const patientArea = document.getElementById('mainContent');
+  const dashView = document.getElementById('dashView');
+  const reportView = document.getElementById('reportView');
+  const searchArea = document.getElementById('searchArea');
+
+  patientArea.classList.add('hidden');
+  dashView.classList.add('hidden');
+  reportView.classList.add('hidden');
+
+  document.querySelectorAll('.nav-btn[data-view]').forEach(b => b.classList.remove('active'));
+  document.getElementById('nav-'+view)?.classList.add('active');
+
+  if (view === 'dash') {
+    dashView.classList.remove('hidden');
+    searchArea.classList.add('hidden');
+    renderDashboard();
+  } else if (view === 'report') {
+    reportView.classList.remove('hidden');
+    searchArea.classList.add('hidden');
+  } else {
+    patientArea.classList.remove('hidden');
+    searchArea.classList.remove('hidden');
+    renderPatientList();
+  }
+}
+
+function switchToTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.tab === tab);
+  });
+  switchView('patients');
+}
+
+// ========== REPORT ==========
+// ── REPORT MODULE ──────────────────────────────────────────────────
+
+let _reportTab = 'daily';
+
+function switchReportTab(tab) {
+  _reportTab = tab;
+  ['daily','monthly','custom'].forEach(t => {
+    document.getElementById('rptControls' + t.charAt(0).toUpperCase() + t.slice(1))
+      .classList.toggle('hidden', t !== tab);
+    document.getElementById('rptTab' + t.charAt(0).toUpperCase() + t.slice(1))
+      .classList.toggle('rpt-tab--active', t === tab);
+  });
+  document.getElementById('reportOutput').innerHTML = '';
+  document.getElementById('reportExportBar').style.display = 'none';
+  window._lastReport = null;
+}
+
+// ── DAILY REPORT ──
+function generateDailyReport() {
+  const date   = document.getElementById('rptDailyDate').value;
+  const status = document.getElementById('rptDailyStatus').value;
+  if (!date) { toast('Please select a date', 'warning'); return; }
+
+  let filtered = patients.filter(p => {
+    if (p['Archived']) return false;
+    const apptDate = p['Appointment Date & Time'] ? p['Appointment Date & Time'].split('T')[0] : null;
+    const dueDate  = p['Due Date'] || '';
+    const seen      = !!p['Injection Administered'];
+    const confirmed = !!p['Appointment Confirmed'];
+
+    if (status === 'seen') {
+      // Injection administered — match by appointment date OR due date
+      return seen && (apptDate === date || dueDate === date);
+    }
+    if (status === 'confirmed') {
+      // Confirmed appointment on this date
+      return confirmed && apptDate === date;
+    }
+    // 'all' — anyone with appointment OR due date on this date
+    return apptDate === date || dueDate === date;
+  }).sort((a,b) => {
+    const at = a['Appointment Date & Time']||'';
+    const bt = b['Appointment Date & Time']||'';
+    if (at && bt) return at.localeCompare(bt);
+    return (a['Due Date']||'').localeCompare(b['Due Date']||'');
+  });
+
+  window._lastReport = filtered;
+  window._reportTitle = `Daily Report — ${formatDateLong(date)}`;
+
+  const out  = document.getElementById('reportOutput');
+  const bar  = document.getElementById('reportExportBar');
+  const cols = [
+    { key:'Patient Name',          label:'Patient'         },
+    { key:'File Number',           label:'File #'          },
+    { key:'Address',               label:'Address'         },
+    { key:'Dose Prescribed',       label:'Dose (mg)'       },
+    { key:'Appointment Date & Time', label:'Appt Time',
+      fmt: v => v ? formatTimeOnly(v) : '—'               },
+    { key:'Injection Administered',  label:'Status',
+      fmt: v => v ? '<span style="color:var(--green);font-weight:700">✓ Seen</span>'
+                  : '<span style="color:var(--orange)">Pending</span>'  },
+    { key:'CPP Patient', label:'CPP',
+      fmt: v => v ? '🩺' : ''                             },
+  ];
+
+  if (!filtered.length) {
+    bar.style.display = 'none';
+    out.innerHTML = `<div class="empty-state"><div class="empty-state__icon">📋</div>
+      <div class="empty-state__title">No patients on ${formatDateLong(date)}</div>
+      <p class="empty-state__sub">Try changing the date or status filter.</p></div>`;
+    return;
+  }
+
+  document.getElementById('reportCount').textContent =
+    `${filtered.length} patient${filtered.length!==1?'s':''} — ${formatDateLong(date)}`;
+  bar.style.display = 'flex';
+  out.innerHTML = buildReportTable(filtered, cols);
+}
+
+// ── MONTHLY DUE REPORT ──
+function generateMonthlyReport() {
+  const month = document.getElementById('rptMonth').value;
+  const year  = document.getElementById('rptYear').value;
+  const prefix = `${year}-${month}`;
+
+  const filtered = patients
+    .filter(p => !p['Archived'] && (p['Due Date']||'').startsWith(prefix))
+    .sort((a,b) => (a['Due Date']||'').localeCompare(b['Due Date']||''));
+
+  window._lastReport = filtered;
+  const monthNames = ['','January','February','March','April','May','June',
+    'July','August','September','October','November','December'];
+  window._reportTitle = `Monthly Due Report — ${monthNames[parseInt(month)]} ${year}`;
+
+  const out  = document.getElementById('reportOutput');
+  const bar  = document.getElementById('reportExportBar');
+  const cols = [
+    { key:'Patient Name',    label:'Patient'          },
+    { key:'File Number',     label:'File #'           },
+    { key:'Address',         label:'Address'          },
+    { key:'Dose Prescribed', label:'Dose (mg)'        },
+    { key:'Due Date',        label:'Due Date'         },
+    { key:'Doses Remaining', label:'Doses Left'       },
+    { key:'Appointment Confirmed', label:'Appt',
+      fmt: v => v ? '<span style="color:var(--teal-dark);font-weight:700">✓ Set</span>' : '—' },
+    { key:'Pending',  label:'Status',
+      fmt: (v,p) => p['Injection Administered']
+        ? '<span style="color:var(--green);font-weight:700">✓ Done</span>'
+        : v ? '<span style="color:var(--orange)">Pending</span>'
+            : '<span style="color:var(--text-2)">Active</span>'   },
+    { key:'CPP Patient', label:'CPP', fmt: v => v ? '🩺' : '' },
+  ];
+
+  if (!filtered.length) {
+    bar.style.display = 'none';
+    out.innerHTML = `<div class="empty-state"><div class="empty-state__icon">📅</div>
+      <div class="empty-state__title">No patients due in ${monthNames[parseInt(month)]} ${year}</div>
+      <p class="empty-state__sub">Try a different month.</p></div>`;
+    return;
+  }
+
+  document.getElementById('reportCount').textContent =
+    `${filtered.length} patient${filtered.length!==1?'s':''} due in ${monthNames[parseInt(month)]} ${year}`;
+  bar.style.display = 'flex';
+  out.innerHTML = buildReportTable(filtered, cols);
+}
+
+// ── CUSTOM REPORT ──
+function generateReport() {
+  if (_reportTab === 'daily')   { generateDailyReport();   return; }
+  if (_reportTab === 'monthly') { generateMonthlyReport(); return; }
+
+  const dateFrom = document.getElementById('reportDateFrom')?.value || '';
+  const dateTo   = document.getElementById('reportDateTo')?.value   || '';
+  const field    = document.getElementById('reportField')?.value    || 'none';
+  const cond     = document.getElementById('reportCondition')?.value || 'equals';
+  const val      = (document.getElementById('reportValue')?.value || '').toLowerCase().trim();
+
+  let filtered = patients.filter(p => !p['Archived']);
+  if (dateFrom) filtered = filtered.filter(p => (p['Due Date']||'') >= dateFrom);
+  if (dateTo)   filtered = filtered.filter(p => (p['Due Date']||'') <= dateTo);
+
+  if (field !== 'none' && val) {
+    filtered = filtered.filter(p => {
+      let fv = '';
+      if (field === 'dose_prescribed') fv = String(p['Dose Prescribed']||'');
+      if (field === 'doses_remaining') fv = String(p['Doses Remaining']||0);
+      if (field === 'assignment_type') fv = (p['Assignment Type']||'').toLowerCase();
+      if (field === 'pending')         fv = String(!!p['Pending']);
+      if (field === 'cpp')             fv = String(!!p['CPP Patient']);
+      if (cond === 'equals')   return fv.toLowerCase() === val;
+      if (cond === 'contains') return fv.toLowerCase().includes(val);
+      if (cond === 'greater')  return parseFloat(fv) > parseFloat(val);
+      if (cond === 'less')     return parseFloat(fv) < parseFloat(val);
+      return false;
+    });
+  }
+
+  filtered.sort((a,b) => (a['Due Date']||'').localeCompare(b['Due Date']||''));
+  window._lastReport = filtered;
+  window._reportTitle = `Custom Report — Due ${dateFrom||'any'} to ${dateTo||'any'}`;
+
+  const out = document.getElementById('reportOutput');
+  const bar = document.getElementById('reportExportBar');
+
+  const cols = [
+    { key:'Patient Name',    label:'Patient'    },
+    { key:'File Number',     label:'File #'     },
+    { key:'Phone 1',         label:'Phone'      },
+    { key:'Dose Prescribed', label:'Dose (mg)'  },
+    { key:'Doses Remaining', label:'Left'       },
+    { key:'Due Date',        label:'Due Date'   },
+    { key:'Assignment Type', label:'Type'       },
+    { key:'CPP Patient',     label:'CPP', fmt: v => v ? '🩺' : '' },
+  ];
+
+  if (!filtered.length) {
+    bar.style.display = 'none';
+    out.innerHTML = `<div class="empty-state"><div class="empty-state__icon">🔍</div>
+      <div class="empty-state__title">No matches</div>
+      <p class="empty-state__sub">Adjust date range or filters and try again.</p></div>`;
+    return;
+  }
+
+  document.getElementById('reportCount').textContent =
+    `${filtered.length} patient${filtered.length!==1?'s':''} found`;
+  bar.style.display = 'flex';
+  out.innerHTML = buildReportTable(filtered, cols);
+}
+
+// ── TABLE BUILDER ──
+function buildReportTable(data, cols) {
+  const headCells = cols.map(c =>
+    `<th style="padding:9px 12px;text-align:left;font-weight:700;white-space:nowrap">${c.label}</th>`
+  ).join('');
+
+  const bodyRows = data.map((p, i) => {
+    const bg = i % 2 === 0 ? '#fff' : '#F8FAFC';
+    const cells = cols.map(c => {
+      let v = p[c.key];
+      const display = c.fmt ? c.fmt(v, p) : esc(String(v||''));
+      return `<td style="padding:8px 12px;border-bottom:1px solid var(--border);vertical-align:middle">${display}</td>`;
+    }).join('');
+    return `<tr style="background:${bg};cursor:pointer" onclick="openEditModal(${p.id})">${cells}</tr>`;
+  }).join('');
+
+  return `<div style="background:var(--card);border-radius:var(--radius);overflow:auto;border:1.5px solid var(--border);box-shadow:var(--shadow)">
+    <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:500px">
+      <thead><tr style="background:var(--navy);color:#fff">${headCells}</tr></thead>
+      <tbody>${bodyRows}</tbody>
+    </table></div>`;
+}
+
+// ── PRINT REPORT ──
+function printReport() {
+  if (!window._lastReport || !window._lastReport.length) return;
+  const title = window._reportTitle || 'Report';
+  const rows = window._lastReport.map((p,i) => `
+    <tr style="background:${i%2?'#F8FAFC':'#fff'}">
+      <td>${esc(p['Patient Name']||'')}</td>
+      <td style="font-family:monospace">${esc(p['File Number']||'')}</td>
+      <td>${esc(p['Address']||'')}</td>
+      <td>${esc(String(p['Dose Prescribed']||''))}mg</td>
+      <td>${esc(p['Due Date']||'')}</td>
+      <td style="width:50px;border:1px solid #ccc"></td>
+    </tr>`).join('');
+  const w = window.open('','_blank');
+  w.document.write(`<!DOCTYPE html><html><head><title>${title}</title>
+  <style>body{font-family:sans-serif;padding:20px;font-size:12px}
+  h2{margin-bottom:12px}table{width:100%;border-collapse:collapse}
+  th{background:#1B2638;color:#fff;padding:6px 8px;text-align:left}
+  td{padding:6px 8px;border-bottom:1px solid #ddd}
+  @media print{body{padding:0}}</style></head><body>
+  <h2>${title}</h2>
+  <table><thead><tr><th>Patient</th><th>File #</th><th>Address</th><th>Dose</th><th>Due Date</th><th>✓ Done</th></tr></thead>
+  <tbody>${rows}</tbody></table>
+  <script>window.print();<\/script></body></html>`);
+  w.document.close();
+}
+
+// ── EXPORT HELPERS ──
+const REPORT_HEADERS = ['Patient Name','File Number','Address','Phone 1','Phone 2',
+  'Dose Prescribed','Doses Remaining','Total Doses','Due Date','Assignment Type',
+  'CPP Patient','Appointment Confirmed','Injection Administered','Special Instructions'];
+
+function exportReportCSV() {
+  if (!window._lastReport) return;
+  const rows = [REPORT_HEADERS.join(','), ...window._lastReport.map(p =>
+    REPORT_HEADERS.map(h => {
+      let v = String(p[h]||'');
+      return v.includes(',') || v.includes('"') ? `"${v.replace(/"/g,'""')}"` : v;
+    }).join(',')
+  )];
+  const blob = new Blob([rows.join('\n')], { type:'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `report_${todayStr()}.csv`;
+  a.click();
+  toast(`CSV exported — ${window._lastReport.length} patients`, 'success', '📋');
+}
+
+function exportReportXLSX() {
+  if (!window._lastReport) return;
+  const e2 = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  let xml = `<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+<Worksheet ss:Name="Report"><Table>
+<Row>${REPORT_HEADERS.map(h=>`<Cell><Data ss:Type="String">${e2(h)}</Data></Cell>`).join('')}</Row>
+`;
+  window._lastReport.forEach(p => {
+    xml += `<Row>${REPORT_HEADERS.map(h => {
+      const v = String(p[h]||'');
+      const isNum = ['Dose Prescribed','Doses Remaining','Total Doses'].includes(h);
+      return `<Cell><Data ss:Type="${isNum&&v?'Number':'String'}">${e2(v)}</Data></Cell>`;
+    }).join('')}</Row>\n`;
+  });
+  xml += '</Table></Worksheet></Workbook>';
+  const blob = new Blob([xml], { type:'application/vnd.ms-excel;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `report_${todayStr()}.xls`;
+  a.click();
+  toast(`Excel exported — ${window._lastReport.length} patients`, 'success', '📗');
+}
+
+function openGoogleSheets() {
+  exportReportCSV();
+  setTimeout(() => toast('CSV saved → sheets.google.com → File → Import → Upload CSV', '', '📊'), 800);
+}
+
+function quickReport(type) {
+  switchReportTab('custom');
+  const today = todayStr();
+  const dt7   = new Date(); dt7.setDate(dt7.getDate()+7);
+  const nw    = `${dt7.getFullYear()}-${pad(dt7.getMonth()+1)}-${pad(dt7.getDate())}`;
+  const dt30  = new Date(); dt30.setDate(dt30.getDate()+30);
+  const n30   = `${dt30.getFullYear()}-${pad(dt30.getMonth()+1)}-${pad(dt30.getDate())}`;
+  const map = {
+    dueToday:        { from:today, to:today,  field:'none', val:'' },
+    thisWeek:        { from:today, to:nw,     field:'none', val:'' },
+    nextMonth:       { from:today, to:n30,    field:'none', val:'' },
+    noRepeatsLeft:   { from:'', to:'', field:'doses_remaining', cond:'equals', val:'0' },
+    pendingPatients: { from:'', to:'', field:'pending', cond:'equals', val:'true' },
+    cppPatients:     { from:'', to:'', field:'cpp', cond:'equals', val:'true' },
+    tempPatients:    { from:'', to:'', field:'assignment_type', cond:'equals', val:'temporary' },
+  };
+  const m = map[type]; if (!m) return;
+  const f = (id, v) => { const el = document.getElementById(id); if(el) el.value = v; };
+  f('reportDateFrom', m.from||''); f('reportDateTo', m.to||'');
+  f('reportField', m.field||'none'); f('reportValue', m.val||'');
+  if (m.cond) f('reportCondition', m.cond);
+  generateReport();
+}
+
+// ========== IMPORT / EXPORT ==========
+async function importGoogleSheets() {
+  closeMenuDrawer();
+  setLoading(true, 'Importing from Google Sheets…');
+  try {
+    const resp = await fetch(GOOGLE_SHEETS_CSV_URL);
+    const text = await resp.text();
+    const rows = text.split('\n');
+    const headers = rows[0].split(',').map(h => h.trim().replace(/"/g,''));
+    let added = 0, skipped = 0;
+    for (let i = 1; i < rows.length; i++) {
+      if (!rows[i].trim()) continue;
+      const vals = parseCSVRow(rows[i]);
+      const p = {};
+      headers.forEach((h,idx) => p[h] = vals[idx]||'');
+      if (!p['Patient Name']) continue;
+      if (patients.find(e => e['File Number'] === p['File Number'])) { skipped++; continue; }
+      await dbInsert({
+        'Patient Name': p['Patient Name'], 'File Number': p['File Number'],
+        'Address': p['Address']||'', 'Phone 1': p['Phone 1']||'', 'Phone 2': p['Phone 2']||'',
+        'Dose Prescribed': p['Dose Prescribed']||'7.5', 'Total Doses': p['Total Doses']||'4',
+        'Doses Remaining': p['Doses Remaining']||'4', 'Due Date': todayStr(),
+        'Assignment Type': 'Permanent', 'Special Instructions': '', 'Adverse Effects Comments': '',
+        'File Status': 'Active', 'Injection Administered': false, 'Appointment Confirmed': false,
+        'Pending': false, 'Archived': false
+      });
+      added++;
+    }
+    toast(`Imported ${added}, skipped ${skipped} duplicates`, 'success');
+    await loadPatients();
+  } catch(e) { toast('Import error: ' + e.message, 'error'); }
+  finally { setLoading(false); }
+}
+
+function parseCSVRow(row) {
+  const vals = []; let inQ = false, cur = '';
+  for (const ch of row) {
+    if (ch === '"') inQ = !inQ;
+    else if (ch === ',' && !inQ) { vals.push(cur.trim().replace(/^"|"$/g,'')); cur = ''; }
+    else cur += ch;
+  }
+  vals.push(cur.trim().replace(/^"|"$/g,''));
+  return vals;
+}
+
+function importCSVFile(file) {
+
+  // ── Build reverse map: supabase_col_name → Display Name ──
+  const supabaseToDisplay = {};
+  for (const [display, supabase] of Object.entries(COL)) supabaseToDisplay[supabase] = display;
+  // Extra columns present in Supabase-export CSVs
+  const extraMap = {
+    'cpp_patient': 'CPP Patient', 'pending': 'Pending', 'archived': 'Archived',
+    'comments': 'Special Instructions', 'pendingreason': 'Special Instructions',
+  };
+
+  // Resolve any header format (Supabase name, display name, or extra) → display name
+  function resolveHeader(h) {
+    const clean = h.trim().replace(/['"]/g, '');
+    if (supabaseToDisplay[clean]) return supabaseToDisplay[clean];  // supabase → display
+    if (COL[clean] !== undefined) return clean;                      // already display name
+    if (extraMap[clean.toLowerCase()]) return extraMap[clean.toLowerCase()]; // extra
+    return clean;
+  }
+
+  // "22.5 mg" / "45mg" / "22.5" → "22.5"
+  function cleanDose(val) {
+    if (!val) return '';
+    const m = String(val).match(/(\d+\.?\d*)/);
+    return m ? m[1] : '';
+  }
+
+  // "2026/04/29" or "2026-04-29" → "2026-04-29"
+  function cleanDate(val) {
+    if (!val) return '';
+    return String(val).trim().replace(/\//g, '-').split('T')[0];
+  }
+
+  // "TRUE" / "true" / "1" / "YES" → boolean
+  function cleanBool(val) {
+    if (typeof val === 'boolean') return val;
+    return ['true','1','yes'].includes(String(val).trim().toLowerCase());
+  }
+
+  function doImport(text) {
+    const rawRows = text.split(/\r?\n/);
+    // Parse headers — use full CSV parser to handle quoted headers
+    const rawHeaders = parseCSVRow(rawRows[0]);
+    const headers = rawHeaders.map(h => resolveHeader(h));
+
+    let added = 0, skipped = 0, failed = 0;
+    setLoading(true, 'Importing CSV…');
+
+    (async () => {
+      try {
+        for (let i = 1; i < rawRows.length; i++) {
+          const row = rawRows[i].trim();
+          if (!row) continue;
+
+          const vals = parseCSVRow(rawRows[i]);
+          const p = {};
+          headers.forEach((h, idx) => {
+            p[h] = (vals[idx] !== undefined ? vals[idx] : '').trim();
+          });
+
+          // Must have a name
+          const name = p['Patient Name'] || '';
+          if (!name) continue;
+
+          // Deduplicate by file number
+          const fileNum = (p['File Number'] || '').trim();
+          if (fileNum && patients.find(e => String(e['File Number']).trim() === fileNum)) {
+            skipped++; continue;
+          }
+
+          try {
+            await dbInsert({
+              'Patient Name':             name,
+              'File Number':              fileNum,
+              'Address':                  p['Address'] || '',
+              'Phone 1':                  p['Phone 1'] || '',
+              'Phone 2':                  p['Phone 2'] || '',
+              'Dose Prescribed':          cleanDose(p['Dose Prescribed']) || '22.5',
+              'Total Doses':              p['Total Doses'] || '4',
+              'Doses Remaining':          p['Doses Remaining'] || '4',
+              'Injection Site':           p['Injection Site'] || '',
+              'Previous Injection Site':  p['Previous Injection Site'] || '',
+              'Due Date':                 cleanDate(p['Due Date']) || todayStr(),
+              'Appointment Date & Time':  p['Appointment Date & Time']
+                                            ? cleanDate(p['Appointment Date & Time'])
+                                            : null,
+              'Previous Injection Dates': p['Previous Injection Dates'] || '',
+              'Assignment Type':          p['Assignment Type'] || 'Permanent',
+              'Special Instructions':     p['Special Instructions'] || '',
+              'Adverse Effects Comments': p['Adverse Effects Comments'] || '',
+              'File Status':              p['File Status'] || 'Active',
+              'Injection Administered':   cleanBool(p['Injection Administered']),
+              'Appointment Confirmed':    cleanBool(p['Appointment Confirmed']),
+              'Pending':                  cleanBool(p['Pending']),
+              'Archived':                 cleanBool(p['Archived']),
+              'CPP Patient':              cleanBool(p['CPP Patient']),
+            });
+            added++;
+          } catch(rowErr) {
+            console.warn(`Row ${i} (${name}) failed:`, rowErr.message);
+            failed++;
+          }
+        }
+
+        const parts = [`✓ Imported ${added} patients`];
+        if (skipped) parts.push(`${skipped} duplicates skipped`);
+        if (failed)  parts.push(`${failed} rows errored`);
+        toast(parts.join(' · '), added > 0 ? 'success' : 'warning');
+        await loadPatients();
+      } catch(e) {
+        toast('Import error: ' + e.message, 'error');
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }
+
+  // Try ISO-8859-1 first (handles é, è, à etc. in French patient data)
+  // then fall back to UTF-8 if needed
+  const r = new FileReader();
+  r.onload = e => doImport(e.target.result);
+  r.onerror = () => {
+    const r2 = new FileReader();
+    r2.onload = e => doImport(e.target.result);
+    r2.readAsText(file, 'UTF-8');
+  };
+  r.readAsText(file, 'ISO-8859-1');
+}
+
+
+
+async function ensurePDFJS() {
+  if (window.pdfjsLib) return;
+  setLoading(true, 'Loading PDF engine…');
+  await new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = window.PDFJS_URL; s.onload = res; s.onerror = rej;
+    document.head.appendChild(s);
+  });
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc = window.PDFJS_WORKER;
+}
+
+async function extractPDFText(file) {
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  let text = '';
+  const styledItems = []; // collects text that is bold OR underlined = selected dose
+
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+
+    // ── Step 1: extract text items with positions ──
+    const tc = await page.getTextContent();
+    const textItems = [];
+    let lastY = null;
+
+    for (const item of tc.items) {
+      const y = item.transform[5];
+      const x = item.transform[4];
+      if (lastY !== null && Math.abs(y - lastY) > 5) text += '\n';
+      text += item.str + ' ';
+      lastY = y;
+      if (item.str.trim()) {
+        textItems.push({
+          str: item.str.trim(),
+          x, y,
+          w: item.width || 0,
+          bold: !!(item.fontName && /bold|heavy|black|-b$/i.test(item.fontName))
+        });
+      }
+    }
+
+    // ── Step 2: find horizontal line segments = underlines ──
+    // PDF.js renders underlines as drawn paths, not font metadata.
+    // We walk the operator list, track moveTo/lineTo, and collect
+    // any horizontal lines (dy < 1.5, dx > 8) → those are underlines.
+    const underlineYs = [];
+    try {
+      const ops = await page.getOperatorList();
+      const { fnArray, argsArray } = ops;
+      let mx = 0, my = 0;
+
+      for (let j = 0; j < fnArray.length; j++) {
+        const fn   = fnArray[j];
+        const args = argsArray[j];
+
+        // moveTo (opcode 13)
+        if (fn === 13) {
+          mx = args[0]; my = args[1];
+
+        // lineTo (opcode 14)
+        } else if (fn === 14) {
+          const ex = args[0], ey = args[1];
+          const dx = ex - mx, dy = ey - my;
+          if (Math.abs(dy) < 1.5 && dx > 8) underlineYs.push(my);
+          mx = ex; my = ey;
+
+        // constructPath (opcode 91) — PDF.js v3 batches path ops here
+        } else if (fn === 91) {
+          const cmds   = args[0]; // array of cmd codes: 0=moveTo,1=lineTo,2=bezier,10=close
+          const coords = args[1]; // flat coord array
+          let ci = 0;
+          for (const cmd of cmds) {
+            if (cmd === 0) {                      // moveTo
+              mx = coords[ci++]; my = coords[ci++];
+            } else if (cmd === 1) {               // lineTo
+              const ex = coords[ci++], ey = coords[ci++];
+              const dx = ex - mx, dy = ey - my;
+              if (Math.abs(dy) < 1.5 && dx > 8) underlineYs.push(my);
+              mx = ex; my = ey;
+            } else if (cmd === 2) {               // bezierCurveTo (6 coords)
+              mx = coords[ci+4]; my = coords[ci+5]; ci += 6;
+            }
+            // cmd 10 = closePath: no coords
+          }
+        }
+      }
+    } catch(e) { /* operator list unavailable on some pages — graceful skip */ }
+
+    // ── Step 3: correlate underline y-positions with text items ──
+    // Underlines are drawn 2–8 units BELOW the text baseline (y decreases downward in PDF space)
+    for (const item of textItems) {
+      const isUnderlined = underlineYs.some(uy => {
+        const delta = item.y - uy; // positive = underline below text baseline
+        return delta > 0 && delta < 10;
+      });
+      if (item.bold || isUnderlined) {
+        styledItems.push(item.str);
+      }
+    }
+
+    text += '\n--- PAGE BREAK ---\n';
+  }
+
+  return { text: text.trim(), boldItems: styledItems };
+}
+
+// ── Claude AI extraction (requires API key in settings) ──
+async function extractWithClaude(fullText, apiKey) {
+  const prompt = `You are a medical document parser specialized in patient enrollment forms.
+
+Extract the following fields from this PDF text and return ONLY a valid JSON object — no prose, no markdown, no explanation.
+
+Required JSON structure:
+{
+  "patient_name": "",
+  "file_number": "",
+  "dose": "",
+  "address": "",
+  "phone_1": "",
+  "phone_2": "",
+  "date_of_injection": "",
+  "missing_fields": []
+}
+
+Extraction Rules:
+- patient_name: Full name from fields labeled "PATIENT NAME", "NOM DU PATIENT", or similar. Title-case the result.
+- file_number: From "FILE NUMBER", "PATIENT ID", "MEDICUM #", or any visible file reference. Prefer actual patient file number over pharmacy/clinic numbers.
+- dose: Must be exactly one of: "7.5", "22.5", "30", or "45" (numbers only, no units). Look for selected/checked checkboxes or circled values next to "mg", "1 month", "3 month", "4 month", "6 month".
+- address: Combine street + city + province/state + postal code into one clean string.
+- phone_1: Primary patient phone (labeled TELEPHONE, PHONE, TEL, HOME). Preserve original formatting (dashes, spaces, brackets).
+- phone_2: Secondary/alternate contact number if available. If none, use "".
+- date_of_injection: From "LAST INJECTION", "DATE OF INJECTION", or "INJECTION DUE DATE". Format as YYYY-MM-DD.
+- missing_fields: Array of field names that could not be found or were ambiguous.
+
+Critical:
+- IGNORE doctor, pharmacy, clinic, and fax numbers
+- IGNORE numbers preceded by "FAX", "TELECOPIEUR", "DR.", "MD", "PHARMACY", "CLINIC"
+- If a field is genuinely missing, use "" and add its name to missing_fields
+- Handle OCR artifacts like broken words, random spaces, and encoding issues
+
+PDF Text:
+${fullText.substring(0, 8000)}`;
+
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1000,
+      messages: [{ role: 'user', content: prompt }]
+    })
+  });
+  if (!resp.ok) throw new Error(`Claude API ${resp.status}: ${await resp.text()}`);
+  const data = await resp.json();
+  const raw  = data.content?.[0]?.text || '';
+  const clean = raw.replace(/```json|```/g, '').trim();
+  return JSON.parse(clean);
+}
+
+// ── Enhanced regex extraction (fallback) ──
+function extractWithRegex(textData, filename) {
+  const text      = typeof textData === 'string' ? textData : textData.text;
+  const boldItems = typeof textData === 'string' ? [] : (textData.boldItems || []);
+  const result = { patient_name:'', file_number:'', dose:'', address:'', phone_1:'', phone_2:'', date_of_injection:'', missing_fields:[] };
+
+  // ══ 1. PATIENT NAME ══
+  // Matches: "PATIENT NAME/NOM DU PATIENT   Yvon FORGET ***"
+  const nameM =
+    text.match(/PATIENT\s+NAME[^\n]*NOM\s+DU\s+PATIENT\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s\-\']{2,60}?)(?:\s*\*+)?\s*(?:\r?\n|$)/im) ||
+    text.match(/NOM\s+DU\s+PATIENT\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s\-\']{2,60}?)(?:\s*\*+)?(?:\r?\n|$)/im) ||
+    text.match(/PATIENT\s*NAME[^\n]*\n\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s\-\']{2,60}?)(?:\s*\*+)?(?:\r?\n|$)/im);
+  if (nameM) result.patient_name = nameM[1].replace(/\*+/g,'').trim().replace(/\s+/g,' ');
+  if (!result.patient_name) result.missing_fields.push('patient_name');
+
+  // ══ 2. FILE NUMBER ══
+  // Matches: "MEDICUM #: 20107"
+  const fileM =
+    text.match(/MEDICUM\s*#\s*[:\s]+([A-Z0-9\-]+)/i) ||
+    text.match(/FILE\s*(?:NUMBER|NO|NUM|#)\s*[:\s]+([A-Z0-9\-]+)/i) ||
+    text.match(/PATIENT\s*(?:ID|FILE|NUMBER)\s*[:\s]+([A-Z0-9\-]+)/i) ||
+    text.match(/(?:DOSSIER|CHART)\s*(?:NO|#)\s*[:\s]+([A-Z0-9\-]+)/i);
+  if (fileM) { result.file_number = fileM[1].trim(); }
+  else {
+    const fnNum = filename.replace(/\.pdf$/i,'').match(/(\d{4,8})/);
+    if (fnNum) result.file_number = fnNum[1];
+  }
+  if (!result.file_number) result.missing_fields.push('file_number');
+
+  // ══ 3. DOSE ══
+  // ══ DOSE DETECTION — 4-layer strategy ══
+  // Selected dose on Medicum form is BOLD + UNDERLINED.
+  // styledItems (boldItems) captures both bold font and underline strokes.
+  const doseMap = [
+    { val:'45',   re:[/45\s*mg/i,    /6[\s\-]m(?:\s|\(|$)/i] },
+    { val:'30',   re:[/30\s*mg/i,    /4[\s\-]m(?:\s|\(|$)/i] },
+    { val:'22.5', re:[/22\.5\s*mg/i, /3[\s\-]m(?:\s|\(|$)/i] },
+    { val:'7.5',  re:[/7\.5\s*mg/i,  /1[\s\-]m(?:\s|\(|$)/i] },
+  ];
+
+  // Layer 1 — check each styled item individually (handles fragmented tokens like "30mg" alone)
+  for (const item of boldItems) {
+    for (const { val, re } of doseMap) {
+      if (re.some(r => r.test(item))) { result.dose = val; break; }
+    }
+    if (result.dose) break;
+  }
+  // Layer 2 — joined boldLine (catches multi-token spans like "4-m (30mg)")
+  if (!result.dose) {
+    const boldLine = boldItems.join(' ');
+    for (const { val, re } of doseMap) {
+      if (re.some(r => r.test(boldLine))) { result.dose = val; break; }
+    }
+  }
+  // Layer 3 — isolation: strip the checkbox row, then find which dose
+  // still appears in the remaining text (selected dose repeats in header).
+  if (!result.dose) {
+    const doseRowRe = /1[\s\-]m\s*\(7\.5[^)]*\).*?6[\s\-]m\s*\(45[^)]*\)/i;
+    const rest = text.replace(doseRowRe, '');
+    for (const { val, re } of doseMap) {
+      if (re.some(r => r.test(rest))) { result.dose = val; break; }
+    }
+  }
+  // Layer 4 — line-frequency score: dose that appears on most distinct lines wins.
+  // (All 4 doses share the checkbox line; selected one appears on extra lines.)
+  if (!result.dose) {
+    const textLines = text.split('\n');
+    const scores = {};
+    for (const { val, re } of doseMap) {
+      scores[val] = textLines.filter(l => re.some(r => r.test(l))).length;
+    }
+    const best = Object.entries(scores).sort((a,b) => b[1]-a[1])[0];
+    if (best && best[1] > 0) result.dose = best[0];
+  }
+
+  if (!result.dose) result.missing_fields.push('dose');
+
+  // ══ 4. ADDRESS ══
+  // Form has separate ADDRESS/ADRESSE and CITY/VILLE rows
+  const streetM = text.match(/ADDRESS\s*[\/|]\s*ADRESSE\s+([^\n\r]+)/i) ||
+                  text.match(/ADDRESS[:\s]+([^\n\r]{5,80})/i);
+  const cityM   = text.match(/CITY\s*[\/|]\s*VILLE\s+([^\n\r]+)/i) ||
+                  text.match(/CITY[:\s]+([^\n\r]{2,60})/i);
+  const addrParts = [streetM?.[1]?.trim(), cityM?.[1]?.trim()].filter(Boolean);
+  if (addrParts.length) {
+    // Combine street + city then move any Apt/Suite/Room to end
+    const rawAddr = addrParts.join(', ').replace(/\s+/g,' ').trim();
+    result.address = formatAddrDisplay(rawAddr); // moves apt to end
+  }
+  if (!result.address) result.missing_fields.push('address');
+
+  // ══ 5 & 6. PHONES ══
+  // Remove entire doctor / pharmacy / fax lines before scanning
+  const cleanText = text
+    .replace(/(?:FAX|TELECOPIEUR|TÉLÉCOPIEUR)[^\d\n]*[\d][\d\s\-\.\(\)]{6,}/gi, ' ')
+    .replace(/(?:PHARMACIE?|PHARMACY)[^\n]+\n?/gi, ' ')
+    .replace(/(?:DOCTOR|MÉDECIN|MEDECIN)[^\n]+\n?/gi, ' ')
+    .replace(/(?:DR\.?)[^\n]*\b\d{3}[\s\-\.]\d{3}[\s\-\.]\d{4}/gi, ' ');
+
+  // Phone 1: labeled TELEPHONE/TELEPHONE row
+  const ph1M = cleanText.match(/TELEPHONE\s*[\/|]\s*TELEPHONE\s+([\d][\d\s\-\.\(\)]+)/i) ||
+               cleanText.match(/TELEPHONE[:\s]+([\d][\d\s\-\.]{6,})/i);
+  if (ph1M) {
+    const m = ph1M[1].match(/(\d{3}[\s\-\.]?\d{3}[\s\-\.]?\d{4})/);
+    if (m) result.phone_1 = m[1].trim();
+  }
+
+  // ══ SECONDARY PHONE — 4-priority extraction ══
+  // Medicum form layout:
+  //   Row label: "SECONDARY CONTACT #/ # DE CONTACT SECONDAIRE"
+  //   Row value: "(Wife) Claire Forget // patient's cell: 514 916-7340"
+  // PDF may render label and value on same text line OR across two lines.
+
+  // P1 — Explicit "patient's cell" / "cellulaire du patient" marker (most reliable)
+  const cellM = text.match(/patient[\u2019\u2018\'s]*\s*cell(?:ulaire)?[^\d]*(\d{3}[\s\-\.]?\d{3}[\s\-\.]?\d{4})/i);
+  if (cellM) result.phone_2 = cellM[1].trim();
+
+  // P2 — Grab everything from SECONDARY CONTACT label to the next section label
+  //       (next section = DATE OF BIRTH, LAST INJECTION, CASODEX, etc.)
+  //       This captures both same-line and next-line values robustly.
+  if (!result.phone_2) {
+    const secBlockRe = /SECONDARY\s*CONTACT[^\n]*(?:#[^\n]*)?\n?([\s\S]{0,350}?)(?=DATE\s*OF\s*BIRTH|LAST\s*INJECTION|CASODEX|PHARMACY|DOCTOR|PRESCRIPTION|$)/i;
+    const secM = text.match(secBlockRe) ||
+                 text.match(/CONTACT\s*SECONDAIRE[^\n]*\n?([\s\S]{0,300}?)(?=DATE\s*DE\s*NAISSANCE|DERNIERE|CASODEX|PHARMACIE|MEDECIN|$)/i);
+    if (secM) {
+      const block = (secM[0] || '') + (secM[1] || '');
+      const phones = [...block.matchAll(/(\d{3}[\s\-\.]?\d{3}[\s\-\.]?\d{4})/g)]
+                       .map(m => m[1].trim())
+                       .filter(ph => ph !== result.phone_1);
+      if (phones.length) result.phone_2 = phones[phones.length - 1];
+    }
+  }
+
+  // P3 — SECONDAIRE label alone on its own line followed by value line
+  if (!result.phone_2) {
+    const m = text.match(/SECONDAIRE[^\d\n]{0,100}(\d{3}[\s\-\.]?\d{3}[\s\-\.]?\d{4})/i);
+    if (m && m[1].trim() !== result.phone_1) result.phone_2 = m[1].trim();
+  }
+
+  // P4 — Fallback: all unique phones in cleaned text; take 2nd one
+  if (!result.phone_1 || !result.phone_2) {
+    const all = [...cleanText.matchAll(/(\d{3}[\s\-\.]?\d{3}[\s\-\.]?\d{4})/g)]
+                  .map(m => m[1].trim())
+                  .filter((v,i,a) => a.indexOf(v) === i);
+    if (!result.phone_1 && all[0]) result.phone_1 = all[0];
+    if (!result.phone_2 && all.length > 1) result.phone_2 = all.find(p => p !== result.phone_1) || '';
+  }
+  if (!result.phone_1) result.missing_fields.push('phone_1');
+
+  // ══ 7. DATE OF INJECTION ══
+  // Form: "LAST INJECTION/DERNIERE INJECTION   01/18/2026"  (MM/DD/YYYY North American)
+  const datePatterns = [
+    /(?:LAST\s*INJECTION|DERNIERE\s*INJECTION)[^\d\n]*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i,
+    /(?:INJECTION\s*DUE\s*DAY|JOUR\s*DU)[^\d\n]*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i,
+    /(?:DATE\s*OF\s*INJECTION|DATE\s*D[\u2019e]\s*INJECTION)[^\d\n]*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i,
+    /(?:LAST\s*INJECTION|INJECTION)[^\d\n]*(\d{4}-\d{2}-\d{2})/i,
+  ];
+  for (const pat of datePatterns) {
+    const m = text.match(pat);
+    if (m) { result.date_of_injection = parseFlexDate(m[1]); if (result.date_of_injection) break; }
+  }
+  if (!result.date_of_injection) result.missing_fields.push('date_of_injection');
+
+  return result;
+}
+
+// Parse date: MM/DD/YYYY  DD-MM-YYYY  YYYY-MM-DD  (2-digit year supported)
+function parseFlexDate(raw) {
+  if (!raw) return '';
+  const p = raw.split(/[\/\-]/);
+  if (p.length !== 3) return '';
+  let [a,b,c] = p.map(s=>s.trim());
+  // YYYY-MM-DD
+  if (a.length === 4) {
+    const iso = `${a}-${b.padStart(2,'0')}-${c.padStart(2,'0')}`;
+    return isNaN(Date.parse(iso)) ? '' : iso;
+  }
+  // x/x/YYYY  — North American form uses MM/DD/YYYY
+  if (c.length === 4) {
+    const [mm,dd] = parseInt(a) > 12 ? [b,a] : [a,b];
+    const iso = `${c}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`;
+    return isNaN(Date.parse(iso)) ? '' : iso;
+  }
+  // 2-digit year
+  if (c.length === 2) c = parseInt(c)>50 ? '19'+c : '20'+c;
+  const iso = `${c}-${a.padStart(2,'0')}-${b.padStart(2,'0')}`;
+  return isNaN(Date.parse(iso)) ? '' : iso;
+}
+
+// ── Show PDF Review Modal ──
+function showPDFReview(extracted, filename) {
+  const missing = extracted.missing_fields || [];
+  const flag = f => missing.includes(f) ? ' style="border-color:#E05A5A;background:#FDEDED"' : '';
+  const flagLabel = f => missing.includes(f) ? ' <span style="color:#E05A5A;font-size:10px;font-weight:700">⚠ Not found</span>' : '';
+
+  document.getElementById('pdfReviewFilename').textContent = filename;
+  document.getElementById('pdfReviewBody').innerHTML = `
+    <div class="form-group"><label>Patient Name ${flagLabel('patient_name')}</label>
+      <input class="form-control" id="pr-name" value="${esc(extracted.patient_name)}"${flag('patient_name')}></div>
+    <div class="form-row-2">
+      <div class="form-group"><label>File Number ${flagLabel('file_number')}</label>
+        <input class="form-control" id="pr-file" value="${esc(extracted.file_number)}"${flag('file_number')}></div>
+      <div class="form-group"><label>Dose (mg) ${flagLabel('dose')}</label>
+        <select class="form-control" id="pr-dose"${flag('dose')}>
+          <option value="">— Select —</option>
+          ${['7.5','22.5','30','45'].map(d=>`<option value="${d}" ${extracted.dose===d?'selected':''}>${d} mg</option>`).join('')}
+        </select></div>
+    </div>
+    <div class="form-group"><label>Address ${flagLabel('address')}</label>
+      <input class="form-control" id="pr-addr" value="${esc(extracted.address)}"${flag('address')}></div>
+    <div class="form-row-2">
+      <div class="form-group"><label>Phone 1 ${flagLabel('phone_1')}</label>
+        <input class="form-control" id="pr-phone1" value="${esc(extracted.phone_1)}"${flag('phone_1')}></div>
+      <div class="form-group"><label>Phone 2</label>
+        <input class="form-control" id="pr-phone2" value="${esc(extracted.phone_2)}"></div>
+    </div>
+    <div class="form-group"><label>Date of Injection ${flagLabel('date_of_injection')}</label>
+      <input class="form-control" type="date" id="pr-date" value="${esc(extracted.date_of_injection)}"${flag('date_of_injection')}></div>
+    ${missing.length ? `<div style="background:#FEF3E8;border:1px solid #F5D0AA;border-radius:8px;padding:10px 12px;margin-top:4px;font-size:12px;color:#E5883A"><strong>⚠️ ${missing.length} field${missing.length>1?'s':''} not detected</strong> — please fill in the highlighted fields before saving.</div>` : `<div style="background:#E8F7F0;border:1px solid #B6DFC8;border-radius:8px;padding:10px 12px;margin-top:4px;font-size:12px;color:#3D9A6B"><strong>✓ All fields extracted</strong> — review and confirm.</div>`}
+  `;
+  openModal('pdfReviewModal');
+}
+
+function confirmPDFAndFill() {
+  const name  = document.getElementById('pr-name').value.trim();
+  const file  = document.getElementById('pr-file').value.trim();
+  const dose  = document.getElementById('pr-dose').value;
+  const addr  = document.getElementById('pr-addr').value.trim();
+  const ph1   = document.getElementById('pr-phone1').value.trim();
+  const ph2   = document.getElementById('pr-phone2').value.trim();
+  const date  = document.getElementById('pr-date').value;
+  if (!name || !file) { toast('Patient name and file number are required', 'warning'); return; }
+  closeModal('pdfReviewModal');
+  openAddModal();
+  document.getElementById('f-name').value   = name;
+  document.getElementById('f-file').value   = file;
+  document.getElementById('f-addr').value   = addr;
+  document.getElementById('f-phone1').value = ph1;
+  document.getElementById('f-phone2').value = ph2;
+  if (dose) document.getElementById('f-dose').value = dose;
+  if (date) { document.getElementById('f-appt').value = date + 'T09:00'; }
+  toast('Form pre-filled — review and save', 'success', '📄');
+}
+
+// ── Main entry point ──
+async function importPDFFile(file) {
+  try {
+    await ensurePDFJS();
+    setLoading(true, 'Reading PDF…');
+    const textData = await extractPDFText(file);
+    setLoading(true, 'Extracting patient data…');
+
+    let extracted;
+    const apiKey = localStorage.getItem('claude_api_key');
+    if (apiKey) {
+      try {
+        toast('Using Claude AI for extraction…', '', '🤖');
+        extracted = await extractWithClaude(textData.text, apiKey);
+      } catch(aiErr) {
+        console.warn('Claude API failed, falling back to regex:', aiErr);
+        toast('AI extraction failed — using smart fallback', 'warning');
+        extracted = extractWithRegex(textData, file.name);
+      }
+    } else {
+      extracted = extractWithRegex(textData, file.name);
+    }
+
+    setLoading(false);
+    showPDFReview(extracted, file.name);
+  } catch(e) {
+    setLoading(false);
+    toast('PDF error: ' + e.message, 'error');
+  }
+}
+
+// ── Batch PDF processing ──
+async function importPDFBatch(files) {
+  const results = [];
+  for (let i = 0; i < files.length; i++) {
+    setLoading(true, `Processing PDF ${i+1} of ${files.length}…`);
+    try {
+      await ensurePDFJS();
+      const fullText = await extractPDFText(files[i]);
+      const apiKey   = localStorage.getItem('claude_api_key');
+      const extracted = apiKey ? await extractWithClaude(textData.text, apiKey) : extractWithRegex(textData, files[i].name);
+      results.push({ file: files[i].name, data: extracted, ok: true });
+    } catch(e) {
+      results.push({ file: files[i].name, error: e.message, ok: false });
+    }
+  }
+  setLoading(false);
+  // Show first result for review; batch summary in toast
+  if (results.length === 1) {
+    showPDFReview(results[0].data, results[0].file);
+  } else {
+    const ok = results.filter(r=>r.ok).length;
+    toast(`Processed ${ok}/${results.length} PDFs — showing first result`, ok===results.length?'success':'warning');
+    if (results[0].ok) showPDFReview(results[0].data, results[0].file);
+  }
+}
+
+function exportCSV() {
+  if (!patients.length) { toast('No patients to export', 'warning'); return; }
+  const hdrs = ['Patient Name','File Number','Address','Phone 1','Phone 2','Dose Prescribed','Total Doses','Doses Remaining','Due Date','Assignment Type','Special Instructions'];
+  const rows = [hdrs.join(','), ...patients.map(p => hdrs.map(h => {
+    let v = String(p[h]||'');
+    if (v.includes(',')) v = `"${v}"`;
+    return v;
+  }).join(','))];
+  const blob = new Blob([rows.join('\n')], { type:'text/csv' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = `patients_${todayStr()}.csv`; a.click();
+  toast(`Exported ${patients.length} patients`, 'success', '📤');
+}
+
+function exportJSON() {
+  const blob = new Blob([JSON.stringify(patients, null, 2)], { type:'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = `backup_${todayStr()}.json`; a.click();
+  toast(`Backup of ${patients.length} patients saved`, 'success', '💾');
+}
+
+// ========== INIT ==========
+document.addEventListener('DOMContentLoaded', async () => {
+  // Supabase
+  const ok = await initSupabase();
+  if (ok) await loadPatients();
+
+  // Nav
+  document.querySelectorAll('.nav-btn[data-view]').forEach(btn => {
+    btn.addEventListener('click', () => switchView(btn.dataset.view));
+  });
+  document.getElementById('nav-new').addEventListener('click', openAddModal);
+
+  // Tabs
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => switchToTab(btn.dataset.tab));
+  });
+
+  // Search
+  const si = document.getElementById('searchInput');
+  si.addEventListener('input', () => { searchQuery = si.value.toLowerCase(); if(currentView==='patients') renderPatientList(); });
+  document.getElementById('clearSearch').addEventListener('click', () => { si.value=''; searchQuery=''; if(currentView==='patients') renderPatientList(); });
+
+  // Refresh
+  document.getElementById('refreshBtn').addEventListener('click', loadPatients);
+  document.getElementById('refreshBtnDrawer')?.addEventListener('click', () => { closeMenuDrawer(); loadPatients(); });
+
+  // Menu
+  document.getElementById('menuBtn').addEventListener('click', openMenuDrawer);
+  document.getElementById('drawerBackdrop').addEventListener('click', closeMenuDrawer);
+
+  // Import/Export
+  document.getElementById('importGSBtn').addEventListener('click', importGoogleSheets);
+  document.getElementById('importCSVBtn').addEventListener('click', () => { closeMenuDrawer(); document.getElementById('csvFileInput').click(); });
+  document.getElementById('importPDFBtn').addEventListener('click', () => { closeMenuDrawer(); document.getElementById('pdfFileInput').click(); });
+  document.getElementById('csvFileInput').addEventListener('change', e => { if(e.target.files[0]) importCSVFile(e.target.files[0]); e.target.value=''; });
+  document.getElementById('pdfFileInput').addEventListener('change', e => {
+    const files = [...e.target.files];
+    if (files.length === 1) importPDFFile(files[0]);
+    else if (files.length > 1) importPDFBatch(files);
+    e.target.value='';
+  });
+
+  // API key management
+  function saveApiKey() {
+    const k = document.getElementById('claudeApiKeyInput').value.trim();
+    if (!k) { toast('Enter a key first', 'warning'); return; }
+    localStorage.setItem('claude_api_key', k);
+    updateApiKeyStatus();
+    closeModal('apiKeyModal');
+    toast('Claude API key saved', 'success', '🤖');
+  }
+  function clearApiKey() {
+    localStorage.removeItem('claude_api_key');
+    document.getElementById('claudeApiKeyInput').value = '';
+    updateApiKeyStatus();
+    closeModal('apiKeyModal');
+    toast('API key cleared', '', '🗑');
+  }
+  function updateApiKeyStatus() {
+    const el = document.getElementById('aiKeyStatus');
+    if (!el) return;
+    const k = localStorage.getItem('claude_api_key');
+    el.textContent = k ? '✓ Active' : 'Not set';
+    el.style.color = k ? 'var(--green)' : 'var(--text-3)';
+  }
+  window.saveApiKey = saveApiKey;
+  window.clearApiKey = clearApiKey;
+  updateApiKeyStatus();
+  // Pre-fill API key input if already set
+  document.getElementById('apiKeyModal').addEventListener('click', e => { if(e.target===e.currentTarget) closeModal('apiKeyModal'); });
+  const existingKey = localStorage.getItem('claude_api_key');
+  if (existingKey) document.getElementById('claudeApiKeyInput').value = existingKey;
+  document.getElementById('exportCSVBtn').addEventListener('click', () => { closeMenuDrawer(); exportCSV(); });
+  document.getElementById('exportJSONBtn').addEventListener('click', () => { closeMenuDrawer(); exportJSON(); });
+
+  // Patient modal
+  document.getElementById('patientModalClose').addEventListener('click', () => closeModal('patientModal'));
+  document.getElementById('patientModalCancel').addEventListener('click', () => closeModal('patientModal'));
+  document.getElementById('patientModalSave').addEventListener('click', savePatient);
+  document.getElementById('deletePatientBtn').addEventListener('click', () => {
+    if (!editingId) return;
+    showConfirm('Delete Patient?', 'This cannot be undone. All data for this patient will be permanently deleted.', () => deletePatient(editingId));
+  });
+  document.getElementById('patientModal').addEventListener('click', e => { if(e.target===e.currentTarget) closeModal('patientModal'); });
+
+  // Injection modal
+  document.getElementById('injectionModalClose').addEventListener('click', () => closeModal('injectionModal'));
+  document.getElementById('injCancelBtn').addEventListener('click', () => closeModal('injectionModal'));
+  document.getElementById('injConfirmBtn').addEventListener('click', performInjection);
+  document.getElementById('injectionModal').addEventListener('click', e => { if(e.target===e.currentTarget) closeModal('injectionModal'); });
+
+  // Appt modal
+  document.getElementById('apptModalClose').addEventListener('click', () => closeModal('apptModal'));
+  document.getElementById('apptCancelBtn').addEventListener('click', () => closeModal('apptModal'));
+  document.getElementById('apptSaveBtn').addEventListener('click', saveAppt);
+  document.getElementById('apptModal').addEventListener('click', e => { if(e.target===e.currentTarget) closeModal('apptModal'); });
+  document.getElementById('apptStatusConfirmed').addEventListener('click', () => {
+    apptConfirmedStatus = true;
+    document.getElementById('apptStatusConfirmed').classList.add('selected');
+    document.getElementById('apptStatusTentative').classList.remove('selected');
+  });
+  document.getElementById('apptStatusTentative').addEventListener('click', () => {
+    apptConfirmedStatus = false;
+    document.getElementById('apptStatusTentative').classList.add('selected');
+    document.getElementById('apptStatusConfirmed').classList.remove('selected');
+  });
+
+  // Confirm sheet
+  document.getElementById('confirmYes').addEventListener('click', () => { if(confirmCallback) confirmCallback(); closeConfirm(); });
+  document.getElementById('confirmNo').addEventListener('click', closeConfirm);
+  document.getElementById('confirmBackdrop').addEventListener('click', closeConfirm);
+
+  // Report
+  // ── Report module wiring (all three tabs) ──
+  document.getElementById('generateReportBtnDaily')?.addEventListener('click', generateDailyReport);
+  document.getElementById('generateReportBtnCustom')?.addEventListener('click', generateReport);
+  document.querySelectorAll('.quick-report-btn').forEach(btn => {
+    btn.addEventListener('click', () => quickReport(btn.dataset.quick));
+  });
+  // Set daily date default to today
+  const rptDaily = document.getElementById('rptDailyDate');
+  if (rptDaily) rptDaily.value = todayStr();
+  // Set monthly defaults to current month/year
+  const now = new Date();
+  const rptMonth = document.getElementById('rptMonth');
+  const rptYear  = document.getElementById('rptYear');
+  if (rptMonth) rptMonth.value = String(now.getMonth()+1).padStart(2,'0');
+  if (rptYear)  rptYear.value  = String(now.getFullYear());
+  // Expose all report functions for inline onclick and quick-report buttons
+  window.switchReportTab       = switchReportTab;
+  window.generateDailyReport   = generateDailyReport;
+  window.generateMonthlyReport = generateMonthlyReport;
+  window.printReport           = printReport;
+  window.openGoogleSheets      = openGoogleSheets;
+  window.exportReportXLSX      = exportReportXLSX;
+  window.exportReportCSV       = exportReportCSV;
+
+  // Auto-update total doses when dose changes
+  document.getElementById('f-dose').addEventListener('change', function() {
+    const w = DOSE_TO_WEEKS[this.value] || 4;
+    // Update due date suggestion from today
+    document.getElementById('f-due').value = addWeeks(todayStr(), w);
+  });
+
+  // Expose for inline handlers
+  window.openEditModal = openEditModal;
+  window.openApptModal = openApptModal;
+  window.exportReportCSV = exportReportCSV;
+  window.switchToTab = switchToTab;
+  window.openMenuDrawer = openMenuDrawer;
+});// EOF
+
+</script>
+</body>
+</html>
