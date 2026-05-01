@@ -2231,7 +2231,28 @@ function getFilteredPatients() {
     return (p['Patient Name']||'').toLowerCase().includes(q) ||
            (p['File Number']||'').toLowerCase().includes(q) ||
            (p['Address']||'').toLowerCase().includes(q);
-  }).sort((a,b) => (a['Due Date']||'').localeCompare(b['Due Date']||''));
+  }).sort((a, b) => {
+    const aConf = !!a['Appointment Confirmed'];
+    const bConf = !!b['Appointment Confirmed'];
+    const aAppt = a['Appointment Date & Time'] || '';
+    const bAppt = b['Appointment Date & Time'] || '';
+    const aDue  = a['Due Date'] || '';
+    const bDue  = b['Due Date'] || '';
+
+    // ── Priority 1: confirmed appointments always come first ──
+    if (aConf && !bConf) return -1;
+    if (!aConf && bConf) return 1;
+
+    // ── Priority 2: both confirmed → sort by appointment datetime (earliest first) ──
+    if (aConf && bConf) {
+      if (aAppt < bAppt) return -1;
+      if (aAppt > bAppt) return 1;
+      return 0;
+    }
+
+    // ── Priority 3: neither confirmed → sort by due date (earliest first) ──
+    return aDue.localeCompare(bDue);
+  });
 }
 
 // ========== RENDER ==========
@@ -2260,26 +2281,75 @@ function renderPatientList() {
   }
 
   const today = todayStr();
-  // Group by date
-  const groups = {};
-  filtered.forEach(p => {
+
+  // ── Split into two priority groups ──
+  const confirmed   = filtered.filter(p => !!p['Appointment Confirmed']);
+  const unconfirmed = filtered.filter(p => !p['Appointment Confirmed']);
+
+  // Group confirmed patients by appointment DATE (not due date)
+  const confGroups = {};
+  confirmed.forEach(p => {
+    const apptDT  = p['Appointment Date & Time'] || '';
+    const key     = apptDT ? apptDT.split('T')[0] : (p['Due Date'] || 'Unknown');
+    if (!confGroups[key]) confGroups[key] = [];
+    confGroups[key].push(p);
+  });
+
+  // Group unconfirmed patients by due date
+  const dueGroups = {};
+  unconfirmed.forEach(p => {
     const key = p['Due Date'] || 'Unknown';
-    if (!groups[key]) groups[key] = [];
-    groups[key].push(p);
+    if (!dueGroups[key]) dueGroups[key] = [];
+    dueGroups[key].push(p);
   });
 
   let html = '';
-  for (const date of Object.keys(groups).sort()) {
-    const isToday = date === today;
-    const isPast = date < today && date !== 'Unknown';
-    const sepClass = isToday ? 'date-sep--today' : (isPast ? 'date-sep--overdue' : '');
-    html += `<div class="date-sep ${sepClass}">
-      <span class="date-sep__label">${isToday ? 'TODAY' : formatDateFull(date).toUpperCase()}</span>
-      <span class="date-sep__badge">${groups[date].length}</span>
-    </div>`;
-    groups[date].forEach((p, i) => {
-      html += renderCard(p, i);
-    });
+  let cardIdx = 0;
+
+  // ── Render confirmed group first ──
+  if (confirmed.length > 0) {
+    // Section header — only shown when there are also unconfirmed patients
+    if (unconfirmed.length > 0) {
+      html += `<div style="display:flex;align-items:center;gap:8px;padding:14px 4px 6px">
+        <span style="width:10px;height:10px;border-radius:50%;background:var(--teal);flex-shrink:0"></span>
+        <span style="font-size:11px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--teal-dark)">Confirmed Appointments</span>
+        <span style="background:var(--teal-light);color:var(--teal-dark);border-radius:20px;padding:1px 8px;font-size:11px;font-weight:700">${confirmed.length}</span>
+      </div>`;
+    }
+    for (const date of Object.keys(confGroups).sort()) {
+      const isToday = date === today;
+      const isPast  = date < today && date !== 'Unknown';
+      const sepClass = isToday ? 'date-sep--today' : (isPast ? 'date-sep--overdue' : '');
+      html += `<div class="date-sep ${sepClass}">
+        <span class="date-sep__label">${isToday ? 'TODAY' : formatDateFull(date).toUpperCase()}</span>
+        <span style="font-size:9px;font-weight:700;letter-spacing:0.5px;color:var(--teal);margin-left:2px">✓ APPT</span>
+        <span class="date-sep__badge">${confGroups[date].length}</span>
+      </div>`;
+      confGroups[date].forEach(p => { html += renderCard(p, cardIdx++); });
+    }
+  }
+
+  // ── Render unconfirmed group second ──
+  if (unconfirmed.length > 0) {
+    // Divider — only shown when there were also confirmed patients above
+    if (confirmed.length > 0) {
+      html += `<div style="display:flex;align-items:center;gap:8px;padding:18px 4px 6px">
+        <div style="flex:1;height:1px;background:var(--border)"></div>
+        <span style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-3)">By Due Date — No Appointment Set</span>
+        <span style="background:var(--border);color:var(--text-2);border-radius:20px;padding:1px 8px;font-size:11px;font-weight:700">${unconfirmed.length}</span>
+        <div style="flex:1;height:1px;background:var(--border)"></div>
+      </div>`;
+    }
+    for (const date of Object.keys(dueGroups).sort()) {
+      const isToday = date === today;
+      const isPast  = date < today && date !== 'Unknown';
+      const sepClass = isToday ? 'date-sep--today' : (isPast ? 'date-sep--overdue' : '');
+      html += `<div class="date-sep ${sepClass}">
+        <span class="date-sep__label">${isToday ? 'TODAY' : formatDateFull(date).toUpperCase()}</span>
+        <span class="date-sep__badge">${dueGroups[date].length}</span>
+      </div>`;
+      dueGroups[date].forEach(p => { html += renderCard(p, cardIdx++); });
+    }
   }
   el.innerHTML = html;
   attachCardEvents();
