@@ -47,6 +47,7 @@
   --shadow-lg:  0 8px 32px rgba(27,38,56,0.15);
   --nav-h:      70px;
   --header-h:   60px;
+  --search-area-h: 106px;  /* search bar ~55px + tabs ~50px + border 1px */
   --transition: 200ms ease-in-out;
   --transition-slow: 300ms ease-in-out;
 }
@@ -172,9 +173,7 @@ input, select, textarea { font: inherit; }
 
 /* ========== SEARCH BAR ========== */
 .search-bar {
-  position: sticky;
-  top: var(--header-h);
-  z-index: 90;
+  position: static;  /* parent #searchArea is now fixed on mobile */
   background: linear-gradient(90deg, #243047 0%, #1E293D 100%);
   padding: 0.625rem 1rem;
   display: flex;
@@ -270,9 +269,21 @@ input, select, textarea { font: inherit; }
 }
 .tab-btn.active .tab-count { background: rgba(255,255,255,0.25); }
 
+/* ── Mobile: freeze entire search+tabs bar so it never scrolls away ──
+   position:fixed takes it out of flow; margin-top on #mainContent compensates */
+#searchArea {
+  position: fixed;
+  top: var(--header-h);
+  left: 0;
+  right: 0;
+  z-index: 89;
+  box-shadow: 0 4px 20px rgba(27,38,56,0.35);
+}
+
 /* ========== PATIENT LIST ========== */
 #mainContent {
   padding: 0.75rem 0.75rem 0;
+  margin-top: var(--search-area-h);  /* clear fixed search+tabs bar */
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -721,7 +732,7 @@ input, select, textarea { font: inherit; }
 }
 
 /* ========== DASHBOARD VIEW ========== */
-#dashView { padding: 0.75rem; }
+#dashView { padding: 0.75rem; margin-top: var(--search-area-h); }
 .stats-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -841,7 +852,7 @@ input, select, textarea { font: inherit; }
 .quick-action-btn:active { transform: scale(0.96) translateY(0); }
 
 /* ========== REPORT VIEW ========== */
-#reportView { padding: 0.75rem; }
+#reportView { padding: 0.75rem; margin-top: var(--search-area-h); }
 .report-controls {
   background: var(--card);
   border-radius: var(--radius);
@@ -1262,7 +1273,7 @@ input, select, textarea { font: inherit; }
 /* ========== RESPONSIVE: TABLET & DESKTOP ========== */
 @media (min-width: 640px) {
   body { padding-bottom: calc(var(--nav-h) + 1.5rem); }
-  #mainContent { padding: 1rem 1rem 0; }
+  #mainContent { padding: 1rem 1rem 0; margin-top: var(--search-area-h); }
   #dashView, #reportView { padding: 1rem; }
   .stats-grid { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
   .detail-grid { grid-template-columns: repeat(3, 1fr); }
@@ -1293,11 +1304,12 @@ input, select, textarea { font: inherit; }
     height: var(--header-h);
   }
 
-  /* Sidebar: search + tabs fill column 1 row 2 */
+  /* Sidebar: override mobile fixed — becomes grid item on desktop */
   #searchArea {
     grid-column: 1;
     grid-row: 2;
-    position: static;
+    position: static;  /* override mobile fixed */
+    box-shadow: none;  /* no shadow in sidebar */
     height: auto;
     overflow-y: auto;
     display: flex;
@@ -1356,6 +1368,9 @@ input, select, textarea { font: inherit; }
     position: static;
   }
 
+  /* Main views: no margin-top needed — sidebar layout handles positioning */
+  #dashView, #reportView { margin-top: 0; }
+
   /* ── CRITICAL: Disable card entry animations on desktop ──
      On mobile, cards animate in nicely as you scroll.
      On desktop, all 34+ cards render simultaneously with cascading
@@ -1375,6 +1390,8 @@ input, select, textarea { font: inherit; }
   /* Safety net: cards must always have visible height */
   .card-head    { min-height: 60px; }
   .card-actions { min-height: 44px; }
+
+  #mainContent { margin-top: 0; }  /* grid handles positioning, not margin */
 
   /* ══ ROOT CAUSE FIX ══
      #mainContent has display:flex + flex-direction:column in base CSS.
