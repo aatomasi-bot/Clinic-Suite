@@ -1,0 +1,1423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#1B2638">
+<title>DosingTracker — Route Scheduler</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ── TOKENS ── */
+:root {
+  --teal:      #2D8C8A;
+  --teal-d:    #1E6665;
+  --teal-l:    #E6F4F4;
+  --navy:      #1B2638;
+  --navy-mid:  #243047;
+  --orange:    #E5883A;
+  --orange-bg: #FEF3E8;
+  --red:       #E05A5A;
+  --red-bg:    #FDEDED;
+  --green:     #3D9A6B;
+  --green-bg:  #E8F7F0;
+  --purple:    #7B68B6;
+  --purple-bg: #F0EEF9;
+  --amber:     #D97706;
+  --amber-bg:  #FFFBEB;
+  --sky:       #0EA5E9;
+  --sky-bg:    #EFF8FE;
+  --rose:      #E11D48;
+  --bg:        #F0F3F8;
+  --card:      #FFFFFF;
+  --border:    #E2E8F0;
+  --text:      #1B2638;
+  --text-2:    #64748B;
+  --text-3:    #94A3B8;
+  --r:         12px;
+  --r-sm:      8px;
+  --shadow:    0 2px 12px rgba(27,38,56,0.08);
+  --shadow-md: 0 4px 20px rgba(27,38,56,0.12);
+  --shadow-lg: 0 8px 32px rgba(27,38,56,0.16);
+  --hdr:       58px;
+  --tr:        200ms ease-in-out;
+}
+
+/* ── ZONE PALETTE — up to 12 geo zones ── */
+.zone-0  { --zc: #2D8C8A; --zb: #E6F4F4; }
+.zone-1  { --zc: #E5883A; --zb: #FEF3E8; }
+.zone-2  { --zc: #7B68B6; --zb: #F0EEF9; }
+.zone-3  { --zc: #3D9A6B; --zb: #E8F7F0; }
+.zone-4  { --zc: #0EA5E9; --zb: #EFF8FE; }
+.zone-5  { --zc: #E11D48; --zb: #FFF0F3; }
+.zone-6  { --zc: #D97706; --zb: #FFFBEB; }
+.zone-7  { --zc: #8B5CF6; --zb: #F5F3FF; }
+.zone-8  { --zc: #059669; --zb: #ECFDF5; }
+.zone-9  { --zc: #DC2626; --zb: #FEF2F2; }
+.zone-10 { --zc: #0891B2; --zb: #ECFEFF; }
+.zone-11 { --zc: #C2410C; --zb: #FFF7ED; }
+
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+html { -webkit-text-size-adjust:100%; scroll-behavior:smooth; }
+body {
+  font-family:'DM Sans', -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  padding-top: var(--hdr);
+  -webkit-font-smoothing: antialiased;
+}
+button { cursor:pointer; border:none; background:none; font:inherit; -webkit-tap-highlight-color:transparent; }
+input, select { font:inherit; }
+
+/* ── HEADER ── */
+.hdr {
+  position: fixed; top:0; left:0; right:0; z-index:100;
+  height: var(--hdr);
+  background: linear-gradient(90deg,#1B2638,#243047);
+  display: flex; align-items:center; justify-content:space-between;
+  padding: 0 1rem;
+  box-shadow: 0 2px 16px rgba(27,38,56,0.3);
+}
+.hdr__brand { display:flex; align-items:center; gap:10px; }
+.hdr__icon {
+  width:36px; height:36px; border-radius:9px;
+  background:linear-gradient(135deg,var(--teal),var(--teal-d));
+  display:flex; align-items:center; justify-content:center;
+  font-size:17px; box-shadow:0 2px 8px rgba(45,140,138,0.4);
+}
+.hdr__title { color:#fff; font-size:15px; font-weight:800; letter-spacing:-0.3px; }
+.hdr__title span { color:var(--teal); }
+.hdr__sub { color:#6B7A8F; font-size:9px; font-weight:600; letter-spacing:1.8px; text-transform:uppercase; }
+.hdr__back {
+  display:flex; align-items:center; gap:6px;
+  color:rgba(255,255,255,0.7); font-size:13px; font-weight:600;
+  padding:6px 10px; border-radius:7px;
+  background:rgba(255,255,255,0.08);
+  text-decoration:none;
+  transition: background var(--tr), color var(--tr);
+}
+.hdr__back:hover { background:rgba(255,255,255,0.14); color:#fff; }
+
+/* ── LAYOUT ── */
+.page { max-width:1100px; margin:0 auto; padding:1rem; }
+
+/* ── CONTROL BAR ── */
+.control-bar {
+  background:var(--card); border-radius:var(--r); border:1.5px solid var(--border);
+  padding:1rem; margin-bottom:1rem; box-shadow:var(--shadow);
+  display:flex; flex-wrap:wrap; gap:0.75rem; align-items:flex-end;
+}
+.ctrl-group { display:flex; flex-direction:column; gap:4px; min-width:140px; }
+.ctrl-group label {
+  font-size:10px; font-weight:700; letter-spacing:0.8px; text-transform:uppercase; color:var(--text-2);
+}
+.ctrl-group input, .ctrl-group select {
+  padding:8px 10px; border:1.5px solid var(--border); border-radius:var(--r-sm);
+  font-size:13px; background:var(--bg); color:var(--text); outline:none;
+  transition:border-color var(--tr), box-shadow var(--tr);
+}
+.ctrl-group input:focus, .ctrl-group select:focus {
+  border-color:var(--teal); background:#fff; box-shadow:0 0 0 3px rgba(45,140,138,0.15);
+}
+.ctrl-spacer { flex:1; }
+.btn-run {
+  display:flex; align-items:center; gap:8px;
+  padding:10px 20px; border-radius:var(--r-sm);
+  background:linear-gradient(135deg,var(--teal),var(--teal-d));
+  color:#fff; font-size:14px; font-weight:700;
+  box-shadow:0 3px 10px rgba(45,140,138,0.4);
+  transition:all var(--tr); white-space:nowrap;
+}
+.btn-run:hover { transform:translateY(-1px); box-shadow:0 5px 16px rgba(45,140,138,0.5); }
+.btn-run:active { transform:translateY(0); }
+.btn-run:disabled { opacity:0.5; pointer-events:none; }
+
+/* ── STATS STRIP ── */
+.stats-strip {
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:0.625rem;
+  margin-bottom:1rem;
+}
+.stat-pill {
+  background:var(--card); border-radius:var(--r); border:1.5px solid var(--border);
+  padding:0.75rem 1rem; box-shadow:var(--shadow); text-align:center;
+}
+.stat-pill__val { font-size:26px; font-weight:800; color:var(--teal-d); line-height:1; }
+.stat-pill__lbl { font-size:10px; font-weight:700; letter-spacing:0.7px; text-transform:uppercase; color:var(--text-2); margin-top:4px; }
+
+/* ── ZONE LEGEND ── */
+.zone-legend {
+  background:var(--card); border-radius:var(--r); border:1.5px solid var(--border);
+  padding:0.75rem 1rem; margin-bottom:1rem; box-shadow:var(--shadow);
+  display:flex; flex-wrap:wrap; gap:0.5rem; align-items:center;
+}
+.zone-legend h4 { font-size:10px; font-weight:700; letter-spacing:0.8px; text-transform:uppercase; color:var(--text-2); width:100%; margin-bottom:2px; }
+.zone-chip {
+  display:inline-flex; align-items:center; gap:5px;
+  padding:4px 10px; border-radius:20px;
+  font-size:11px; font-weight:700;
+  background:var(--zb); color:var(--zc);
+  border:1.5px solid currentColor;
+}
+.zone-chip__dot { width:7px; height:7px; border-radius:50%; background:var(--zc); }
+
+/* ── WEEK NAVIGATOR ── */
+.week-nav {
+  display:flex; align-items:center; gap:0.5rem; margin-bottom:0.75rem;
+}
+.week-nav h3 { flex:1; text-align:center; font-size:15px; font-weight:700; }
+.week-nav-btn {
+  width:34px; height:34px; border-radius:var(--r-sm);
+  border:1.5px solid var(--border); background:var(--card);
+  display:flex; align-items:center; justify-content:center;
+  font-size:16px; color:var(--text-2);
+  transition:all var(--tr);
+}
+.week-nav-btn:hover { border-color:var(--teal); color:var(--teal); background:var(--teal-l); }
+
+/* ── CALENDAR WEEK ── */
+.week-grid {
+  display:grid; grid-template-columns:repeat(7,1fr); gap:0.375rem;
+  margin-bottom:1rem;
+}
+.day-cell {
+  background:var(--card); border-radius:var(--r-sm);
+  border:1.5px solid var(--border);
+  min-height:100px; padding:0.5rem;
+  cursor:pointer; transition:all var(--tr);
+  position:relative; overflow:hidden;
+}
+.day-cell:hover { border-color:var(--teal); box-shadow:var(--shadow-md); transform:translateY(-1px); }
+.day-cell.active { border-color:var(--teal); box-shadow:0 0 0 3px rgba(45,140,138,0.15); }
+.day-cell.today { background:linear-gradient(160deg,#fff,var(--teal-l)); }
+.day-cell.past { opacity:0.45; pointer-events:none; }
+.day-cell.empty { opacity:0.5; pointer-events:none; }
+.day-cell__hdr { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:4px; }
+.day-cell__name { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.6px; color:var(--text-2); }
+.day-cell__num { font-size:18px; font-weight:800; color:var(--text); line-height:1; }
+.day-cell.today .day-cell__num {
+  color:#fff; background:var(--teal);
+  width:28px; height:28px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center; font-size:13px;
+}
+.day-cell__zones { display:flex; flex-direction:column; gap:3px; margin-top:4px; }
+.day-cell__zone-row {
+  display:flex; align-items:center; gap:4px;
+  padding:3px 6px; border-radius:6px;
+  font-size:10px; font-weight:700;
+  background:var(--zb); color:var(--zc);
+}
+.day-cell__zone-dot { width:6px; height:6px; border-radius:50%; background:var(--zc); flex-shrink:0; }
+.day-cell__count-badge {
+  position:absolute; bottom:5px; right:5px;
+  background:var(--teal); color:#fff;
+  border-radius:10px; padding:1px 6px;
+  font-size:10px; font-weight:700;
+  font-family:'DM Mono',monospace;
+}
+.day-cell__warning {
+  position:absolute; top:5px; right:5px;
+  background:var(--orange); color:#fff;
+  border-radius:10px; padding:1px 6px; font-size:9px; font-weight:700;
+}
+
+/* ── DAY DETAIL PANEL ── */
+.detail-panel {
+  background:var(--card); border-radius:var(--r); border:1.5px solid var(--border);
+  box-shadow:var(--shadow-md); overflow:hidden; margin-bottom:1rem;
+  animation:slideDown 0.22s ease-in-out;
+}
+@keyframes slideDown {
+  from { opacity:0; transform:translateY(-8px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+.detail-hdr {
+  padding:0.875rem 1rem; border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between;
+  background:linear-gradient(90deg,var(--navy),var(--navy-mid));
+  color:#fff;
+}
+.detail-hdr h3 { font-size:15px; font-weight:800; }
+.detail-hdr-meta { display:flex; align-items:center; gap:0.5rem; }
+.detail-badge {
+  padding:3px 9px; border-radius:20px;
+  font-size:11px; font-weight:700;
+  background:rgba(255,255,255,0.15); color:#fff;
+}
+.detail-badge--green { background:rgba(61,154,107,0.3); color:#6EE7B7; }
+.detail-badge--orange { background:rgba(229,136,58,0.3); color:#FCD34D; }
+.detail-actions { display:flex; gap:0.5rem; padding:0.75rem 1rem; border-bottom:1px solid var(--border); flex-wrap:wrap; }
+.detail-action-btn {
+  display:flex; align-items:center; gap:5px;
+  padding:6px 12px; border-radius:var(--r-sm);
+  border:1.5px solid var(--border); background:var(--bg);
+  font-size:12px; font-weight:600; color:var(--text);
+  transition:all var(--tr);
+}
+.detail-action-btn:hover { border-color:var(--teal); color:var(--teal-d); background:var(--teal-l); }
+.detail-action-btn--primary {
+  background:linear-gradient(135deg,var(--teal),var(--teal-d)); color:#fff; border-color:var(--teal-d);
+  box-shadow:0 2px 8px rgba(45,140,138,0.3);
+}
+.detail-action-btn--primary:hover { color:#fff; box-shadow:0 4px 14px rgba(45,140,138,0.45); transform:translateY(-1px); }
+
+/* Route sections */
+.route-section { padding:0.75rem 1rem; border-bottom:1px solid var(--border); }
+.route-section:last-child { border-bottom:none; }
+.route-section__hdr {
+  display:flex; align-items:center; gap:8px; margin-bottom:0.5rem;
+}
+.route-section__hdr h4 { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; color:var(--text-2); flex:1; }
+.zone-tag {
+  display:inline-flex; align-items:center; gap:4px;
+  padding:3px 10px; border-radius:20px;
+  font-size:11px; font-weight:700;
+  background:var(--zb); color:var(--zc); border:1px solid currentColor;
+}
+.route-km {
+  display:flex; align-items:center; gap:4px;
+  font-size:11px; font-weight:600; color:var(--text-2);
+  font-family:'DM Mono',monospace;
+}
+
+/* Patient route rows */
+.patient-route-list { display:flex; flex-direction:column; gap:4px; }
+.patient-row {
+  display:flex; align-items:center; gap:10px;
+  padding:8px 10px; border-radius:var(--r-sm);
+  border:1px solid var(--border); background:var(--bg);
+  transition:all var(--tr); cursor:default;
+}
+.patient-row:hover { background:var(--teal-l); border-color:#B2DADA; }
+.route-num {
+  width:22px; height:22px; border-radius:50%;
+  background:var(--zc); color:#fff;
+  display:flex; align-items:center; justify-content:center;
+  font-size:10px; font-weight:800; flex-shrink:0;
+  font-family:'DM Mono',monospace;
+}
+.patient-row__name { font-size:13px; font-weight:700; flex:1; min-width:0; }
+.patient-row__file { font-size:11px; color:var(--text-2); font-weight:500; }
+.patient-row__addr { font-size:11px; color:var(--text-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:2; }
+.patient-row__postal { font-size:11px; font-weight:600; color:var(--text); font-family:'DM Mono',monospace; background:var(--border); padding:2px 6px; border-radius:4px; flex-shrink:0; }
+.patient-row__dose { font-size:10px; font-weight:700; color:var(--teal-d); background:var(--teal-l); padding:2px 7px; border-radius:10px; flex-shrink:0; }
+.patient-row__window { font-size:10px; color:var(--text-2); font-family:'DM Mono',monospace; flex-shrink:0; }
+.patient-row__urgency { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+.urgency-tight { background:var(--red); }
+.urgency-normal { background:var(--green); }
+.urgency-flexible { background:var(--teal); }
+
+/* Route connector line */
+.route-connector {
+  display:flex; align-items:center; gap:8px; padding:2px 10px 2px 20px;
+}
+.route-connector__line { flex:1; height:1px; border-top:1.5px dashed var(--border); }
+.route-connector__km { font-size:10px; color:var(--text-3); font-family:'DM Mono',monospace; }
+
+/* EV Range bar */
+.ev-bar { padding:0.75rem 1rem; background:linear-gradient(90deg,#f0f9ff,#e0f2fe); border-top:1px solid #BAE6FD; }
+.ev-bar__hdr { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+.ev-bar__title { font-size:11px; font-weight:700; color:#0369A1; text-transform:uppercase; letter-spacing:0.6px; }
+.ev-bar__km { font-size:12px; font-weight:700; color:#0369A1; font-family:'DM Mono',monospace; }
+.ev-track { height:8px; background:#BAE6FD; border-radius:99px; overflow:hidden; }
+.ev-fill { height:100%; background:linear-gradient(90deg,#0EA5E9,#0369A1); border-radius:99px; transition:width 0.5s ease-in-out; }
+
+/* ── UNSCHEDULED PANEL ── */
+.unscheduled-panel {
+  background:var(--card); border-radius:var(--r); border:1.5px solid var(--border);
+  margin-bottom:1rem; box-shadow:var(--shadow); overflow:hidden;
+}
+.unscheduled-panel__hdr {
+  padding:0.75rem 1rem; background:linear-gradient(90deg,var(--red-bg),#fff);
+  border-bottom:1px solid var(--border); display:flex; align-items:center; gap:8px;
+}
+.unscheduled-panel__hdr h3 { font-size:13px; font-weight:700; color:var(--red); flex:1; }
+.unscheduled-list { padding:0.75rem; display:flex; flex-direction:column; gap:4px; }
+.unscheduled-row {
+  display:flex; align-items:center; gap:10px;
+  padding:7px 10px; border-radius:var(--r-sm);
+  border:1px solid #F0C0C0; background:var(--red-bg);
+}
+.unscheduled-row__name { font-size:13px; font-weight:700; flex:1; color:var(--red); }
+.unscheduled-row__reason { font-size:11px; color:var(--text-2); }
+.unscheduled-row__due { font-size:11px; font-family:'DM Mono',monospace; color:var(--text-2); }
+
+/* ── EMPTY / LOADING ── */
+.empty-state { text-align:center; padding:3rem 1.5rem; }
+.empty-state__icon { font-size:3.5rem; margin-bottom:1rem; }
+.empty-state__title { font-size:18px; font-weight:800; margin-bottom:6px; }
+.empty-state__sub { font-size:13px; color:var(--text-2); max-width:340px; margin:0 auto; }
+.loading-wrap { display:flex; align-items:center; justify-content:center; gap:10px; padding:2rem; }
+.spinner { width:28px; height:28px; border-radius:50%; border:3px solid var(--border); border-top-color:var(--teal); animation:spin 0.8s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+
+/* ── TOAST ── */
+.toast-wrap {
+  position:fixed; top:calc(var(--hdr) + 8px); left:50%; transform:translateX(-50%);
+  z-index:9999; pointer-events:none; width:calc(100% - 2rem); max-width:380px;
+}
+.toast {
+  background:var(--navy); color:#fff; border-radius:var(--r-sm);
+  padding:10px 14px; font-size:13px; font-weight:600;
+  display:flex; align-items:center; gap:8px;
+  box-shadow:var(--shadow-lg); pointer-events:all;
+  animation:toastIn 0.3s ease, toastOut 0.3s ease 2.7s forwards;
+}
+.toast--ok  { background:linear-gradient(135deg,var(--green),#2A7050); }
+.toast--err { background:linear-gradient(135deg,var(--red),#B04040); }
+@keyframes toastIn  { from{opacity:0;transform:translateY(-12px) scale(0.95)} to{opacity:1;transform:translateY(0) scale(1)} }
+@keyframes toastOut { from{opacity:1} to{opacity:0;transform:translateY(-8px)} }
+
+/* ── EXPORT MODAL ── */
+.modal-overlay { position:fixed; inset:0; background:rgba(27,38,56,0.55); z-index:300; display:none; align-items:flex-end; justify-content:center; backdrop-filter:blur(3px); }
+.modal-overlay.open { display:flex; }
+.modal { width:100%; max-width:480px; background:var(--card); border-radius:20px 20px 0 0; max-height:70vh; overflow-y:auto; padding:0 0 24px; animation:slideUp 0.3s ease; box-shadow:0 -8px 40px rgba(27,38,56,0.2); }
+@keyframes slideUp { from{transform:translateY(40px);opacity:0} to{transform:translateY(0);opacity:1} }
+.modal__handle { width:36px; height:4px; background:var(--border); border-radius:2px; margin:10px auto 14px; }
+.modal__title { font-size:17px; font-weight:800; padding:0 20px 12px; border-bottom:1px solid var(--border); }
+.modal__body { padding:16px 20px; }
+.export-option {
+  display:flex; align-items:center; gap:12px;
+  padding:12px 14px; border-radius:var(--r-sm);
+  border:1.5px solid var(--border); background:var(--bg);
+  margin-bottom:8px; cursor:pointer; transition:all var(--tr);
+}
+.export-option:hover { border-color:var(--teal); background:var(--teal-l); color:var(--teal-d); }
+.export-option__icon { font-size:22px; }
+.export-option__text strong { display:block; font-size:14px; font-weight:700; }
+.export-option__text span { font-size:12px; color:var(--text-2); }
+
+/* ── MISC ── */
+.hidden { display:none !important; }
+@media (max-width:640px) {
+  .week-grid { grid-template-columns:repeat(7,1fr); gap:2px; }
+  .day-cell { min-height:70px; padding:4px; }
+  .day-cell__num { font-size:14px; }
+  .day-cell__zones { display:none; }
+  .stats-strip { grid-template-columns:repeat(2,1fr); }
+  .control-bar { flex-direction:column; }
+  .ctrl-group { min-width:unset; width:100%; }
+  .patient-row__addr, .patient-row__window { display:none; }
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="hdr">
+  <div class="hdr__brand">
+    <div class="hdr__icon">🗺️</div>
+    <div>
+      <div class="hdr__title">Dosing<span>Tracker</span></div>
+      <div class="hdr__sub">Route Scheduler</div>
+    </div>
+  </div>
+  <a href="index.html" class="hdr__back">← Back</a>
+</header>
+
+<div class="toast-wrap" id="toastWrap"></div>
+
+<div class="page">
+
+  <!-- CONTROL BAR -->
+  <div class="control-bar">
+    <div class="ctrl-group">
+      <label>Schedule Starting From</label>
+      <input type="date" id="startDate">
+    </div>
+    <div class="ctrl-group">
+      <label>Weeks to Plan</label>
+      <select id="weeksAhead">
+        <option value="4">4 weeks</option>
+        <option value="6" selected>6 weeks</option>
+        <option value="8">8 weeks</option>
+        <option value="12">12 weeks</option>
+      </select>
+    </div>
+    <div class="ctrl-group">
+      <label>Max Patients / Day</label>
+      <select id="maxPerDay">
+        <option value="10">10</option>
+        <option value="12">12</option>
+        <option value="14" selected>14</option>
+        <option value="16">16</option>
+        <option value="18">18</option>
+      </select>
+    </div>
+    <div class="ctrl-group">
+      <label>Min Patients / Day</label>
+      <select id="minPerDay">
+        <option value="6">6</option>
+        <option value="8">8</option>
+        <option value="10">10</option>
+        <option value="12">12</option>
+      </select>
+    </div>
+    <div class="ctrl-group">
+      <label>Work Days</label>
+      <select id="workDays">
+        <option value="12345">Mon – Fri</option>
+        <option value="1234" selected>Mon – Thu</option>
+        <option value="12346">Mon – Fri + Sat</option>
+        <option value="23456">Tue – Sat</option>
+      </select>
+    </div>
+    <div class="ctrl-group">
+      <label>EV Range (km)</label>
+      <input type="number" id="evRange" value="350" min="100" max="600" step="10" style="width:90px">
+    </div>
+    <div class="ctrl-spacer"></div>
+    <button class="btn-run" id="runBtn">
+      <span>⚡</span> Generate Schedule
+    </button>
+  </div>
+
+  <!-- STATS STRIP -->
+  <div class="stats-strip" id="statsStrip" style="display:none">
+    <div class="stat-pill">
+      <div class="stat-pill__val" id="st-patients">0</div>
+      <div class="stat-pill__lbl">Patients</div>
+    </div>
+    <div class="stat-pill">
+      <div class="stat-pill__val" id="st-days">0</div>
+      <div class="stat-pill__lbl">Work Days</div>
+    </div>
+    <div class="stat-pill">
+      <div class="stat-pill__val" id="st-zones">0</div>
+      <div class="stat-pill__lbl">Zones</div>
+    </div>
+    <div class="stat-pill">
+      <div class="stat-pill__val" id="st-avg">0</div>
+      <div class="stat-pill__lbl">Avg / Day</div>
+    </div>
+    <div class="stat-pill">
+      <div class="stat-pill__val" id="st-km">0</div>
+      <div class="stat-pill__lbl">Est. km Total</div>
+    </div>
+    <div class="stat-pill">
+      <div class="stat-pill__val" id="st-unscheduled" style="color:var(--red)">0</div>
+      <div class="stat-pill__lbl">Unscheduled</div>
+    </div>
+  </div>
+
+  <!-- ZONE LEGEND -->
+  <div class="zone-legend hidden" id="zoneLegend">
+    <h4>Geographic Zones</h4>
+  </div>
+
+  <!-- INITIAL STATE -->
+  <div class="empty-state" id="emptyState">
+    <div class="empty-state__icon">📍</div>
+    <div class="empty-state__title">Ready to Schedule</div>
+    <p class="empty-state__sub">Configure your preferences above and click <strong>Generate Schedule</strong> to auto-group patients by zone and date window.</p>
+  </div>
+
+  <!-- LOADING -->
+  <div class="loading-wrap hidden" id="loadingWrap">
+    <div class="spinner"></div>
+    <span style="font-size:14px;color:var(--text-2)" id="loadingMsg">Loading patients…</span>
+  </div>
+
+  <!-- CALENDAR + DETAIL (rendered by JS) -->
+  <div id="calendarWrap" class="hidden"></div>
+  <div id="detailWrap"></div>
+  <div id="unscheduledWrap"></div>
+
+</div>
+
+<!-- EXPORT MODAL -->
+<div class="modal-overlay" id="exportModal">
+  <div class="modal">
+    <div class="modal__handle"></div>
+    <div class="modal__title">📤 Export Schedule</div>
+    <div class="modal__body">
+      <div class="export-option" id="exportICS">
+        <div class="export-option__icon">📅</div>
+        <div class="export-option__text">
+          <strong>Calendar (.ics)</strong>
+          <span>Import to Apple Calendar, Google Calendar, Outlook</span>
+        </div>
+      </div>
+      <div class="export-option" id="exportCSV">
+        <div class="export-option__icon">📋</div>
+        <div class="export-option__text">
+          <strong>Route Sheet (.csv)</strong>
+          <span>Full patient list with addresses sorted by route order</span>
+        </div>
+      </div>
+      <div class="export-option" id="exportPrintDay">
+        <div class="export-option__icon">🖨️</div>
+        <div class="export-option__text">
+          <strong>Print Day Sheet</strong>
+          <span>Printer-friendly route list for selected day</span>
+        </div>
+      </div>
+      <div class="export-option" id="exportCloseBtn" style="border-color:var(--border);justify-content:center;color:var(--text-2)">
+        Cancel
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════
+//  CONFIG
+// ══════════════════════════════════════════════
+const SUPABASE_URL      = "https://wqlbmtjbjloxpvsbeqyb.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_gcyK2z_8lvbOgHNcJfdX1g_8QCWJ_Xi";
+const WINDOW_DAYS = 3; // ±3 days
+
+// Canadian FSA → zone name mapping
+// FSA = first 3 chars of postal code
+const FSA_ZONES = {
+  // Laval
+  H7: 'Laval',
+  // West Island / Vaudreuil
+  H8: 'West Island', H9: 'West Island',
+  // Montreal West / NDG / Côte-des-Neiges
+  H3: 'Montreal West', H4: 'Montreal West',
+  // Montreal Central / Plateau / Mile-End
+  H2: 'Montreal Central',
+  // Montreal North / Ahuntsic / Villeray
+  H1: 'Montreal North',
+  // Montreal East / Rosemont
+  H5: 'Montreal East', H6: 'Montreal East',
+  // South Shore
+  J4: 'South Shore', J5: 'South Shore',
+  // Longueuil
+  J3: 'Longueuil',
+  // Repentigny / Lanaudière
+  J6: 'Lanaudière',
+  // Laurentians / Blainville
+  J7: 'Laurentians',
+  // Mirabel / Saint-Jérôme
+  J8: 'Nord',
+};
+
+// Approximate inter-patient km within same zone (used for EV estimate)
+const ZONE_KM_SPACING = {
+  'Laval':            1.8,
+  'West Island':      2.2,
+  'Montreal West':    1.5,
+  'Montreal Central': 1.2,
+  'Montreal North':   1.6,
+  'Montreal East':    1.4,
+  'South Shore':      2.0,
+  'Longueuil':        2.0,
+  'Lanaudière':       2.5,
+  'Laurentians':      3.0,
+  'Nord':             3.5,
+  'Unknown':          2.0,
+};
+
+// Approximate km between zones (depot at Montreal Central as base)
+const ZONE_FROM_BASE = {
+  'Montreal Central': 8,
+  'Montreal North':   12,
+  'Montreal West':    14,
+  'Montreal East':    14,
+  'Laval':            22,
+  'West Island':      30,
+  'South Shore':      18,
+  'Longueuil':        20,
+  'Lanaudière':       35,
+  'Laurentians':      45,
+  'Nord':             55,
+  'Unknown':          20,
+};
+
+const COL = {
+  'Patient Name':'patient_name','File Number':'file_number','Address':'address',
+  'Phone 1':'phone1','Phone 2':'phone2','Dose Prescribed':'dose_prescribed',
+  'Total Doses':'total_doses','Doses Remaining':'doses_remaining',
+  'Due Date':'due_date','Assignment Type':'assignment_type',
+  'Special Instructions':'special_instructions','Injection Administered':'injection_administered',
+  'Pending':'pending','Archived':'archived','Appointment Confirmed':'appointment_confirmed',
+  'Appointment Date & Time':'appointment_date_time'
+};
+
+// ══ STATE ══
+let sb = null;
+let allPatients = [];
+let schedule = [];       // [{date, zones:[{name,zoneIdx,patients:[]}]}]
+let unscheduled = [];
+let selectedDay = null;
+let activeDayEl = null;
+let exportTargetDate = null;
+let zoneList = [];       // ordered zone names for coloring
+
+// ══ UTILS ══
+function pad(n){ return String(n).padStart(2,'0'); }
+function todayStr(){
+  const d=new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+function addDays(dateStr, n){
+  const d = new Date(dateStr+'T00:00:00');
+  d.setDate(d.getDate()+n);
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+function daysBetween(a,b){
+  return Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/86400000);
+}
+function formatDateLong(s){
+  if(!s) return '—';
+  const [y,m,d]=s.split('-').map(Number);
+  const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const dt=new Date(y,m-1,d);
+  return `${days[dt.getDay()]}, ${months[m-1]} ${d}, ${y}`;
+}
+function formatDateShort(s){
+  if(!s) return '—';
+  const [y,m,d]=s.split('-').map(Number);
+  const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${months[m-1]} ${d}`;
+}
+function getWeekDates(anchor){ // anchor = any date in week; returns Mon–Sun
+  const dt = new Date(anchor+'T00:00:00');
+  const day = dt.getDay(); // 0=Sun
+  const mon = new Date(dt); mon.setDate(dt.getDate() - (day===0?6:day-1));
+  return Array.from({length:7},(_,i)=>{
+    const x=new Date(mon); x.setDate(mon.getDate()+i);
+    return `${x.getFullYear()}-${pad(x.getMonth()+1)}-${pad(x.getDate())}`;
+  });
+}
+function isWorkDay(dateStr, workDaysMask){
+  const dt=new Date(dateStr+'T00:00:00');
+  const d=dt.getDay(); // 0=Sun,1=Mon,...,6=Sat
+  // mask: "1234"=Mon-Thu, "12345"=Mon-Fri, "12346"=Mon-Fri+Sat, "23456"=Tue-Sat
+  return workDaysMask.includes(String(d));
+}
+function toast(msg, type=''){
+  const wrap=document.getElementById('toastWrap');
+  const el=document.createElement('div');
+  el.className=`toast${type?' toast--'+type:''}`;
+  el.textContent=msg;
+  wrap.appendChild(el);
+  setTimeout(()=>el.remove(),3100);
+}
+function setLoading(show, msg='Loading…'){
+  document.getElementById('loadingWrap').classList.toggle('hidden',!show);
+  document.getElementById('emptyState').classList.toggle('hidden', show||schedule.length>0);
+  document.getElementById('loadingMsg').textContent=msg;
+}
+
+// ══ FSA EXTRACTION ══
+function getPostalCode(addr){
+  if(!addr) return '';
+  const m = addr.match(/\b([A-Z]\d[A-Z]\s?\d[A-Z]\d)\b/i);
+  return m ? m[1].replace(/\s/g,'').toUpperCase() : '';
+}
+function getFSA(addr){
+  const pc = getPostalCode(addr);
+  return pc.substring(0,3) || '';
+}
+function getZoneName(addr, city){
+  const fsa = getFSA(addr);
+  if(!fsa) {
+    // Fallback to city name normalization
+    const c = (city||'').trim().toLowerCase()
+      .replace(/é|è|ê/g,'e').replace(/à|â/g,'a').replace(/î/g,'i').replace(/ô/g,'o');
+    if(c.includes('laval')) return 'Laval';
+    if(c.includes('longueuil')) return 'Longueuil';
+    if(c.includes('brossard')||c.includes('south shore')||c.includes('rive-sud')) return 'South Shore';
+    if(c.includes('montreal')||c.includes('montréal')) return 'Montreal Central';
+    return 'Unknown';
+  }
+  // Try 2-char prefix first (H7 → Laval)
+  const twoChar = fsa.substring(0,2);
+  if(FSA_ZONES[twoChar]) return FSA_ZONES[twoChar];
+  // Try 3-char (future-proof)
+  if(FSA_ZONES[fsa]) return FSA_ZONES[fsa];
+  // Fallback by first char
+  if(fsa[0]==='H') return 'Montreal Central';
+  if(fsa[0]==='J') return 'South Shore';
+  return 'Unknown';
+}
+
+// Extract city from address string
+function parseCity(addr){
+  if(!addr) return '';
+  // "5650 Avenue Gatineau, Apt: #1, Montréal, QC, H3T 1X7"
+  // City usually sits between comma-parts, before the province abbreviation
+  const parts = addr.split(',').map(s=>s.trim());
+  for(let i=0;i<parts.length;i++){
+    const p = parts[i];
+    // Province abbreviation comes after city
+    if(parts[i+1] && /^(QC|ON|BC|AB|MB|SK|NS|NB|NL|PE|NT|YT|NU)$/i.test(parts[i+1].trim())){
+      return p;
+    }
+    // Or if p itself looks like a city (no digits, not a postal code)
+    if(/^[A-ZÀ-ÿ][a-zA-ZÀ-ÿ\s\-'\.]+$/.test(p) && p.length>2) return p;
+  }
+  return '';
+}
+
+// ══ SUPABASE ══
+async function initDB(){
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+}
+
+async function loadPatients(){
+  const {data,error} = await sb.from('patients').select('*');
+  if(error) throw error;
+  return data.map(row=>{
+    const p={id:row.id};
+    for(const [k,v] of Object.entries(COL)) p[k]=row[v]??null;
+    return p;
+  }).filter(p=>
+    !p['Archived'] &&
+    !p['Pending'] &&
+    !!p['Due Date']          // must have a due date; scheduling window handles date logic
+  );
+}
+
+// ══════════════════════════════════════════════
+//  CORE SCHEDULING ALGORITHM
+// ══════════════════════════════════════════════
+function buildSchedule(patients, opts){
+  const { startDate, endDate, maxPerDay, minPerDay, workDaysMask } = opts;
+
+  // Step 1 — Enrich each patient with geo info + date window
+  const enriched = patients.map(p=>{
+    const addr = p['Address'] || '';
+    const city = parseCity(addr);
+    const fsa  = getFSA(addr);
+    const postal = getPostalCode(addr);
+    const zone = getZoneName(addr, city);
+    const due  = p['Due Date'];
+    const winStart = addDays(due, -WINDOW_DAYS);
+    const winEnd   = addDays(due, +WINDOW_DAYS);
+    const tightness = daysBetween(startDate, due); // smaller = more urgent
+    return { ...p, fsa, postal, zone, city, due, winStart, winEnd, tightness, scheduled:false };
+  });
+
+  // Sort by urgency: patients whose window closes soonest go first
+  enriched.sort((a,b)=> a.winEnd.localeCompare(b.winEnd) || a.zone.localeCompare(b.zone) || a.postal.localeCompare(b.postal));
+
+  // Step 2 — Build candidate work days in range
+  const workDays = [];
+  let cur = startDate;
+  while(cur <= endDate){
+    if(isWorkDay(cur, workDaysMask)) workDays.push(cur);
+    cur = addDays(cur,1);
+  }
+
+  // Step 3 — For each work day, collect eligible patients per zone
+  // A patient is eligible on a day if winStart ≤ day ≤ winEnd
+  const daySlots = workDays.map(date=>({
+    date,
+    eligible: enriched.filter(p=> p.winStart<=date && date<=p.winEnd && !p.scheduled)
+  }));
+
+  // Step 4 — Greedy scheduling with zone cohesion score
+  // Score a day: maximize patients from same zone (zone density bonus)
+  const scheduledDays = [];
+  const unschPats = [];
+
+  function scoreDay(eligible, maxP){
+    // Group by zone, pick best zone cluster
+    const zones = {};
+    eligible.forEach(p=>{ (zones[p.zone]=zones[p.zone]||[]).push(p); });
+    return Object.entries(zones).sort((a,b)=>b[1].length-a[1].length);
+  }
+
+  // Iterative: pick days with most zone-coherent eligible patients
+  for(const slot of daySlots){
+    // Refresh eligibility (remove already scheduled)
+    slot.eligible = enriched.filter(p=> p.winStart<=slot.date && slot.date<=slot.winEnd && !p.scheduled);
+    if(slot.eligible.length < 1) continue;
+
+    const zoneClusters = scoreDay(slot.eligible, maxPerDay);
+    if(!zoneClusters.length) continue;
+
+    // Build today's patient list: fill up to maxPerDay, prioritizing largest zone clusters
+    const todayPatients = [];
+    const zonesUsed = {};
+
+    for(const [zoneName, zonePats] of zoneClusters){
+      if(todayPatients.length >= maxPerDay) break;
+      const slots = maxPerDay - todayPatients.length;
+      const take = zonePats.slice(0,slots);
+      take.forEach(p=>{ p.scheduled=true; (zonesUsed[zoneName]=zonesUsed[zoneName]||[]).push(p); });
+      todayPatients.push(...take);
+    }
+
+    // Schedule the day if it meets min, OR if it's the last day, OR if patients are urgent
+    const hasUrgent = todayPatients.some(p => daysBetween(slot.date, p.winEnd) <= 1);
+    if(todayPatients.length >= minPerDay || todayPatients.length >= 1 && hasUrgent ||
+       (todayPatients.length > 0 && slot.date === workDays[workDays.length-1])){
+      // Sort each zone group by postal code for route optimization
+      const dayZones = Object.entries(zonesUsed).map(([name,pats])=>({
+        name,
+        patients: pats.sort((a,b)=>a.postal.localeCompare(b.postal))
+      })).sort((a,b)=>(ZONE_FROM_BASE[a.name]||20)-(ZONE_FROM_BASE[b.name]||20));
+
+      scheduledDays.push({ date:slot.date, zones:dayZones, total:todayPatients.length });
+    } else {
+      // Too few — un-mark as scheduled, leave for later
+      todayPatients.forEach(p=>{ p.scheduled=false; });
+    }
+  }
+
+  // ── Force-schedule remaining patients into the best available day ──
+  // Patients that had too few neighbours to meet minPerDay — schedule them anyway
+  // by appending to the nearest existing scheduled day, or creating a new sparse day.
+  const unscheduledNow = enriched.filter(p => !p.scheduled);
+  if (unscheduledNow.length > 0) {
+    // Group remaining by closest work day within their window
+    for (const p of unscheduledNow) {
+      // Find a scheduled day within the window
+      const bestExisting = scheduledDays
+        .filter(d => p.winStart <= d.date && d.date <= p.winEnd && d.total < maxPerDay)
+        .sort((a,b) => a.total - b.total)[0];  // least full day first
+      if (bestExisting) {
+        p.scheduled = true;
+        const zg = bestExisting.zones.find(z => z.name === p.zone);
+        if (zg) zg.patients.push(p);
+        else bestExisting.zones.push({name:p.zone, patients:[p]});
+        bestExisting.total++;
+        continue;
+      }
+      // No existing day fits — create a new sparse day if any work day available
+      const sparseDay = workDays.find(d => p.winStart <= d && d <= p.winEnd &&
+        !scheduledDays.find(s => s.date === d));
+      if (sparseDay) {
+        p.scheduled = true;
+        scheduledDays.push({
+          date: sparseDay,
+          zones: [{ name: p.zone, patients:[p] }],
+          total: 1
+        });
+      }
+    }
+    // Re-sort all scheduled days by date
+    scheduledDays.sort((a,b) => a.date.localeCompare(b.date));
+    // Re-sort patients within each zone by postal code
+    scheduledDays.forEach(d => {
+      d.zones.forEach(z => z.patients.sort((a,b)=>a.postal.localeCompare(b.postal)));
+      d.zones.sort((a,b)=>(ZONE_FROM_BASE[a.name]||20)-(ZONE_FROM_BASE[b.name]||20));
+    });
+  }
+
+  // Collect truly unscheduled (outside planning period or no work day in window)
+  enriched.filter(p=>!p.scheduled).forEach(p=>{
+    unschPats.push({...p, reason: p.winEnd < endDate ? 'Window closed before any available slot' : 'Outside planning period'});
+  });
+
+  // If unscheduled patients remain and there are days with <minPerDay,
+  // try to append them to existing days that have room
+  for(const day of scheduledDays){
+    if(day.total >= maxPerDay) continue;
+    const leftovers = unschPats.filter(p=> p.winStart<=day.date && day.date<=p.winEnd && !p.scheduled);
+    if(!leftovers.length) continue;
+    const slots = maxPerDay - day.total;
+    const take = leftovers.slice(0,slots);
+    take.forEach(p=>{
+      p.scheduled=true;
+      const zg = day.zones.find(z=>z.name===p.zone);
+      if(zg) zg.patients.push(p);
+      else day.zones.push({name:p.zone, patients:[p]});
+      day.total++;
+    });
+    // Re-sort zones and patients within zones
+    day.zones.forEach(z=>{ z.patients.sort((a,b)=>a.postal.localeCompare(b.postal)); });
+    day.zones.sort((a,b)=>(ZONE_FROM_BASE[a.name]||20)-(ZONE_FROM_BASE[b.name]||20));
+  }
+
+  // Remove from unscheduled those now scheduled
+  const finalUnsched = unschPats.filter(p=>!p.scheduled);
+
+  return { scheduledDays, unscheduled:finalUnsched };
+}
+
+// ══ KM ESTIMATE ══
+function estimateDayKm(zones){
+  let km = 0;
+  const seen = new Set();
+  for(const zone of zones){
+    const n = zone.patients.length;
+    const spacing = ZONE_KM_SPACING[zone.name] || 2.0;
+    km += n * spacing; // intra-zone routing
+    if(!seen.size) km += (ZONE_FROM_BASE[zone.name]||20); // base → first zone
+    else {
+      // zone-to-zone transit (rough)
+      const lastZone = [...seen].pop();
+      const d1 = ZONE_FROM_BASE[lastZone]||20;
+      const d2 = ZONE_FROM_BASE[zone.name]||20;
+      km += Math.abs(d2-d1) + 5;
+    }
+    seen.add(zone.name);
+  }
+  // Return trip
+  km += (ZONE_FROM_BASE[[...seen].pop()]||20) * 0.6;
+  return Math.round(km);
+}
+
+// ══ ZONE INDEX ══
+function getZoneIdx(zoneName){
+  let idx = zoneList.indexOf(zoneName);
+  if(idx===-1){ idx=zoneList.length; zoneList.push(zoneName); }
+  return idx;
+}
+
+// ══ URGENCY ══
+function getUrgency(p, date){
+  const daysLeft = daysBetween(date, p.winEnd);
+  if(daysLeft<=1) return 'tight';
+  if(daysLeft<=3) return 'normal';
+  return 'flexible';
+}
+
+// ══════════════════════════════════════════════
+//  RENDER
+// ══════════════════════════════════════════════
+let currentWeekAnchor = null;
+
+function renderCalendar(schedDays){
+  const wrap = document.getElementById('calendarWrap');
+  wrap.classList.remove('hidden');
+
+  // Build a map: date → schedule day
+  const dayMap = {};
+  schedDays.forEach(d=>{ dayMap[d.date]=d; });
+
+  // Week navigation
+  const weekHtml = `
+    <div class="week-nav">
+      <button class="week-nav-btn" id="prevWeek">&#8249;</button>
+      <h3 id="weekLabel"></h3>
+      <button class="week-nav-btn" id="nextWeek">&#8250;</button>
+    </div>
+    <div class="week-grid" id="weekGrid"></div>
+  `;
+  wrap.innerHTML = weekHtml;
+
+  document.getElementById('prevWeek').addEventListener('click',()=>{ currentWeekAnchor=addDays(currentWeekAnchor,-7); renderWeek(dayMap); });
+  document.getElementById('nextWeek').addEventListener('click',()=>{ currentWeekAnchor=addDays(currentWeekAnchor,+7); renderWeek(dayMap); });
+
+  renderWeek(dayMap);
+}
+
+function renderWeek(dayMap){
+  const dates = getWeekDates(currentWeekAnchor);
+  const today = todayStr();
+  const dayNames = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+
+  document.getElementById('weekLabel').textContent =
+    `${formatDateShort(dates[0])} – ${formatDateShort(dates[6])}`;
+
+  const grid = document.getElementById('weekGrid');
+  grid.innerHTML = dates.map((date,i)=>{
+    const day = dayMap[date];
+    const isToday = date===today;
+    const isPast  = date < today;
+    const dt = new Date(date+'T00:00:00');
+    const dayNum = dt.getDate();
+    const isActive = selectedDay && selectedDay.date===date;
+
+    let classes = 'day-cell';
+    if(isToday) classes+=' today';
+    if(isPast)  classes+=' past';
+    if(!day)    classes+=' empty';
+    if(isActive) classes+=' active';
+
+    let inner = `
+      <div class="day-cell__hdr">
+        <span class="day-cell__name">${dayNames[i]}</span>
+        <span class="day-cell__num">${dayNum}</span>
+      </div>`;
+
+    if(day){
+      const km = estimateDayKm(day.zones);
+      inner += `<div class="day-cell__zones">`;
+      day.zones.forEach(z=>{
+        const zi = getZoneIdx(z.name);
+        inner += `<div class="day-cell__zone-row zone-${zi%12}">
+          <div class="day-cell__zone-dot"></div>
+          ${z.name} <strong style="margin-left:auto">${z.patients.length}</strong>
+        </div>`;
+      });
+      inner += `</div>`;
+      inner += `<div class="day-cell__count-badge">${day.total}</div>`;
+      if(day.total > parseInt(document.getElementById('maxPerDay').value))
+        inner += `<div class="day-cell__warning">!</div>`;
+    }
+
+    return `<div class="${classes}" data-date="${date}">${inner}</div>`;
+  }).join('');
+
+  // Attach click handlers
+  grid.querySelectorAll('.day-cell:not(.empty):not(.past)').forEach(el=>{
+    el.addEventListener('click',()=>{
+      const date = el.dataset.date;
+      const day = dayMap[date];
+      if(!day) return;
+      if(activeDayEl) activeDayEl.classList.remove('active');
+      el.classList.add('active');
+      activeDayEl = el;
+      selectedDay = day;
+      exportTargetDate = date;
+      renderDetail(day);
+    });
+  });
+}
+
+function renderDetail(day){
+  const km = estimateDayKm(day.zones);
+  const evRange = parseInt(document.getElementById('evRange').value) || 350;
+  const evPct = Math.min(100, Math.round((km/evRange)*100));
+  const evColor = evPct>80?'#E05A5A':evPct>60?'#E5883A':'#0EA5E9';
+
+  let html = `
+  <div class="detail-panel">
+    <div class="detail-hdr">
+      <h3>📍 ${formatDateLong(day.date)}</h3>
+      <div class="detail-hdr-meta">
+        <span class="detail-badge">${day.total} patients</span>
+        <span class="detail-badge detail-badge--green">~${km} km</span>
+      </div>
+    </div>
+    <div class="detail-actions">
+      <button class="detail-action-btn detail-action-btn--primary" id="exportDayBtn">📤 Export Day</button>
+      <button class="detail-action-btn" id="printDayBtn">🖨️ Print Route</button>
+      <button class="detail-action-btn" id="mapsAllBtn">🗺️ Open in Maps</button>
+    </div>`;
+
+  // EV Range bar
+  html += `
+    <div class="ev-bar">
+      <div class="ev-bar__hdr">
+        <span class="ev-bar__title">⚡ EV Range Used</span>
+        <span class="ev-bar__km">${km} km of ${evRange} km (${evPct}%)</span>
+      </div>
+      <div class="ev-track">
+        <div class="ev-fill" style="width:${evPct}%;background:linear-gradient(90deg,${evColor},${evColor}dd)"></div>
+      </div>
+    </div>`;
+
+  // Route zones
+  let stopNum = 1;
+  day.zones.forEach(zone=>{
+    const zi = getZoneIdx(zone.name);
+    const zoneKm = Math.round(zone.patients.length * (ZONE_KM_SPACING[zone.name]||2.0));
+    html += `
+    <div class="route-section">
+      <div class="route-section__hdr">
+        <h4>Stop Cluster</h4>
+        <span class="zone-tag zone-${zi%12}">
+          <span class="zone-chip__dot"></span>${zone.name}
+        </span>
+        <span class="route-km">~${zoneKm} km within zone</span>
+      </div>
+      <div class="patient-route-list">`;
+
+    zone.patients.forEach((p,i)=>{
+      const urgency = getUrgency(p, day.date);
+      const daysLeft = daysBetween(day.date, p.winEnd);
+      html += `
+        <div class="patient-row">
+          <div class="route-num zone-${zi%12}" style="background:var(--zc);color:#fff">${stopNum++}</div>
+          <div style="flex-shrink:0">
+            <div class="patient-row__name">${esc(p['Patient Name']||'')}</div>
+            <div class="patient-row__file">#${esc(p['File Number']||'')}</div>
+          </div>
+          <div class="patient-row__addr">${esc(formatAddrDisplay(p['Address']||''))}</div>
+          <div class="patient-row__postal">${esc(p.postal||'')}</div>
+          <div class="patient-row__dose">${esc(p['Dose Prescribed']||'')}mg</div>
+          <div class="patient-row__window">Due ${formatDateShort(p.due)}<br>±${WINDOW_DAYS}d</div>
+          <div class="patient-row__urgency ${urgency==='tight'?'urgency-tight':urgency==='normal'?'urgency-normal':'urgency-flexible'}" title="${urgency}"></div>
+        </div>`;
+      if(i < zone.patients.length-1){
+        html += `<div class="route-connector"><div class="route-connector__line"></div><div class="route-connector__km">~${ZONE_KM_SPACING[zone.name]||2} km</div><div class="route-connector__line"></div></div>`;
+      }
+    });
+
+    html += `</div></div>`;
+  });
+
+  html += `</div>`;
+  document.getElementById('detailWrap').innerHTML = html;
+
+  // Wire buttons
+  document.getElementById('exportDayBtn').addEventListener('click',()=>openExportModal(day));
+  document.getElementById('printDayBtn').addEventListener('click',()=>printDay(day));
+  document.getElementById('mapsAllBtn').addEventListener('click',()=>openMapsRoute(day));
+}
+
+function renderUnscheduled(unsched){
+  const wrap = document.getElementById('unscheduledWrap');
+  if(!unsched.length){ wrap.innerHTML=''; return; }
+  let html = `
+  <div class="unscheduled-panel">
+    <div class="unscheduled-panel__hdr">
+      <h3>⚠️ Unscheduled Patients (${unsched.length})</h3>
+      <span style="font-size:12px;color:var(--text-2)">No available slot within planning window</span>
+    </div>
+    <div class="unscheduled-list">`;
+  unsched.forEach(p=>{
+    html += `<div class="unscheduled-row">
+      <div class="unscheduled-row__name">${esc(p['Patient Name']||'')}</div>
+      <div class="unscheduled-row__reason">${esc(p.reason)}</div>
+      <div class="unscheduled-row__due">Due ${formatDateShort(p.due)}</div>
+    </div>`;
+  });
+  html += `</div></div>`;
+  wrap.innerHTML = html;
+}
+
+function renderZoneLegend(){
+  const wrap = document.getElementById('zoneLegend');
+  if(!zoneList.length){ wrap.classList.add('hidden'); return; }
+  wrap.classList.remove('hidden');
+  wrap.innerHTML = `<h4>Geographic Zones</h4>` +
+    zoneList.map((name,i)=>`<div class="zone-chip zone-${i%12}"><div class="zone-chip__dot"></div>${name}</div>`).join('');
+}
+
+function renderStats(schedDays, unsched, patients){
+  document.getElementById('statsStrip').style.display='';
+  const totalKm = schedDays.reduce((sum,d)=>sum+estimateDayKm(d.zones),0);
+  const totalPats = schedDays.reduce((sum,d)=>sum+d.total,0);
+  document.getElementById('st-patients').textContent = totalPats;
+  document.getElementById('st-days').textContent = schedDays.length;
+  document.getElementById('st-zones').textContent = zoneList.length;
+  document.getElementById('st-avg').textContent = schedDays.length ? Math.round(totalPats/schedDays.length) : 0;
+  document.getElementById('st-km').textContent = totalKm.toLocaleString();
+  document.getElementById('st-unscheduled').textContent = unsched.length;
+}
+
+// ══ ADDRESS FORMATTER (same as app.js) ══
+function formatAddrDisplay(addr){
+  if(!addr) return '';
+  const aptRe = /,?\s*(?:Apt\.?|Appartement|Suite|Unit|App\.?)\s*:?\s*#?(\w+[-\w]*)/i;
+  const m = addr.match(aptRe);
+  if(!m) return addr;
+  const base = addr.replace(m[0],'').replace(/,\s*$/,'').trim();
+  return `${base}, Apt. ${m[1]}`;
+}
+function esc(s){
+  if(!s) return '';
+  return String(s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+// ══ EXPORT ══
+function openExportModal(day){
+  document.getElementById('exportModal').classList.add('open');
+}
+document.getElementById('exportCloseBtn').addEventListener('click',()=>{
+  document.getElementById('exportModal').classList.remove('open');
+});
+document.getElementById('exportModal').addEventListener('click',e=>{
+  if(e.target===e.currentTarget) document.getElementById('exportModal').classList.remove('open');
+});
+
+document.getElementById('exportCSV').addEventListener('click',()=>{
+  if(!selectedDay){ toast('Select a day first','err'); return; }
+  exportDayCSV(selectedDay);
+  document.getElementById('exportModal').classList.remove('open');
+});
+
+document.getElementById('exportICS').addEventListener('click',()=>{
+  exportICS(schedule);
+  document.getElementById('exportModal').classList.remove('open');
+});
+
+document.getElementById('exportPrintDay').addEventListener('click',()=>{
+  if(!selectedDay){ toast('Select a day first','err'); return; }
+  printDay(selectedDay);
+  document.getElementById('exportModal').classList.remove('open');
+});
+
+function exportDayCSV(day){
+  const rows = [['Stop','Patient Name','File #','Address','Postal Code','Phone 1','Phone 2','Dose','Due Date','Zone']];
+  let stop = 1;
+  day.zones.forEach(zone=>{
+    zone.patients.forEach(p=>{
+      rows.push([
+        stop++,
+        p['Patient Name']||'',
+        p['File Number']||'',
+        p['Address']||'',
+        p.postal||'',
+        p['Phone 1']||'',
+        p['Phone 2']||'',
+        (p['Dose Prescribed']||'')+'mg',
+        p['Due Date']||'',
+        zone.name
+      ]);
+    });
+  });
+  const csv = rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  downloadBlob(csv,'text/csv',`route_${day.date}.csv`);
+  toast(`Route sheet exported for ${formatDateShort(day.date)}`,'ok');
+}
+
+function exportICS(schedDays){
+  const lines = [
+    'BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//DosingTracker//Scheduler//EN','CALSCALE:GREGORIAN'
+  ];
+  schedDays.forEach(day=>{
+    const km = estimateDayKm(day.zones);
+    const zones = day.zones.map(z=>z.name).join(' + ');
+    const patients = day.zones.flatMap(z=>z.patients).map(p=>p['Patient Name']).join(', ');
+    const dtStr = day.date.replace(/-/g,'');
+    lines.push(
+      'BEGIN:VEVENT',
+      `DTSTART;VALUE=DATE:${dtStr}`,
+      `DTEND;VALUE=DATE:${dtStr}`,
+      `SUMMARY:🏠 ${day.total} Home Injections — ${zones}`,
+      `DESCRIPTION:Patients: ${patients}\\nEstimated route: ~${km} km`,
+      `UID:dosingtracker-${day.date}@scheduler`,
+      'END:VEVENT'
+    );
+  });
+  lines.push('END:VCALENDAR');
+  downloadBlob(lines.join('\r\n'),'text/calendar','dosingtracker_schedule.ics');
+  toast('Calendar exported — import into your calendar app','ok');
+}
+
+function printDay(day){
+  const km = estimateDayKm(day.zones);
+  let stop=1;
+  const rows = day.zones.flatMap(z=>z.patients.map(p=>`
+    <tr>
+      <td style="font-weight:700;color:#2D8C8A">${stop++}</td>
+      <td><strong>${p['Patient Name']||''}</strong><br><small>#${p['File Number']||''}</small></td>
+      <td>${formatAddrDisplay(p['Address']||'')}</td>
+      <td style="font-family:monospace">${p.postal||''}</td>
+      <td>${p['Phone 1']||''}</td>
+      <td><strong>${p['Dose Prescribed']||''}mg</strong></td>
+      <td style="color:#E5883A">Due ${formatDateShort(p['Due Date']||'')}</td>
+      <td>${z.name}</td>
+      <td style="width:60px;border:1px solid #ccc"></td>
+    </tr>`)).join('');
+
+  const win = window.open('','_blank');
+  win.document.write(`<!DOCTYPE html><html><head><title>Route ${formatDateLong(day.date)}</title>
+  <style>
+    body{font-family:'DM Sans',sans-serif;padding:20px;color:#1B2638}
+    h1{font-size:20px;margin-bottom:4px}
+    .meta{color:#64748B;font-size:13px;margin-bottom:16px}
+    table{width:100%;border-collapse:collapse;font-size:12px}
+    th{background:#1B2638;color:#fff;padding:6px 8px;text-align:left}
+    td{padding:6px 8px;border-bottom:1px solid #E2E8F0;vertical-align:top}
+    tr:nth-child(even){background:#F8FAFC}
+    .legend{margin-top:14px;font-size:11px;color:#64748B}
+    @media print{body{padding:0}}
+  </style></head><body>
+  <h1>📍 Route Sheet — ${formatDateLong(day.date)}</h1>
+  <div class="meta">${day.total} patients · Est. ${km} km · Zones: ${day.zones.map(z=>z.name).join(', ')}</div>
+  <table>
+    <thead><tr><th>#</th><th>Patient</th><th>Address</th><th>Postal</th><th>Phone</th><th>Dose</th><th>Due</th><th>Zone</th><th>✓ Done</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <div class="legend">⚡ Urgency: <span style="color:#E05A5A">●</span> Tight (≤1 day left)  <span style="color:#3D9A6B">●</span> Normal  <span style="color:#2D8C8A">●</span> Flexible</div>
+  <script>window.print();<\/script></body></html>`);
+  win.document.close();
+}
+
+function openMapsRoute(day){
+  // Build Google Maps waypoint URL
+  const all = day.zones.flatMap(z=>z.patients);
+  if(!all.length) return;
+  const waypoints = all.slice(0,-1).map(p=>encodeURIComponent(p['Address']||'')).join('|');
+  const dest = encodeURIComponent(all[all.length-1]['Address']||'');
+  const url = `https://www.google.com/maps/dir/?api=1&destination=${dest}&waypoints=${waypoints}&travelmode=driving`;
+  window.open(url,'_blank');
+}
+
+function downloadBlob(content, type, filename){
+  const blob = new Blob([content],{type});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+}
+
+// ══ MAIN RUN ══
+async function run(){
+  const btn = document.getElementById('runBtn');
+  btn.disabled = true;
+  setLoading(true,'Loading patients from Supabase…');
+  zoneList = [];
+  document.getElementById('calendarWrap').classList.add('hidden');
+  document.getElementById('detailWrap').innerHTML='';
+  document.getElementById('unscheduledWrap').innerHTML='';
+  document.getElementById('zoneLegend').classList.add('hidden');
+  document.getElementById('statsStrip').style.display='none';
+  selectedDay = null; activeDayEl = null;
+
+  try {
+    allPatients = await loadPatients();
+    setLoading(true,`Scheduling ${allPatients.length} patients…`);
+
+    const startDate   = document.getElementById('startDate').value || todayStr();
+    const weeksAhead  = parseInt(document.getElementById('weeksAhead').value) || 6;
+    const maxPerDay   = parseInt(document.getElementById('maxPerDay').value) || 14;
+    const minPerDay   = parseInt(document.getElementById('minPerDay').value) || 10;
+    const workDaysMask = document.getElementById('workDays').value;
+    const endDate     = addDays(startDate, weeksAhead*7);
+
+    currentWeekAnchor = startDate;
+
+    const result = buildSchedule(allPatients, { startDate, endDate, maxPerDay, minPerDay, workDaysMask });
+    schedule = result.scheduledDays;
+    unscheduled = result.unscheduled;
+
+    setLoading(false);
+    document.getElementById('emptyState').classList.add('hidden');
+
+    if(!allPatients.length){
+      document.getElementById('emptyState').classList.remove('hidden');
+      document.getElementById('emptyState').querySelector('.empty-state__icon').textContent='📭';
+      document.getElementById('emptyState').querySelector('.empty-state__title').textContent='No patients found in database';
+      document.getElementById('emptyState').querySelector('.empty-state__sub').innerHTML=
+        'Make sure your patients have a <strong>Due Date</strong> set and are not Archived or Pending.<br><br>' +
+        '<strong>Example:</strong> Patient due <em>Jul 23, 2026</em> → eligible window is <em>Jul 20–26</em>.<br>' +
+        'The scheduler groups Laval patients together, Montreal patients together, etc.<br>' +
+        'Try extending the <strong>Weeks to Plan</strong> range.';
+      return;
+    }
+
+    if(schedule.length === 0){
+      document.getElementById('emptyState').classList.remove('hidden');
+      document.getElementById('emptyState').querySelector('.empty-state__icon').textContent='🗓️';
+      document.getElementById('emptyState').querySelector('.empty-state__title').textContent='No schedulable windows found';
+      document.getElementById('emptyState').querySelector('.empty-state__sub').innerHTML=
+        `Loaded <strong>${allPatients.length} patients</strong> but none have due dates within the selected planning period.<br><br>` +
+        `<strong>Try:</strong> Extend weeks to plan, or change the start date to an earlier date that covers your patients' due dates.`;
+      return;
+    }
+
+    renderCalendar(schedule);
+    renderUnscheduled(unscheduled);
+    renderZoneLegend();
+    renderStats(schedule, unscheduled, allPatients);
+
+    toast(`✓ Scheduled ${allPatients.length - unscheduled.length} patients across ${schedule.length} days`,'ok');
+  } catch(e){
+    setLoading(false);
+    toast('Error: '+e.message,'err');
+    console.error(e);
+  } finally {
+    btn.disabled=false;
+  }
+}
+
+// ══ INIT ══
+document.addEventListener('DOMContentLoaded',async()=>{
+  // Set default start date to today
+  document.getElementById('startDate').value = todayStr();
+
+  await initDB();
+
+  document.getElementById('runBtn').addEventListener('click', run);
+
+  // Add link from main app
+  const backLink = document.querySelector('.hdr__back');
+  if(backLink) backLink.href = 'index.html';
+});
+</script>
+</body>
+</html>
