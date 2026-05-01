@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1B2638">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>DosingTracker — Clinical Suite</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script>
+    window.PDFJS_URL    = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    window.PDFJS_WORKER = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  </script>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="header__brand">
+    <div class="header__icon">💉</div>
+    <div class="header__wordmark">
+      <h1>Dosing<span>Tracker</span></h1>
+      <p>Clinical Suite</p>
+    </div>
+  </div>
+  <div class="header__right">
+    <div class="sync-dot" id="syncDot" title="Connection status"></div>
+    <button class="header__menu-btn" id="menuBtn" aria-label="Open menu">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</header>
+
+<!-- TOAST -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- LOADING -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="spinner"></div>
+  <p id="loadingMsg">Loading patients…</p>
+</div>
+
+<!-- SEARCH + TABS -->
+<div id="searchArea">
+  <div class="search-bar">
+    <div class="search-input-wrap">
+      <input type="search" id="searchInput" placeholder="Search name or file number…" autocomplete="off">
+      <button class="search-clear" id="clearSearch">✕</button>
+    </div>
+    <button class="search-bar__refresh" id="refreshBtn" title="Refresh">⟳</button>
+  </div>
+  <div class="tabs" id="tabBar">
+    <button class="tab-btn active" data-tab="today">Today <span class="tab-count" id="cnt-today">0</span></button>
+    <button class="tab-btn" data-tab="scheduled">Scheduled <span class="tab-count" id="cnt-scheduled">0</span></button>
+    <button class="tab-btn" data-tab="all">All Active <span class="tab-count" id="cnt-all">0</span></button>
+    <button class="tab-btn" data-tab="overdue">Overdue <span class="tab-count" id="cnt-overdue">0</span></button>
+    <button class="tab-btn" data-tab="pending">Pending <span class="tab-count" id="cnt-pending">0</span></button>
+    <button class="tab-btn" data-tab="archived">Archived <span class="tab-count" id="cnt-archived">0</span></button>
+  </div>
+</div>
+
+<!-- PATIENT LIST -->
+<div id="mainContent"></div>
+
+<!-- DASHBOARD -->
+<div id="dashView" class="hidden">
+  <div class="stats-grid">
+    <div class="stat-card stat-card--teal">
+      <div class="stat-card__icon">💊</div>
+      <div class="stat-card__label">Active Patients</div>
+      <div class="stat-card__value" id="ds-active">0</div>
+      <div class="stat-card__sub">Total in system</div>
+    </div>
+    <div class="stat-card stat-card--orange">
+      <div class="stat-card__icon">📅</div>
+      <div class="stat-card__label">Due Today</div>
+      <div class="stat-card__value" id="ds-today">0</div>
+      <div class="stat-card__sub">Appointments</div>
+    </div>
+    <div class="stat-card stat-card--red">
+      <div class="stat-card__icon">⚠️</div>
+      <div class="stat-card__label">Overdue</div>
+      <div class="stat-card__value" id="ds-overdue">0</div>
+      <div class="stat-card__sub">Need attention</div>
+    </div>
+    <div class="stat-card stat-card--navy">
+      <div class="stat-card__icon">⏳</div>
+      <div class="stat-card__label">Pending Renewal</div>
+      <div class="stat-card__value" id="ds-pending">0</div>
+      <div class="stat-card__sub">Low on doses</div>
+    </div>
+  </div>
+  <div class="dose-chart" id="doseChartWrap">
+    <h3>Patients by Dose</h3>
+    <div id="doseChart"></div>
+  </div>
+  <div class="quick-actions">
+    <h3>Quick Actions</h3>
+    <div class="quick-action-btns">
+      <button class="quick-action-btn" onclick="switchToTab('today')">📅 Due Today</button>
+      <button class="quick-action-btn" onclick="switchToTab('overdue')">⚠️ Overdue</button>
+      <button class="quick-action-btn" onclick="openMenuDrawer()">📥 Import Data</button>
+      <button class="quick-action-btn" onclick="openMenuDrawer()">📤 Export Data</button>
+    </div>
+  </div>
+</div>
+
+<!-- REPORT VIEW -->
+<div id="reportView" class="hidden">
+  <div class="report-controls">
+    <h3>Custom Report</h3>
+    <div class="quick-report-btns">
+      <button class="quick-report-btn" data-quick="dueToday">Due Today</button>
+      <button class="quick-report-btn" data-quick="noRepeatsLeft">No Doses Left</button>
+      <button class="quick-report-btn" data-quick="pendingPatients">Pending</button>
+      <button class="quick-report-btn" data-quick="tempPatients">Temporary</button>
+    </div>
+    <div class="form-row">
+      <label class="form-label">Field</label>
+      <select class="form-control" id="reportField">
+        <option value="due_date">Due Date</option>
+        <option value="dose_prescribed">Dose Prescribed</option>
+        <option value="doses_remaining">Doses Remaining</option>
+        <option value="assignment_type">Assignment Type</option>
+        <option value="pending">Pending Status</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <label class="form-label">Condition</label>
+      <select class="form-control" id="reportCondition">
+        <option value="equals">Equals</option>
+        <option value="contains">Contains</option>
+        <option value="greater">Greater than</option>
+        <option value="less">Less than</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <label class="form-label">Value</label>
+      <input class="form-control" type="text" id="reportValue" placeholder="Enter value…">
+    </div>
+    <button class="run-report-btn" id="generateReportBtn">Run Report</button>
+  </div>
+  <div id="reportOutput"></div>
+</div>
+
+<!-- BOTTOM NAV -->
+<nav class="bottom-nav">
+  <button class="nav-btn" data-view="dash" id="nav-dash">
+    <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+    <span>Dashboard</span>
+    <span class="nav-badge hidden" id="badge-overdue"></span>
+  </button>
+  <button class="nav-btn active" data-view="patients" id="nav-patients">
+    <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    <span>Patients</span>
+  </button>
+  <button class="nav-btn nav-btn--new" id="nav-new">
+    <div class="nav-plus-wrap">
+      <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    </div>
+    <span>New</span>
+  </button>
+  <button class="nav-btn" data-view="report" id="nav-report">
+    <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+    <span>Reports</span>
+  </button>
+</nav>
+
+<!-- MENU DRAWER -->
+<div class="drawer-backdrop" id="drawerBackdrop"></div>
+<div class="drawer" id="menuDrawer">
+  <div class="drawer-handle"></div>
+  <div class="drawer-title">⚙️ Settings &amp; Data</div>
+  <div class="drawer-section">
+    <h4>Import</h4>
+    <div class="drawer-btn-list">
+      <button class="drawer-btn" id="importGSBtn"><span class="drawer-btn-icon">📊</span>Google Sheets Import</button>
+      <button class="drawer-btn" id="importCSVBtn"><span class="drawer-btn-icon">📋</span>CSV File</button>
+      <button class="drawer-btn" id="importPDFBtn"><span class="drawer-btn-icon">📄</span>PDF Prescription</button>
+    </div>
+  </div>
+  <div class="drawer-section">
+    <h4>Export</h4>
+    <div class="drawer-btn-list">
+      <button class="drawer-btn" id="exportCSVBtn"><span class="drawer-btn-icon">📤</span>Export to CSV</button>
+      <button class="drawer-btn" id="exportJSONBtn"><span class="drawer-btn-icon">💾</span>Backup (JSON)</button>
+    </div>
+  </div>
+  <div class="drawer-section">
+    <div class="drawer-btn-list">
+      <button class="drawer-btn" id="refreshBtnDrawer"><span class="drawer-btn-icon">🔄</span>Refresh Data</button>
+      <button class="drawer-btn" onclick="closeMenuDrawer();openModal('apiKeyModal')">
+        <span class="drawer-btn-icon">🤖</span>Claude AI Key
+        <span id="aiKeyStatus" style="margin-left:auto;font-size:11px;color:var(--text-3)">Not set</span>
+      </button>
+      <a class="drawer-btn" href="scheduler.html" style="text-decoration:none;color:inherit">
+        <span class="drawer-btn-icon">🗺️</span>Route Scheduler
+        <span style="margin-left:auto;font-size:10px;font-weight:700;background:var(--teal-light);color:var(--teal-dark);padding:2px 7px;border-radius:20px">New</span>
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- HIDDEN FILE INPUTS -->
+<input type="file" id="csvFileInput" accept=".csv" style="display:none">
+<input type="file" id="pdfFileInput" accept=".pdf" multiple style="display:none">
+
+<!-- PDF REVIEW MODAL -->
+<div class="modal-overlay" id="pdfReviewModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">📄 PDF Extraction Review</div>
+        <div style="font-size:11px;color:var(--text-2);margin-top:2px" id="pdfReviewFilename"></div>
+      </div>
+      <button class="modal-close" onclick="closeModal('pdfReviewModal')">✕</button>
+    </div>
+    <div class="modal-body" id="pdfReviewBody"></div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('pdfReviewModal')">Cancel</button>
+      <button class="btn-primary" onclick="confirmPDFAndFill()">✓ Confirm &amp; Fill Form</button>
+    </div>
+  </div>
+</div>
+
+<!-- CLAUDE API KEY MODAL -->
+<div class="modal-overlay" id="apiKeyModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title">🤖 Claude AI Settings</div>
+      <button class="modal-close" onclick="closeModal('apiKeyModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:var(--teal-light);border:1px solid #B2DADA;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px;color:var(--teal-dark)">
+        <strong>Optional — Turbocharge PDF extraction with AI.</strong><br>
+        Without a key, smart regex is used. With a Claude API key, extraction is dramatically more accurate for complex/scanned forms.
+      </div>
+      <div class="form-group">
+        <label>Claude API Key</label>
+        <input type="password" id="claudeApiKeyInput" class="form-control" placeholder="sk-ant-api03-…" style="padding:10px 12px;font-family:monospace">
+      </div>
+      <p style="font-size:11px;color:var(--text-2);margin-top:-6px">Key is stored locally in your browser only — never sent anywhere except Anthropic's API.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-danger" onclick="clearApiKey()">Clear Key</button>
+      <button class="btn-primary" onclick="saveApiKey()">Save Key</button>
+    </div>
+  </div>
+</div>
+
+<!-- PATIENT MODAL -->
+<div class="modal-overlay" id="patientModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title" id="patientModalTitle">Add Patient</div>
+      <button class="modal-close" id="patientModalClose">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="patientForm" autocomplete="off">
+        <div class="form-section-title" style="border-top:none;margin-top:0;padding-top:0">Patient Info</div>
+        <div class="form-group">
+          <label>Full Name *</label>
+          <input type="text" id="f-name" placeholder="Sarah Johnson" required>
+        </div>
+        <div class="form-row-2">
+          <div class="form-group">
+            <label>File Number *</label>
+            <input type="text" id="f-file" placeholder="PT-001" required>
+          </div>
+          <div class="form-group">
+            <label>Type</label>
+            <select id="f-type">
+              <option value="Permanent">Permanent</option>
+              <option value="Temporary">Temporary</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Address</label>
+          <input type="text" id="f-addr" placeholder="221 Baker St, Springfield, IL">
+        </div>
+        <div class="form-row-2">
+          <div class="form-group">
+            <label>Phone 1</label>
+            <input type="tel" id="f-phone1" placeholder="+1 555 123 4567">
+          </div>
+          <div class="form-group">
+            <label>Phone 2</label>
+            <input type="tel" id="f-phone2" placeholder="+1 555 987 1122">
+          </div>
+        </div>
+        <div class="form-section-title">Dosing</div>
+        <div class="form-row-2">
+          <div class="form-group">
+            <label>Dose (mg) *</label>
+            <select id="f-dose">
+              <option value="7.5">7.5 mg (4 weeks)</option>
+              <option value="22.5" selected>22.5 mg (12 weeks)</option>
+              <option value="30">30 mg (16 weeks)</option>
+              <option value="45">45 mg (24 weeks)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Total Doses</label>
+            <input type="number" id="f-total" value="4" min="1">
+          </div>
+        </div>
+        <div class="form-row-2">
+          <div class="form-group">
+            <label>Doses Remaining</label>
+            <input type="number" id="f-remaining" value="4" min="0">
+          </div>
+          <div class="form-group">
+            <label>Due Date</label>
+            <input type="date" id="f-due">
+          </div>
+        </div>
+        <div class="form-section-title">Injection</div>
+        <div class="form-row-2">
+          <div class="form-group">
+            <label>Last Site</label>
+            <select id="f-lastsite">
+              <option value="">— None —</option>
+              <option value="Right Side">Right Side</option>
+              <option value="Left Side">Left Side</option>
+              <option value="Right Glute">Right Glute</option>
+              <option value="Left Glute">Left Glute</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Appt Date &amp; Time</label>
+            <input type="datetime-local" id="f-appt">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Previous Injection Dates</label>
+          <input type="text" id="f-prevdates" placeholder="2024-01-15, 2024-04-20">
+        </div>
+        <div class="form-section-title">Notes</div>
+        <div class="form-group">
+          <label>Special Instructions</label>
+          <textarea id="f-special" placeholder="e.g. Patient prefers morning appointments"></textarea>
+        </div>
+        <div class="form-group">
+          <label>Adverse Effects Notes</label>
+          <textarea id="f-adverse" placeholder="Any adverse effects or reactions…"></textarea>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-danger hidden" id="deletePatientBtn">🗑</button>
+      <button class="btn-secondary" id="patientModalCancel">Cancel</button>
+      <button class="btn-primary" id="patientModalSave">Save Patient</button>
+    </div>
+  </div>
+</div>
+
+<!-- INJECTION MODAL -->
+<div class="modal-overlay" id="injectionModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title">💉 Record Injection</div>
+      <button class="modal-close" id="injectionModalClose">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="inj-info-box">
+        <h4 id="injPatientName">—</h4>
+        <p id="injPatientInfo">—</p>
+      </div>
+      <div class="form-group">
+        <label>Injection Site *</label>
+        <select id="injSiteSelect" class="form-control" style="padding:10px 12px">
+          <option value="">— Select site —</option>
+          <option value="Right Side">Right Side</option>
+          <option value="Left Side">Left Side</option>
+          <option value="Right Glute">Right Glute</option>
+          <option value="Left Glute">Left Glute</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Session Notes / Comments</label>
+        <textarea id="injComments" placeholder="Any notes about this session…" style="min-height:60px"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Adverse Effects (if any)</label>
+        <textarea id="injAdverse" placeholder="Redness, swelling, patient reactions…" style="min-height:60px"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Special Instructions Update</label>
+        <textarea id="injSpecial" placeholder="Updated care instructions…" style="min-height:60px"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" id="injCancelBtn">Cancel</button>
+      <button class="btn-primary" id="injConfirmBtn">✓ Confirm Injection</button>
+    </div>
+  </div>
+</div>
+
+<!-- APPOINTMENT MODAL -->
+<div class="modal-overlay" id="apptModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title">📅 Appointment</div>
+      <button class="modal-close" id="apptModalClose">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:14px;color:var(--text-2);margin-bottom:14px" id="apptPatientName">Set appointment date and time.</p>
+      <div class="appt-status-row">
+        <button class="appt-status-btn selected" id="apptStatusConfirmed">✓ Confirmed</button>
+        <button class="appt-status-btn" id="apptStatusTentative">~ Tentative</button>
+      </div>
+      <div class="form-group">
+        <label>Date &amp; Time</label>
+        <input type="datetime-local" id="apptDateInput" class="form-control" style="padding:10px 12px">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" id="apptCancelBtn">Cancel</button>
+      <button class="btn-primary" id="apptSaveBtn">Save Appointment</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM SHEET -->
+<div class="drawer-backdrop" id="confirmBackdrop"></div>
+<div class="drawer" id="confirmSheet">
+  <div class="drawer-handle"></div>
+  <div class="confirm-sheet">
+    <h3 id="confirmTitle">Are you sure?</h3>
+    <p id="confirmMsg">This action cannot be undone.</p>
+    <div class="confirm-btns">
+      <button class="btn-danger" id="confirmYes">Confirm</button>
+      <button class="btn-secondary" id="confirmNo">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js" defer></script>
+</body>
+</html>
