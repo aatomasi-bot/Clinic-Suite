@@ -558,7 +558,9 @@ function loadPatients(){
   document.getElementById("optBar").classList.add("hidden");
   const{s:ds,e:de}=getDateRange();
   const label=ds===de?fmtLong(ds):`${fmtShort(ds)} – ${fmtShort(de)}`;
-  document.const excl=allPats.filter(p=>p["Appointment Confirmed"]&&p["Appointment Date & Time"]).length;document.getElementById("patTitle").innerHTML=`${filtPats.length} patients eligible — ${lbl}${excl>0?` <span style="font-size:10px;color:var(--text-3)">(${excl} confirmed hidden)</span>`:""}`;
+  const excl=allPats.filter(p=>p["Appointment Confirmed"]&&p["Appointment Date & Time"]).length;
+  const exclNote=excl>0?' <span style="font-size:10px;color:var(--text-3)">('+excl+' confirmed hidden)</span>':'';
+  document.getElementById("patTitle").innerHTML=`${filtPats.length} patients eligible — ${lbl}`+exclNote;
   renderPatList();buildLegend();
   document.getElementById("step2Card").classList.remove("hidden");
   setStep(2);
