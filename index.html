@@ -606,11 +606,13 @@ input, select, textarea { font: inherit; }
 }
 .action-circle--phone {
   border-color: #B6DFC8;
-  background: linear-gradient(135deg, #fff, var(--green-bg));
+  background: var(--green-bg);
+  color: var(--green);
 }
 .action-circle--map {
   border-color: #B6D0EB;
-  background: linear-gradient(135deg, #fff, #EEF5FB);
+  background: var(--card);
+  color: var(--teal-dark);
 }
 .action-circle:hover { transform: scale(1.08); box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
 .action-circle:active { transform: scale(0.92); }
@@ -698,13 +700,13 @@ input, select, textarea { font: inherit; }
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  color: var(--teal-dark);
+  color: var(--teal);
   font-weight: 600;
   font-size: 0.8125rem;
   text-decoration: none;
   transition: color var(--transition);
 }
-.phone-link:hover { color: var(--teal); }
+.phone-link:hover { color: var(--teal-dark); }
 
 /* Expanded Buttons */
 .card-btn-row { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.25rem; }
@@ -1677,6 +1679,66 @@ body, .patient-card, .card-expanded, .bottom-nav, .modal, .drawer,
   html:not([data-theme="light"]) .quick-report-btn { background:rgba(45,140,138,.18) !important; color:#5ECECE !important; border-color:rgba(45,140,138,.4) !important; }
 }
 
+
+/* ── DATE INPUT MOBILE FIXES ── */
+/* Prevent date inputs from overflowing their containers on iOS */
+input[type="date"],
+input[type="datetime-local"] {
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  -webkit-appearance: none;
+  appearance: none;
+}
+/* Stack date-range side-by-side fields on narrow screens */
+@media (max-width: 480px) {
+  .date-range-row {
+    grid-template-columns: 1fr !important;
+  }
+  .form-row-2 {
+    grid-template-columns: 1fr !important;
+  }
+  .report-controls {
+    overflow: hidden;  /* prevent any child from escaping card boundary */
+  }
+  #reportView {
+    overflow-x: hidden;
+  }
+  /* Force date inputs to stay inside card */
+  .date-input-mobile {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    font-size: 0.8125rem !important;  /* smaller font fits the picker text */
+  }
+}
+
+/* ── PHONE / MAP BUTTONS DARK MODE ── */
+[data-theme="dark"] .action-circle {
+  background: var(--card) !important;
+  border-color: var(--border) !important;
+}
+[data-theme="dark"] .action-circle--phone {
+  background: rgba(61,154,107,0.15) !important;
+  border-color: rgba(61,154,107,0.4) !important;
+  color: #5ECECE !important;
+}
+[data-theme="dark"] .action-circle--map {
+  background: rgba(45,140,138,0.12) !important;
+  border-color: rgba(45,140,138,0.35) !important;
+  color: var(--teal) !important;
+}
+[data-theme="dark"] .phone-link {
+  color: #5ECECE !important;
+}
+/* Auto dark mode equivalents */
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) .action-circle { background:var(--card) !important; border-color:var(--border) !important; }
+  html:not([data-theme="light"]) .action-circle--phone { background:rgba(61,154,107,.15) !important; border-color:rgba(61,154,107,.4) !important; color:#5ECECE !important; }
+  html:not([data-theme="light"]) .action-circle--map   { background:rgba(45,140,138,.12) !important; border-color:rgba(45,140,138,.35) !important; color:var(--teal) !important; }
+  html:not([data-theme="light"]) .phone-link { color:#5ECECE !important; }
+}
+
 </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script>
@@ -1808,7 +1870,7 @@ body, .patient-card, .card-expanded, .bottom-nav, .modal, .drawer,
     </div>
     <div class="form-row" style="margin-bottom:10px">
       <label class="form-label">Date</label>
-      <input class="form-control" type="date" id="rptDailyDate">
+      <input class="form-control" type="date" id="rptDailyDate" style="max-width:100%;box-sizing:border-box;-webkit-appearance:none;appearance:none;min-width:0">
     </div>
     <div class="form-row" style="margin-bottom:10px">
       <label class="form-label">Status Filter</label>
@@ -1865,14 +1927,14 @@ body, .patient-card, .card-expanded, .bottom-nav, .modal, .drawer,
       <button class="quick-report-btn" data-quick="cppPatients">🩺 CPP Only</button>
       <button class="quick-report-btn" data-quick="tempPatients">📋 Temporary</button>
     </div>
-    <div class="form-row-2">
+    <div class="form-row-2 date-range-row">
       <div class="form-row">
         <label class="form-label">Due Date From</label>
-        <input class="form-control" type="date" id="reportDateFrom">
+        <input class="form-control date-input-mobile" type="date" id="reportDateFrom">
       </div>
       <div class="form-row">
         <label class="form-label">Due Date To</label>
-        <input class="form-control" type="date" id="reportDateTo">
+        <input class="form-control date-input-mobile" type="date" id="reportDateTo">
       </div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:10px">
