@@ -560,7 +560,7 @@ function loadPatients(){
   const label=ds===de?fmtLong(ds):`${fmtShort(ds)} – ${fmtShort(de)}`;
   const excl=allPats.filter(p=>p["Appointment Confirmed"]&&p["Appointment Date & Time"]).length;
   const exclNote=excl>0?' <span style="font-size:10px;color:var(--text-3)">('+excl+' confirmed hidden)</span>':'';
-  document.getElementById("patTitle").innerHTML=`${filtPats.length} patients eligible — ${lbl}`+exclNote;
+  document.getElementById("patTitle").innerHTML=`${patList.length} patients eligible — ${label}`+exclNote;
   renderPatList();buildLegend();
   document.getElementById("step2Card").classList.remove("hidden");
   setStep(2);
@@ -627,7 +627,7 @@ function updateChkAll(){const el=document.getElementById("chkAll");const all=pat
 
 // ── OPTIMIZE ──
 function optimizeRoute(){
-  const sel=filtPats.filter(p=>selIds.has(p.id));
+  const sel=patList.filter(p=>selIds.has(p.id));
   if(!sel.length){toast("Select at least one patient","warn");return}
   const btn=document.querySelector(".fb--opt");if(btn){btn.innerHTML='<span class="spinner"></span> …';btn.disabled=true}
   setTimeout(()=>{
@@ -645,7 +645,7 @@ function optimizeRoute(){
     // Order cities by distance from base — closest first, complete each fully
     const orderedCities=Object.keys(cityGroups).sort((a,b)=>(CITY_DIST[a]||20)-(CITY_DIST[b]||20));
     const sorted=orderedCities.flatMap(city=>cityGroups[city]);
-    const unsel=filtPats.filter(p=>!selIds.has(p.id));
+    const unsel=patList.filter(p=>!selIds.has(p.id));
     patList=[...sorted,...unsel];
     routeOrder=sorted;
     optimized=true;
