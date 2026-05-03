@@ -2016,6 +2016,15 @@ input[type="datetime-local"] {
     </div>
   </div>
   <div class="drawer-section">
+    <h4>Tools</h4>
+    <div class="drawer-btn-list">
+      <button class="drawer-btn" onclick="closeMenuDrawer();openDedupeModal()" style="border-color:var(--orange)">
+        <span class="drawer-btn-icon">🧹</span>Remove Duplicates
+        <span style="margin-left:auto;font-size:10px;font-weight:700;background:var(--orange-bg);color:var(--orange);padding:2px 7px;border-radius:20px" id="dedupeBadge"></span>
+      </button>
+    </div>
+  </div>
+  <div class="drawer-section">
     <h4>Export</h4>
     <div class="drawer-btn-list">
       <button class="drawer-btn" id="exportCSVBtn"><span class="drawer-btn-icon">📤</span>Export to CSV</button>
@@ -3610,7 +3619,7 @@ async function importGoogleSheets() {
       const p = {};
       headers.forEach((h,idx) => p[h] = vals[idx]||'');
       if (!p['Patient Name']) continue;
-      if (patients.find(e => e['File Number'] === p['File Number'])) { skipped++; continue; }
+      if (patients.find(e => String(e['File Number']||'').trim() === String(p['File Number']||'').trim())) { skipped++; continue; }
       await dbInsert({
         'Patient Name': p['Patient Name'], 'File Number': p['File Number'],
         'Address': p['Address']||'', 'Phone 1': p['Phone 1']||'', 'Phone 2': p['Phone 2']||'',
@@ -3703,9 +3712,9 @@ function importCSVFile(file) {
           const name = p['Patient Name'] || '';
           if (!name) continue;
 
-          // Deduplicate by file number
+          // Deduplicate by file number (case-insensitive, trimmed)
           const fileNum = (p['File Number'] || '').trim();
-          if (fileNum && patients.find(e => String(e['File Number']).trim() === fileNum)) {
+          if (fileNum && patients.find(e => String(e['File Number']||'').trim() === fileNum)) {
             skipped++; continue;
           }
 
@@ -4578,9 +4587,9 @@ async function importNotesPatients() {
   for (const p of _notesExtracted) {
     if (!p.patient_name) { skipped++; continue; }
 
-    // Check duplicate by file number
+    // Check duplicate by file number (trimmed, string-safe)
     const fileNum = String(p.file_number || '').trim();
-    if (fileNum && patients.find(e => String(e['File Number']).trim() === fileNum)) {
+    if (fileNum && patients.find(e => String(e['File Number']||'').trim() === fileNum)) {
       skipped++; continue;
     }
 
@@ -4627,6 +4636,172 @@ async function importNotesPatients() {
 
   btn.textContent = `✓ Done — ${added} imported`;
   if (added > 0) setTimeout(() => closeModal('notesImportModal'), 1500);
+}
+
+// ══════════════════════════════════════════════
+//  DUPLICATE DETECTION & REMOVAL ENGINE
+// ══════════════════════════════════════════════
+
+function normKey(p) {
+  // Normalize file number for comparison: trim whitespace, lowercase
+  return String(p['File Number'] || '').trim().toLowerCase();
+}
+
+function nameKey(p) {
+  // Secondary key: normalized name (for cases with no file number)
+  return String(p['Patient Name'] || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function findDuplicateGroups() {
+  const byFile = {};   // file_number → [patient, ...]
+  const noFile = [];   // patients with no file number
+
+  patients.forEach(p => {
+    const k = normKey(p);
+    if (!k) { noFile.push(p); return; }
+    if (!byFile[k]) byFile[k] = [];
+    byFile[k].push(p);
+  });
+
+  // Groups with >1 patient = duplicates
+  const groups = Object.values(byFile).filter(g => g.length > 1);
+
+  // Also check no-file patients by name
+  const byName = {};
+  noFile.forEach(p => {
+    const k = nameKey(p);
+    if (!byName[k]) byName[k] = [];
+    byName[k].push(p);
+  });
+  Object.values(byName).filter(g => g.length > 1).forEach(g => groups.push(g));
+
+  return groups;
+}
+
+function openDedupeModal() {
+  openModal('dedupeModal');
+  setTimeout(scanDuplicates, 150);
+}
+
+function scanDuplicates() {
+  const groups = findDuplicateGroups();
+  const total  = groups.reduce((s, g) => s + g.length - 1, 0); // count to remove
+  const badge  = document.getElementById('dedupeBadge');
+  if (badge) badge.textContent = total > 0 ? `${total} found` : '';
+
+  const content = document.getElementById('dedupeContent');
+  const mergeBtn = document.getElementById('dedupeMergeBtn');
+  const status   = document.getElementById('dedupeStatus');
+
+  if (!groups.length) {
+    content.innerHTML = `<div style="text-align:center;padding:2rem">
+      <div style="font-size:3rem;margin-bottom:10px">✅</div>
+      <div style="font-size:15px;font-weight:800;color:var(--green)">No duplicates found!</div>
+      <div style="font-size:12px;color:var(--text-2);margin-top:6px">All ${patients.length} patients have unique records.</div>
+    </div>`;
+    mergeBtn.style.display = 'none';
+    status.textContent = '';
+    return;
+  }
+
+  // Build review table — show each group, highlight which will be KEPT vs REMOVED
+  let html = `<div style="font-size:12px;color:var(--text-2);margin-bottom:12px;padding:9px 12px;background:var(--orange-bg);border:1px solid #F5D0AA;border-radius:var(--radius-sm)">
+    <strong>${total} duplicate record${total>1?'s':''} found in ${groups.length} group${groups.length>1?'s':''}.</strong>
+    The newest record (most recent created_at) is kept. All others are deleted.
+  </div>`;
+
+  groups.forEach((group, gi) => {
+    // Sort: prefer the one with most data (most non-empty fields), then most recent
+    const scored = group.map(p => ({
+      p,
+      score: Object.values(p).filter(v => v && v !== false && v !== '0' && v !== 0).length
+    })).sort((a,b) => b.score - a.score);
+
+    const keeper = scored[0].p;
+    const removes = scored.slice(1).map(s => s.p);
+
+    html += `<div style="margin-bottom:14px;border:1.5px solid var(--border);border-radius:var(--radius-sm);overflow:hidden">
+      <div style="padding:7px 12px;background:var(--bg);border-bottom:1px solid var(--border);font-size:11px;font-weight:800;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px">
+        Group ${gi+1} — File # ${esc(String(keeper['File Number']||'No file number'))} · ${group.length} records
+      </div>`;
+
+    // KEEP row
+    html += `<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--green-bg);border-bottom:1px solid var(--border)">
+      <span style="font-size:16px">✅</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:700;color:var(--text)">${esc(keeper['Patient Name']||'—')}</div>
+        <div style="font-size:11px;color:var(--text-2)">File #${esc(String(keeper['File Number']||''))} · ${esc(keeper['Due Date']||'')} · ${esc(keeper['Dose Prescribed']||'')}mg</div>
+        <div style="font-size:10px;color:var(--green);font-weight:700;margin-top:2px">KEPT — most complete record</div>
+      </div>
+      <span style="font-size:11px;font-weight:700;color:var(--green);background:var(--green-bg);padding:3px 8px;border-radius:20px;border:1px solid #B6DFC8">Keep</span>
+    </div>`;
+
+    // REMOVE rows
+    removes.forEach(p => {
+      html += `<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--red-bg);border-bottom:1px solid var(--border)">
+        <span style="font-size:16px">🗑️</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:700;color:var(--text);opacity:0.7">${esc(p['Patient Name']||'—')}</div>
+          <div style="font-size:11px;color:var(--text-2)">File #${esc(String(p['File Number']||''))} · ${esc(p['Due Date']||'')} · ${esc(p['Dose Prescribed']||'')}mg</div>
+          <div style="font-size:10px;color:var(--red);font-weight:700;margin-top:2px">REMOVE — duplicate</div>
+        </div>
+        <span style="font-size:11px;font-weight:700;color:var(--red);background:var(--red-bg);padding:3px 8px;border-radius:20px;border:1px solid #F0C0C0">Delete</span>
+      </div>`;
+    });
+    html += `</div>`;
+  });
+
+  content.innerHTML = html;
+  mergeBtn.style.display = '';
+  mergeBtn.textContent  = `🧹 Remove ${total} Duplicate${total>1?'s':''}`;
+  status.textContent = `${groups.length} group${groups.length>1?'s':''} · ${total} to remove · ${patients.length - total} will remain`;
+}
+
+async function mergeAllDuplicates() {
+  const groups = findDuplicateGroups();
+  if (!groups.length) { toast('No duplicates found', 'ok'); return; }
+
+  const btn = document.getElementById('dedupeMergeBtn');
+  btn.disabled = true;
+  btn.textContent = 'Removing…';
+
+  let removed = 0, errors = 0;
+  setLoading(true, 'Removing duplicates…');
+
+  for (const group of groups) {
+    // Sort same way as display — keep the most complete record
+    const scored = group.map(p => ({
+      p,
+      score: Object.values(p).filter(v => v && v !== false && v !== '0' && v !== 0).length
+    })).sort((a,b) => b.score - a.score);
+
+    // Delete all except the first (keeper)
+    for (const { p } of scored.slice(1)) {
+      try {
+        const { error } = await _sb.from('patients').delete().eq('id', p.id);
+        if (error) throw error;
+        removed++;
+      } catch(e) {
+        console.error('Delete failed:', p['Patient Name'], e.message);
+        errors++;
+      }
+    }
+  }
+
+  setLoading(false);
+  await loadPatients();
+
+  const msg = `✓ Removed ${removed} duplicate${removed!==1?'s':''}` + (errors ? ` · ${errors} errors` : '');
+  toast(msg, 'success');
+  document.getElementById('dedupeStatus').textContent = msg;
+  btn.textContent = `✓ Done — ${removed} removed`;
+
+  // Update badge
+  const badge = document.getElementById('dedupeBadge');
+  if (badge) badge.textContent = '';
+
+  // Re-scan to show clean state
+  setTimeout(scanDuplicates, 500);
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -4778,6 +4953,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   window.exportReportCSV = exportReportCSV;
   window.switchToTab = switchToTab;
   window.openMenuDrawer = openMenuDrawer;
+  window.openDedupeModal = openDedupeModal;
+  window.mergeAllDuplicates = mergeAllDuplicates;
 });// EOF
 
 </script>
@@ -4831,6 +5008,34 @@ document.addEventListener('DOMContentLoaded', async () => {
       <div style="font-size:11px;color:var(--text-2)" id="notesStatus"></div>
       <div style="display:flex;gap:8px;margin-left:auto" id="notesFooterBtns">
         <button class="btn-secondary" onclick="closeModal('notesImportModal')">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DEDUPLICATE MODAL -->
+<div class="modal-overlay" id="dedupeModal">
+  <div class="modal" style="max-height:92vh">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title">🧹 Remove Duplicate Patients</div>
+      <button class="modal-close" onclick="closeModal('dedupeModal')">✕</button>
+    </div>
+    <div class="modal-body" style="overflow-y:auto;max-height:58vh">
+      <div id="dedupeContent">
+        <div style="text-align:center;padding:2rem">
+          <div style="font-size:2rem;margin-bottom:8px">🔍</div>
+          <div style="font-size:14px;font-weight:700;color:var(--text)">Scanning for duplicates…</div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <span id="dedupeStatus" style="font-size:12px;color:var(--text-2)"></span>
+      <div style="display:flex;gap:8px;margin-left:auto">
+        <button class="btn-secondary" onclick="closeModal('dedupeModal')">Close</button>
+        <button class="btn-primary" id="dedupeMergeBtn" style="background:linear-gradient(135deg,var(--orange),#C06820);display:none" onclick="mergeAllDuplicates()">
+          🧹 Remove All Duplicates
+        </button>
       </div>
     </div>
   </div>
