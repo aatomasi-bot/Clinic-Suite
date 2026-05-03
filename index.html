@@ -493,14 +493,14 @@ input, select, textarea { font: inherit; }
   cursor: pointer;
 }
 .card-avatar {
-  width: 3.183rem;
-  height: 3.183rem;
+  width: 2.625rem;
+  height: 2.625rem;
   border-radius: 0.75rem;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.986rem;
+  font-size: 0.894rem;
   font-weight: 700;
   letter-spacing: 0.5px;
   color: #fff;
@@ -2011,6 +2011,7 @@ input[type="datetime-local"] {
     <div class="drawer-btn-list">
       <button class="drawer-btn" id="importGSBtn"><span class="drawer-btn-icon">📊</span>Google Sheets Import</button>
       <button class="drawer-btn" id="importCSVBtn"><span class="drawer-btn-icon">📋</span>CSV File</button>
+      <button class="drawer-btn" onclick="closeMenuDrawer();openModal('notesImportModal')"><span class="drawer-btn-icon">📝</span>Apple Notes Import</button>
       <button class="drawer-btn" id="importPDFBtn"><span class="drawer-btn-icon">📄</span>PDF Prescription</button>
     </div>
   </div>
@@ -2031,6 +2032,10 @@ input[type="datetime-local"] {
       <a class="drawer-btn" href="scheduler.html" style="text-decoration:none;color:inherit">
         <span class="drawer-btn-icon">🗺️</span>Route Scheduler
         <span style="margin-left:auto;font-size:10px;font-weight:700;background:var(--teal-light);color:var(--teal-dark);padding:2px 7px;border-radius:20px">New</span>
+      </a>
+      <a class="drawer-btn" href="import.html" style="text-decoration:none;color:inherit">
+        <span class="drawer-btn-icon">📋</span>Apple Notes Importer
+      </a>
       </a>
     </div>
   </div>
@@ -4297,6 +4302,333 @@ function sendNoRepeatsEmail() {
   toast(`Email draft opened for ${p['Patient Name']}`, 'success', '📧');
 }
 
+// ══════════════════════════════════════════════════════════════
+//  APPLE NOTES IMPORT ENGINE
+// ══════════════════════════════════════════════════════════════
+
+let _notesExtracted = [];  // holds extracted patient objects for review
+
+// Update line count as user types
+document.addEventListener('input', e => {
+  if (e.target.id !== 'notesImportText') return;
+  const lines = e.target.value.split('\n')
+    .map(l => l.replace(/^[\s•\-\*]+/, '').trim())
+    .filter(l => l.length > 10);
+  document.getElementById('notesLineCount').textContent =
+    `${lines.length} patient line${lines.length !== 1 ? 's' : ''} detected`;
+});
+
+// ── STEP 1: Send to Claude for extraction ──
+// ── Pure regex/rule-based Notes parser (no API key needed) ──
+function parseNotesWithClaude() {   // name kept for onclick compatibility
+  const raw = document.getElementById('notesImportText').value.trim();
+  if (!raw) { toast('Paste your Apple Notes text first', 'warning'); return; }
+
+  const btn = document.getElementById('notesParseBtn');
+  btn.textContent = '⏳ Parsing…';
+  btn.disabled = true;
+
+  try {
+    const lines = raw.split('\n')
+      .map(l => l.replace(/^[\s•\-\*\u2022\u25E6\u2023]+/, '').trim())  // strip bullet chars
+      .filter(l => l.length > 8);
+
+    if (!lines.length) { toast('No patient lines found', 'warning'); return; }
+
+    const extracted = lines.map(line => parseOneNoteLine(line)).filter(Boolean);
+
+    if (!extracted.length) { toast('Could not parse any patients', 'warning'); return; }
+
+    _notesExtracted = extracted;
+    showNotesReview(extracted);
+    toast(`Parsed ${extracted.length} patients`, 'success');
+  } catch(e) {
+    toast('Parse error: ' + e.message, 'error');
+    console.error(e);
+  } finally {
+    btn.textContent = '📋 Parse Notes';
+    btn.disabled = false;
+  }
+}
+
+function parseOneNoteLine(line) {
+  const today = todayStr();
+  const out = {
+    patient_name:'', file_number:'', dose_prescribed:'', total_doses:'',
+    doses_remaining:'', address:'', phone1:'', phone2:'',
+    previous_injection_site:'', previous_injection_dates:'',
+    due_date:'', special_instructions:'',
+    assignment_type:'Permanent', file_status:'Active'
+  };
+
+  // Strip leading bullet characters (•, -, *, etc.)
+  line = line.replace(/^[\s\u2022\u25E6\u2023\-\*]+/, '').trim();
+
+  // ── 1. Name + File # ──
+  const nameFileM = line.match(/^([A-ZÀ-Ÿa-zà-ÿ\s\-'\.]+?)\s+(\d{4,6})\b/);
+  if (!nameFileM) return null;
+  out.patient_name = nameFileM[1].trim();
+  out.file_number  = nameFileM[2];
+  const rest = line.slice(nameFileM[0].length);
+
+  // ── 2. Dose ──
+  const doseM = rest.match(/(\d+\.?\d*)\s*mg/i);
+  if (doseM) out.dose_prescribed = doseM[1];
+  const cntM = rest.match(/x\s*\(?(\d+)\)?/i);
+  if (cntM) { out.total_doses = cntM[1]; out.doses_remaining = cntM[1]; }
+
+  // ── 3. Phone numbers — digits only, strip ALL labels (Daughter, Wife, Son etc.) ──
+  const rawPhones = rest.match(/\d{3}[\s\-\.]?\d{3}[\s\-\.]?\d{4}/g) || [];
+  const phones = [];
+  rawPhones.forEach(p => {
+    const clean = p.replace(/[\s\.]/g, '-');
+    if (!phones.includes(clean)) phones.push(clean);
+  });
+  out.phone1 = phones[0] || '';
+  out.phone2 = phones[1] || '';
+  // Labels like Daughter / Wife / Son intentionally NOT saved anywhere
+
+  // ── 4. Injection site ──
+  const siteM = rest.match(/(left|right)\s*(side|glute|gluteus)/i);
+  if (siteM) out.previous_injection_site = siteM[0].toLowerCase().trim();
+
+  // ── 5. Address anchored by postal code ──
+  const postalM = rest.match(/\b([A-Z]\d[A-Z]\s?\d[A-Z]\d)\b/i);
+  if (postalM) {
+    const postalEnd = rest.indexOf(postalM[0]) + postalM[0].length;
+    let addrRaw = rest.slice(0, postalEnd).trim();
+    // Remove dose prefix
+    if (doseM) {
+      const di = addrRaw.indexOf(doseM[0]);
+      if (di !== -1) addrRaw = addrRaw.slice(di + doseM[0].length);
+      if (cntM) {
+        const xi = addrRaw.search(/x\s*\(?\d+\)?/i);
+        if (xi !== -1) addrRaw = addrRaw.slice(addrRaw.indexOf(',', xi) + 1);
+      }
+    }
+    addrRaw = addrRaw.replace(/^[\s,]+/, '').trim();
+
+    // Apt after postal — skip if next thing is a phone number
+    const afterPostal = rest.slice(postalEnd);
+    let aptExtra = '';
+    if (!/^\s*,?\s*\d{3}[\s\-\.]?\d{3}/.test(afterPostal)) {
+      const aptM = afterPostal.match(/,?\s*(Apt\.?\s*[\w-]+|\d{2,4}(?!\d))/i);
+      if (aptM) {
+        aptExtra = aptM[1].trim().replace(/^,?\s*/, '');
+        if (/^\d+$/.test(aptExtra))       aptExtra = 'Apt. ' + aptExtra;
+        else if (/^apt\.?\s*/i.test(aptExtra)) aptExtra = aptExtra.replace(/^apt\.?\s*/i, 'Apt. ');
+      }
+    }
+    out.address = formatAddrDisplay(
+      aptExtra ? `${addrRaw.replace(/,\s*$/, '')}, ${aptExtra}` : addrRaw.replace(/,\s*$/, '')
+    );
+  }
+
+  // ── 6. Dates — collect all, split past vs future ──
+  const MONTHS_MAP = {
+    january:1,february:2,march:3,april:4,may:5,june:6,
+    july:7,august:8,september:9,october:10,november:11,december:12,
+    jan:1,feb:2,mar:3,apr:4,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12
+  };
+  const datedPos = [];
+  const longDatePat = /(\d{1,2})\s+(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec)\s+(\d{4})/gi;
+  let dm;
+  while ((dm = longDatePat.exec(rest)) !== null) {
+    const mo = MONTHS_MAP[dm[2].toLowerCase()];
+    if (mo) datedPos.push({ iso:`${dm[3]}-${String(mo).padStart(2,'0')}-${String(parseInt(dm[1])).padStart(2,'0')}`, pos:dm.index, end:dm.index+dm[0].length });
+  }
+  const yearPat = /(?<!\d)(20\d{2})(?!\d)/g;
+  while ((dm = yearPat.exec(rest)) !== null) {
+    const yr = dm[1];
+    if (!datedPos.some(d => d.iso.startsWith(yr)))
+      datedPos.push({ iso:`${yr}-01-01`, pos:dm.index, end:dm.index+dm[0].length });
+  }
+  datedPos.sort((a,b) => a.pos - b.pos);
+
+  const allDates   = datedPos.map(d => d.iso).sort();
+  const prevDates  = allDates.filter(d => d <  today);
+  const futureDates= allDates.filter(d => d >= today);
+
+  out.previous_injection_dates = prevDates.join(', ');
+
+  // Due date = last future date (or last past date if none future)
+  let dueDateEnd = -1;
+  if (futureDates.length) {
+    out.due_date = futureDates[futureDates.length - 1];
+    const dp = datedPos.find(d => d.iso === out.due_date);
+    if (dp) dueDateEnd = dp.end;
+  } else if (prevDates.length) {
+    out.due_date = prevDates[prevDates.length - 1];
+    const dp = datedPos.find(d => d.iso === out.due_date);
+    if (dp) dueDateEnd = dp.end;
+  }
+
+  // ── 7. Special instructions: time window ONLY if found before due date ──
+  // Everything AFTER the due date (OK, 0K, comments, status etc.) is completely ignored
+  const scanArea = dueDateEnd > 0 ? rest.slice(0, dueDateEnd) : rest;
+  const timeM = scanArea.match(/(\d+[\.\:]\d+\s*[–\-—]\s*\d+[\.\:]\d+)/);
+  if (timeM) {
+    out.special_instructions = 'Window: ' + timeM[1].replace(/(\d)\.(\d{2})/g, '$1:$2');
+  }
+  // OK, 0K, Daughter, Wife, RC, and all comments → completely ignored
+
+  return out;
+}
+
+// ── STEP 2: Show review table ──
+function showNotesReview(data) {
+  document.getElementById('notesStep1').classList.add('hidden');
+  const step2 = document.getElementById('notesStep2');
+  step2.classList.remove('hidden');
+
+  const COLS = [
+    { key:'patient_name',            label:'Name',            width:140, required:true  },
+    { key:'file_number',             label:'File #',          width:70,  required:true  },
+    { key:'dose_prescribed',         label:'Dose(mg)',        width:65,  required:true  },
+    { key:'total_doses',             label:'Total',           width:50                  },
+    { key:'address',                 label:'Address',         width:220                 },
+    { key:'phone1',                  label:'Phone 1',         width:110                 },
+    { key:'phone2',                  label:'Phone 2',         width:110                 },
+    { key:'previous_injection_site', label:'Last Site',       width:90                  },
+    { key:'due_date',                label:'Due Date',        width:100, required:true  },
+    { key:'previous_injection_dates',label:'Prev Dates',      width:160                 },
+    { key:'special_instructions',    label:'Notes',           width:140                 },
+  ];
+
+  const today = todayStr();
+  let html = `<table style="border-collapse:collapse;font-size:11px;min-width:100%">
+    <thead><tr style="background:var(--navy);color:#fff;position:sticky;top:0">
+      <th style="padding:6px 8px;text-align:left;white-space:nowrap">#</th>`;
+  COLS.forEach(c => {
+    html += `<th style="padding:6px 8px;text-align:left;white-space:nowrap;min-width:${c.width}px">${c.label}${c.required?'*':''}</th>`;
+  });
+  html += `<th style="padding:6px 8px">Action</th></tr></thead><tbody>`;
+
+  data.forEach((p, idx) => {
+    const issues = [];
+    if (!p.patient_name) issues.push('name');
+    if (!p.file_number)  issues.push('file#');
+    if (!p.dose_prescribed || !['7.5','22.5','30','45'].includes(String(p.dose_prescribed)))
+      issues.push('dose');
+    if (!p.due_date)     issues.push('due date');
+    if (p.due_date && p.due_date < today) issues.push('due date in past');
+
+    const rowBg = issues.length ? 'rgba(224,90,90,0.08)' : (idx%2===0 ? 'var(--card)' : 'var(--bg)');
+    html += `<tr style="background:${rowBg}" data-idx="${idx}">
+      <td style="padding:5px 8px;font-weight:700;color:var(--text-2)">${idx+1}</td>`;
+
+    COLS.forEach(c => {
+      const val = p[c.key] || '';
+      const isIssue = issues.some(iss => iss.includes(c.label.toLowerCase().split('(')[0].trim()));
+      html += `<td style="padding:4px 5px">
+        <input value="${esc(val)}"
+          style="width:100%;padding:3px 6px;border:1.5px solid ${isIssue?'var(--red)':'var(--border)'};border-radius:5px;font-size:11px;background:var(--bg);color:var(--text);min-width:${(c.width||80)-10}px"
+          onchange="notesUpdateField(${idx},'${c.key}',this.value)"
+          title="${c.label}">
+      </td>`;
+    });
+
+    const warn = issues.length ? `<span title="${issues.join(', ')}" style="color:var(--red)">⚠️</span>` : `<span style="color:var(--green)">✓</span>`;
+    html += `<td style="padding:5px 8px;text-align:center">${warn}
+      <button onclick="notesRemoveRow(${idx})" style="color:var(--red);font-size:12px;padding:2px 4px;cursor:pointer" title="Remove">✕</button>
+    </td></tr>`;
+  });
+
+  html += '</tbody></table>';
+  document.getElementById('notesReviewTable').innerHTML = html;
+
+  const good = data.filter(p => p.patient_name && p.file_number && p.due_date).length;
+  document.getElementById('notesReviewTitle').textContent =
+    `${data.length} patients extracted — ${good} ready, ${data.length-good} need review`;
+
+  // Footer buttons
+  document.getElementById('notesFooterBtns').innerHTML = `
+    <button class="btn-secondary" onclick="notesBackToEdit()">← Back</button>
+    <button class="btn-primary" onclick="importNotesPatients()" id="notesImportBtn">
+      💾 Import ${data.length} Patients
+    </button>`;
+}
+
+function notesUpdateField(idx, key, val) {
+  if (_notesExtracted[idx]) _notesExtracted[idx][key] = val;
+}
+
+function notesRemoveRow(idx) {
+  _notesExtracted.splice(idx, 1);
+  showNotesReview(_notesExtracted);
+}
+
+function notesBackToEdit() {
+  document.getElementById('notesStep2').classList.add('hidden');
+  document.getElementById('notesStep1').classList.remove('hidden');
+  document.getElementById('notesFooterBtns').innerHTML =
+    `<button class="btn-secondary" onclick="closeModal('notesImportModal')">Close</button>`;
+}
+
+// ── STEP 3: Import to Supabase ──
+async function importNotesPatients() {
+  if (!_notesExtracted.length) return;
+  const btn = document.getElementById('notesImportBtn');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+
+  let added = 0, skipped = 0, failed = 0;
+  setLoading(true, `Importing ${_notesExtracted.length} patients…`);
+
+  for (const p of _notesExtracted) {
+    if (!p.patient_name) { skipped++; continue; }
+
+    // Check duplicate by file number
+    const fileNum = String(p.file_number || '').trim();
+    if (fileNum && patients.find(e => String(e['File Number']).trim() === fileNum)) {
+      skipped++; continue;
+    }
+
+    try {
+      await dbInsert({
+        'Patient Name':             p.patient_name || '',
+        'File Number':              fileNum,
+        'Address':                  formatAddrDisplay(p.address || ''),
+        'Phone 1':                  p.phone1 || '',
+        'Phone 2':                  p.phone2 || '',
+        'Dose Prescribed':          String(p.dose_prescribed || '22.5'),
+        'Total Doses':              String(p.total_doses || '4'),
+        'Doses Remaining':          String(p.doses_remaining || p.total_doses || '4'),
+        'Injection Site':           p.previous_injection_site || '',
+        'Previous Injection Site':  '',
+        'Due Date':                 p.due_date || todayStr(),
+        'Appointment Date & Time':  null,
+        'Previous Injection Dates': p.previous_injection_dates || '',
+        'Assignment Type':          p.assignment_type || 'Permanent',
+        'Special Instructions':     p.special_instructions || '',
+        'Adverse Effects Comments': '',
+        'File Status':              'Active',
+        'Injection Administered':   false,
+        'Appointment Confirmed':    false,
+        'Pending':                  false,
+        'Archived':                 false,
+        'CPP Patient':              false,
+      });
+      added++;
+    } catch(e) {
+      console.warn('Row failed:', p.patient_name, e.message);
+      failed++;
+    }
+  }
+
+  setLoading(false);
+  await loadPatients();
+
+  const msg = [`✓ Imported ${added} patients`];
+  if (skipped) msg.push(`${skipped} duplicates skipped`);
+  if (failed)  msg.push(`${failed} errors`);
+  toast(msg.join(' · '), 'success');
+  document.getElementById('notesStatus').textContent = msg.join(' · ');
+
+  btn.textContent = `✓ Done — ${added} imported`;
+  if (added > 0) setTimeout(() => closeModal('notesImportModal'), 1500);
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   // Supabase
   const ok = await initSupabase();
@@ -4449,5 +4781,60 @@ document.addEventListener('DOMContentLoaded', async () => {
 });// EOF
 
 </script>
+<!-- APPLE NOTES IMPORT MODAL -->
+<div class="modal-overlay" id="notesImportModal">
+  <div class="modal" style="max-height:92vh">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title">📝 Import from Apple Notes</div>
+      <button class="modal-close" onclick="closeModal('notesImportModal')">✕</button>
+    </div>
+    <div class="modal-body" style="overflow-y:auto;max-height:60vh">
+
+      <!-- STEP 1: Paste -->
+      <div id="notesStep1">
+        <div style="background:var(--teal-light);border:1px solid #B2DADA;border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:12px;font-size:12px;color:var(--teal-dark)">
+          <strong>How to use:</strong> Paste your Apple Notes patient list below — one patient per line. Bullet points (•) are fine. All fields are extracted automatically.
+        </div>
+        <div style="font-size:11px;color:var(--text-2);margin-bottom:8px;font-weight:700;text-transform:uppercase;letter-spacing:.5px">Expected format per line:</div>
+        <div style="font-size:11px;color:var(--text-3);font-family:monospace;background:var(--bg);padding:8px 10px;border-radius:6px;margin-bottom:12px;line-height:1.7">
+          Name File#, Dose mg x N, Address, Phone1, Phone2?, Site, PrevDates..., DueDate, TimeWindow, Status
+        </div>
+        <textarea id="notesImportText" class="form-control"
+          style="min-height:220px;font-size:12px;font-family:monospace;line-height:1.6;resize:vertical"
+          placeholder="• Robert LAMARRE 19961, 30 mg x 1 Only, 4520 Promenade Paton, Laval, QC, H7W 4X1, 514-946-4440, left side, 16 January 2026, 8 May 2026, OK&#10;• Spyridon DEDEPSIDIS 22018, 30 mg x (19), 4250 Avenue Prince Charles Laval, QC...&#10;&#10;Paste your full list here..."></textarea>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:10px">
+          <span style="font-size:11px;color:var(--text-2)" id="notesLineCount">0 lines detected</span>
+          <div style="flex:1"></div>
+          <button class="btn-secondary" onclick="closeModal('notesImportModal')">Cancel</button>
+          <button class="btn-primary" onclick="parseNotesWithClaude()" id="notesParseBtn">
+            📋 Parse Notes →
+          </button>
+        </div>
+      </div>
+
+      <!-- STEP 2: Review table -->
+      <div id="notesStep2" class="hidden">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <div style="font-size:13px;font-weight:800" id="notesReviewTitle">Reviewing extracted patients</div>
+          <div style="flex:1"></div>
+          <button class="btn-secondary" style="font-size:11px;padding:5px 10px" onclick="notesBackToEdit()">← Edit</button>
+        </div>
+        <div style="font-size:11px;color:var(--text-2);margin-bottom:8px;background:var(--orange-bg);padding:8px 10px;border-radius:6px;border:1px solid #F5D0AA">
+          ⚠️ Review each row before importing. Click any field to edit. Rows with ⚠️ need attention.
+        </div>
+        <div id="notesReviewTable" style="overflow-x:auto"></div>
+      </div>
+
+    </div>
+    <div class="modal-footer" id="notesFooter">
+      <div style="font-size:11px;color:var(--text-2)" id="notesStatus"></div>
+      <div style="display:flex;gap:8px;margin-left:auto" id="notesFooterBtns">
+        <button class="btn-secondary" onclick="closeModal('notesImportModal')">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
