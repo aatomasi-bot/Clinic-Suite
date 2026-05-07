@@ -849,19 +849,32 @@ function openMapsSelected(){
 }
 
 function openMapQuest(){
-  // Open MapQuest Trip Planner with all selected patient addresses
-  // MapQuest allows up to 26 waypoints and has drag-and-drop route optimization
   const sel = routeOrder.length ? routeOrder : patList.filter(p=>selIds.has(p.id));
   if(!sel.length){toast("Select patients first","warn");return}
   const addrs = sel.map(p=>(p["Address"]||"").replace(/\s+/g,' ').trim()).filter(Boolean);
-  if(addrs.length < 2){toast("Need at least 2 patients for MapQuest route","warn");return}
-  // MapQuest Directions URL — encodes all waypoints
-  const base = "https://www.mapquest.com/directions/from/";
-  const enc  = a => encodeURIComponent(a+", Quebec, Canada");
+  if(addrs.length < 2){toast("Need at least 2 patients for route","warn");return}
+
+  // Copy all addresses to clipboard — paste into MapQuest stops
+  const clipText = addrs.map((a,i)=>`${i+1}. ${a}, Quebec, Canada`).join('\n');
+  navigator.clipboard.writeText(clipText)
+    .then(()=>{})
+    .catch(()=>{});
+
+  // Build MapQuest URL using + for spaces
+  // encodeURIComponent breaks MapQuest routing (it can't parse %2C %20 in path segments)
+  const cleanAccents = a => a
+    .replace(/[àâä]/g,'a').replace(/[éèêë]/g,'e')
+    .replace(/[îï]/g,'i').replace(/[ôö]/g,'o')
+    .replace(/[ùûü]/g,'u').replace(/ç/g,'c');
+
+  const enc = a => cleanAccents(a + ', Quebec, Canada').replace(/\s+/g,'+');
   const stops = addrs.map(enc);
-  const url  = base + stops[0] + stops.slice(1).map(a=>"/to/"+a).join("") ;
-  window.open(url,"_blank");
-  toast(`Opened MapQuest with ${addrs.length} stops — drag to reorder on their map`,"ok");
+  const url = 'https://www.mapquest.com/directions/from/'
+            + stops[0]
+            + stops.slice(1).map(a=>'/to/'+a).join('');
+
+  window.open(url,'_blank');
+  toast(`MapQuest opened · ${addrs.length} stops · addresses also copied to clipboard`,'ok');
 }
 
 function resetSchedule(){optimized=false;confirmed=false;routeOrder=[];document.getElementById("optBar").classList.add("hidden");document.getElementById("routeCard").classList.add("hidden");document.getElementById("apptSection").classList.add("hidden")}
