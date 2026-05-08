@@ -1,0 +1,1120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#1B2638">
+<title>DosingTracker — Route Scheduler</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&display=swap" rel="stylesheet">
+<style>
+/* ── SAME TOKENS AS DOSINGTRACKER ── */
+:root {
+  --teal:      #2D8C8A; --teal-light:#E6F4F4; --teal-dark:#1E6665;
+  --navy:      #1B2638; --navy-mid:#243047;
+  --orange:    #E5883A; --orange-bg:#FEF3E8;
+  --red:       #E05A5A; --red-bg:#FDEDED;
+  --green:     #3D9A6B; --green-bg:#E8F7F0;
+  --bg:        #F2F4F8; --card:#FFFFFF;
+  --border:    #E4E8EF; --text:#1B2638;
+  --text-2:    #6B7A8F; --text-3:#A0ABBC;
+  --radius:    14px; --radius-sm:8px;
+  --shadow:    0 2px 12px rgba(27,38,56,0.09);
+  --shadow-md: 0 4px 20px rgba(27,38,56,0.12);
+  --header-h:  60px; --tr:200ms ease-in-out;
+}
+@media(prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F1621; --card:#1A2335; --border:#263146;
+    --text:#E2E8F0; --text-2:#94A3B8; --text-3:#64748B;
+    --navy:#0A1020; --navy-mid:#111827;
+    --teal-light:#0D2B2A; --orange-bg:#2A1A08; --red-bg:#2A0F0F;
+    --shadow:0 2px 12px rgba(0,0,0,0.4);
+  }
+}
+[data-theme="dark"]{--bg:#0F1621;--card:#1A2335;--border:#263146;--text:#E2E8F0;--text-2:#94A3B8;--text-3:#64748B;--navy:#0A1020;--navy-mid:#111827;--teal-light:#0D2B2A;--orange-bg:#2A1A08;--red-bg:#2A0F0F;}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding-top:var(--header-h);-webkit-font-smoothing:antialiased;transition:background .3s,color .3s}
+button{cursor:pointer;border:none;background:none;font:inherit;-webkit-tap-highlight-color:transparent}
+input,select{font:inherit}
+
+/* ── HEADER (identical to DosingTracker) ── */
+.header{position:fixed;top:0;left:0;right:0;z-index:100;height:var(--header-h);background:linear-gradient(90deg,#1B2638,#243047);display:flex;align-items:center;justify-content:space-between;padding:0 1rem;box-shadow:0 2px 16px rgba(27,38,56,0.25)}
+.header__brand{display:flex;align-items:center;gap:10px}
+.header__icon{width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,var(--teal),var(--teal-dark));display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 2px 8px rgba(45,140,138,0.4)}
+.header__wordmark h1{font-size:16px;font-weight:700;color:#fff;letter-spacing:-.3px}
+.header__wordmark h1 span{color:var(--teal)}
+.header__wordmark p{font-size:9px;font-weight:600;letter-spacing:1.8px;color:#6B7A8F;text-transform:uppercase}
+.header__right{display:flex;align-items:center;gap:8px}
+.hdr-back{display:flex;align-items:center;gap:5px;color:rgba(255,255,255,.7);font-size:12px;font-weight:600;padding:6px 10px;border-radius:7px;background:rgba(255,255,255,.08);text-decoration:none;transition:all var(--tr)}
+.hdr-back:hover{background:rgba(255,255,255,.15);color:#fff}
+.sync-dot{width:8px;height:8px;border-radius:50%;background:#6B7A8F;transition:background .4s}
+.sync-dot.connected{background:var(--green);box-shadow:0 0 6px rgba(61,154,107,.6)}
+.dark-toggle{width:32px;height:32px;border-radius:8px;background:rgba(255,255,255,.1);color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;border:none;cursor:pointer;transition:background var(--tr)}
+.dark-toggle:hover{background:rgba(255,255,255,.18)}
+
+/* ── PAGE ── */
+.page{max-width:900px;margin:0 auto;padding:.875rem .875rem 7rem}
+
+/* ── CARD ── */
+.card{background:var(--card);border-radius:var(--radius);border:1.5px solid var(--border);box-shadow:var(--shadow);margin-bottom:.875rem;overflow:hidden}
+.card__hdr{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;background:var(--card)}
+.card__hdr h3{font-size:13px;font-weight:800;letter-spacing:.2px;flex:1}
+.card__body{padding:14px}
+
+/* ── STEP INDICATOR ── */
+.steps{display:flex;margin-bottom:.875rem;background:var(--card);border-radius:var(--radius);border:1.5px solid var(--border);overflow:hidden}
+.step{flex:1;padding:8px 4px;text-align:center;font-size:10px;font-weight:700;color:var(--text-3);border-right:1px solid var(--border);transition:all var(--tr)}
+.step:last-child{border-right:none}
+.step .sn{width:18px;height:18px;border-radius:50%;background:var(--border);color:var(--text-3);display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;margin-bottom:2px}
+.step.active{color:var(--teal-dark);background:var(--teal-light)}
+.step.active .sn{background:var(--teal);color:#fff}
+.step.done{color:var(--green)}
+.step.done .sn{background:var(--green);color:#fff}
+
+/* ── MODE TABS ── */
+.mode-tabs{display:flex;gap:6px;margin-bottom:12px}
+.mode-tab{flex:1;padding:8px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:var(--bg);font-size:12px;font-weight:700;color:var(--text-2);transition:all var(--tr)}
+.mode-tab.active{background:linear-gradient(135deg,var(--teal),var(--teal-dark));color:#fff;border-color:var(--teal-dark);box-shadow:0 2px 8px rgba(45,140,138,.3)}
+
+/* ── MINI CALENDAR ── */
+.cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;max-width:280px}
+.cal-nav__title{font-size:13px;font-weight:800;color:var(--text);flex:1;text-align:center}
+.cal-nav-btn{width:28px;height:28px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:var(--bg);font-size:15px;color:var(--text-2);display:flex;align-items:center;justify-content:center;transition:all var(--tr)}
+.cal-nav-btn:hover{border-color:var(--teal);color:var(--teal)}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:8px;max-width:280px}
+.cal-dname{text-align:center;font-size:8px;font-weight:700;color:var(--text-3);letter-spacing:.3px;padding:2px 0}
+.cal-day{aspect-ratio:1;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--text);cursor:pointer;transition:all .15s;position:relative;border:1.5px solid transparent;}
+.cal-day:hover{background:var(--teal-light);border-color:#B2DADA;color:var(--teal-dark)}
+.cal-day.today{font-weight:800;color:var(--teal-dark);border-color:var(--teal)}
+.cal-day.selected{background:var(--teal);color:#fff;border-color:var(--teal-dark);font-weight:800}
+.cal-day.range-start{background:var(--teal);color:#fff;border-radius:var(--radius-sm) 0 0 var(--radius-sm)}
+.cal-day.range-end{background:var(--teal);color:#fff;border-radius:0 var(--radius-sm) var(--radius-sm) 0}
+.cal-day.in-range{background:var(--teal-light);color:var(--teal-dark);border-radius:0;border-color:transparent}
+.cal-day.other{color:var(--text-3);cursor:default}
+.cal-day.past{color:var(--text-3);cursor:default}
+.cal-day.past:hover{background:none;border-color:transparent}
+/* orange dot = patients eligible on this date */
+.cal-day.has-pts::after{content:"";position:absolute;bottom:3px;left:50%;transform:translateX(-50%);width:4px;height:4px;border-radius:50%;background:var(--orange)}
+.cal-day.selected.has-pts::after,.cal-day.range-start.has-pts::after,.cal-day.range-end.has-pts::after{background:#fff}
+
+/* Date summary pill */
+.date-pill{display:flex;align-items:center;gap:8px;background:var(--teal-light);border:1px solid #B2DADA;border-radius:var(--radius-sm);padding:8px 12px;margin-top:8px;font-size:12px;font-weight:600;color:var(--teal-dark)}
+
+/* EV row */
+.ev-row{display:flex;align-items:center;gap:10px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
+.ev-row label{font-size:11px;font-weight:700;color:var(--text-2);white-space:nowrap}
+.ev-input{width:80px;padding:6px 8px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:13px;font-weight:700;text-align:center;background:var(--bg);color:var(--text)}
+
+/* Time picker */
+.time-row{display:flex;align-items:center;gap:10px}
+.time-input{flex:1;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:13px;font-weight:600;color:var(--text);background:var(--bg);outline:none;transition:border .15s}
+.time-input:focus{border-color:var(--teal)}
+.time-note{font-size:11px;color:var(--text-2);font-weight:500}
+
+/* Load button */
+.btn-load{width:100%;margin-top:12px;padding:11px;border-radius:var(--radius-sm);background:linear-gradient(135deg,var(--teal),var(--teal-dark));color:#fff;font-size:14px;font-weight:800;box-shadow:0 3px 10px rgba(45,140,138,.4);transition:all var(--tr)}
+.btn-load:hover{transform:translateY(-1px);box-shadow:0 5px 16px rgba(45,140,138,.5)}
+.btn-load:disabled{opacity:.45;pointer-events:none}
+
+/* ── PATIENT LIST ── */
+.list-hdr{padding:10px 14px;border-bottom:1px solid var(--border);background:var(--bg);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.list-hdr__title{font-size:13px;font-weight:700;flex:1}
+.lbtn{padding:6px 12px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:var(--card);font-size:11px;font-weight:700;color:var(--text-2);transition:all var(--tr)}
+.lbtn:hover{border-color:var(--teal);color:var(--teal-dark);background:var(--teal-light)}
+.btn-optimize{display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:var(--radius-sm);background:linear-gradient(135deg,var(--teal),var(--teal-dark));color:#fff;font-size:12px;font-weight:700;box-shadow:0 2px 8px rgba(45,140,138,.35);transition:all var(--tr)}
+.btn-optimize:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(45,140,138,.5)}
+.btn-optimize:disabled{opacity:.45;pointer-events:none}
+.btn-confirm{display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:var(--radius-sm);background:linear-gradient(135deg,var(--green),#2A7050);color:#fff;font-size:12px;font-weight:700;box-shadow:0 2px 8px rgba(61,154,107,.35);transition:all var(--tr)}
+.btn-confirm:disabled{opacity:.45;pointer-events:none}
+.btn-reset{padding:7px 12px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:var(--bg);color:var(--text-2);font-size:12px;font-weight:700;transition:all var(--tr)}
+.btn-reset:hover{border-color:var(--teal);color:var(--teal-dark)}
+
+/* Opt bar */
+.opt-bar{display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--green-bg);border:1px solid #B6DFC8;border-radius:var(--radius-sm);margin:0 14px 10px;font-size:12px;font-weight:600;color:var(--green)}
+.opt-bar.hidden{display:none}
+
+/* City group header */
+.city-hdr{display:flex;align-items:center;gap:7px;padding:9px 14px 5px;position:sticky;top:0;z-index:2;background:rgba(242,244,248,.97);backdrop-filter:blur(4px);border-bottom:1px solid var(--border)}
+[data-theme="dark"] .city-hdr{background:rgba(15,22,33,.97)}
+.city-badge{display:inline-flex;align-items:center;gap:4px;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:800;letter-spacing:.2px}
+.city-dot{width:7px;height:7px;border-radius:50%}
+.city-count{font-size:11px;color:var(--text-3)}
+.city-sel-all{margin-left:auto;font-size:10px;font-weight:700;color:var(--teal-dark);padding:3px 8px;border-radius:5px;background:var(--teal-light);border:1px solid #B2DADA;cursor:pointer;transition:all var(--tr)}
+
+/* Select all checkbox */
+.chk-row{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border-bottom:1px solid var(--border)}
+.chk-left{display:flex;align-items:center;gap:8px;cursor:pointer}
+.chk-label{font-size:12px;font-weight:700;color:var(--text-2)}
+.chk{width:20px;height:20px;border-radius:5px;border:2px solid var(--border);background:var(--card);display:flex;align-items:center;justify-content:center;font-size:11px;transition:all .15s;flex-shrink:0}
+.chk.checked{border-color:var(--teal);background:var(--teal);color:#fff}
+.chk.indeterminate{border-color:var(--teal);background:var(--card);color:var(--teal)}
+
+/* Patient row */
+.pat-scroll{max-height:420px;overflow-y:auto}
+.pat-scroll::-webkit-scrollbar{width:3px}
+.pat-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:99px}
+.pt-row{display:flex;align-items:center;gap:9px;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--card);transition:background var(--tr);cursor:pointer;-webkit-tap-highlight-color:transparent}
+.pt-row:hover{background:var(--bg)}
+.pt-row.sel{background:var(--teal-light)}
+.pt-row.dragging{opacity:.35}
+.pt-row.drag-over{border-top:2.5px solid var(--orange);background:var(--orange-bg)}
+.pt-drag{font-size:16px;color:var(--text-3);cursor:grab;flex-shrink:0;padding:0 2px;line-height:1;user-select:none}
+.pt-drag:active{cursor:grabbing}
+.pt-stop{width:22px;height:22px;border-radius:50%;background:var(--border);color:var(--text-3);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;flex-shrink:0;transition:all var(--tr)}
+.pt-row.sel .pt-stop{background:var(--teal);color:#fff}
+.pt-info{flex:1;min-width:0}
+.pt-name{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pt-meta{font-size:11px;color:var(--text-2);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pt-due{font-size:10px;font-weight:700;flex-shrink:0;padding:2px 7px;border-radius:10px;white-space:nowrap}
+.due-tight{background:var(--red-bg);color:var(--red)}
+.due-norm{background:var(--orange-bg);color:var(--orange)}
+.due-ok{background:var(--teal-light);color:var(--teal-dark)}
+
+/* ── FLOATING ACTION BAR ── */
+.fab{position:fixed;bottom:0;left:0;right:0;z-index:200;background:linear-gradient(90deg,var(--navy),var(--navy-mid));padding:10px 14px calc(env(safe-area-inset-bottom,0px)+10px);display:flex;align-items:center;gap:8px;flex-wrap:wrap;box-shadow:0 -4px 20px rgba(27,38,56,.3);transform:translateY(100%);transition:transform .3s cubic-bezier(.34,1.1,.64,1)}
+.fab.visible{transform:translateY(0)}
+.fab__count{font-size:13px;font-weight:700;color:#fff;flex:1}
+.fb{padding:8px 14px;border-radius:var(--radius-sm);font-size:12px;font-weight:800;border:none;cursor:pointer;transition:all var(--tr);white-space:nowrap}
+.fb--clear{background:rgba(255,255,255,.12);color:#fff}
+.fb--opt{background:linear-gradient(135deg,var(--teal),var(--teal-dark));color:#fff;box-shadow:0 2px 8px rgba(45,140,138,.4)}
+.fb--maps{background:linear-gradient(135deg,#4285F4,#1a56c4);color:#fff}
+.fb:active{transform:scale(.96)}
+
+/* ── ROUTE PANEL ── */
+.route-panel{background:var(--card);border-radius:var(--radius);border:1.5px solid #B2DADA;box-shadow:var(--shadow-md);overflow:hidden;margin-bottom:.875rem}
+.rp-hdr{padding:12px 14px;background:linear-gradient(90deg,var(--teal),var(--teal-dark));color:#fff;display:flex;align-items:center;gap:8px}
+.rp-hdr h3{font-size:14px;font-weight:800;flex:1}
+.rp-ev{padding:8px 14px;background:#EFF8FE;border-bottom:1px solid #BAE6FD;display:flex;align-items:center;gap:10px}
+.rp-ev__lbl{font-size:11px;font-weight:700;color:#0369A1;white-space:nowrap}
+.ev-track{flex:1;height:7px;background:#BAE6FD;border-radius:99px;overflow:hidden}
+.ev-fill{height:100%;border-radius:99px;transition:width .5s ease}
+.rp-ev__km{font-size:11px;font-weight:700;color:#0369A1;white-space:nowrap}
+
+/* Confirm section */
+.confirm-sec{padding:12px 14px;border-top:1px solid var(--border);background:var(--card)}
+.route-panel{position:relative}
+.confirm-sec h4{font-size:11px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px}
+.confirm-info{font-size:12px;color:var(--text-2);background:var(--teal-light);border-radius:var(--radius-sm);padding:8px 10px;margin-bottom:10px}
+.btn-confirm-main{width:100%;padding:12px;border-radius:var(--radius-sm);background:linear-gradient(135deg,var(--green),#2A7050);color:#fff;font-size:14px;font-weight:800;box-shadow:0 3px 12px rgba(61,154,107,.4);transition:all var(--tr)}
+/* Sticky confirm bar — always accessible above FAB */
+.sticky-confirm{
+  position:sticky;bottom:0;left:0;right:0;z-index:50;
+  padding:10px 14px calc(env(safe-area-inset-bottom,0px)+10px);
+  background:var(--card);border-top:2px solid #B2DADA;
+  box-shadow:0 -4px 20px rgba(27,38,56,0.18);
+  display:none;
+}
+.sticky-confirm.show{display:block}
+.btn-confirm-main:hover{transform:translateY(-1px)}
+.btn-confirm-main:disabled{opacity:.45;pointer-events:none}
+
+/* ── APPOINTMENT CARDS ── */
+.appt-section{margin-top:.875rem}
+.appt-hdr{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--border);background:var(--green-bg)}
+.appt-hdr__icon{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--green),#2A7050);display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+.appt-hdr__title{font-size:15px;font-weight:800;color:var(--text)}
+.appt-hdr__sub{font-size:11px;color:var(--text-2);margin-top:1px}
+.appt-card{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--card);transition:background var(--tr)}
+.appt-card:hover{background:var(--bg)}
+.appt-time-box{background:var(--teal-light);border-radius:var(--radius-sm);padding:7px 10px;text-align:center;min-width:65px;flex-shrink:0}
+.appt-time-main{font-size:14px;font-weight:800;color:var(--teal-dark)}
+.appt-time-end{font-size:9px;color:var(--text-2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-top:1px}
+.appt-pt-name{font-size:13px;font-weight:700}
+.appt-pt-addr{font-size:11px;color:var(--text-2);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ── CITY PALETTE ── */
+.city-laval           {--cz:#2D8C8A;--czb:#E6F4F4}
+.city-montreal        {--cz:#7B68B6;--czb:#F0EEF9}
+.city-montreal-west   {--cz:#7B68B6;--czb:#F0EEF9}
+.city-montreal-north  {--cz:#2D8C8A;--czb:#E6F4F4}
+.city-montreal-east   {--cz:#7B68B6;--czb:#F0EEF9}
+.city-longueuil       {--cz:#3D9A6B;--czb:#E8F7F0}
+.city-south-shore     {--cz:#E5883A;--czb:#FEF3E8}
+.city-west-island     {--cz:#7B68B6;--czb:#F0EEF9}
+.city-lanadiere       {--cz:#E05A5A;--czb:#FDEDED}
+.city-laurentians     {--cz:#3D9A6B;--czb:#E8F7F0}
+.city-unknown         {--cz:#6B7A8F;--czb:#F2F4F8}
+
+/* ── MISC ── */
+.hidden{display:none!important}
+.empty{text-align:center;padding:2.5rem 1rem}
+.empty__icon{font-size:2.5rem;margin-bottom:8px}
+.empty__title{font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px}
+.empty__sub{font-size:12px;color:var(--text-2);max-width:280px;margin:0 auto}
+.spinner{display:inline-block;width:13px;height:13px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.toast-wrap{position:fixed;top:calc(var(--header-h)+8px);left:50%;transform:translateX(-50%);z-index:9999;pointer-events:none;width:calc(100% - 2rem);max-width:380px}
+.toast{background:var(--navy);color:#fff;border-radius:var(--radius-sm);padding:10px 14px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;box-shadow:0 8px 32px rgba(27,38,56,.2);animation:tIn .3s ease,tOut .3s ease 2.7s forwards}
+.toast--ok{background:linear-gradient(135deg,var(--green),#2A7050)}
+.toast--err{background:linear-gradient(135deg,var(--red),#B04040)}
+.toast--warn{background:linear-gradient(135deg,var(--orange),#C06820)}
+@keyframes tIn{from{opacity:0;transform:translateY(-12px) scale(.95)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes tOut{from{opacity:1}to{opacity:0;transform:translateY(-8px)}}
+
+@media(max-width:640px){.page{padding:.75rem .75rem 5rem}}
+</style>
+</head>
+<body>
+
+<div class="toast-wrap" id="toastWrap"></div>
+
+<!-- HEADER — identical to DosingTracker -->
+<header class="header">
+  <div class="header__brand">
+    <div class="header__icon">💉</div>
+    <div class="header__wordmark">
+      <h1>Dosing<span>Tracker</span></h1>
+      <p>Route Scheduler</p>
+    </div>
+  </div>
+  <div class="header__right">
+    <div class="sync-dot" id="syncDot"></div>
+    <button class="dark-toggle" id="darkToggle" onclick="toggleDark()">🌙</button>
+    <a href="index.html" class="hdr-back">← Back</a>
+  </div>
+</header>
+
+<div class="page">
+
+  <!-- STEPS -->
+  <div class="steps">
+    <div class="step active" id="step1El"><div class="sn">1</div><div>Pick Day</div></div>
+    <div class="step" id="step2El"><div class="sn">2</div><div>Patients</div></div>
+    <div class="step" id="step3El"><div class="sn">3</div><div>Optimize</div></div>
+    <div class="step" id="step4El"><div class="sn">4</div><div>Confirm</div></div>
+  </div>
+
+  <!-- STEP 1: DATE PICKER -->
+  <div class="card" id="step1Card">
+    <div class="card__hdr">
+      <span>📅</span>
+      <h3>Choose Your Work Day</h3>
+      <span style="font-size:11px;color:var(--text-3)" id="selDayLabel">No date selected</span>
+    </div>
+    <div class="card__body">
+      <!-- Mode tabs -->
+      <div class="mode-tabs">
+        <button class="mode-tab active" id="modeTabSingle" onclick="setMode('single')">📅 Single Day</button>
+        <button class="mode-tab" id="modeTabRange" onclick="setMode('range')">📅 Date Range</button>
+      </div>
+      <!-- Calendar -->
+      <div class="cal-nav">
+        <button class="cal-nav-btn" onclick="prevMonth()">&#8249;</button>
+        <div class="cal-nav__title" id="calTitle"></div>
+        <button class="cal-nav-btn" onclick="nextMonth()">&#8250;</button>
+      </div>
+      <div class="cal-grid" id="calGrid"></div>
+      <div id="datePill" class="hidden"></div>
+      <!-- EV Range -->
+      <div class="ev-row">
+        <label>⚡ EV Range (km)</label>
+        <input type="number" class="ev-input" id="evRange" value="350" min="100" max="600" step="10">
+      </div>
+      <!-- Start time -->
+      <div class="ev-row" style="margin-top:8px">
+        <label>🕐 Start Time</label>
+        <input type="time" class="time-input" id="startTime" value="08:00" style="flex:0 0 auto;width:110px">
+        <span class="time-note">30 min intervals</span>
+      </div>
+      <button class="btn-load" id="btnLoad" disabled onclick="loadPatients()">Load Eligible Patients →</button>
+      <button onclick="loadAllUpcoming()" style="width:100%;margin-top:8px;padding:10px;border-radius:var(--radius-sm);border:2px dashed var(--teal);background:transparent;color:var(--teal-dark);font-size:13px;font-weight:700;cursor:pointer;transition:all var(--tr)">
+        📋 All Upcoming Unconfirmed Patients
+      </button>
+    </div>
+  </div>
+
+  <!-- STEP 2: PATIENT LIST -->
+  <div id="step2Card" class="hidden">
+    <div class="card">
+      <div class="list-hdr">
+        <div class="list-hdr__title" id="patTitle">Eligible Patients</div>
+        <button class="lbtn" onclick="selectAll()">☑ All</button>
+        <button class="lbtn" onclick="clearAll()">☐ Clear</button>
+      </div>
+      <div class="opt-bar hidden" id="optBar">✅ Route optimized — drag rows to fine-tune, then confirm</div>
+      <div class="chk-row">
+        <div class="chk-left" onclick="toggleAll()">
+          <div class="chk" id="chkAll"></div>
+          <span class="chk-label">Select All</span>
+        </div>
+        <div id="cityLegend" style="display:flex;gap:5px;flex-wrap:wrap"></div>
+      </div>
+      <div class="pat-scroll" id="patList">
+        <div class="empty"><div class="empty__icon">📋</div><div class="empty__title">Select a date above</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 3+4: ROUTE -->
+  <div id="routeCard" class="hidden">
+    <div class="route-panel">
+      <div class="rp-hdr">
+        <h3 id="routeTitle">⚡ Optimized Route</h3>
+        <button onclick="closeRoute()" style="background:rgba(255,255,255,.15);color:#fff;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer">✕ Reset</button>
+      </div>
+      <div class="rp-ev">
+        <span class="rp-ev__lbl">⚡ EV usage</span>
+        <div class="ev-track"><div class="ev-fill" id="evFill" style="width:0%"></div></div>
+        <span class="rp-ev__km" id="evKmLabel">—</span>
+      </div>
+      <div id="routeBody"></div>
+      <div class="confirm-sec">
+        <h4>📅 Set Appointments</h4>
+        <div class="confirm-info" id="confirmInfo">Drag rows above to reorder. Then confirm to set appointments.</div>
+        <button class="btn-confirm-main" id="btnConfirmMain" onclick="doConfirm()">✓ Confirm &amp; Set All Appointments</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- STICKY CONFIRM BAR — always visible above FAB -->
+  <div class="sticky-confirm" id="stickyConfirm">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+      <span id="stickyRouteInfo" style="font-size:12px;color:var(--text-2);flex:1"></span>
+      <a onclick="document.getElementById('routeCard').scrollIntoView({behavior:'smooth'})" style="font-size:11px;color:var(--teal-dark);font-weight:700;cursor:pointer">View Route ↑</a>
+    </div>
+    <button class="btn-confirm-main" onclick="doConfirm()" id="stickyConfirmBtn">✓ Confirm &amp; Set All Appointments</button>
+  </div>
+
+  <!-- CONFIRMED APPOINTMENTS -->
+  <div id="apptSection" class="hidden"></div>
+
+</div>
+
+<!-- FAB -->
+<div class="fab" id="fab">
+  <div class="fab__count" id="fabCount">0 selected</div>
+  <button class="fb fb--clear" onclick="clearAll()">✕ Clear</button>
+  <button class="fb fb--maps" onclick="openMapsSelected()">🗺️ Google Maps</button>
+  <button class="fb" onclick="openMapQuest()" style="background:linear-gradient(135deg,#c0392b,#922b21);color:#fff">🗺️ MapQuest</button>
+  <button class="fb fb--opt" onclick="optimizeRoute()">⚡ Optimize Route</button>
+</div>
+
+<script>
+const SUPABASE_URL      = "https://wqlbmtjbjloxpvsbeqyb.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_gcyK2z_8lvbOgHNcJfdX1g_8QCWJ_Xi";
+const WIN = 3; // ±3 days
+
+const FSA = {H7:"Laval",H8:"West Island",H9:"West Island",H3:"Montreal West",H4:"Montreal West",H2:"Montreal",H1:"Montreal North",H5:"Montreal East",H6:"Montreal East",J4:"South Shore",J5:"South Shore",J3:"Longueuil",J6:"Lanaudière",J7:"Laurentians",J8:"Nord"};
+const CITY_DIST = {Laval:22,"West Island":30,"Montreal West":14,Montreal:8,"Montreal North":12,"Montreal East":14,"South Shore":18,Longueuil:20,Lanaudière:35,Laurentians:45,Nord:55,Unknown:20};
+const CITY_KM   = {Laval:1.8,"West Island":2.2,"Montreal West":1.5,Montreal:1.2,"Montreal North":1.6,"Montreal East":1.4,"South Shore":2.0,Longueuil:2.0,Lanaudière:2.5,Laurentians:3.0,Nord:3.5,Unknown:2.0};
+const CITY_STYLE = {
+  Laval:{bg:"#E6F4F4",text:"#1E6665",border:"#B2DADA"},
+  Montreal:{bg:"#F0EEF9",text:"#5B48A0",border:"#C4B8E8"},
+  "Montreal West":{bg:"#F0EEF9",text:"#5B48A0",border:"#C4B8E8"},
+  "Montreal North":{bg:"#E6F4F4",text:"#1E6665",border:"#B2DADA"},
+  "Montreal East":{bg:"#F0EEF9",text:"#5B48A0",border:"#C4B8E8"},
+  Longueuil:{bg:"#E8F7F0",text:"#2A7050",border:"#B6DFC8"},
+  "South Shore":{bg:"#FEF3E8",text:"#C06820",border:"#F5D0AA"},
+  "West Island":{bg:"#F0EEF9",text:"#5B48A0",border:"#C4B8E8"},
+  Lanaudière:{bg:"#FDEDED",text:"#B04040",border:"#F0C0C0"},
+  Laurentians:{bg:"#E8F7F0",text:"#2A7050",border:"#B6DFC8"},
+  Unknown:{bg:"#F2F4F8",text:"#6B7A8F",border:"#E4E8EF"},
+};
+const COL={"Patient Name":"patient_name","File Number":"file_number","Address":"address","Phone 1":"phone1","Phone 2":"phone2","Dose Prescribed":"dose_prescribed","Total Doses":"total_doses","Doses Remaining":"doses_remaining","Previous Injection Site":"previous_injection_site","Injection Site":"injection_site","Due Date":"due_date","Appointment Date & Time":"appointment_date_time","Previous Injection Dates":"previous_injection_dates","Assignment Type":"assignment_type","Special Instructions":"special_instructions","Adverse Effects Comments":"adverse_effects_comments","File Status":"file_status","Injection Administered":"injection_administered","Appointment Confirmed":"appointment_confirmed","Pending":"pending","Archived":"archived","CPP Patient":"cpp_patient"};
+const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
+const MONTHS_S=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const DAYS=["Su","Mo","Tu","We","Th","Fr","Sa"];
+
+let sb,allPats=[],patList=[],selIds=new Set(),routeOrder=[],confirmed=false,optimized=false;
+let mode="single",selDate=null,rStart=null,rEnd=null,calY=0,calM=0;
+let dragIdx=null,dragOverIdx=null;
+
+function pad(n){return String(n).padStart(2,"0")}
+function todayStr(){const d=new Date();return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`}
+function addDays(s,n){const d=new Date(s+"T00:00:00");d.setDate(d.getDate()+n);return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`}
+function diffDays(a,b){return Math.round((new Date(b+"T00:00:00")-new Date(a+"T00:00:00"))/86400000)}
+function fmtLong(s){if(!s)return"";const[y,m,d]=s.split("-").map(Number),dt=new Date(y,m-1,d);return `${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][dt.getDay()]}, ${MONTHS[m-1]} ${d}, ${y}`}
+function fmtShort(s){if(!s)return"";const[y,m,d]=s.split("-").map(Number);return `${MONTHS_S[m-1]} ${d}`}
+function fmtTime(totalMin){const h=Math.floor(totalMin/60),m=totalMin%60,suf=h>=12?"PM":"AM",hh=h>12?h-12:h===0?12:h;return `${hh}:${pad(m)} ${suf}`}
+function esc(s){return String(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function toast(msg,t=""){const w=document.getElementById("toastWrap"),el=document.createElement("div");el.className=`toast${t?" toast--"+t:""}`;el.textContent=msg;w.appendChild(el);setTimeout(()=>el.remove(),3100)}
+function getPC(a){if(!a)return"";const m=a.match(/\b([A-Z]\d[A-Z]\s?\d[A-Z]\d)\b/i);return m?m[1].replace(/\s/g,"").toUpperCase():""}
+function getCity(a){if(!a)return"Unknown";const fsa=getPC(a).substring(0,2);if(FSA[fsa])return FSA[fsa];const parts=a.split(",").map(s=>s.trim());for(let i=0;i<parts.length;i++){if(/^(QC|ON|BC|AB)$/i.test(parts[i+1]||""))return parts[i]}return"Unknown"}
+function fmtAddr(a){if(!a)return"";const m=a.match(/,?\s*(?:Apt\.?|Appartement|Suite|Unit)\s*:?\s*#?(\w+[-\w]*)/i);if(!m)return a;return a.replace(m[0],"").replace(/,\s*$/,"").trim()+", Apt. "+m[1]}
+function cStyle(city){return CITY_STYLE[city]||CITY_STYLE.Unknown}
+
+async function initDB(){sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);try{await sb.from("patients").select("count",{count:"exact",head:true});document.getElementById("syncDot").className="sync-dot connected";}catch(e){document.getElementById("syncDot").className="sync-dot"}}
+async function fetchPats(){
+  const{data,error}=await sb.from("patients").select("*");
+  if(error)throw error;
+  return data.map(row=>{
+    const p={id:row.id};
+    for(const[k,v]of Object.entries(COL))p[k]=row[v]??null;
+    return p;
+  }).filter(p=>
+    !p["Archived"] &&
+    !p["Pending"] &&
+    !!p["Due Date"] &&
+    // Exclude patients who already have a confirmed appointment
+    // (they don't need scheduling — unless their appointment was cleared)
+    !(p["Appointment Confirmed"] && p["Appointment Date & Time"])
+  );
+}
+
+// ── DARK MODE ──
+function toggleDark(){
+  const root=document.documentElement,curr=root.getAttribute("data-theme");
+  const sys=window.matchMedia("(prefers-color-scheme: dark)").matches;
+  if(!curr){root.setAttribute("data-theme",sys?"light":"dark");}
+  else if(curr==="dark"){root.setAttribute("data-theme","light");}
+  else{root.removeAttribute("data-theme");}
+  const btn=document.getElementById("darkToggle");
+  if(btn)btn.textContent=(root.getAttribute("data-theme")||"")!=="light"?"🌙":"☀️";
+}
+
+// ── CALENDAR ──
+function setMode(m){
+  mode=m;
+  document.getElementById("modeTabSingle").classList.toggle("active",m==="single");
+  document.getElementById("modeTabRange").classList.toggle("active",m==="range");
+  selDate=null;rStart=null;rEnd=null;
+  resetSchedule();renderCal();updatePill();updateBtnLoad();
+}
+function prevMonth(){calM--;if(calM<0){calM=11;calY--;}renderCal()}
+function nextMonth(){calM++;if(calM>11){calM=0;calY++;}renderCal()}
+
+function renderCal(){
+  document.getElementById("calTitle").textContent=`${MONTHS[calM]} ${calY}`;
+  const today=todayStr();
+  // Build eligible dates set (patient due ±WIN)
+  const elig=new Set();
+  allPats.forEach(p=>{if(!p["Due Date"])return;for(let i=-WIN;i<=WIN;i++)elig.add(addDays(p["Due Date"],i))});
+  const dim=new Date(calY,calM+1,0).getDate();
+  const firstDow=new Date(calY,calM,1).getDay();
+  const diprev=new Date(calY,calM,0).getDate();
+  let html="";
+  DAYS.forEach(d=>{html+=`<div class="cal-dname">${d}</div>`});
+  for(let i=0;i<firstDow;i++)html+=`<div class="cal-day other">${diprev-firstDow+1+i}</div>`;
+  for(let d=1;d<=dim;d++){
+    const ds=`${calY}-${pad(calM+1)}-${pad(d)}`;
+    const isPast=ds<today,isToday=ds===today,hasPts=elig.has(ds);
+    let cls="cal-day";
+    if(isPast)cls+=" past";if(isToday)cls+=" today";if(hasPts)cls+=" has-pts";
+    if(mode==="single"){if(selDate===ds)cls+=" selected";}
+    else{
+      if(rStart&&rEnd){
+        if(ds===rStart)cls+=" range-start";
+        else if(ds===rEnd)cls+=" range-end";
+        else if(ds>rStart&&ds<rEnd)cls+=" in-range";
+      }else if(ds===rStart)cls+=" selected";
+    }
+    const click=isPast?"":`onclick="onDay('${ds}')"`;
+    html+=`<div class="${cls}" ${click}>${d}</div>`;
+  }
+  const rem=(firstDow+dim)%7===0?0:7-((firstDow+dim)%7);
+  for(let i=1;i<=rem;i++)html+=`<div class="cal-day other">${i}</div>`;
+  document.getElementById("calGrid").innerHTML=html;
+}
+
+function onDay(ds){
+  if(mode==="single"){selDate=ds;rStart=null;rEnd=null;}
+  else{if(!rStart||rEnd){rStart=ds;rEnd=null;}else{if(ds<rStart){rEnd=rStart;rStart=ds;}else rEnd=ds;}selDate=null;}
+  resetSchedule();renderCal();updatePill();updateBtnLoad();
+  // Auto-load when valid date selected
+  const hasDate=(mode==="single"&&selDate)||(mode==="range"&&rStart&&rEnd);
+  if(hasDate)loadPatients();
+}
+
+function updatePill(){
+  const el=document.getElementById("datePill"),lbl=document.getElementById("selDayLabel");
+  if(mode==="single"&&selDate){
+    el.className="date-pill";el.textContent="📅 "+fmtLong(selDate);
+    lbl.textContent=fmtShort(selDate);
+  }else if(mode==="range"&&rStart&&rEnd){
+    el.className="date-pill";el.textContent=`📅 ${fmtShort(rStart)} → ${fmtShort(rEnd)} (${diffDays(rStart,rEnd)+1} days)`;
+    lbl.textContent=`${fmtShort(rStart)}–${fmtShort(rEnd)}`;
+  }else if(mode==="range"&&rStart){
+    el.className="date-pill";el.textContent="📅 "+fmtLong(rStart)+" → click end date";
+    lbl.textContent="Pick end date";
+  }else{el.className="hidden";lbl.textContent="No date selected";}
+}
+function updateBtnLoad(){
+  const ok=(mode==="single"&&selDate)||(mode==="range"&&rStart&&rEnd);
+  document.getElementById("btnLoad").disabled=!ok;
+}
+
+// ── LOAD PATIENTS ──
+function getDateRange(){
+  const s=mode==="single"?selDate:rStart;
+  const e=mode==="single"?selDate:rEnd;
+  return{s,e};
+}
+function loadAllUpcoming(){
+  // Show ALL patients with a due date in the future who have NO confirmed appointment
+  // Regardless of selected date — gives full "to-do" overview
+  const today = todayStr();
+  const upcoming = allPats
+    .filter(p => p["Due Date"] && p["Due Date"] >= today)
+    .sort((a,b) => a["Due Date"].localeCompare(b["Due Date"]));
+
+  if(!upcoming.length){
+    toast("No upcoming unconfirmed patients found","warn"); return;
+  }
+
+  // Display as read-only list grouped by due date
+  const groups = {};
+  upcoming.forEach(p => {
+    const d = p["Due Date"];
+    (groups[d] = groups[d] || []).push(p);
+  });
+
+  let html = `<div style="padding:10px 14px;background:var(--bg);border-bottom:1px solid var(--border);font-size:11px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px">
+    ${upcoming.length} upcoming unconfirmed — sorted by due date
+    <button onclick="document.getElementById('step2Card').classList.add('hidden');setStep(1)" style="float:right;font-size:10px;padding:2px 8px;border-radius:5px;border:1px solid var(--border);background:var(--card);cursor:pointer">✕ Close</button>
+  </div>`;
+
+  Object.keys(groups).sort().forEach(date => {
+    const dt = new Date(date + 'T00:00:00');
+    const dLabel = dt.toLocaleDateString('en-CA',{weekday:'short',month:'short',day:'numeric'});
+    const isOverdue = date < today;
+    html += `<div style="padding:6px 14px;background:${isOverdue?'var(--red-bg)':'var(--teal-light)'};border-bottom:1px solid var(--border);font-size:10px;font-weight:800;color:${isOverdue?'var(--red)':'var(--teal-dark)'};text-transform:uppercase">
+      ${isOverdue?'⚠️ OVERDUE':'📅'} Due ${dLabel} — ${groups[date].length} patient${groups[date].length>1?'s':''}
+    </div>`;
+    groups[date].forEach(p => {
+      const city = getCity(p["Address"]||""), cs = cStyle(city);
+      const addr = fmtAddr(p["Address"]||"");
+      html += `<div style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--border);background:var(--card)">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:700;color:var(--text)">${esc(p["Patient Name"]||"")}</div>
+          <div style="font-size:11px;color:var(--text-2);margin-top:1px">#${esc(p["File Number"]||"")} · ${esc(addr)}</div>
+        </div>
+        <span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700;background:${cs.bg};color:${cs.text};border:1px solid ${cs.border};flex-shrink:0">${esc(city)}</span>
+        <span style="font-size:11px;font-weight:700;color:var(--teal-dark);flex-shrink:0">${esc(p["Dose Prescribed"]||"")}mg</span>
+      </div>`;
+    });
+  });
+
+  const el = document.getElementById("patList");
+  if(el) el.innerHTML = html;
+  document.getElementById("patTitle").textContent = "📋 All Upcoming Unconfirmed";
+  document.getElementById("step2Card").classList.remove("hidden");
+  document.getElementById("optBar").classList.add("hidden");
+  setStep(2);
+  setTimeout(()=>document.getElementById("step2Card").scrollIntoView({behavior:"smooth",block:"start"}),120);
+  toast(`${upcoming.length} upcoming patients — ${Object.keys(groups).length} due dates`,"ok");
+}
+
+function loadPatients(){
+  const{s,e}=getDateRange();
+  if(!s||!e){toast("Select a valid date first","warn");return}
+  // Patients eligible: their ±WIN window overlaps [s,e]
+  patList=allPats.filter(p=>{
+    const ws=addDays(p["Due Date"],-WIN),we=addDays(p["Due Date"],WIN);
+    return ws<=e&&we>=s;
+  }).sort((a,b)=>{
+    const ca=getCity(a["Address"]||""),cb=getCity(b["Address"]||"");
+    const da=CITY_DIST[ca]||20,db=CITY_DIST[cb]||20;
+    if(da!==db)return da-db;
+    return getPC(a["Address"]||"").localeCompare(getPC(b["Address"]||""));
+  });
+  selIds.clear();routeOrder=[];optimized=false;confirmed=false;
+  document.getElementById("routeCard").classList.add("hidden");
+  document.getElementById("apptSection").classList.add("hidden");
+  document.getElementById("optBar").classList.add("hidden");
+  const{s:ds,e:de}=getDateRange();
+  const label=ds===de?fmtLong(ds):`${fmtShort(ds)} – ${fmtShort(de)}`;
+  const excl=allPats.filter(p=>p["Appointment Confirmed"]&&p["Appointment Date & Time"]).length;
+  const exclNote=excl>0?' <span style="font-size:10px;color:var(--text-3)">('+excl+' confirmed hidden)</span>':'';
+  document.getElementById("patTitle").innerHTML=`${patList.length} patients eligible — ${label}`+exclNote;
+  renderPatList();buildLegend();
+  document.getElementById("step2Card").classList.remove("hidden");
+  setStep(2);
+  setTimeout(()=>document.getElementById("step2Card").scrollIntoView({behavior:"smooth",block:"start"}),120);
+}
+
+function buildLegend(){
+  const cities=new Set(patList.map(p=>getCity(p["Address"]||"")));
+  let html="";
+  cities.forEach(city=>{const cs=cStyle(city);html+=`<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700;background:${cs.bg};color:${cs.text};border:1px solid ${cs.border}"><span style="width:6px;height:6px;border-radius:50%;background:${cs.text}"></span>${esc(city)}</span>`;});
+  document.getElementById("cityLegend").innerHTML=html;
+}
+
+function renderPatList(){
+  const el = document.getElementById('patList');
+  if(!patList.length){
+    el.innerHTML=`<div class="empty"><div class="empty__icon">📭</div><div class="empty__title">No eligible patients</div><div class="empty__sub">No patients due within ±${WIN} days of selected date.</div></div>`;
+    updateChkAll(); return;
+  }
+
+  const today = todayStr();
+  let html = '';
+
+  if(optimized){
+    // ── OPTIMIZED MODE: flat list — no city barriers between selected patients ──
+    const selPats = patList.filter(p => selIds.has(p.id));
+    const unselPats = patList.filter(p => !selIds.has(p.id));
+    let stopN = 0;
+
+    if(selPats.length){
+      html += `<div class="city-hdr" style="position:relative"><span style="font-size:11px;font-weight:800;color:var(--teal-dark)">✓ ${selPats.length} selected — drag ⋮⋮ to reorder</span></div>`;
+      selPats.forEach(p => {
+        const pid=p.id, city=getCity(p["Address"]||""), cs=cStyle(city);
+        const due=p["Due Date"]||"", dLeft=due?diffDays(today,addDays(due,WIN)):99;
+        const dc=dLeft<=1?"due-tight":dLeft<=4?"due-norm":"due-ok";
+        const dueLabel=due?`Due ${fmtShort(due)}`:"";
+        const addr=fmtAddr(p["Address"]||"");
+        stopN++;
+        html+=`<div class="pt-row sel" data-pid="${pid}" data-idx="${patList.indexOf(p)}"
+          draggable="true"
+          ondragstart="dStart(event,${patList.indexOf(p)})"
+          ondragenter="dEnter(event,${patList.indexOf(p)})"
+          ondragend="dEnd(event)"
+          ondragover="event.preventDefault()"
+          ondragleave="event.currentTarget.classList.remove('drag-over')">
+          <span class="pt-drag" onclick="event.stopPropagation()">⋮⋮</span>
+          <div class="chk checked" onclick="event.stopPropagation();togglePat(${pid})"><span style="color:#fff;font-size:10px;font-weight:800">✓</span></div>
+          <div class="pt-stop" style="background:${cs.text};color:#fff">${stopN}</div>
+          <div class="pt-info">
+            <div class="pt-name">${esc(p["Patient Name"]||"")}</div>
+            <div class="pt-meta">#${esc(p["File Number"]||"")} · <span style="color:${cs.text};font-weight:700">${esc(city)}</span> · ${esc(addr)}</div>
+          </div>
+          ${dueLabel?`<div class="pt-due ${dc}">${dueLabel}</div>`:""}
+          <span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700;background:${cs.bg};color:${cs.text};border:1px solid ${cs.border};flex-shrink:0">${esc(city)}</span>
+        </div>`;
+      });
+    }
+
+    if(unselPats.length){
+      const groups={};
+      unselPats.forEach(p=>{const c=getCity(p["Address"]||"");(groups[c]=groups[c]||[]).push(p);});
+      const cities=Object.keys(groups).sort((a,b)=>(CITY_DIST[a]||20)-(CITY_DIST[b]||20));
+      html+=`<div class="city-hdr" style="margin-top:6px"><span style="font-size:10px;color:var(--text-3)">Not selected</span></div>`;
+      cities.forEach(city=>{
+        const pats=groups[city],cs=cStyle(city);
+        pats.forEach(p=>{
+          const pid=p.id;
+          html+=`<div class="pt-row" data-pid="${pid}" data-idx="${patList.indexOf(p)}" onclick="togglePat(${pid})">
+            <div class="chk"></div>
+            <div class="pt-stop">·</div>
+            <div class="pt-info">
+              <div class="pt-name">${esc(p["Patient Name"]||"")}</div>
+              <div class="pt-meta">#${esc(p["File Number"]||"")} · <span style="color:${cs.text};font-weight:700">${esc(city)}</span></div>
+            </div>
+            <span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700;background:${cs.bg};color:${cs.text};border:1px solid ${cs.border};flex-shrink:0">${esc(city)}</span>
+          </div>`;
+        });
+      });
+    }
+  } else {
+    // ── NORMAL MODE: grouped by city ──
+    const groups={};
+    patList.forEach(p=>{const c=getCity(p["Address"]||"");(groups[c]=groups[c]||[]).push(p);});
+    const cities=Object.keys(groups).sort((a,b)=>(CITY_DIST[a]||20)-(CITY_DIST[b]||20));
+    cities.forEach(city=>{
+      const pats=groups[city],cs=cStyle(city);
+      html+=`<div class="city-hdr"><div class="city-badge" style="background:${cs.bg};color:${cs.text};border:1.5px solid ${cs.text}"><span class="city-dot" style="background:${cs.text}"></span>${esc(city)}</div><span class="city-count">${pats.length} patient${pats.length>1?"s":""}</span><button class="city-sel-all" onclick="selCity('${esc(city)}')">Select all</button></div>`;
+      pats.forEach(p=>{
+        const pid=p.id,isSel=selIds.has(pid);
+        const cs2=cStyle(city);
+        const due=p["Due Date"]||"",dLeft=due?diffDays(today,addDays(due,WIN)):99;
+        const dc=dLeft<=1?"due-tight":dLeft<=4?"due-norm":"due-ok";
+        const dueLabel=due?`Due ${fmtShort(due)}`:"";
+        const addr=fmtAddr(p["Address"]||"");
+        html+=`<div class="pt-row${isSel?" sel":""}" data-pid="${pid}" data-idx="${patList.indexOf(p)}" onclick="togglePat(${pid})">
+          <div class="chk${isSel?" checked":""}">${isSel?'<span style="color:#fff;font-size:10px;font-weight:800">✓</span>':""}</div>
+          <div class="pt-stop${isSel?"":" "}">·</div>
+          <div class="pt-info">
+            <div class="pt-name">${esc(p["Patient Name"]||"")}</div>
+            <div class="pt-meta">#${esc(p["File Number"]||"")} · ${esc(addr)}</div>
+          </div>
+          ${dueLabel?`<div class="pt-due ${dc}">${dueLabel}</div>`:""}
+          <span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700;background:${cs2.bg};color:${cs2.text};border:1px solid ${cs2.border};flex-shrink:0">${esc(city)}</span>
+        </div>`;
+      });
+    });
+  }
+  el.innerHTML=html; updateChkAll(); updateFab();
+}
+
+function togglePat(pid){if(confirmed)return;if(selIds.has(pid))selIds.delete(pid);else selIds.add(pid);resetSchedule();renderPatList();updateFab()}
+function selCity(city){patList.filter(p=>getCity(p["Address"]||"")===city).forEach(p=>selIds.add(p.id));resetSchedule();renderPatList();updateFab()}
+function selectAll(){patList.forEach(p=>selIds.add(p.id));resetSchedule();renderPatList();updateFab()}
+function clearAll(){selIds.clear();resetSchedule();renderPatList();updateFab()}
+function toggleAll(){if(confirmed)return;if(selIds.size===patList.length)selIds.clear();else patList.forEach(p=>selIds.add(p.id));resetSchedule();renderPatList();updateFab()}
+function updateFab(){const n=selIds.size,fab=document.getElementById("fab");if(n>0){fab.classList.add("visible");document.getElementById("fabCount").textContent=`${n} patient${n>1?"s":""} selected`;}else fab.classList.remove("visible")}
+function updateChkAll(){const el=document.getElementById("chkAll");const all=patList.length>0&&selIds.size===patList.length;const some=selIds.size>0&&selIds.size<patList.length;el.className="chk"+(all?" checked":some?" indeterminate":"");el.innerHTML=all?'<span style="color:#fff;font-size:10px;font-weight:800">✓</span>':some?'<span style="font-size:13px;font-weight:800">−</span>':"";}
+
+// ── OPTIMIZE ──
+function optimizeRoute(){
+  const sel=patList.filter(p=>selIds.has(p.id));
+  if(!sel.length){toast("Select at least one patient","warn");return}
+  const btn=document.querySelector(".fb--opt");if(btn){btn.innerHTML='<span class="spinner"></span> …';btn.disabled=true}
+  setTimeout(()=>{
+    // Step 1: cluster by city zone — complete each city before moving on
+    const cityGroups={};
+    sel.forEach(p=>{const c=getCity(p["Address"]||"");(cityGroups[c]=cityGroups[c]||[]).push(p);});
+    // Step 2: sort postal codes within each city (geographic sweep)
+    Object.keys(cityGroups).forEach(city=>{
+      cityGroups[city].sort((a,b)=>getPC(a["Address"]||"").localeCompare(getPC(b["Address"]||"")));
+    });
+    // Step 3: order cities by distance — complete each before moving on
+    const orderedCities=Object.keys(cityGroups).sort((a,b)=>(CITY_DIST[a]||20)-(CITY_DIST[b]||20));
+    const sorted=orderedCities.flatMap(city=>cityGroups[city]);
+
+    const unsel=patList.filter(p=>!selIds.has(p.id));
+    patList=[...sorted,...unsel];
+    routeOrder=sorted;
+    optimized=true;
+    document.getElementById("optBar").classList.remove("hidden");
+    renderPatList();   // now renders flat selected list — no barriers
+    if(btn){btn.innerHTML="⚡ Optimize Route";btn.disabled=false}
+    renderRoute();
+    document.getElementById("routeCard").classList.remove("hidden");
+    setStep(3);
+    setTimeout(()=>document.getElementById("routeCard").scrollIntoView({behavior:"smooth",block:"start"}),120);
+    const summary=orderedCities.map(c=>`${c}(${cityGroups[c].length})`).join(" → ");
+    toast(`Route: ${orderedCities.length} zone${orderedCities.length>1?"s":""} — ${summary}`,"ok");
+  },900);
+}
+
+// ── ROUTE KM ESTIMATE ──
+function estKm(){
+  if(!routeOrder.length)return 0;let km=0;
+  const fc=getCity(routeOrder[0]["Address"]||"");km+=CITY_DIST[fc]||20;
+  for(let i=0;i<routeOrder.length-1;i++){const ca=getCity(routeOrder[i]["Address"]||""),cb=getCity(routeOrder[i+1]["Address"]||"");km+=ca===cb?(CITY_KM[ca]||2):Math.abs((CITY_DIST[ca]||20)-(CITY_DIST[cb]||20))+5}
+  km+=(CITY_DIST[getCity(routeOrder[routeOrder.length-1]["Address"]||"")]||20)*0.6;
+  return Math.round(km);
+}
+
+function renderRoute(){
+  const km=estKm(),evRange=parseInt(document.getElementById("evRange").value)||350;
+  const pct=Math.min(100,Math.round(km/evRange*100));
+  const fc=pct>80?"#E05A5A":pct>60?"#E5883A":"#0EA5E9";
+  document.getElementById("evFill").style.cssText=`width:${pct}%;background:linear-gradient(90deg,${fc},${fc}dd)`;
+  document.getElementById("evKmLabel").textContent=`${km} km / ${evRange} km (${pct}%)`;
+  const{s:wd}=getDateRange();
+  document.getElementById("routeTitle").textContent=`⚡ Optimized Route — ${routeOrder.length} patients · ${fmtShort(wd)}`;
+  const[sh,sm]=document.getElementById("startTime").value.split(":").map(Number);
+  const startMin=sh*60+sm;
+  const lh=Math.floor((startMin+(routeOrder.length-1)*30)/60),lm=pad(((startMin+(routeOrder.length-1)*30))%60);
+  document.getElementById("confirmInfo").innerHTML=`Appointments every <strong>30 min</strong> from <strong>${fmtTime(startMin)}</strong> on <strong>${fmtLong(wd)}</strong>. Last: <strong>${lh}:${lm} ${lh>=12?"PM":"AM"}</strong>.<br>Drag ⋮⋮ to reorder.`;
+  let rows="";
+  routeOrder.forEach((p,i)=>{
+    const city=getCity(p["Address"]||""),cs=cStyle(city),addr=fmtAddr(p["Address"]||"");
+    const am=startMin+i*30,ah=Math.floor(am/60),amm=pad(am%60),asuf=ah>=12?"PM":"AM",ahh=ah>12?ah-12:ah===0?12:ah;
+    rows+=`<div class="pt-row" data-ridx="${i}" draggable="true" ondragstart="rDragStart(event,${i})" ondragover="event.preventDefault();event.currentTarget.classList.add('drag-over')" ondrop="rDrop(event,${i})" ondragleave="event.currentTarget.classList.remove('drag-over')" ondragend="event.currentTarget.classList.remove('dragging')">
+      <span class="pt-drag">⋮⋮</span>
+      <div class="pt-stop" style="background:${cs.text};color:#fff">${i+1}</div>
+      <div class="pt-info">
+        <div class="pt-name">${esc(p["Patient Name"]||"")}</div>
+        <div class="pt-meta">#${esc(p["File Number"]||"")} · <span style="color:${cs.text};font-weight:700">${esc(city)}</span> · ${esc(getPC(p["Address"]||""))}</div>
+        <div style="font-size:11px;color:var(--text-2)">${esc(addr)}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-size:12px;font-weight:800;color:var(--teal-dark)">${ahh}:${amm} ${asuf}</div>
+        <div style="font-size:10px;color:var(--text-3)">Appt</div>
+      </div>
+    </div>`;
+  });
+  document.getElementById("routeBody").innerHTML=rows;
+  showStickyConfirm();
+}
+
+function closeRoute(){document.getElementById("routeCard").classList.add("hidden");routeOrder=[];optimized=false;const sc=document.getElementById("stickyConfirm");if(sc)sc.classList.remove("show");renderPatList();setStep(2)}
+
+// ── ROUTE DRAG ──
+let rDragFrom=null;
+function rDragStart(e,idx){rDragFrom=idx;setTimeout(()=>e.currentTarget.classList.add("dragging"),0)}
+function rDrop(e,idx){
+  e.currentTarget.classList.remove("drag-over");
+  if(rDragFrom===null||rDragFrom===idx)return;
+  const moved=routeOrder.splice(rDragFrom,1)[0];
+  routeOrder.splice(idx,0,moved);
+  rDragFrom=null;
+  renderRoute();
+}
+
+// ── PATIENT LIST DRAG ──
+function dStart(e,idx){dragIdx=idx;setTimeout(()=>e.currentTarget.classList.add("dragging"),0)}
+function dEnter(e,idx){dragOverIdx=idx;document.querySelectorAll(".pt-row").forEach(r=>r.classList.remove("drag-over"));if(idx!==dragIdx){const el=document.querySelector(`[data-idx="${idx}"]`);if(el)el.classList.add("drag-over")}}
+function dEnd(e){
+  e.currentTarget.classList.remove("dragging");
+  if(dragIdx!==null&&dragOverIdx!==null&&dragIdx!==dragOverIdx){
+    const moved=patList.splice(dragIdx,1)[0];
+    patList.splice(dragOverIdx,0,moved);
+    renderPatList();
+  }
+  dragIdx=null;dragOverIdx=null;
+  document.querySelectorAll(".pt-row").forEach(r=>r.classList.remove("drag-over","dragging"));
+}
+
+// ── CONFIRM ──
+async function doConfirm(){
+  if(!routeOrder.length){toast("No route to confirm","warn");return}
+  const{s:wd}=getDateRange();
+  if(!wd){toast("No date selected","warn");return}
+  const[sh,sm]=document.getElementById("startTime").value.split(":").map(Number);
+  const startMin=sh*60+sm;
+  const btn=document.getElementById("btnConfirmMain");
+  btn.disabled=true;btn.textContent="Saving…";
+  try{
+    for(let i=0;i<routeOrder.length;i++){
+      const p=routeOrder[i],tm=startMin+i*30,h=Math.floor(tm/60),m=tm%60;
+      const dt=`${wd}T${pad(h)}:${pad(m)}`;
+      const row={};for(const[k,v]of Object.entries(COL))row[v]=p[k]??null;
+      row.appointment_date_time=dt;row.appointment_confirmed=true;
+      const{error}=await sb.from("patients").update(row).eq("id",p.id);
+      if(error)throw error;
+    }
+    confirmed=true;
+    btn.textContent="✓ Appointments Confirmed!";
+    btn.style.background="linear-gradient(135deg,#2A7050,#1A5C37)";const sc2=document.getElementById("stickyConfirm");if(sc2)sc2.classList.remove("show");
+    renderAppts(wd,startMin);
+    setStep(4);
+    toast(`✓ ${routeOrder.length} appointments set from ${fmtTime(startMin)}`,"ok");
+  }catch(e){toast("Error: "+e.message,"err");btn.disabled=false;btn.textContent="✓ Confirm & Set All Appointments"}
+}
+
+function renderAppts(workDay,startMin){
+  const sec=document.getElementById("apptSection");
+  sec.classList.remove("hidden");
+  let rows=routeOrder.map((p,i)=>{
+    const cs=cStyle(getCity(p["Address"]||"")),tm=startMin+i*30,addr=fmtAddr(p["Address"]||"");
+    return `<div class="appt-card">
+      <div class="appt-time-box">
+        <div class="appt-time-main">${fmtTime(tm)}</div>
+        <div class="appt-time-end">to ${fmtTime(tm+30)}</div>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div class="appt-pt-name">${esc(p["Patient Name"]||"")}</div>
+        <div class="appt-pt-addr">${esc(addr)}</div>
+      </div>
+      <span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700;background:${cs.bg};color:${cs.text};border:1px solid ${cs.border};flex-shrink:0">${esc(getCity(p["Address"]||""))}</span>
+    </div>`;
+  }).join("");
+  sec.innerHTML=`<div class="card appt-section">
+    <div class="appt-hdr">
+      <div class="appt-hdr__icon">✓</div>
+      <div>
+        <div class="appt-hdr__title">Schedule Confirmed</div>
+        <div class="appt-hdr__sub">${fmtLong(workDay)} · ${routeOrder.length} appointments · 30 min each</div>
+      </div>
+      <button onclick="resetAll()" style="margin-left:auto;padding:6px 12px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:var(--bg);font-size:11px;font-weight:700;color:var(--text-2);cursor:pointer">↺ New Schedule</button>
+    </div>
+    ${rows}
+  </div>`;
+}
+
+function openMapsSelected(){
+  const sel=patList.filter(p=>selIds.has(p.id));
+  if(!sel.length){toast("Select patients first","warn");return}
+  const pts=sel.map(p=>encodeURIComponent(p["Address"]||"")).filter(Boolean);
+  window.open(`https://www.google.com/maps/dir/?api=1&destination=${pts[pts.length-1]}&waypoints=${pts.slice(0,-1).join("|")}&travelmode=driving`,"_blank");
+}
+
+function openMapQuest(){
+  const sel = routeOrder.length ? routeOrder : patList.filter(p=>selIds.has(p.id));
+  if(!sel.length){toast("Select patients first","warn");return}
+  const addrs = sel
+    .map(p=>({name:p["Patient Name"]||"", addr:(p["Address"]||"").trim()}))
+    .filter(p=>p.addr);
+  if(addrs.length<2){toast("Need at least 2 patients","warn");return}
+
+  // Render the MapQuest helper modal
+  let rows = addrs.map((p,i)=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--border);background:var(--card)">
+      <div style="width:24px;height:24px;border-radius:50%;background:var(--teal);color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">${String.fromCharCode(65+i)}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:700;color:var(--text)">${esc(p.name)}</div>
+        <div style="font-size:11px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.addr)}</div>
+      </div>
+      <button onclick="mqCopyAddr(this,'${esc(p.addr+', Quebec, Canada')}')"
+        style="flex-shrink:0;padding:5px 10px;border-radius:6px;border:1.5px solid var(--teal);background:var(--teal-light);color:var(--teal-dark);font-size:11px;font-weight:700;cursor:pointer;transition:all .2s">
+        Copy
+      </button>
+    </div>`).join('');
+
+  document.getElementById('mqAddrList').innerHTML = rows;
+  document.getElementById('mqCount').textContent = addrs.length + ' stops';
+
+  // Copy-all text to clipboard automatically
+  const all = addrs.map((p,i)=>`${String.fromCharCode(65+i)}. ${p.addr}, Quebec, Canada`).join('\n');
+  navigator.clipboard.writeText(all).then(()=>{}).catch(()=>{});
+
+  openModal('mqHelperModal');
+}
+
+function mqCopyAddr(btn, addr){
+  navigator.clipboard.writeText(addr).then(()=>{
+    const orig = btn.textContent;
+    btn.textContent = '✓ Copied!';
+    btn.style.background = 'var(--green-bg)';
+    btn.style.borderColor = 'var(--green)';
+    btn.style.color = 'var(--green)';
+    setTimeout(()=>{ btn.textContent=orig; btn.style.background='var(--teal-light)'; btn.style.borderColor='var(--teal)'; btn.style.color='var(--teal-dark)'; }, 1500);
+  }).catch(()=> toast("Copy failed — try long-pressing the address","warn"));
+}
+
+function mqOpenSite(){
+  window.open('https://www.mapquest.com/directions','_blank');
+}
+function mqCopyAll(){
+  const rows = document.querySelectorAll('#mqAddrList [onclick^="mqCopyAddr"]');
+  // Re-extract from buttons — grab addr attribute
+  const all = [];
+  document.querySelectorAll('#mqAddrList [onclick^="mqCopyAddr"]').forEach((btn,i)=>{
+    const m = btn.getAttribute('onclick').match(/'([^']+)'\)/);
+    if(m) all.push(`${String.fromCharCode(65+i)}. ${m[1]}`);
+  });
+  navigator.clipboard.writeText(all.join('\n')).then(()=>{
+    toast(`All ${all.length} addresses copied to clipboard`,'ok');
+  });
+}
+
+function resetSchedule(){optimized=false;confirmed=false;routeOrder=[];document.getElementById("optBar").classList.add("hidden");document.getElementById("routeCard").classList.add("hidden");document.getElementById("apptSection").classList.add("hidden")}
+function resetAll(){selIds.clear();routeOrder=[];resetSchedule();renderPatList();updateFab();setStep(selDate||rStart?2:1)}
+
+function setStep(n){[1,2,3,4].forEach(i=>{const el=document.getElementById(`step${i}El`);el.classList.remove("active","done");if(i<n)el.classList.add("done");else if(i===n)el.classList.add("active")})}
+
+
+// ══ MOBILE TOUCH DRAG-AND-DROP ══
+// Standard HTML5 drag-and-drop doesn't fire on iOS/Android.
+// We use touchstart/touchmove/touchend to replicate the behavior.
+
+let touchDragPid = null;   // pid being dragged in patient list
+let touchDragRIdx = null;  // index being dragged in route list
+let touchDragType = null;  // 'list' | 'route'
+let touchDragEl = null;
+let touchClone = null;
+
+function getTouchTarget(y) {
+  // Hide clone so elementFromPoint works
+  if (touchClone) touchClone.style.display = 'none';
+  const el = document.elementFromPoint(window.innerWidth / 2, y);
+  if (touchClone) touchClone.style.display = '';
+  return el;
+}
+
+function findRowAt(y, selector) {
+  const el = getTouchTarget(y);
+  return el ? el.closest(selector) : null;
+}
+
+function initTouchDnd() {
+  // Patient list rows
+  document.addEventListener('touchstart', function(e) {
+    const handle = e.target.closest('.pt-drag');
+    if (!handle) return;
+    const row = handle.closest('.pt-row');
+    if (!row) return;
+    e.preventDefault();
+    const ridx = row.dataset.ridx;
+    const pid  = row.dataset.pid;
+    if (ridx !== undefined) {
+      touchDragType = 'route';
+      touchDragRIdx = parseInt(ridx);
+    } else if (pid !== undefined) {
+      touchDragType = 'list';
+      touchDragPid  = parseInt(pid);
+    }
+    touchDragEl = row;
+    row.classList.add('dragging');
+    // Create floating clone
+    const rect = row.getBoundingClientRect();
+    touchClone = row.cloneNode(true);
+    touchClone.style.cssText = `position:fixed;left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;z-index:9999;pointer-events:none;opacity:0.85;box-shadow:0 8px 24px rgba(0,0,0,.3);border-radius:10px;background:var(--card)`;
+    document.body.appendChild(touchClone);
+  }, { passive: false });
+
+  document.addEventListener('touchmove', function(e) {
+    if (!touchDragEl || !touchClone) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    touchClone.style.top = (touch.clientY - 30) + 'px';
+    touchClone.style.left = '8px';
+    touchClone.style.width = 'calc(100% - 16px)';
+    // Highlight drop target
+    document.querySelectorAll('.pt-row.drag-over').forEach(r => r.classList.remove('drag-over'));
+    const target = findRowAt(touch.clientY, '.pt-row');
+    if (target && target !== touchDragEl) target.classList.add('drag-over');
+  }, { passive: false });
+
+  document.addEventListener('touchend', function(e) {
+    if (!touchDragEl) return;
+    const touch = e.changedTouches[0];
+    document.querySelectorAll('.pt-row.drag-over, .pt-row.dragging').forEach(r => {
+      r.classList.remove('drag-over', 'dragging');
+    });
+    if (touchClone) { touchClone.remove(); touchClone = null; }
+
+    const target = findRowAt(touch.clientY, '.pt-row');
+    if (target && target !== touchDragEl) {
+      if (touchDragType === 'route') {
+        const toIdx = parseInt(target.dataset.ridx);
+        if (!isNaN(toIdx) && touchDragRIdx !== null && touchDragRIdx !== toIdx) {
+          const moved = routeOrder.splice(touchDragRIdx, 1)[0];
+          routeOrder.splice(toIdx, 0, moved);
+          renderRoute();
+        }
+      } else if (touchDragType === 'list') {
+        const fromIdx = patList.findIndex(p => p.id === touchDragPid);
+        const toPid  = parseInt(target.dataset.pid);
+        const toIdx  = patList.findIndex(p => p.id === toPid);
+        if (fromIdx !== -1 && toIdx !== -1 && fromIdx !== toIdx) {
+          const moved = patList.splice(fromIdx, 1)[0];
+          patList.splice(toIdx, 0, moved);
+          renderPatList();
+        }
+      }
+    }
+    touchDragEl = null; touchDragPid = null; touchDragRIdx = null; touchDragType = null;
+  });
+}
+
+document.addEventListener("DOMContentLoaded",async()=>{
+  const now=new Date();calY=now.getFullYear();calM=now.getMonth();
+  renderCal();
+  document.getElementById("calPrev")?.addEventListener("click",prevMonth);
+  document.getElementById("calNext")?.addEventListener("click",nextMonth);
+  try{await initDB();allPats=await fetchPats();renderCal();}
+  catch(e){toast("DB error: "+e.message,"err")}
+  // Dark mode: sync button icon to current state
+  const sys=window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const btn=document.getElementById("darkToggle");
+  if(btn)btn.textContent=sys?"🌙":"☀️";
+  initTouchDnd();
+  // Expose all for inline handlers
+  const fns={setMode,prevMonth,nextMonth,onDay,loadPatients,loadAllUpcoming,toggleAll,selectAll,clearAll,
+    togglePat,selCity,optimizeRoute,openMapsSelected,doConfirm,closeRoute,resetAll,
+    dStart,dEnter,dEnd,rDragStart,rDrop,toggleDark};
+  Object.entries(fns).forEach(([k,v])=>window[k]=v);
+});
+</script>
+
+<!-- MAPQUEST HELPER MODAL -->
+<div class="modal-overlay" id="mqHelperModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title">🗺️ MapQuest — <span id="mqCount"></span></div>
+      <button class="modal-close" onclick="closeModal('mqHelperModal')">✕</button>
+    </div>
+    <div class="modal-body" style="padding:0">
+      <div style="padding:10px 12px;background:var(--teal-light);border-bottom:1px solid #B2DADA;font-size:12px;color:var(--teal-dark)">
+        <strong>How to use:</strong><br>
+        1. Tap <strong>Open MapQuest</strong> below<br>
+        2. Tap <strong>Copy</strong> next to each address<br>
+        3. Paste into each stop field (A, B, C…) in MapQuest<br>
+        4. Use MapQuest's <em>"Re-order stops for the most optimized route"</em> toggle ✓
+      </div>
+      <div style="padding:8px 12px;display:flex;align-items:center;gap:8px;border-bottom:2px solid var(--border);background:var(--bg)">
+        <span style="font-size:11px;color:var(--text-2);flex:1">All addresses auto-copied to clipboard</span>
+        <button onclick="mqCopyAll()" style="padding:5px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--card);color:var(--text-2);font-size:11px;font-weight:700;cursor:pointer">Copy All Again</button>
+      </div>
+      <div id="mqAddrList" style="max-height:340px;overflow-y:auto"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('mqHelperModal')">Close</button>
+      <button class="btn-primary" onclick="mqOpenSite()" style="display:flex;align-items:center;gap:6px">
+        🗺️ Open MapQuest
+      </button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
