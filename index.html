@@ -2507,6 +2507,12 @@ function todayStr() {
   const d = new Date();
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 }
+// Add N days to an ISO date string — used by invoice and scheduler
+function addDays(dateStr, n) {
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
 // Safe date comparison: strip time component before comparing
 function dateOnly(isoOrDatetime) {
   if (!isoOrDatetime) return null;
