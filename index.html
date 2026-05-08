@@ -5184,49 +5184,50 @@ function renderInvoiceView() {
   }
 
   if (!data.finalized && unbilledDates.length > 0) {
-    // Group: recent (≤30 days) vs old (>30 days)
     const today30 = addDays(todayStr(), -30);
-    const recent = unbilledDates.filter(d => d >= today30);
-    const older  = unbilledDates.filter(d => d <  today30);
+    const recent  = unbilledDates.filter(d => d >= today30);
+    const older   = unbilledDates.filter(d => d <  today30);
 
     recent.forEach(date => {
-      const pats = getPatientsSeenOn(date);
-      const dt   = new Date(date + 'T00:00:00');
-      const isToday = date === todayStr();
-      const label = isToday ? 'Today' : dt.toLocaleDateString('en-CA',{weekday:'long',month:'short',day:'numeric'});
-      html += `<div style="background:var(--orange-bg);border:1.5px solid #F5D0AA;border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:6px;display:flex;align-items:center;gap:10px">
-        <span style="font-size:18px">⚠️</span>
-        <div style="flex:1;cursor:pointer" onclick="openAddDayModal('${date}')">
-          <div style="font-size:13px;font-weight:800;color:var(--orange)">${label} — not added</div>
-          <div style="font-size:12px;color:var(--text-2)">${pats.length} patient${pats.length!==1?'s':''} — tap to add</div>
-        </div>
-        <button onclick="ignoreDate('${date}')" title="Dismiss — don't show again"
-          style="flex-shrink:0;padding:4px 9px;border-radius:6px;border:1px solid #F5D0AA;background:transparent;color:var(--orange);font-size:11px;font-weight:700;cursor:pointer">
-          Ignore
-        </button>
-        <span style="font-size:16px;color:var(--orange);cursor:pointer" onclick="openAddDayModal('${date}')">›</span>
-      </div>`;
+      const cnt   = getPatientsSeenOn(date).length;
+      const dt    = new Date(date + 'T00:00:00');
+      const label = date === todayStr() ? 'Today'
+        : dt.toLocaleDateString('en-CA', {weekday:'long', month:'short', day:'numeric'});
+      html += [
+        '<div class="inv-unbilled" data-date="' + date + '" style="background:var(--orange-bg);border:1.5px solid #F5D0AA;border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:6px;display:flex;align-items:center;gap:10px">',
+          '<span style="font-size:18px">⚠️</span>',
+          '<div class="inv-add-day" data-date="' + date + '" style="flex:1;cursor:pointer">',
+            '<div style="font-size:13px;font-weight:800;color:var(--orange)">' + esc(label) + ' — not added</div>',
+            '<div style="font-size:12px;color:var(--text-2)">' + cnt + ' patient' + (cnt!==1?'s':'') + ' — tap to add</div>',
+          '</div>',
+          '<button class="inv-ignore-day" data-date="' + date + '" style="flex-shrink:0;padding:4px 9px;border-radius:6px;border:1px solid #F5D0AA;background:transparent;color:var(--orange);font-size:11px;font-weight:700;cursor:pointer">Ignore</button>',
+          '<span class="inv-add-day" data-date="' + date + '" style="font-size:16px;color:var(--orange);cursor:pointer">›</span>',
+        '</div>'
+      ].join('');
     });
 
     if (older.length > 0) {
-      html += `<div style="background:var(--bg);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:8px">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-          <span style="font-size:12px;font-weight:800;color:var(--text-2)">🗂 Older unbilled dates (${older.length})</span>
-          <button onclick="ignoreAllOld()" style="margin-left:auto;font-size:10px;padding:3px 8px;border-radius:5px;border:1px solid var(--border);background:var(--card);color:var(--text-2);cursor:pointer;font-weight:700">
-            Ignore All
-          </button>
-        </div>
-        ${older.map(date => {
-          const pats = getPatientsSeenOn(date);
-          const dt   = new Date(date + 'T00:00:00');
-          const label = dt.toLocaleDateString('en-CA',{month:'short',day:'numeric',year:'numeric'});
-          return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">
-            <span style="font-size:12px;color:var(--text-2);flex:1">${label} — ${pats.length} patient${pats.length!==1?'s':''}</span>
-            <button onclick="openAddDayModal('${date}')" style="font-size:10px;padding:2px 7px;border-radius:5px;border:1px solid var(--teal);background:transparent;color:var(--teal-dark);cursor:pointer;font-weight:700">Add</button>
-            <button onclick="ignoreDate('${date}')" style="font-size:10px;padding:2px 7px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--text-2);cursor:pointer;font-weight:700">Ignore</button>
-          </div>`;
-        }).join('')}
-      </div>`;
+      var olderInner = older.map(date => {
+        const cnt   = getPatientsSeenOn(date).length;
+        const dt    = new Date(date + 'T00:00:00');
+        const label = dt.toLocaleDateString('en-CA', {month:'short', day:'numeric', year:'numeric'});
+        return [
+          '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">',
+            '<span style="font-size:12px;color:var(--text-2);flex:1">' + esc(label) + ' — ' + cnt + ' patient' + (cnt!==1?'s':'') + '</span>',
+            '<button class="inv-add-day" data-date="' + date + '" style="font-size:10px;padding:2px 8px;border-radius:5px;border:1px solid var(--teal);background:transparent;color:var(--teal-dark);cursor:pointer;font-weight:700">Add</button>',
+            '<button class="inv-ignore-day" data-date="' + date + '" style="font-size:10px;padding:2px 8px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--text-2);cursor:pointer;font-weight:700">Ignore</button>',
+          '</div>'
+        ].join('');
+      }).join('');
+      html += [
+        '<div style="background:var(--bg);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:8px">',
+          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">',
+            '<span style="font-size:12px;font-weight:800;color:var(--text-2)">🗂 Older unbilled dates (' + older.length + ')</span>',
+            '<button onclick="ignoreAllOld()" style="margin-left:auto;font-size:10px;padding:3px 8px;border-radius:5px;border:1px solid var(--border);background:var(--card);color:var(--text-2);cursor:pointer;font-weight:700">Ignore All</button>',
+          '</div>',
+          olderInner,
+        '</div>'
+      ].join('');
     }
   }
 
@@ -5303,6 +5304,14 @@ function renderInvoiceView() {
   </div>`;
 
   document.getElementById('invoiceContent').innerHTML = html;
+
+  // Wire click handlers via delegation (avoids inline onclick quote issues)
+  document.querySelectorAll('.inv-add-day').forEach(el => {
+    el.addEventListener('click', () => openAddDayModal(el.dataset.date));
+  });
+  document.querySelectorAll('.inv-ignore-day').forEach(el => {
+    el.addEventListener('click', () => ignoreDate(el.dataset.date));
+  });
 
   // Check if we need to show the unbilled badge on nav
   const badge = document.getElementById('badge-invoice');
