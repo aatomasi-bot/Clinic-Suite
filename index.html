@@ -2313,7 +2313,7 @@ a:focus:not(:focus-visible) { outline: none; }
              autocomplete="current-password">
     </div>
 
-    <button class="login-btn" id="loginBtn" onclick="doLogin()">
+    <button class="login-btn" id="loginBtn" onclick="(window.doLogin||doLogin)()">
       Sign In
     </button>
     <div class="login-error" id="loginError"></div>
@@ -6991,6 +6991,7 @@ async function doLogin() {
     btn.textContent = 'Sign In'; btn.disabled = false;
   }
 }
+window.doLogin  = doLogin;  // immediate global assignment
 
 async function doLogout() {
   await _sb.auth.signOut();
@@ -6999,6 +7000,7 @@ async function doLogout() {
   closeMenuDrawer();
   toast('Signed out', 'success');
 }
+window.doLogout = doLogout; // immediate global assignment
 
 // Allow pressing Enter in password field
 document.addEventListener('keydown', e => {
