@@ -7349,18 +7349,6 @@ _applyThemeTokens(e.newValue, isDark);
 
 <script>
 /* Login button wired after all scripts — guaranteed scope */
-(function(){
-  function wire(){
-    var btn = document.getElementById('loginBtn');
-    if (!btn) return;
-    btn.onclick = function(){
-      if (typeof doLogin === 'function') { doLogin(); }
-      else console.error('doLogin not yet defined');
-    };
-  }
-  // Always wait for DOMContentLoaded so main script sets _sb first
-  document.addEventListener('DOMContentLoaded', wire);
-})();
 </script>
 
 </body>
