@@ -2978,8 +2978,6 @@ const COL = {
 
 // State
 let _sb = null;
-// Initialise Supabase immediately — CDN loads before this script
-try { _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); } catch(e) {}
 let patients = [];
 let currentTab = 'today';
 let currentView = 'patients';
@@ -6950,7 +6948,7 @@ doLogin();
 
 document.addEventListener(‘DOMContentLoaded’, async () => {
 // Supabase — init client first (no network call yet)
-_sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+if (!_sb) _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 document.getElementById(‘syncDot’).className = ‘sync-dot connected’;
 
 // Check for existing session (persisted from last login)
@@ -7355,10 +7353,6 @@ _applyThemeTokens(e.newValue, isDark);
   function wire(){
     var btn = document.getElementById('loginBtn');
     if (!btn) return;
-    // Ensure _sb is ready before wiring
-    if (!window._sb && typeof SUPABASE_URL !== 'undefined') {
-      try { window._sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); } catch(e) {}
-    }
     btn.onclick = function(){
       if (typeof doLogin === 'function') { doLogin(); }
       else console.error('doLogin not yet defined');
