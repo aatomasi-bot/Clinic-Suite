@@ -3109,6 +3109,13 @@ function todayStr() {
   const d = new Date();
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 }
+
+// Convert any Date object to YYYY-MM-DD in LOCAL timezone (never UTC)
+// Use this everywhere a date string is needed — avoids the midnight UTC rollover bug
+function localDateStr(d) {
+  if (!d || isNaN(d.getTime())) return '';
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
 // Add N days to an ISO date string — used by invoice and scheduler
 function addDays(dateStr, n) {
   const d = new Date(dateStr + 'T00:00:00');
@@ -5857,7 +5864,7 @@ function parseOneNoteLine(line) {
 
   const past   = dates.filter(d=>d<=today).sort((a,b)=>a-b);
   const future = dates.filter(d=>d>today).sort((a,b)=>a-b);
-  out.previous_injection_dates = past.map(d=>d.toISOString().split('T')[0]).join(', ');
+  out.previous_injection_dates = past.map(d=>localDateStr(d)).join(', ');
 
   const injCount = past.length;
   if (future.length) {
@@ -5866,7 +5873,7 @@ function parseOneNoteLine(line) {
     const wks = parseInt(DOSE_WKS[out.dose_prescribed])||4;
     const last = new Date(past[past.length-1]);
     last.setDate(last.getDate()+wks*7);
-    out.due_date = last.toISOString().split('T')[0];
+    out.due_date = localDateStr(last);
   }
 
   out.doses_remaining = String(Math.max(0, parseInt(out.total_doses||0) - injCount));
