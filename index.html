@@ -2295,6 +2295,17 @@ a:focus:not(:focus-visible) { outline: none; }
     window.PDFJS_URL    = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
     window.PDFJS_WORKER = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   </script>
+
+  <script>
+    // Register service worker for offline caching + fast repeat loads
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js', { scope: './' })
+          .then(reg => console.info('[SW] Registered, scope:', reg.scope))
+          .catch(err => console.warn('[SW] Registration failed:', err));
+      });
+    }
+  </script>
 </head>
 <body>
 
@@ -2327,6 +2338,64 @@ a:focus:not(:focus-visible) { outline: none; }
       Sign In
     </button>
     <div class="login-error" id="loginError"></div>
+
+    <!-- Forgot password link -->
+    <div id="forgotLink" style="text-align:center;margin-top:10px">
+      <button onclick="showResetForm()"
+        style="background:none;border:none;color:var(--teal-dark,#1E6665);
+               font-size:12px;cursor:pointer;text-decoration:underline;
+               font-family:inherit;opacity:.8">
+        Forgot password?
+      </button>
+    </div>
+
+    <!-- Password reset form (hidden by default) -->
+    <div id="resetForm" style="display:none;margin-top:12px">
+      <div style="font-size:12px;color:var(--text-2,#6B7A8F);margin-bottom:8px;text-align:center">
+        Enter your email — we'll send a reset link
+      </div>
+      <input id="resetEmail" type="email" placeholder="your@email.com"
+        style="width:100%;padding:10px 14px;border:1.5px solid #D1D9E6;
+               border-radius:8px;font-size:14px;box-sizing:border-box;
+               margin-bottom:8px;font-family:inherit">
+      <button onclick="doPasswordReset()"
+        style="width:100%;padding:10px;border-radius:8px;border:none;
+               background:linear-gradient(135deg,#2D8C8A,#1E6665);
+               color:#fff;font-size:14px;font-weight:700;cursor:pointer;
+               font-family:inherit">
+        Send Reset Link
+      </button>
+      <div id="resetMsg" style="font-size:12px;text-align:center;margin-top:8px"></div>
+      <button onclick="showLoginForm()"
+        style="background:none;border:none;color:#6B7A8F;font-size:12px;
+               cursor:pointer;width:100%;margin-top:4px;font-family:inherit">
+        ← Back to sign in
+      </button>
+    </div>
+
+    <!-- New password form — shown after clicking email reset link -->
+    <div id="newPasswordForm" style="display:none;margin-top:12px">
+      <div style="font-size:13px;font-weight:700;color:var(--text,#1B2638);
+                  text-align:center;margin-bottom:12px">
+        🔑 Set Your New Password
+      </div>
+      <input id="newPwd1" type="password" placeholder="New password"
+        style="width:100%;padding:10px 14px;border:1.5px solid #D1D9E6;
+               border-radius:8px;font-size:14px;box-sizing:border-box;
+               margin-bottom:8px;font-family:inherit">
+      <input id="newPwd2" type="password" placeholder="Confirm new password"
+        style="width:100%;padding:10px 14px;border:1.5px solid #D1D9E6;
+               border-radius:8px;font-size:14px;box-sizing:border-box;
+               margin-bottom:8px;font-family:inherit">
+      <button onclick="doSetNewPassword()"
+        style="width:100%;padding:10px;border-radius:8px;border:none;
+               background:linear-gradient(135deg,#2D8C8A,#1E6665);
+               color:#fff;font-size:14px;font-weight:700;cursor:pointer;
+               font-family:inherit;margin-bottom:6px">
+        ✓ Save New Password
+      </button>
+      <div id="newPwdMsg" style="font-size:12px;text-align:center;color:#6B7A8F"></div>
+    </div>
 
     <div class="login-footer">
       VaPiq · Clinical Suite<br>Secure patient management
@@ -3093,7 +3162,16 @@ const COL = {
 // State
 let _sb = null;
 let patients = [];
-let _patientsByFileNum = new Map(); // O(1) lookup by file number
+let _patientsByFileNum = new Map();
+
+// ── Virtual Scroll State ──────────────────────────────────────
+// Stores pre-built HTML segments (one per date group).
+// Only VS_BATCH groups are in the DOM at a time — the rest
+// are appended as the user scrolls. Zero change to filter/sort logic.
+let _vsSegments   = [];   // [{html, label}] — all groups pre-built
+let _vsNextIdx    = 0;    // next segment index to render
+let _vsObserver   = null; // IntersectionObserver for sentinel div
+const VS_BATCH    = 5;    // date-groups per render batch (~30-50 patients) // O(1) lookup by file number
 let currentTab = 'today';
 let currentView = 'patients';
 let searchQuery = '';
@@ -3473,18 +3551,76 @@ function renderView() {
   renderPatientList();
 }
 
+
+// ── Virtual Scroll Helpers ────────────────────────────────────
+function _vsRenderBatch(el) {
+  if (_vsNextIdx >= _vsSegments.length) return;
+
+  // Remove sentinel before appending new content
+  const oldSentinel = document.getElementById('_vsSentinel');
+  if (oldSentinel) oldSentinel.remove();
+
+  // Render next batch of segments
+  const end = Math.min(_vsNextIdx + VS_BATCH, _vsSegments.length);
+  const tmp  = document.createElement('div');
+  let batchHtml = '';
+  for (let i = _vsNextIdx; i < end; i++) {
+    batchHtml += _vsSegments[i].html;
+  }
+  tmp.innerHTML = batchHtml;
+  while (tmp.firstChild) el.appendChild(tmp.firstChild);
+  _vsNextIdx = end;
+
+  // Attach events to newly rendered cards
+  attachCardEvents();
+
+  // Add sentinel if more segments remain
+  if (_vsNextIdx < _vsSegments.length) {
+    const remaining = _vsSegments.length - _vsNextIdx;
+    const sentinel = document.createElement('div');
+    sentinel.id = '_vsSentinel';
+    sentinel.style.cssText =
+      'height:80px;display:flex;align-items:center;justify-content:center;' +
+      'color:var(--text-3);font-size:12px;font-weight:600;letter-spacing:.5px';
+    sentinel.innerHTML =
+      '<span>↓ Scroll for ' + remaining + ' more date group' +
+      (remaining !== 1 ? 's' : '') + '</span>';
+    el.appendChild(sentinel);
+
+    // Disconnect old observer, create new one
+    if (_vsObserver) _vsObserver.disconnect();
+    _vsObserver = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting) {
+        _vsObserver.disconnect();
+        _vsObserver = null;
+        _vsRenderBatch(el);
+      }
+    }, { rootMargin: '200px' }); // start loading 200px before sentinel is visible
+    _vsObserver.observe(sentinel);
+  }
+}
+
+function _vsReset() {
+  if (_vsObserver) { _vsObserver.disconnect(); _vsObserver = null; }
+  _vsSegments = [];
+  _vsNextIdx  = 0;
+}
+
 function renderPatientList() {
   const el = document.getElementById('mainContent');
   const filtered = getFilteredPatients();
+
+  // ── Empty state (unchanged) ──
   if (!filtered.length) {
+    _vsReset();
     const msgs = {
-      today: { icon:'📅', title:'No appointments today', sub:'All clear for today.' },
-      scheduled: { icon:'🗓', title:'No scheduled appointments', sub:'No upcoming confirmed appointments.' },
-      all: { icon:'👥', title:'No active patients', sub:'Add a patient to get started.' },
-      overdue: { icon:'✅', title:'No overdue appointments', sub:'All appointments are up to date.' },
-      pending: { icon:'⏳', title:'No pending patients', sub:'Patients pending renewal will appear here.' },
-      archived: { icon:'🗄', title:'No archived patients', sub:'Archived patients will appear here.' },
-      cpp:      { icon:'🩺', title:'No CPP patients', sub:'Patients marked as CPP will appear here.' },
+      today:    { icon:'📅', title:'No appointments today',        sub:'All clear for today.' },
+      scheduled:{ icon:'🗓', title:'No scheduled appointments',    sub:'No upcoming confirmed appointments.' },
+      all:      { icon:'👥', title:'No active patients',           sub:'Add a patient to get started.' },
+      overdue:  { icon:'✅', title:'No overdue appointments',      sub:'All appointments are up to date.' },
+      pending:  { icon:'⏳', title:'No pending patients',          sub:'Patients pending renewal will appear here.' },
+      archived: { icon:'🗄', title:'No archived patients',         sub:'Archived patients will appear here.' },
+      cpp:      { icon:'🩺', title:'No CPP patients',              sub:'Patients marked as CPP will appear here.' },
     };
     const m = msgs[currentTab] || { icon:'👥', title:'No patients', sub:'' };
     el.innerHTML = `<div class="empty-state"><div class="empty-state__icon">${m.icon}</div><div class="empty-state__title">${m.title}</div><p class="empty-state__sub">${m.sub}</p></div>`;
@@ -3493,20 +3629,18 @@ function renderPatientList() {
 
   const today = todayStr();
 
-  // ── Split into two priority groups ──
+  // ── Split and group (logic completely unchanged) ──
   const confirmed   = filtered.filter(p => !!p['Appointment Confirmed']);
   const unconfirmed = filtered.filter(p => !p['Appointment Confirmed']);
 
-  // Group confirmed patients by appointment DATE (not due date)
   const confGroups = {};
   confirmed.forEach(p => {
-    const apptDT  = p['Appointment Date & Time'] || '';
-    const key     = apptDT ? apptDT.split('T')[0] : (p['Due Date'] || 'Unknown');
+    const apptDT = p['Appointment Date & Time'] || '';
+    const key    = apptDT ? apptDT.split('T')[0] : (p['Due Date'] || 'Unknown');
     if (!confGroups[key]) confGroups[key] = [];
     confGroups[key].push(p);
   });
 
-  // Group unconfirmed patients by due date
   const dueGroups = {};
   unconfirmed.forEach(p => {
     const key = p['Due Date'] || 'Unknown';
@@ -3514,58 +3648,66 @@ function renderPatientList() {
     dueGroups[key].push(p);
   });
 
-  let html = '';
+  // ── Build segment array (each segment = one date group's HTML) ──
+  // This is identical to before but stores strings instead of concatenating
+  _vsReset();
   let cardIdx = 0;
 
-  // ── Render confirmed group first ──
-  if (confirmed.length > 0) {
-    // Section header — only shown when there are also unconfirmed patients
-    if (unconfirmed.length > 0) {
-      html += `<div style="display:flex;align-items:center;gap:8px;padding:14px 4px 6px">
+  // Confirmed section header
+  if (confirmed.length > 0 && unconfirmed.length > 0) {
+    _vsSegments.push({ html:
+      `<div style="display:flex;align-items:center;gap:8px;padding:14px 4px 6px">
         <span style="width:10px;height:10px;border-radius:50%;background:var(--teal);flex-shrink:0"></span>
         <span style="font-size:11px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--teal-dark)">Confirmed Appointments</span>
         <span style="background:var(--teal-light);color:var(--teal-dark);border-radius:20px;padding:1px 8px;font-size:11px;font-weight:700">${confirmed.length}</span>
-      </div>`;
-    }
-    for (const date of Object.keys(confGroups).sort()) {
-      const isToday = date === today;
-      const isPast  = date < today && date !== 'Unknown';
-      const sepClass = isToday ? 'date-sep--today' : (isPast ? 'date-sep--overdue' : '');
-      html += `<div class="date-sep ${sepClass}">
+      </div>`
+    });
+  }
+
+  // Confirmed date groups
+  for (const date of Object.keys(confGroups).sort()) {
+    const isToday  = date === today;
+    const isPast   = date < today && date !== 'Unknown';
+    const sepClass = isToday ? 'date-sep--today' : (isPast ? 'date-sep--overdue' : '');
+    let segHtml = `<div class="date-sep ${sepClass}">
         <span class="date-sep__label">${isToday ? 'TODAY' : formatDateFull(date).toUpperCase()}</span>
         <span style="font-size:9px;font-weight:700;letter-spacing:0.5px;color:var(--teal);margin-left:2px">✓ APPT</span>
         <span class="date-sep__badge">${confGroups[date].length}</span>
-        ${isToday ? `<button class="eod-link" onclick="openEndOfDayModal('${date}')">📧 End of Day</button>` + `<button class="record-all-link" onclick="recordAllForDate('${date}')">⚡ Record All</button>` : ''}
+        ${isToday ? `<button class="eod-link" onclick="openEndOfDayModal('${date}')">📧 End of Day</button><button class="record-all-link" onclick="recordAllForDate('${date}')">⚡ Record All</button>` : ''}
       </div>`;
-      confGroups[date].forEach(p => { html += renderCard(p, cardIdx++); });
-    }
+    confGroups[date].forEach(p => { segHtml += renderCard(p, cardIdx++); });
+    _vsSegments.push({ html: segHtml });
   }
 
-  // ── Render unconfirmed group second ──
-  if (unconfirmed.length > 0) {
-    // Divider — only shown when there were also confirmed patients above
-    if (confirmed.length > 0) {
-      html += `<div style="display:flex;align-items:center;gap:8px;padding:18px 4px 6px">
+  // Divider between confirmed and unconfirmed
+  if (confirmed.length > 0 && unconfirmed.length > 0) {
+    _vsSegments.push({ html:
+      `<div style="display:flex;align-items:center;gap:8px;padding:18px 4px 6px">
         <div style="flex:1;height:1px;background:var(--border)"></div>
         <span style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-3)">By Due Date — No Appointment Set</span>
         <span style="background:var(--border);color:var(--text-2);border-radius:20px;padding:1px 8px;font-size:11px;font-weight:700">${unconfirmed.length}</span>
         <div style="flex:1;height:1px;background:var(--border)"></div>
-      </div>`;
-    }
-    for (const date of Object.keys(dueGroups).sort()) {
-      const isToday = date === today;
-      const isPast  = date < today && date !== 'Unknown';
-      const sepClass = isToday ? 'date-sep--today' : (isPast ? 'date-sep--overdue' : '');
-      html += `<div class="date-sep ${sepClass}">
+      </div>`
+    });
+  }
+
+  // Unconfirmed date groups
+  for (const date of Object.keys(dueGroups).sort()) {
+    const isToday  = date === today;
+    const isPast   = date < today && date !== 'Unknown';
+    const sepClass = isToday ? 'date-sep--today' : (isPast ? 'date-sep--overdue' : '');
+    let segHtml = `<div class="date-sep ${sepClass}">
         <span class="date-sep__label">${isToday ? 'TODAY' : formatDateFull(date).toUpperCase()}</span>
         <span class="date-sep__badge">${dueGroups[date].length}</span>
-        ${isToday ? `<button class="eod-link" onclick="openEndOfDayModal('${date}')">📧 End of Day</button>` + `<button class="record-all-link" onclick="recordAllForDate('${date}')">⚡ Record All</button>` : ''}
+        ${isToday ? `<button class="eod-link" onclick="openEndOfDayModal('${date}')">📧 End of Day</button><button class="record-all-link" onclick="recordAllForDate('${date}')">⚡ Record All</button>` : ''}
       </div>`;
-      dueGroups[date].forEach(p => { html += renderCard(p, cardIdx++); });
-    }
+    dueGroups[date].forEach(p => { segHtml += renderCard(p, cardIdx++); });
+    _vsSegments.push({ html: segHtml });
   }
-  el.innerHTML = html;
-  attachCardEvents();
+
+  // ── Render first batch into DOM ──
+  el.innerHTML = '';
+  _vsRenderBatch(el);
 }
 
 function renderCard(p, idx) {
@@ -4135,22 +4277,14 @@ function openEditModal(id) {
 async function savePatient() {
   try {
   // ── Input validation ─────────────────────────────────────
-  const ptNameVal = document.getElementById('ptName')?.value.trim() || '';
-  const fileNum = document.getElementById('ptFileNum')?.value.trim() || '';
-  if (!ptNameVal) {
-    toast('Patient name is required', 'warning'); return;
-  }
-  if (!fileNum) {
-    toast('File number is required', 'warning'); return;
-  }
-  // Prevent duplicate file numbers
-  if (_patientsByFileNum.has(fileNum)) {
-    const existing = _patientsByFileNum.get(fileNum);
-    const isEdit   = document.getElementById('ptId')?.value === String(existing?.id);
-    if (!isEdit) {
-      toast('File #' + fileNum + ' already exists — check for duplicates', 'error');
-      return;
-    }
+  const _nameCheck = (document.getElementById('f-name')?.value || '').trim();
+  const _fileCheck = (document.getElementById('f-file')?.value || '').trim();
+  if (!_nameCheck) { toast('Patient name is required', 'warning'); return; }
+  if (!_fileCheck) { toast('File number is required', 'warning');  return; }
+  // Prevent duplicate file numbers — skip when editing existing patient
+  if (!editingId && _patientsByFileNum.has(_fileCheck)) {
+    toast('File #' + _fileCheck + ' already exists — check for duplicates', 'error');
+    return;
   }
   
   const fn = document.getElementById('f-file').value.trim();
@@ -5002,7 +5136,7 @@ function importCSVFile(file) {
 
           // Must have a name
           const _name = p['Patient Name'] || '';
-          if (!name) continue;
+          if (!_name) continue;
 
           // Deduplicate by file number (case-insensitive, trimmed)
           const fileNum = (p['File Number'] || '').trim();
@@ -8185,9 +8319,116 @@ async function recordAllFromNote(fileNum) {
   }
 }
 
+
+// ══════════════════════════════════════════════════════════════
+//  PASSWORD RESET — uses Supabase built-in reset email
+// ══════════════════════════════════════════════════════════════
+function showResetForm() {
+  document.getElementById('forgotLink').style.display = 'none';
+  document.getElementById('resetForm').style.display  = 'block';
+  document.getElementById('loginError').style.display = 'none';
+  // Pre-fill with whatever email was typed
+  const email = document.getElementById('loginEmail')?.value.trim();
+  if (email) document.getElementById('resetEmail').value = email;
+  document.getElementById('resetEmail').focus();
+}
+
+function showLoginForm() {
+  document.getElementById('forgotLink').style.display = 'block';
+  document.getElementById('resetForm').style.display  = 'none';
+  document.getElementById('resetMsg').textContent     = '';
+}
+
+async function doPasswordReset() {
+  const email  = (document.getElementById('resetEmail')?.value || '').trim();
+  const msgEl  = document.getElementById('resetMsg');
+  if (!email || !email.includes('@')) {
+    msgEl.style.color   = '#E05A5A';
+    msgEl.textContent   = 'Please enter a valid email address.';
+    return;
+  }
+  if (!_sb) _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  msgEl.style.color   = '#6B7A8F';
+  msgEl.textContent   = 'Sending…';
+  try {
+    const { error } = await _sb.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.href   // returns user to the app after reset
+    });
+    if (error) throw error;
+    msgEl.style.color = '#3D9A6B';
+    msgEl.textContent = '✓ Reset link sent — check your inbox (and spam folder)';
+    document.querySelector('#resetForm button[onclick="doPasswordReset()"]').disabled = true;
+  } catch(e) {
+    msgEl.style.color = '#E05A5A';
+    msgEl.textContent = e.message.includes('rate')
+      ? 'Too many requests — please wait a minute and try again.'
+      : 'Could not send reset email. Please try again.';
+  }
+}
+
 // ── Login rate-limiter (client-side guard, real limiting is server-side via Supabase)
 let _loginAttempts = 0;
 let _loginLocked   = false;
+
+
+// ── Password Reset — Set New Password ──────────────────────
+// Called when PASSWORD_RECOVERY event fires (user arrived via email link)
+function showNewPasswordForm() {
+  // Show login screen if hidden
+  const ls = document.getElementById('loginScreen');
+  if (ls) ls.style.display = 'flex';
+  // Hide other login sections, show new password form
+  document.getElementById('forgotLink').style.display     = 'none';
+  document.getElementById('resetForm').style.display      = 'none';
+  const mainForm = document.querySelector('#loginScreen .login-card form,#loginScreen .login-fields');
+  // Hide the email/password fields and sign-in button
+  ['loginEmail','loginPassword','loginBtn','forgotLink'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.closest('div')?.style && (el.style.display = 'none');
+  });
+  document.getElementById('newPasswordForm').style.display = 'block';
+  document.getElementById('newPwd1').focus();
+}
+
+async function doSetNewPassword() {
+  const pwd1  = document.getElementById('newPwd1').value;
+  const pwd2  = document.getElementById('newPwd2').value;
+  const msgEl = document.getElementById('newPwdMsg');
+
+  if (!pwd1 || pwd1.length < 8) {
+    msgEl.style.color = '#E05A5A';
+    msgEl.textContent = 'Password must be at least 8 characters.';
+    return;
+  }
+  if (pwd1 !== pwd2) {
+    msgEl.style.color = '#E05A5A';
+    msgEl.textContent = 'Passwords do not match.';
+    return;
+  }
+
+  msgEl.style.color   = '#6B7A8F';
+  msgEl.textContent   = 'Saving…';
+
+  try {
+    const { error } = await _sb.auth.updateUser({ password: pwd1 });
+    if (error) throw error;
+    msgEl.style.color = '#3D9A6B';
+    msgEl.textContent = '✓ Password updated successfully!';
+    // After 2 seconds, reload the app — user is now logged in
+    setTimeout(() => {
+      document.getElementById('newPasswordForm').style.display = 'none';
+      ['loginEmail','loginPassword','loginBtn','forgotLink'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = '';
+      });
+      document.getElementById('forgotLink').style.display = 'block';
+      hideLoginScreen();
+    }, 2000);
+  } catch(e) {
+    msgEl.style.color = '#E05A5A';
+    msgEl.textContent = 'Could not update password: ' + (e.message || 'please try again');
+  }
+}
 
 async function doLogin() {
   try {
@@ -8274,6 +8515,11 @@ async function doLogout() {
 window.recordAllFromNote = recordAllFromNote;
   window.recordAllForDate  = recordAllForDate;
   window.doLogin  = doLogin;  // immediate global assignment
+window.showResetForm      = showResetForm;
+window.showLoginForm      = showLoginForm;
+window.doPasswordReset    = doPasswordReset;
+window.doSetNewPassword   = doSetNewPassword;
+window.showNewPasswordForm= showNewPasswordForm;
 
 async function doLogout() {
   await _sb.auth.signOut();
@@ -8404,6 +8650,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Listen for auth state changes (logout from another tab etc.)
   _sb.auth.onAuthStateChange((event, session) => {
     if (event === 'TOKEN_REFRESHED') { _resetInactivityTimer(); }
+    if (event === 'PASSWORD_RECOVERY') {
+      // User clicked reset link in email — show the new password form
+      showNewPasswordForm();
+    }
     if (event === 'SIGNED_OUT') {
       clearInactivityTimer();
       patients = []; showLoginScreen(); }
