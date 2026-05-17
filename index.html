@@ -2298,13 +2298,7 @@ a:focus:not(:focus-visible) { outline: none; }
 
   <script>
     // Register service worker for offline caching + fast repeat loads
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js', { scope: './' })
-          .then(reg => console.info('[SW] Registered, scope:', reg.scope))
-          .catch(err => console.warn('[SW] Registration failed:', err));
-      });
-    }
+
   </script>
 </head>
 <body>
@@ -4287,35 +4281,36 @@ async function savePatient() {
     return;
   }
   
-  const fn = document.getElementById('f-file').value.trim();
+  const fn    = document.getElementById('f-file').value.trim();
   const _name = document.getElementById('f-name').value.trim();
   if (!fn || !_name) { toast('Name and file number are required', 'warning'); return; }
-  if (!editingId && patients.find(p => p['File Number'] === fn)) {
-    toast('File number already exists', 'error'); return;
-  }
+
+  // Preserve existing patient fields that are NOT in the edit form
+  const _existPat = editingId ? patients.find(p => p.id === editingId) : null;
+
   const data = {
-    'Patient Name': name,
-    'File Number': fn,
-    'Address': document.getElementById('f-addr').value,
-    'Phone 1': document.getElementById('f-phone1').value,
-    'Phone 2': document.getElementById('f-phone2').value,
-    'Dose Prescribed': document.getElementById('f-dose').value,
-    'Total Doses': document.getElementById('f-total').value,
-    'Doses Remaining': document.getElementById('f-remaining').value,
-    'Previous Injection Site': document.getElementById('f-lastsite').value,
-    'Injection Site': document.getElementById('f-lastsite').value,
-    'Due Date': document.getElementById('f-due').value,
-    'Appointment Date & Time': document.getElementById('f-appt').value || null,
+    'Patient Name': _name,
+    'File Number':  fn,
+    'Address':      document.getElementById('f-addr').value,
+    'Phone 1':      document.getElementById('f-phone1').value,
+    'Phone 2':      document.getElementById('f-phone2').value,
+    'Dose Prescribed':          document.getElementById('f-dose').value,
+    'Total Doses':              document.getElementById('f-total').value,
+    'Doses Remaining':          document.getElementById('f-remaining').value,
+    'Previous Injection Site':  document.getElementById('f-lastsite').value,
+    'Injection Site':           document.getElementById('f-lastsite').value,
+    'Due Date':                 document.getElementById('f-due').value,
+    'Appointment Date & Time':  document.getElementById('f-appt').value || null,
     'Previous Injection Dates': document.getElementById('f-prevdates').value,
-    'Assignment Type': document.getElementById('f-type').value,
-    'Special Instructions': document.getElementById('f-special').value,
+    'Assignment Type':          document.getElementById('f-type').value,
+    'Special Instructions':     document.getElementById('f-special').value,
     'Adverse Effects Comments': document.getElementById('f-adverse').value,
-    'CPP Patient': document.getElementById('f-cpp').checked,
-    'File Status': 'Active',
-    'Injection Administered': false,
-    'Appointment Confirmed': !!document.getElementById('f-appt').value,
-    'Pending': false,
-    'Archived': false
+    'CPP Patient':              document.getElementById('f-cpp').checked,
+    'Appointment Confirmed':    !!document.getElementById('f-appt').value,
+    'File Status':            _existPat ? (_existPat['File Status']            || 'Active') : 'Active',
+    'Injection Administered': _existPat ? (_existPat['Injection Administered'] || false)   : false,
+    'Pending':                _existPat ? (_existPat['Pending']                || false)   : false,
+    'Archived':               _existPat ? (_existPat['Archived']               || false)   : false,
   };
   setLoading(true, editingId ? 'Updating patient…' : 'Adding patient…');
   try {
@@ -6002,7 +5997,7 @@ function parseOneNoteLine(line) {
 
   const injCount = past.length;
   if (future.length) {
-    out.due_date = future[0].toISOString().split('T')[0];
+    out.due_date = localDateStr(future[0]);
   } else if (past.length) {
     const wks = parseInt(DOSE_WKS[out.dose_prescribed])||4;
     const last = new Date(past[past.length-1]);
