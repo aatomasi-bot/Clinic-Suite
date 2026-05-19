@@ -3565,9 +3565,7 @@ function _vsRenderBatch(el) {
   while (tmp.firstChild) el.appendChild(tmp.firstChild);
   _vsNextIdx = end;
 
-  // Event delegation on mainContent handles all cards —
-  // no per-batch attachCardEvents() needed here
-  attachCardEvents(); // no-op after first call (guarded by _vapiqDelegated)
+  // attachCardEvents() is a no-op — _handleCardClick listener is permanent
 
   // Add sentinel if more segments remain
   if (_vsNextIdx < _vsSegments.length) {
@@ -3702,8 +3700,7 @@ function renderPatientList() {
 
   // ── Render first batch into DOM ──
   el.innerHTML = '';
-  el._vapiqDelegated = false; // reset so delegation re-attaches
-  _vsRenderBatch(el);
+  _vsRenderBatch(el); // _handleCardClick listener stays on el permanently
 }
 
 function renderCard(p, idx) {
@@ -3866,93 +3863,74 @@ function formatAddrDisplay(addr) {
 // For Google Maps query keep original (works better for geocoding)
 function formatAddrForMaps(addr) { return addr; }
 
-function attachCardEvents() {
-  // ── Event delegation — ONE listener on the container ────────
-  // Handles ALL cards regardless of when they were rendered by
-  // virtual scroll. Never adds duplicate listeners.
-  const el = document.getElementById('mainContent');
-  if (!el || el._vapiqDelegated) return; // attach only once per element
-  el._vapiqDelegated = true;
-
-  el.addEventListener('click', e => {
-    // ── Card header → expand/collapse ────────────────────────
-    const head = e.target.closest('.card-head');
-    if (head) {
-      // Ignore clicks directly on buttons or links inside the header
-      if (e.target.closest('button') || e.target.closest('a')) return;
-      head.closest('.patient-card')?.classList.toggle('expanded');
-      return;
-    }
-
-    // ── .js-expand toggle button ─────────────────────────────
-    const xBtn = e.target.closest('.js-expand');
-    if (xBtn) {
-      e.stopPropagation();
-      xBtn.closest('.patient-card')?.classList.toggle('expanded');
-      return;
-    }
-
-    // ── Phone call ───────────────────────────────────────────
-    const callBtn = e.target.closest('.js-call');
-    if (callBtn) {
-      e.stopPropagation();
-      window.location.href = 'tel:' + callBtn.dataset.phone;
-      return;
-    }
-
-    // ── Google Maps ──────────────────────────────────────────
-    const mapBtn = e.target.closest('.js-map');
-    if (mapBtn) {
-      e.stopPropagation();
-      window.open('https://maps.google.com/?q=' + encodeURIComponent(mapBtn.dataset.addr));
-      return;
-    }
-
-    // ── Record Injection ─────────────────────────────────────
-    const injectBtn = e.target.closest('.js-inject');
-    if (injectBtn) {
-      e.stopPropagation();
-      openInjectionModal(parseInt(injectBtn.dataset.id));
-      return;
-    }
-
-    // ── Edit patient ─────────────────────────────────────────
-    const editBtn = e.target.closest('.js-edit');
-    if (editBtn) {
-      e.stopPropagation();
-      openEditModal(parseInt(editBtn.dataset.id));
-      return;
-    }
-
-    // ── Mark Pending ─────────────────────────────────────────
-    const pendingBtn = e.target.closest('.js-pending');
-    if (pendingBtn) {
-      e.stopPropagation();
-      showConfirm('Mark as Pending?',
-        'Patient will be moved to the Pending tab.',
-        () => markPending(parseInt(pendingBtn.dataset.id)));
-      return;
-    }
-
-    // ── Archive ──────────────────────────────────────────────
-    const archiveBtn = e.target.closest('.js-archive');
-    if (archiveBtn) {
-      e.stopPropagation();
-      showConfirm('Archive Patient?',
-        'Patient will be archived. You can restore them anytime.',
-        () => archivePatient(parseInt(archiveBtn.dataset.id)));
-      return;
-    }
-
-    // ── Move / Restore ───────────────────────────────────────
-    const moveBtn = e.target.closest('.js-move');
-    if (moveBtn) {
-      e.stopPropagation();
-      restorePatient(parseInt(moveBtn.dataset.id));
-      return;
-    }
-  });
+// ── Card interaction handler (attached ONCE at DOMContentLoaded) ──
+// Do NOT call this function manually — it is wired up once at startup.
+// Adding it again would create duplicate listeners causing toggle bugs.
+function _handleCardClick(e) {
+  const head = e.target.closest('.card-head');
+  if (head) {
+    if (e.target.closest('button') || e.target.closest('a')) return;
+    head.closest('.patient-card')?.classList.toggle('expanded');
+    return;
+  }
+  const xBtn = e.target.closest('.js-expand');
+  if (xBtn) {
+    e.stopPropagation();
+    xBtn.closest('.patient-card')?.classList.toggle('expanded');
+    return;
+  }
+  const callBtn = e.target.closest('.js-call');
+  if (callBtn) {
+    e.stopPropagation();
+    window.location.href = 'tel:' + callBtn.dataset.phone;
+    return;
+  }
+  const mapBtn = e.target.closest('.js-map');
+  if (mapBtn) {
+    e.stopPropagation();
+    window.open('https://maps.google.com/?q=' + encodeURIComponent(mapBtn.dataset.addr));
+    return;
+  }
+  const injectBtn = e.target.closest('.js-inject');
+  if (injectBtn) {
+    e.stopPropagation();
+    openInjectionModal(parseInt(injectBtn.dataset.id));
+    return;
+  }
+  const editBtn = e.target.closest('.js-edit');
+  if (editBtn) {
+    e.stopPropagation();
+    openEditModal(parseInt(editBtn.dataset.id));
+    return;
+  }
+  const pendingBtn = e.target.closest('.js-pending');
+  if (pendingBtn) {
+    e.stopPropagation();
+    showConfirm('Mark as Pending?',
+      'Patient will be moved to the Pending tab.',
+      () => markPending(parseInt(pendingBtn.dataset.id)));
+    return;
+  }
+  const archiveBtn = e.target.closest('.js-archive');
+  if (archiveBtn) {
+    e.stopPropagation();
+    showConfirm('Archive Patient?',
+      'Patient will be archived. You can restore them anytime.',
+      () => archivePatient(parseInt(archiveBtn.dataset.id)));
+    return;
+  }
+  const moveBtn = e.target.closest('.js-move');
+  if (moveBtn) {
+    e.stopPropagation();
+    restorePatient(parseInt(moveBtn.dataset.id));
+    return;
+  }
 }
+
+// attachCardEvents() is intentionally a no-op.
+// The real listener (_handleCardClick) is attached once in DOMContentLoaded.
+// Keeping this function prevents errors from any remaining call sites.
+function attachCardEvents() { /* intentional no-op — listener lives on mainContent permanently */ }
 
 // ========== DASHBOARD ==========
 function renderDashboard() {
@@ -8676,6 +8654,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       patients = []; showLoginScreen(); }
     if (event === 'SIGNED_IN' && session) { hideLoginScreen(); }
   });
+
+  // ── Card interactions — permanent single delegation listener ────
+  // Attached here ONCE. Handles ALL cards regardless of virtual scroll.
+  // Never call attachCardEvents() manually — it is a no-op.
+  const _mainContent = document.getElementById('mainContent');
+  if (_mainContent) _mainContent.addEventListener('click', _handleCardClick);
 
   // Nav
   document.querySelectorAll('.nav-btn[data-view]').forEach(btn => {
