@@ -5607,23 +5607,26 @@ function showPDFReview(extracted, filename) {
 }
 
 function confirmPDFAndFill() {
-  const _name  = document.getElementById('pr-name').value.trim();
-  const file  = document.getElementById('pr-file').value.trim();
-  const dose  = document.getElementById('pr-dose').value;
-  const addr  = document.getElementById('pr-addr').value.trim();
-  const ph1   = document.getElementById('pr-phone1').value.trim();
-  const ph2   = document.getElementById('pr-phone2').value.trim();
-  const date  = document.getElementById('pr-date').value;
-  if (!name || !file) { toast('Patient name and file number are required', 'warning'); return; }
+  const _pdfName = document.getElementById('pr-name').value.trim();
+  const _pdfFile = document.getElementById('pr-file').value.trim();
+  const _pdfDose = document.getElementById('pr-dose').value;
+  const _pdfAddr = document.getElementById('pr-addr').value.trim();
+  const _pdfPh1  = document.getElementById('pr-phone1').value.trim();
+  const _pdfPh2  = document.getElementById('pr-phone2').value.trim();
+  const _pdfDate = document.getElementById('pr-date').value;
+  // Use prefixed variables — avoids conflict with window.name global
+  if (!_pdfName || !_pdfFile) {
+    toast('Patient name and file number are required', 'warning'); return;
+  }
   closeModal('pdfReviewModal');
   openAddModal();
-  document.getElementById('f-name').value   = name;
-  document.getElementById('f-file').value   = file;
-  document.getElementById('f-addr').value   = addr;
-  document.getElementById('f-phone1').value = ph1;
-  document.getElementById('f-phone2').value = ph2;
-  if (dose) document.getElementById('f-dose').value = dose;
-  if (date) { document.getElementById('f-appt').value = date + 'T09:00'; }
+  document.getElementById('f-name').value   = _pdfName;
+  document.getElementById('f-file').value   = _pdfFile;
+  document.getElementById('f-addr').value   = _pdfAddr;
+  document.getElementById('f-phone1').value = _pdfPh1;
+  document.getElementById('f-phone2').value = _pdfPh2;
+  if (_pdfDose) document.getElementById('f-dose').value = _pdfDose;
+  if (_pdfDate) { document.getElementById('f-appt').value = _pdfDate + 'T09:00'; }
   toast('Form pre-filled — review and save', 'success', '📄');
 }
 
