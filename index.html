@@ -2839,8 +2839,23 @@ a:focus:not(:focus-visible) { outline: none; }
       <button class="modal-close" onclick="closeModal('pdfReviewModal')">✕</button>
     </div>
     <div class="modal-body" id="pdfReviewBody"></div>
-    <div class="modal-footer">
+    <div id="pdfRawTextBox" style="display:none;padding:10px 16px;border-top:1px solid var(--border)">
+      <div style="font-size:11px;font-weight:700;color:var(--text-2);margin-bottom:6px">
+        📋 Raw extracted text — copy and share to improve parsing:
+      </div>
+      <textarea id="pdfRawText" readonly
+        style="width:100%;height:160px;font-size:10px;font-family:monospace;
+               background:var(--bg);color:var(--text-2);border:1px solid var(--border);
+               border-radius:6px;padding:8px;box-sizing:border-box;resize:vertical">
+      </textarea>
+    </div>
+    <div class="modal-footer" style="flex-wrap:wrap;gap:8px">
       <button class="btn-secondary" onclick="closeModal('pdfReviewModal')">Cancel</button>
+      <button class="btn-secondary" style="font-size:12px"
+        onclick="const b=document.getElementById('pdfRawTextBox');
+                 b.style.display=b.style.display==='none'?'block':'none'">
+        🔍 Show Raw Text
+      </button>
       <button class="btn-primary" onclick="confirmPDFAndFill()">✓ Confirm &amp; Fill Form</button>
     </div>
   </div>
@@ -5577,12 +5592,16 @@ function parseFlexDate(raw) {
 }
 
 // ── Show PDF Review Modal ──
-function showPDFReview(extracted, filename) {
+function showPDFReview(extracted, filename, textData) {
   const missing = extracted.missing_fields || [];
   const flag = f => missing.includes(f) ? ' style="border-color:#E05A5A;background:#FDEDED"' : '';
   const flagLabel = f => missing.includes(f) ? ' <span style="color:#E05A5A;font-size:10px;font-weight:700">⚠ Not found</span>' : '';
 
   document.getElementById('pdfReviewFilename').textContent = filename;
+  // Store raw text for debugging
+  const _rawEl = document.getElementById('pdfRawText');
+  if (_rawEl) _rawEl.value = typeof textData === 'string' ? textData : (textData?.text || '(no text extracted — PDF may be image-based)');
+  document.getElementById('pdfRawTextBox').style.display = 'none';
   document.getElementById('pdfReviewBody').innerHTML = `
     <div class="form-group"><label>Patient Name ${flagLabel('patient_name')}</label>
       <input class="form-control" id="pr-name" value="${esc(extracted.patient_name)}"${flag('patient_name')}></div>
@@ -5645,9 +5664,11 @@ async function importPDFFile(file) {
     // Smart regex extraction — no external API needed
     toast('Extracting patient data…', '', '📋');
     const extracted = extractWithRegex(textData, file.name);
+    console.info('[PDF] Raw text (first 1000 chars):', (textData?.text||textData||'').slice(0,1000));
+    console.info('[PDF] Extracted fields:', extracted);
 
     setLoading(false);
-    showPDFReview(extracted, file.name);
+    showPDFReview(extracted, file.name, textData);
   } catch(e) {
     setLoading(false);
     const _pdfMsg = e?.message || String(e) || 'Unknown error';
