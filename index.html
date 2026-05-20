@@ -2802,10 +2802,7 @@ a:focus:not(:focus-visible) { outline: none; }
       <button class="drawer-btn" onclick="doLogout()" style="color:#F87171;">
         <span class="drawer-btn-icon">🔓</span>Sign Out
       </button>
-      <button class="drawer-btn" onclick="closeMenuDrawer();openModal('apiKeyModal')">
-        <span class="drawer-btn-icon">🔑</span>Claude AI Key
-        <span id="aiKeyStatus" style="margin-left:auto;font-size:11px;color:var(--text-3)">Not set</span>
-      </button>
+      <!-- Claude API key removed -->
     </div>
   </div>
 
@@ -5394,7 +5391,9 @@ function extractWithRegex(textData, filename) {
   const nameM =
     text.match(/PATIENT\s+NAME[^\n]*NOM\s+DU\s+PATIENT\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s\-\']{2,60}?)(?:\s*\*+)?\s*(?:\r?\n|$)/im) ||
     text.match(/NOM\s+DU\s+PATIENT\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s\-\']{2,60}?)(?:\s*\*+)?(?:\r?\n|$)/im) ||
-    text.match(/PATIENT\s*NAME[^\n]*\n\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s\-\']{2,60}?)(?:\s*\*+)?(?:\r?\n|$)/im);
+    text.match(/PATIENT\s*NAME[^\n]*\n\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s\-\']{2,60}?)(?:\s*\*+)?(?:\r?\n|$)/im) ||
+    text.match(/(?:NAME|NOM)\s*[:\/]\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s\-\']{2,60}?)(?:\s*\*+)?(?:\r?\n|$)/im) ||
+    text.match(/^([A-ZÀÂÉÈÊËÎÏÔÙÛÜŸÆŒ][A-Za-zÀ-ÿ]+(?:\s+[A-ZÀÂÉÈÊËÎÏÔÙÛÜŸÆŒ][A-Za-zÀ-ÿ]+){1,3})\s*$(?=[\s\S]*(?:MEDICUM|FILE\s*#|DOSSIER))/m);
   if (nameM) result.patient_name = nameM[1].replace(/\*+/g,'').trim().replace(/\s+/g,' ');
   if (!result.patient_name) result.missing_fields.push('patient_name');
 
@@ -5463,10 +5462,15 @@ function extractWithRegex(textData, filename) {
   // ══ 4. ADDRESS ══
   // Form has separate ADDRESS/ADRESSE and CITY/VILLE rows
   const streetM = text.match(/ADDRESS\s*[\/|]\s*ADRESSE\s+([^\n\r]+)/i) ||
+                  text.match(/ADRESSE\s+([^\n\r]{5,80})/i) ||
                   text.match(/ADDRESS[:\s]+([^\n\r]{5,80})/i);
   const cityM   = text.match(/CITY\s*[\/|]\s*VILLE\s+([^\n\r]+)/i) ||
+                  text.match(/VILLE\s+([^\n\r]{2,60})/i) ||
                   text.match(/CITY[:\s]+([^\n\r]{2,60})/i);
-  const addrParts = [streetM?.[1]?.trim(), cityM?.[1]?.trim()].filter(Boolean);
+  // Also try to capture postal code / province if on a separate row
+  const postalM = text.match(/(?:POSTAL\s*CODE|CODE\s*POSTAL)[\s:]+([A-Z]\d[A-Z]\s*\d[A-Z]\d)/i) ||
+                  text.match(/([A-Z]\d[A-Z]\s*\d[A-Z]\d)(?:\s|$)/m);
+  const addrParts = [streetM?.[1]?.trim(), cityM?.[1]?.trim(), postalM?.[1]?.trim()].filter(Boolean);
   if (addrParts.length) {
     // Combine street + city then move any Apt/Suite/Room to end
     const rawAddr = addrParts.join(', ').replace(/\s+/g,' ').trim();
@@ -5638,20 +5642,9 @@ async function importPDFFile(file) {
     const textData = await extractPDFText(file);
     setLoading(true, 'Extracting patient data…');
 
-    let extracted;
-    const apiKey = localStorage.getItem('claude_api_key');
-    if (apiKey) {
-      try {
-        toast('Using Claude AI for extraction…', '', '🤖');
-        extracted = await extractWithClaude(textData.text, apiKey);
-      } catch(aiErr) {
-        console.warn('Claude API failed, falling back to regex:', aiErr?.message || aiErr);
-        toast('AI extraction failed — using smart fallback', 'warning');
-        extracted = extractWithRegex(textData, file.name);
-      }
-    } else {
-      extracted = extractWithRegex(textData, file.name);
-    }
+    // Smart regex extraction — no external API needed
+    toast('Extracting patient data…', '', '📋');
+    const extracted = extractWithRegex(textData, file.name);
 
     setLoading(false);
     showPDFReview(extracted, file.name);
@@ -8704,7 +8697,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     const k = document.getElementById('claudeApiKeyInput').value.trim();
     if (!k) { toast('Enter a key first', 'warning'); return; }
     localStorage.setItem('claude_api_key', k);
-    updateApiKeyStatus();
+    // Claude API no longer used — remove any stored key
+  localStorage.removeItem('claude_api_key');
+  // updateApiKeyStatus(); — API key UI removed
     closeModal('apiKeyModal');
     toast('Claude API key saved', 'success', '🤖');
   }
