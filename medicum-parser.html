@@ -139,6 +139,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       <button class="btn btn-s" onclick="reset()">↺ New PDF</button>
     </div>
     <div class="note">Bold text (name+file#, dose, date) stays bold when pasted into Apple Notes.</div>
+    <div style="margin-top:10px">
+      <button class="btn btn-s" style="font-size:11px;padding:7px 14px;width:100%"
+        onclick="toggleRaw()">🔍 Show extracted PDF text (for debugging)</button>
+      <textarea id="rawOut" readonly
+        style="display:none;width:100%;height:130px;margin-top:8px;font-size:10px;
+               font-family:monospace;background:var(--bg);color:var(--t2);
+               border:1px solid var(--b);border-radius:7px;padding:8px;
+               box-sizing:border-box;resize:vertical"></textarea>
+    </div>
   </div>
 </div>
 <div class="toast" id="toast"></div>
@@ -242,9 +251,38 @@ async function doPDF(file){
     // If AcroForm gave us the dose, inject it into bold array
     if(formDose)bold.unshift(formDose+' mg');
 
-    // Log what was captured for dose debugging
-    console.log('[DOSE] bold items:', bold);
-    console.log('[DOSE] AcroForm dose:', formDose||'none');
+    // Font-diversity detection: find dose item with DIFFERENT font from siblings
+    if(!bold.length&&!formDose){
+      try{
+        const _fontMap={}; // fontName -> [dose values seen]
+        for(let _pi=1;_pi<=pdf.numPages;_pi++){
+          const _pg2=await pdf.getPage(_pi);
+          const _tc2=await _pg2.getTextContent();
+          for(const _it of _tc2.items){
+            if(!_it.str)continue;
+            const _s=_it.str.trim();
+            const _fn=_it.fontName||'unknown';
+            if(/6[\s-]*m|45/i.test(_s))_fontMap[_fn]=(_fontMap[_fn]||[]).concat('45');
+            else if(/4[\s-]*m|30/i.test(_s))_fontMap[_fn]=(_fontMap[_fn]||[]). concat('30');
+            else if(/3[\s-]*m|22\.5/i.test(_s))_fontMap[_fn]=(_fontMap[_fn]||[]).concat('22.5');
+            else if(/1[\s-]*m|7\.5/i.test(_s))_fontMap[_fn]=(_fontMap[_fn]||[]).concat('7.5');
+          }
+        }
+        // Font used by only ONE dose value = that dose is selected (different font = bold)
+        const _fontEntries=Object.entries(_fontMap);
+        if(_fontEntries.length>1){
+          // Find font that appears for only one specific dose
+          for(const[_fn,_doses]of _fontEntries){
+            const _unique=[...new Set(_doses)];
+            if(_unique.length===1&&_fontEntries.filter(([f])=>f!==_fn).some(([,d])=>d.length>0)){
+              bold.push(_unique[0]+' mg');
+              break;
+            }
+          }
+        }
+        console.log('[DOSE] font map:',_fontMap,'bold:',bold);
+      }catch(e){console.log('[DOSE] font detect error:',e.message);}
+    }
 
     const meaningful=txt.replace(/\s+/g,'').length;
     if(meaningful>80){
@@ -301,6 +339,7 @@ async function ocrCV(cv,fname){
   await worker.terminate();
   prog(92,'🔍 Parsing…','Extracting patient data');
   console.log('[OCR]',text.slice(0,1200));
+  _rawPdfText = text;
   fill(parse(text,[],fname));
   hideProg();
 }
@@ -509,6 +548,9 @@ function parse(text, bold, fname){
 
 
 
+// Global raw text store for debug display
+let _rawPdfText = '';
+
 // ── Fill form fields
 function fill(r){
   function set(id,val){
@@ -550,7 +592,8 @@ function fill(r){
 function build(){
   const v=id=>(document.getElementById(id)?.value||'').trim();
   const name=v('fn'),file=v('ff'),dose=v('fd')?v('fd')+' mg':'';
-  const parts=[v('fst'),v('fci'),v('fpr'),v('fpo'),v('fa')].filter(Boolean);
+  const apt=v('fa')?'Apt. '+v('fa'):'';
+  const parts=[v('fst'),v('fci'),v('fpr'),v('fpo'),apt].filter(Boolean);
   const addr=parts.join(', ');
   const ph1=v('fp1'),ph2=v('fp2'),dt=v('fdt');
   const segments=[];
@@ -607,6 +650,18 @@ function onNameInput(el){
     if(hint)hint.style.display='block';
     if(lbl){lbl.textContent='❗ Patient Name — type manually';lbl.style.color='var(--re)';}
     el.style.borderColor='var(--re)';
+  }
+}
+
+// ── Debug toggle
+function toggleRaw(){
+  const ta=document.getElementById('rawOut');
+  if(!ta)return;
+  if(ta.style.display==='none'){
+    ta.style.display='block';
+    ta.value=_rawPdfText||'(no text extracted — PDF may be image-based)';
+  } else {
+    ta.style.display='none';
   }
 }
 
