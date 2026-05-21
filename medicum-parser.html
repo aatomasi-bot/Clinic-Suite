@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Medicum Parser</title>
+<style>
+:root{--bg:#F4F6FA;--card:#fff;--navy:#1B2638;--teal:#2D8C8A;--td:#1E6665;
+  --t:#1B2638;--t2:#4A5568;--t3:#8A96A3;--b:#E2E8F0;--gr:#3D9A6B;--re:#E05A5A}
+[data-theme=dark]{--bg:#0F1923;--card:#1B2638;--t:#E8EEF4;--t2:#8A96A3;--t3:#556070;--b:#243044;--navy:#243044}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--t);min-height:100vh}
+.bar{background:var(--navy);padding:14px 20px;display:flex;align-items:center;justify-content:space-between}
+.bar h1{color:#fff;font-size:17px;font-weight:700}
+.bar span{color:rgba(255,255,255,.45);font-size:11px}
+.dkbtn{background:none;border:1px solid rgba(255,255,255,.2);color:#fff;border-radius:8px;padding:5px 12px;cursor:pointer;font-size:12px}
+.wrap{max-width:620px;margin:0 auto;padding:20px 14px}
+.drop{border:2.5px dashed var(--b);border-radius:14px;background:var(--card);
+  padding:36px 20px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:16px}
+.drop.over{border-color:var(--teal);background:rgba(45,140,138,.06)}
+.drop.done{border-color:var(--gr);border-style:solid}
+.drop .ico{font-size:44px;margin-bottom:10px}
+.drop h2{font-size:16px;font-weight:700;margin-bottom:4px}
+.drop p{font-size:13px;color:var(--t3)}
+.drop input{display:none}
+.prog{display:none;background:var(--card);border-radius:12px;padding:18px;margin-bottom:16px}
+.prog-bar{height:7px;background:var(--b);border-radius:99px;overflow:hidden;margin:10px 0 6px}
+.prog-fill{height:100%;background:linear-gradient(90deg,var(--teal),var(--td));border-radius:99px;transition:width .4s;width:0}
+.prog-lbl{font-size:13px;color:var(--t2);font-weight:600}
+.prog-sub{font-size:11px;color:var(--t3)}
+.card{display:none;background:var(--card);border-radius:14px;padding:22px;margin-bottom:16px}
+.sec{font-size:12px;font-weight:800;color:var(--teal);text-transform:uppercase;letter-spacing:.8px;margin-bottom:14px}
+.grid{display:grid;gap:10px;margin-bottom:18px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.fld{display:flex;flex-direction:column;gap:3px}
+.fld label{font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.4px}
+.fld input,.fld select{padding:9px 11px;border:1.5px solid var(--b);border-radius:7px;
+  font-size:13px;background:var(--bg);color:var(--t);font-family:inherit;transition:border-color .2s}
+.fld input:focus,.fld select:focus{outline:none;border-color:var(--teal)}
+.fld input.ok{border-color:var(--gr)}
+.fld input.miss{border-color:var(--re);background:rgba(224,90,90,.04)}
+.out{background:var(--bg);border:1.5px solid var(--b);border-radius:9px;
+  padding:13px 15px;font-size:13px;line-height:1.8;min-height:56px;
+  word-break:break-word;margin-bottom:14px}
+.out b{font-weight:700}
+.btns{display:flex;gap:8px;flex-wrap:wrap}
+.btn{padding:10px 18px;border-radius:9px;border:none;font-size:13px;
+  font-weight:700;cursor:pointer;font-family:inherit;transition:all .15s}
+.btn-g{background:var(--gr);color:#fff;flex:1}
+.btn-g:hover{opacity:.88}
+.btn-s{background:var(--b);color:var(--t2)}
+.btn-s:hover{opacity:.75}
+.note{font-size:11px;color:var(--t3);margin-top:12px;padding:9px 13px;
+  background:var(--bg);border-radius:7px;border-left:3px solid var(--teal)}
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(70px);
+  background:var(--navy);color:#fff;padding:11px 18px;border-radius:11px;
+  font-size:13px;font-weight:600;transition:transform .3s;z-index:99;
+  box-shadow:0 6px 20px rgba(0,0,0,.3);white-space:nowrap}
+.toast.on{transform:translateX(-50%) translateY(0)}
+@media(max-width:400px){.row2{grid-template-columns:1fr}.btns{flex-direction:column}}
+</style>
+</head>
+<body>
+<div class="bar">
+  <div><h1>📋 Medicum Form Parser</h1><span>OCR → Apple Notes</span></div>
+  <button class="dkbtn" onclick="toggleDk()">🌙</button>
+</div>
+<div class="wrap">
+  <div class="drop" id="dz" onclick="document.getElementById('fi').click()"
+       ondragover="event.preventDefault();this.classList.add('over')"
+       ondragleave="this.classList.remove('over')"
+       ondrop="onDrop(event)">
+    <div class="ico">📄</div>
+    <h2>Drop Medicum PDF or Image</h2>
+    <p>Tap to choose file · Scanned PDFs supported via OCR</p>
+    <p style="font-size:11px;color:var(--t3);margin-top:6px">Works offline after first use · Add to Home Screen for app experience</p>
+    <input type="file" id="fi" accept=".pdf,image/*" onchange="go(this.files[0])">
+  </div>
+
+  <div class="prog" id="prog">
+    <div class="prog-lbl" id="pl">Loading…</div>
+    <div class="prog-bar"><div class="prog-fill" id="pf"></div></div>
+    <div class="prog-sub" id="ps">Please wait</div>
+  </div>
+
+  <div class="card" id="card">
+    <div class="sec">✅ Fields — Review &amp; Edit</div>
+    <div class="grid">
+      <!-- Name field: shows warning only when name NOT found by parser -->
+      <div class="fld" id="fn-wrap">
+        <label id="fn-label" style="font-size:10px;font-weight:700;color:var(--t3);
+          text-transform:uppercase;letter-spacing:.4px">Patient Name</label>
+        <input id="fn" type="text" placeholder="e.g. Jacques RHEAUME"
+          style="font-size:14px;font-weight:600;margin-top:4px"
+          oninput="onNameInput(this)">
+        <div id="fn-hint" style="display:none;font-size:11px;color:var(--re);margin-top:4px">
+          ❗ Handwritten on form — check the paper and type the name above.
+        </div>
+      </div>
+      <div class="row2">
+        <div class="fld"><label>File #</label>
+          <input id="ff" type="text" placeholder="33631" oninput="build()"></div>
+        <div class="fld"><label>Dose (mg)</label>
+          <select id="fd" onchange="build()">
+            <option value="">— Select —</option>
+            <option value="7.5">7.5 mg</option>
+            <option value="22.5">22.5 mg</option>
+            <option value="30">30 mg</option>
+            <option value="45">45 mg</option>
+          </select></div>
+      </div>
+      <div class="fld"><label>Street</label>
+        <input id="fst" type="text" placeholder="290 54e Avenue" oninput="build()"></div>
+      <div class="row2">
+        <div class="fld"><label>City</label>
+          <input id="fci" type="text" placeholder="Montréal" oninput="build()"></div>
+        <div class="fld"><label>Province</label>
+          <input id="fpr" type="text" value="QC" oninput="build()"></div>
+      </div>
+      <div class="row2">
+        <div class="fld"><label>Postal Code</label>
+          <input id="fpo" type="text" placeholder="H8T 3A3" oninput="build()"></div>
+        <div class="fld"><label>Apt #</label>
+          <input id="fa" type="text" placeholder="Apt. 5" oninput="build()"></div>
+      </div>
+      <div class="row2">
+        <div class="fld"><label>Phone 1</label>
+          <input id="fp1" type="text" placeholder="438-351-4765" oninput="build()"></div>
+        <div class="fld"><label>Phone 2</label>
+          <input id="fp2" type="text" placeholder="514-817-7388" oninput="build()"></div>
+      </div>
+      <div class="fld"><label>Due Date (e.g. 15 April 2026)</label>
+        <input id="fdt" type="text" placeholder="leave blank if ASAP" oninput="build()"></div>
+    </div>
+    <div class="sec" style="margin-bottom:8px">📝 Apple Notes Output</div>
+    <div class="out" id="out"></div>
+    <div class="btns">
+      <button class="btn btn-g" onclick="copyNotes()">📋 Copy for Apple Notes</button>
+      <button class="btn btn-s" onclick="reset()">↺ New PDF</button>
+    </div>
+    <div class="note">Bold text (name+file#, dose, date) stays bold when pasted into Apple Notes.</div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script>
+// ── Theme
+const isDk=()=>document.documentElement.getAttribute('data-theme')==='dark';
+function toggleDk(){document.documentElement.setAttribute('data-theme',isDk()?'light':'dark');}
+if(window.matchMedia('(prefers-color-scheme:dark)').matches)
+  document.documentElement.setAttribute('data-theme','dark');
+
+// ── Toast
+function toast(msg,dur=2400){
+  const el=document.getElementById('toast');
+  el.textContent=msg;el.classList.add('on');
+  setTimeout(()=>el.classList.remove('on'),dur);
+}
+
+// ── Progress
+function prog(pct,lbl,sub=''){
+  document.getElementById('prog').style.display='block';
+  document.getElementById('pf').style.width=pct+'%';
+  document.getElementById('pl').textContent=lbl;
+  document.getElementById('ps').textContent=sub;
+}
+function hideProg(){document.getElementById('prog').style.display='none';}
+
+// ── Drop / file
+function onDrop(e){
+  e.preventDefault();
+  document.getElementById('dz').classList.remove('over');
+  const f=e.dataTransfer.files[0];if(f)go(f);
+}
+async function go(file){
+  if(!file)return;
+  document.getElementById('card').style.display='none';
+  document.getElementById('dz').classList.add('done');
+  if(file.type.startsWith('image/'))await ocrImg(file);
+  else if(file.name.toLowerCase().endsWith('.pdf'))await doPDF(file);
+  else toast('Please drop a PDF or image file');
+}
+
+// ── PDF processing
+async function doPDF(file){
+  try{
+    prog(5,'📄 Loading PDF…','Reading file');
+    if(typeof pdfjsLib==='undefined'){toast('PDF.js not loaded');hideProg();return;}
+    pdfjsLib.GlobalWorkerOptions.workerSrc=
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    const buf=await file.arrayBuffer();
+    const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+    prog(15,'🖼 Reading pages…',pdf.numPages+' page(s)');
+
+    // Extract text + detect selected dose via multiple strategies
+    let txt='';
+    const bold=[];
+    let formDose=''; // dose from AcroForm checkbox field
+
+    for(let i=1;i<=pdf.numPages;i++){
+      const pg=await pdf.getPage(i);
+
+      // ── Strategy A: Read PDF form field annotations (most reliable)
+      try{
+        const annotations=await pg.getAnnotations();
+        for(const ann of annotations){
+          // Look for checked checkboxes or radio buttons near dose options
+          if((ann.fieldType==='Btn')&&ann.fieldValue&&ann.fieldValue!=='Off'){
+            const v=String(ann.fieldValue).toLowerCase();
+            if(/6m|6-m|45/.test(v))formDose='45';
+            else if(/4m|4-m|30/.test(v))formDose='30';
+            else if(/3m|3-m|22/.test(v))formDose='22.5';
+            else if(/1m|1-m|7/.test(v))formDose='7.5';
+          }
+          // Also check button field names which often encode the dose
+          if(ann.fieldType==='Btn'&&ann.fieldName){
+            const fn=String(ann.fieldName).toLowerCase();
+            if(/45/.test(fn))formDose='45';
+            else if(/30/.test(fn)&&!formDose)formDose='30';
+            else if(/22/.test(fn)&&!formDose)formDose='22.5';
+            else if(/7/.test(fn)&&!formDose)formDose='7.5';
+          }
+        }
+      }catch(e){/* annotations not available */}
+
+      // ── Strategy B: Text content + bold font detection
+      const tc=await pg.getTextContent();
+      for(const item of tc.items){
+        if(!item.str||!item.str.trim())continue;
+        txt+=item.str+' ';
+        // Bold: font name contains Bold/Heavy/Black OR has different rendering
+        const isBold=item.fontName&&/Bold|Heavy|Black|BoldIt|Bd/i.test(item.fontName);
+        // Also flag items rendered in a distinct font from surrounding text
+        const fs=item.transform?Math.abs(item.transform[3]):0;
+        if(isBold||(fs>11&&/m\s*\(?\s*(?:7\.5|22\.5|30|45)\s*mg/i.test(item.str))){
+          bold.push(item.str.trim());
+        }
+      }
+    }
+    // If AcroForm gave us the dose, inject it into bold array
+    if(formDose)bold.unshift(formDose+' mg');
+
+    // Log what was captured for dose debugging
+    console.log('[DOSE] bold items:', bold);
+    console.log('[DOSE] AcroForm dose:', formDose||'none');
+
+    const meaningful=txt.replace(/\s+/g,'').length;
+    if(meaningful>80){
+      prog(85,'🔍 Parsing fields…','Analysing form data');
+      fill(parse(txt,bold,file.name));
+      hideProg();
+      return;
+    }
+
+    // Image PDF — render to canvas then OCR
+    prog(25,'🖼 Rendering page…','Preparing for OCR');
+    const pg=await pdf.getPage(1);
+    const vp=pg.getViewport({scale:2.5});
+    const cv=document.createElement('canvas');
+    cv.width=vp.width;cv.height=vp.height;
+    await pg.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise;
+    prog(40,'🤖 Running OCR…','First use downloads ~10MB of language data');
+    await ocrCV(cv,file.name);
+  }catch(e){
+    hideProg();
+    toast('Error: '+(e.message||'Could not process PDF'));
+    console.error(e);
+  }
+}
+
+// ── OCR image file
+async function ocrImg(file){
+  try{
+    prog(10,'🖼 Loading image…','');
+    const img=await createImageBitmap(file);
+    const cv=document.createElement('canvas');
+    cv.width=img.width;cv.height=img.height;
+    cv.getContext('2d').drawImage(img,0,0);
+    prog(30,'🤖 Running OCR…','First use downloads ~10MB');
+    await ocrCV(cv,file.name);
+  }catch(e){hideProg();toast('Image error: '+(e.message||''));}
+}
+
+// ── Tesseract OCR
+async function ocrCV(cv,fname){
+  if(typeof Tesseract==='undefined'){toast('OCR not loaded — check connection');hideProg();return;}
+  const worker=await Tesseract.createWorker('eng+fra',1,{
+    logger:m=>{
+      if(m.status==='recognizing text'){
+        const p=40+Math.round(m.progress*50);
+        prog(p,'🤖 Reading text…',Math.round(m.progress*100)+'% complete');
+      }else if(m.status.includes('load')){
+        prog(35,'📥 Loading language data…',m.status);
+      }
+    }
+  });
+  prog(42,'🤖 Recognising…','Processing image');
+  const{data:{text}}=await worker.recognize(cv);
+  await worker.terminate();
+  prog(92,'🔍 Parsing…','Extracting patient data');
+  console.log('[OCR]',text.slice(0,1200));
+  fill(parse(text,[],fname));
+  hideProg();
+}
+
+// ─────────────────────────────────────────────────────────────
+// PARSER — built from actual Medicum form OCR text
+// OCR sample: "33631 7.5 mg 290 54e Avenue CITY/VILLE Montréal,
+//   QC, H8T 3A3 TELEPHONE/TELEPHONE 438 351-4765 SECONDARY
+//   CONTACT ... 514 817-7388 DATE OF BIRTH 04/11/2017
+//   INJECTION DUE DAY OF: [date or blank/ASAP]
+//   PRESCRIPTION DATE 05/11/2026  MEDICUM #: 33631"
+// ─────────────────────────────────────────────────────────────
+function parse(text, bold, fname){
+  const r={name:'',file:'',dose:'',street:'',city:'',prov:'QC',
+           postal:'',apt:'',ph1:'',ph2:'',date:''};
+
+  // ── helpers ────────────────────────────────────────────────
+  function fmtPh(raw){
+    if(!raw)return'';
+    const d=raw.replace(/\D/g,'');
+    if(d.length===10)return d.slice(0,3)+'-'+d.slice(3,6)+'-'+d.slice(6);
+    if(d.length===11&&d[0]==='1')return d.slice(1,4)+'-'+d.slice(4,7)+'-'+d.slice(7);
+    return'';
+  }
+  const MO_EN=['January','February','March','April','May','June',
+               'July','August','September','October','November','December'];
+  const MO_FR=['Janvier','Février','Mars','Avril','Mai','Juin',
+               'Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+  const MO_FR2=['janvier','fevrier','mars','avril','mai','juin',
+                'juillet','aout','septembre','octobre','novembre','decembre'];
+  function fmtDate(raw){
+    if(!raw)return'';
+    raw=raw.trim();
+    // "21 Avril 2026" or "21 April 2026" format
+    const wordy=raw.match(/(\d{1,2})\s+([A-Za-z\u00C0-\u00FF]+)\s+(\d{4})/);
+    if(wordy){
+      const dd=+wordy[1], mon=wordy[2], yy=+wordy[3];
+      let mm=-1;
+      MO_EN.forEach((m,i)=>{if(m.toLowerCase()===mon.toLowerCase())mm=i;});
+      MO_FR.forEach((m,i)=>{if(m.toLowerCase()===mon.toLowerCase())mm=i;});
+      MO_FR2.forEach((m,i)=>{if(mon.toLowerCase().startsWith(m.slice(0,4)))mm=i;});
+      if(mm>=0)return dd+' '+MO_EN[mm]+' '+yy;
+    }
+    // "MM/DD/YYYY" or "DD/MM/YYYY"
+    const slashed=raw.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+    if(slashed){
+      let a=+slashed[1],b=+slashed[2],c=+slashed[3];
+      if(c<100)c+=2000;
+      let mm,dd;
+      if(a>12&&b<=12){mm=b;dd=a;}else{mm=a;dd=b;}
+      if(mm<1||mm>12||dd<1||dd>31||c<2000)return'';
+      return dd+' '+MO_EN[mm-1]+' '+c;
+    }
+    return'';
+  }
+
+  // ── 1. FILE NUMBER ─────────────────────────────────────────
+  // "MEDICUM #: 33243"
+  const fm=text.match(/MEDICUM\s*#\s*:?\s*(\d{3,8})/i)
+          ||text.match(/FILE\s*(?:NUMBER|NO|#)\s*:?\s*([A-Z0-9\-]{3,10})/i);
+  if(fm)r.file=fm[1].trim();
+  if(!r.file){const fn=fname.replace(/\.pdf$/i,'').match(/(\d{4,8})/);if(fn)r.file=fn[1];}
+
+  // ── 2. PATIENT NAME ────────────────────────────────────────
+  // Form table: "PATIENT NAME/NOM DU PATIENT | Marc BALOR **"
+  // OCR reads this as: "PATIENT NAME/NOM DU PATIENT Marc BALOR **"
+  // Strategy 1: text starts with "Marc BALOR 33243," (name + file# at top)
+  const startM=text.match(/^([A-Z][a-z\u00C0-\u00FF]+(?:\s+[A-Z][A-Za-z\u00C0-\u00FF\-]+)+)\s+\d{3,8}[,\s]/);
+  if(startM&&!/PATIENT|MEDICUM|ADDRESS|TELEPHONE|LOGO|ELIGARD/i.test(startM[1])){
+    r.name=startM[1].replace(/\s+/g,' ').trim();
+  }
+  // Strategy 2: explicit PATIENT NAME label in table row
+  if(!r.name){
+    const nameLbl=text.match(/PATIENT\s+NAME\s*\/\s*NOM\s+DU\s+PATIENT\s+([^\n\r]+)/i)
+                 ||text.match(/NOM\s+DU\s+PATIENT\s+([^\n\r]+)/i)
+                 ||text.match(/PATIENT\s+NAME\s+([^\n\r]+)/i);
+    if(nameLbl){
+      r.name=nameLbl[1]
+        .replace(/\*+/g,'')
+        .replace(/(?:ADDRESS|ADRESSE|CITY|VILLE|MEDICUM).*/i,'')
+        .replace(/\s+/g,' ').trim();
+    }
+  }
+
+  // ── 3. DOSE ────────────────────────────────────────────────
+  // For DIGITAL PDFs: bold items from PDF.js font name detection
+  // For SCANNED PDFs: look for dose before the options list
+  // The form lists: 1-m (7.5mg)  3-m (22.5mg)  4-m (30mg)  6-m (45mg)
+  // Selected one is bold + underlined — appears in boldItems array if digital
+  // Selected dose is BOLD + UNDERLINED: "6-m (45mg)"
+  // boldItems from PDF.js captures this
+  const dmap=[
+    {v:'45',  rx:[/45\s*mg/i, /6\s*-?\s*m\b/i]},
+    {v:'30',  rx:[/30\s*mg/i, /4\s*-?\s*m\b/i]},
+    {v:'22.5',rx:[/22\.5\s*mg/i,/3\s*-?\s*m\b/i]},
+    {v:'7.5', rx:[/7\.5\s*mg/i, /1\s*-?\s*m\b/i]},
+  ];
+  // Check bold/styled items first (most reliable for digital PDFs)
+  for(const item of bold){
+    for(const{v,rx}of dmap){if(rx.some(r=>r.test(item))){r.dose=v;break;}}
+    if(r.dose)break;
+  }
+  // OCR fallback: look for dose appearing BEFORE the options list line
+  if(!r.dose){
+    const listIdx=text.search(/1\s*-?\s*m\s*\(?\s*7\.5/i);
+    if(listIdx>0){
+      const before=text.slice(0,listIdx);
+      for(const{v,rx}of dmap){if(rx.some(p=>p.test(before))){r.dose=v;break;}}
+    }
+  }
+
+  // ── 4. ADDRESS ─────────────────────────────────────────────
+  // Table row: "ADDRESS/ADRESSE | 1 Boulevard De Maisonneuve Ouest Appartement 703"
+  // OCR:       "ADDRESS/ADRESSE 1 Boulevard De Maisonneuve Ouest Appartement 703"
+  // Street extraction — 3 strategies:
+  // 1. Standard label: "ADDRESS/ADRESSE [street] CITY/VILLE"
+  // 2. No label: "[Name] [File#], [street] CITY/VILLE" (your actual OCR format)
+  // 3. "Page 1" summary at end of OCR text
+  let addrRaw='';
+  const addrLbl=text.match(/ADDRESS\s*\/\s*ADRESSE\s+(.+?)(?=\s+CITY\s*\/|\s+CITY\s+VILLE)/i)
+               ||text.match(/ADRESSE\s+(.+?)(?=\s+CITY\s*\/|\s+CITY\s+VILLE)/i);
+  if(addrLbl){
+    addrRaw=addrLbl[1].replace(/\s+/g,' ').trim();
+  } else {
+    // Format: "Name FileNum, [street] CITY/VILLE"
+    const noLbl=text.match(/\d{3,8}\s*,\s*(.+?)(?=\s+CITY\s*\/|\s+CITY\s+VILLE)/i);
+    if(noLbl)addrRaw=noLbl[1].replace(/\s+/g,' ').trim();
+  }
+  if(addrRaw){
+    // Extract inline apartment: "Appartement 703" / "Apt 5"
+    const aptM=addrRaw.match(/(?:Appartement|Apartment|APT\.?|APP\.?)\s*#?\s*(\w+)/i);
+    if(aptM){r.apt=aptM[1];addrRaw=addrRaw.replace(aptM[0],'').replace(/,\s*$/,'').trim();}
+    r.street=addrRaw;
+  }
+  // Apt fallback from "Page 1" summary: "Page 1, City, Prov, Postal, AptNum, Ph1, Ph2, Date"
+  if(!r.apt){
+    const pgM=text.match(/Page\s+\d\s*,\s*[^,]+,\s*[A-Z]{2}\s*,\s*[A-Z]\d[A-Z]\s*\d[A-Z]\d\s*,\s*(\d+)\s*,/i);
+    if(pgM)r.apt=pgM[1];
+  }
+
+  // City/Province/Postal — "CITY/VILLE | Montreal, QC, H2X 0E3"
+  const cityM=text.match(/CITY\s*[\/|]\s*VILLE\s+([^\n\r]+)/i)
+             ||text.match(/VILLE\s+([^\n\r]{2,60})/i);
+  if(cityM){
+    const parts=cityM[1].split(',').map(s=>s.trim()).filter(Boolean);
+    if(parts[0])r.city=parts[0];
+    if(parts[1])r.prov=parts[1].toUpperCase();
+    if(parts[2]){const pM=parts[2].match(/([A-Z]\d[A-Z]\s*\d[A-Z]\d)/i);if(pM)r.postal=pM[1].toUpperCase();}
+  }
+  // Postal fallback
+  if(!r.postal){const pM=text.match(/\b([A-Z]\d[A-Z]\s*\d[A-Z]\d)\b/i);if(pM)r.postal=pM[1].toUpperCase();}
+
+  // ── 5. PHONES ──────────────────────────────────────────────
+  // Build exclusion set (doctor tel/fax + pharmacy)
+  const excl=new Set();
+  const drB=text.match(/DOCTOR.{0,5}NAME[\s\S]{0,300}?(?=PRESCRIPTION|DATE\s+OF\s+BIRTH|LAST\s+INJECTION|$)/i);
+  if(drB)(drB[0].match(/\d{3}[\s\-]?\d{3}[\s\-]?\d{4}/g)||[]).forEach(p=>excl.add(fmtPh(p)));
+  const phB=text.match(/PHARMACY\s*#[\s\S]{0,80}?(?=DOCTOR|DATE|LAST|$)/i);
+  if(phB)(phB[0].match(/\d{3}[\s\-]?\d{3}[\s\-]?\d{4}/g)||[]).forEach(p=>excl.add(fmtPh(p)));
+
+  // Phone 1: right after TELEPHONE label
+  const t1=text.match(/TELEPHONE\s*[\/|]\s*TELEPHONE\s*(\d{3}[\s\-]?\d{3}[\s\-]?\d{4})/i)
+          ||text.match(/TELEPHONE\s*:?\s*(\d{3}[\s\-]?\d{3}[\s\-]?\d{4})/i);
+  if(t1){const p=fmtPh(t1[1]);if(!excl.has(p))r.ph1=p;}
+
+  // Phone 2: SECONDARY CONTACT block — strip labels like "Cellulaire/ Tel:"
+  const secRaw=text.match(/SECONDARY\s*CONTACT[\s\S]{0,300}?(?=DATE\s*OF\s*BIRTH|LAST\s*INJECTION|PHARMACY|DOCTOR|$)/i);
+  if(secRaw){
+    const secPhs=(secRaw[0].match(/\d{3}[\s\-]?\d{3}[\s\-]?\d{4}/g)||[])
+      .map(p=>fmtPh(p))
+      .filter(p=>p&&p!==r.ph1&&!excl.has(p));
+    if(secPhs.length)r.ph2=secPhs[secPhs.length-1];
+  }
+  // Fallback: all phones in text minus excluded
+  if(!r.ph1||!r.ph2){
+    const allPh=[...text.matchAll(/\d{3}[\s\-]?\d{3}[\s\-]?\d{4}/g)]
+      .map(m=>fmtPh(m[0])).filter((v,i,a)=>v&&a.indexOf(v)===i&&!excl.has(v));
+    if(!r.ph1&&allPh[0])r.ph1=allPh[0];
+    if(!r.ph2)r.ph2=allPh.find(p=>p!==r.ph1)||'';
+  }
+
+  // ── 6. DUE DATE ────────────────────────────────────────────
+  // Check "INJECTION DUE DAY OF:" first
+  const dueDayM=text.match(/INJECTION\s*DUE\s*DAY\s*OF[^:]*:\s*([^\n\r]{0,40})/i);
+  if(dueDayM){
+    const dM=dueDayM[1].match(/(\d{1,2}[\s\w]*\d{4}|\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i);
+    if(dM)r.date=fmtDate(dM[1]);
+  }
+  // "INJECTION WILL BE READY" — often has the actual ready date (e.g. "21 Avril 2026")
+  if(!r.date){
+    const readyM=text.match(/INJECTION\s*WILL\s*BE\s*READY[^0-9\n\r]*([^\n\r]{0,40})/i);
+    if(readyM){
+      // Match "21 Avril 2026" or "21 April 2026" or "MM/DD/YYYY"
+      const dM=readyM[1].match(/(\d{1,2}\s+[A-Za-z\u00C0-\u00FF]+\s+\d{4}|\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i);
+      if(dM)r.date=fmtDate(dM[1]);
+    }
+  }
+  // "NEXT INJECTION" fallback
+  if(!r.date){
+    const nxtM=text.match(/NEXT\s*INJECTION[^0-9\n\r]*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i);
+    if(nxtM)r.date=fmtDate(nxtM[1]);
+  }
+
+  return r;
+}
+
+
+
+// ── Fill form fields
+function fill(r){
+  function set(id,val){
+    const el=document.getElementById(id);if(!el)return;
+    if(el.tagName==='SELECT'){el.value=val||'';}
+    else{el.value=val||'';el.classList.toggle('ok',!!val);el.classList.toggle('miss',!val);}
+  }
+  set('fn',r.name);
+  // Show/hide name warning based on whether parser found the name
+  const _fnWrap=document.getElementById('fn-wrap');
+  const _fnHint=document.getElementById('fn-hint');
+  const _fnLbl =document.getElementById('fn-label');
+  const _fnInp =document.getElementById('fn');
+  if(r.name){
+    // Name found — green, no warning
+    if(_fnWrap){_fnWrap.style.background='';_fnWrap.style.border='';}
+    if(_fnHint)_fnHint.style.display='none';
+    if(_fnLbl){_fnLbl.textContent='Patient Name';_fnLbl.style.color='';}
+    if(_fnInp){_fnInp.style.borderColor='var(--gr)';}
+  } else {
+    // Name missing — red warning
+    if(_fnWrap){_fnWrap.style.background='rgba(224,90,90,.08)';
+                _fnWrap.style.border='2.5px solid var(--re)';
+                _fnWrap.style.borderRadius='9px';_fnWrap.style.padding='10px 12px';}
+    if(_fnHint)_fnHint.style.display='block';
+    if(_fnLbl){_fnLbl.textContent='❗ Patient Name — type manually';_fnLbl.style.color='var(--re)';}
+    if(_fnInp){_fnInp.style.borderColor='var(--re)';setTimeout(()=>_fnInp.focus(),450);}
+  }set('ff',r.file);set('fd',r.dose);
+  set('fst',r.street);set('fci',r.city);set('fpr',r.prov||'QC');
+  set('fpo',r.postal);set('fa',r.apt);set('fp1',r.ph1);set('fp2',r.ph2);
+  set('fdt',r.date);
+  document.getElementById('card').style.display='block';
+  build();
+  document.getElementById('card').scrollIntoView({behavior:'smooth'});
+  setTimeout(()=>{ const fn=document.getElementById('fn'); if(fn)fn.focus(); },450);
+}
+
+// ── Build output
+function build(){
+  const v=id=>(document.getElementById(id)?.value||'').trim();
+  const name=v('fn'),file=v('ff'),dose=v('fd')?v('fd')+' mg':'';
+  const parts=[v('fst'),v('fci'),v('fpr'),v('fpo'),v('fa')].filter(Boolean);
+  const addr=parts.join(', ');
+  const ph1=v('fp1'),ph2=v('fp2'),dt=v('fdt');
+  const segments=[];
+  if(name||file)segments.push('<b>'+(name+(file?' '+file:'')).trim()+'</b>');
+  if(dose)segments.push('<b>'+dose+'</b>');
+  if(addr)segments.push(addr);
+  if(ph1)segments.push(ph1);
+  if(ph2)segments.push(ph2);
+  if(dt)segments.push('<b>'+dt+'</b>');
+  const out=document.getElementById('out');
+  out.innerHTML=segments.length?segments.join(', '):'<span style="color:var(--t3)">Fill fields above…</span>';
+}
+
+// ── Copy for Apple Notes
+async function copyNotes(){
+  const html=document.getElementById('out').innerHTML;
+  const plain=document.getElementById('out').innerText;
+  try{
+    await navigator.clipboard.write([new ClipboardItem({
+      'text/html':new Blob([html],{type:'text/html'}),
+      'text/plain':new Blob([plain],{type:'text/plain'}),
+    })]);
+    toast('✅ Copied with bold — paste into Apple Notes');
+  }catch{
+    const d=document.createElement('div');
+    d.contentEditable='true';
+    d.style.cssText='position:fixed;left:-9999px;top:0;opacity:0';
+    d.innerHTML=html;
+    document.body.appendChild(d);
+    const s=window.getSelection(),rng=document.createRange();
+    rng.selectNodeContents(d);s.removeAllRanges();s.addRange(rng);
+    document.execCommand('copy');
+    s.removeAllRanges();document.body.removeChild(d);
+    toast('✅ Copied — paste into Apple Notes');
+  }
+}
+
+// ── Name field clears its warning once user types
+function onNameInput(el){
+  build();
+  const wrap=document.getElementById('fn-wrap');
+  const hint=document.getElementById('fn-hint');
+  const lbl =document.getElementById('fn-label');
+  const ok  =el.value.trim().length>0;
+  if(ok){
+    if(wrap){wrap.style.background='';wrap.style.border='';}
+    if(hint)hint.style.display='none';
+    if(lbl){lbl.textContent='Patient Name';lbl.style.color='';}
+    el.style.borderColor='var(--gr)';
+  } else {
+    if(wrap){wrap.style.background='rgba(224,90,90,.08)';
+             wrap.style.border='2.5px solid var(--re)';
+             wrap.style.borderRadius='9px';wrap.style.padding='10px 12px';}
+    if(hint)hint.style.display='block';
+    if(lbl){lbl.textContent='❗ Patient Name — type manually';lbl.style.color='var(--re)';}
+    el.style.borderColor='var(--re)';
+  }
+}
+
+// ── Reset
+function reset(){
+  document.getElementById('card').style.display='none';
+  document.getElementById('dz').classList.remove('done');
+  document.getElementById('fi').value='';
+  ['fn','ff','fst','fci','fpr','fpo','fa','fp1','fp2','fdt'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el){el.value='';el.classList.remove('ok','miss');}
+  });
+  document.getElementById('fd').value='';
+  document.getElementById('fpr').value='QC';
+}
+</script>
+</body>
+</html>
