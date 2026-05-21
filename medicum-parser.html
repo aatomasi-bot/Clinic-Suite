@@ -72,7 +72,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
        ondrop="onDrop(event)">
     <div class="ico">📄</div>
     <h2>Drop Medicum PDF or Image</h2>
-    <p>Tap to choose file · Scanned PDFs supported via OCR</p>
+    <p>Tap to choose · Drag &amp; drop · Or paste a copied PDF</p>
     <p style="font-size:11px;color:var(--t3);margin-top:6px">Works offline after first use · Add to Home Screen for app experience</p>
     <input type="file" id="fi" accept=".pdf,image/*" onchange="go(this.files[0])">
   </div>
@@ -183,6 +183,25 @@ function onDrop(e){
   document.getElementById('dz').classList.remove('over');
   const f=e.dataTransfer.files[0];if(f)go(f);
 }
+
+// ── Paste support — Cmd/Ctrl+V with a copied PDF or image ────
+document.addEventListener('paste',e=>{
+  const items=e.clipboardData?.items;
+  if(!items)return;
+  for(const item of items){
+    if(item.kind==='file'&&
+       (item.type==='application/pdf'||item.type.startsWith('image/'))){
+      const f=item.getAsFile();
+      if(f){
+        const dz=document.getElementById('dz');
+        dz.classList.add('over');
+        setTimeout(()=>dz.classList.remove('over'),400);
+        toast('📋 PDF pasted — processing…');
+        go(f); break;
+      }
+    }
+  }
+});
 async function go(file){
   if(!file)return;
   document.getElementById('card').style.display='none';
