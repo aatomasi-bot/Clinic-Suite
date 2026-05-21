@@ -6,846 +6,852 @@
 <title>VaPiq · Schedule Builder</title>
 <style>
 :root{
-  --bg:#0F1923;--card:#1B2638;--card2:#243044;--navy:#111D2B;
-  --teal:#2D8C8A;--td:#1E6665;--tl:rgba(45,140,138,.12);
-  --t:#E8EEF4;--t2:#8A96A3;--t3:#556070;
-  --b:#243044;--b2:#1B2638;--re:#E05A5A;--gr:#3D9A6B;
-  --sh:0 4px 24px rgba(0,0,0,.4);
+  --bg:#0F1923;--card:#1B2638;--card2:#1D2B3E;--navy:#0B1420;
+  --teal:#2D8C8A;--td:#1E6665;--tl:rgba(45,140,138,.14);
+  --t:#E8EEF4;--t2:#8A96A3;--t3:#4A5568;
+  --b:#1F3050;--b2:#243044;--re:#E05A5A;--gr:#3D9A6B;
+  --sh:0 2px 12px rgba(0,0,0,.5);
+  --sidebar-w:300px;
 }
 [data-theme=light]{
-  --bg:#F0F4FA;--card:#fff;--card2:#F8FAFC;--navy:#1B2638;
-  --t:#1B2638;--t2:#4A5568;--t3:#8A96A3;--b:#E2E8F0;--b2:#F0F4FA;
-  --sh:0 4px 20px rgba(0,0,0,.1);
+  --bg:#EEF2F8;--card:#fff;--card2:#F5F8FC;--navy:#1B2638;
+  --t:#1B2638;--t2:#4A5568;--t3:#8A96A3;--b:#DDE3ED;--b2:#EEF2F8;
+  --sh:0 2px 10px rgba(0,0,0,.1);
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-  background:var(--bg);color:var(--t);min-height:100vh;overflow-x:hidden}
+  background:var(--bg);color:var(--t);display:flex;flex-direction:column}
 
-/* ── TOPBAR ─────────────────────────────────────────────── */
-.bar{background:var(--navy);padding:12px 16px;display:flex;align-items:center;
-  justify-content:space-between;position:sticky;top:0;z-index:100;
-  box-shadow:0 2px 12px rgba(0,0,0,.5)}
-.bar-left h1{font-size:16px;font-weight:800;color:#fff;letter-spacing:-.3px}
-.bar-left p{font-size:11px;color:rgba(255,255,255,.4);margin-top:1px}
-.bar-right{display:flex;gap:8px;align-items:center}
-.icon-btn{background:rgba(255,255,255,.08);border:none;color:rgba(255,255,255,.7);
-  width:34px;height:34px;border-radius:8px;cursor:pointer;font-size:15px;
-  display:flex;align-items:center;justify-content:center}
-.icon-btn:hover{background:rgba(255,255,255,.14)}
+/* ── TOP BAR ───────────────────────────────────────────── */
+.topbar{background:var(--navy);display:flex;align-items:center;
+  gap:10px;padding:0 14px;height:50px;flex-shrink:0;
+  border-bottom:1px solid var(--b)}
+.topbar h1{font-size:15px;font-weight:800;color:#fff;flex:1;white-space:nowrap}
+.topbar-sub{font-size:10px;color:rgba(255,255,255,.35);margin-left:6px}
+.iBtn{background:rgba(255,255,255,.08);border:none;color:rgba(255,255,255,.7);
+  width:32px;height:32px;border-radius:7px;cursor:pointer;font-size:14px;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.iBtn:hover{background:rgba(255,255,255,.16)}
 
-/* ── WEEK NAV ───────────────────────────────────────────── */
-.week-bar{background:var(--card);border-bottom:1px solid var(--b);
-  padding:12px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.week-label{flex:1;font-size:14px;font-weight:700;color:var(--t);text-align:center}
-.wk-btn{background:var(--card2);border:1px solid var(--b);color:var(--t2);
-  border-radius:8px;padding:7px 14px;cursor:pointer;font-size:12px;
-  font-weight:600;font-family:inherit;transition:all .15s}
-.wk-btn:hover{border-color:var(--teal);color:var(--teal)}
-.wk-btn.primary{background:var(--teal);color:#fff;border-color:var(--teal)}
+/* ── WEEK BAR ───────────────────────────────────────────── */
+.weekbar{background:var(--card);border-bottom:1px solid var(--b);
+  display:flex;align-items:center;gap:8px;padding:8px 12px;flex-shrink:0;
+  flex-wrap:wrap}
+.week-lbl{flex:1;text-align:center;font-size:13px;font-weight:700;color:var(--t);
+  min-width:200px}
+.wBtn{background:var(--card2);border:1px solid var(--b);color:var(--t2);
+  border-radius:7px;padding:6px 14px;cursor:pointer;font-size:12px;
+  font-weight:600;font-family:inherit;transition:all .15s;white-space:nowrap}
+.wBtn:hover{border-color:var(--teal);color:var(--teal)}
+.wBtn.go{background:var(--teal);border-color:var(--teal);color:#fff}
+.wBtn.go:hover{opacity:.88}
 
-/* ── SEARCH BAR ─────────────────────────────────────────── */
-.search-wrap{padding:10px 16px;background:var(--card);border-bottom:1px solid var(--b);
-  display:flex;gap:8px}
-.search-wrap input{flex:1;background:var(--card2);border:1.5px solid var(--b);
-  color:var(--t);border-radius:9px;padding:9px 14px;font-size:13px;
-  font-family:inherit;outline:none;transition:border-color .2s}
-.search-wrap input:focus{border-color:var(--teal)}
-.search-wrap input::placeholder{color:var(--t3)}
-.search-btn{background:var(--teal);border:none;color:#fff;border-radius:9px;
-  padding:9px 16px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;
-  white-space:nowrap}
+/* ── MAIN LAYOUT ────────────────────────────────────────── */
+.layout{display:flex;flex:1;overflow:hidden;min-height:0}
 
-/* ── POOL SECTION ───────────────────────────────────────── */
-.section-hdr{padding:10px 16px;display:flex;align-items:center;gap:8px;
-  background:var(--navy);border-bottom:1px solid var(--b);position:sticky;top:56px;z-index:90}
-.section-hdr h2{font-size:11px;font-weight:800;letter-spacing:1px;
-  text-transform:uppercase;color:var(--t2)}
-.count-badge{background:var(--teal);color:#fff;border-radius:99px;
-  padding:2px 9px;font-size:11px;font-weight:700}
-.pool-help{font-size:11px;color:var(--t3);margin-left:auto}
+/* ── SIDEBAR ────────────────────────────────────────────── */
+.sidebar{width:var(--sidebar-w);min-width:var(--sidebar-w);display:flex;
+  flex-direction:column;border-right:1px solid var(--b);
+  background:var(--card);transition:width .25s,min-width .25s;flex-shrink:0}
+.sidebar.collapsed{width:0;min-width:0;overflow:hidden}
+.sb-hdr{padding:8px 10px;background:var(--navy);display:flex;align-items:center;
+  gap:7px;flex-shrink:0;border-bottom:1px solid var(--b)}
+.sb-hdr h2{font-size:10px;font-weight:800;letter-spacing:.9px;text-transform:uppercase;
+  color:var(--t2);flex:1;white-space:nowrap}
+.badge{background:var(--teal);color:#fff;border-radius:99px;padding:1px 8px;
+  font-size:11px;font-weight:700}
+.sb-search{padding:8px;flex-shrink:0;border-bottom:1px solid var(--b)}
+.sb-search input{width:100%;background:var(--bg);border:1.5px solid var(--b);
+  color:var(--t);border-radius:7px;padding:7px 10px;font-size:12px;
+  font-family:inherit;outline:none}
+.sb-search input:focus{border-color:var(--teal)}
+.sb-search input::placeholder{color:var(--t3)}
+.sb-search-row{display:flex;gap:5px;margin-top:5px}
+.sb-add-btn{flex:1;background:var(--teal);border:none;color:#fff;border-radius:7px;
+  padding:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit}
+.pool-list{flex:1;overflow-y:auto;padding:6px}
+.pool-empty{color:var(--t3);font-size:11px;text-align:center;
+  padding:24px 8px;line-height:1.6}
 
-.pool{display:flex;flex-direction:column;gap:6px;padding:10px 12px;
-  max-height:260px;overflow-y:auto;background:var(--bg)}
-.pool:empty::after{content:'All patients assigned — or none eligible for this week.';
-  display:block;text-align:center;color:var(--t3);font-size:12px;padding:20px}
+/* ── POOL CARD (compact) ─────────────────────────────────── */
+.pcard{background:var(--card2);border:1.5px solid var(--b);border-radius:8px;
+  padding:7px 9px;margin-bottom:5px;cursor:grab;user-select:none;
+  transition:all .15s}
+.pcard:hover,.pcard.dragging{border-color:var(--teal);
+  box-shadow:0 0 0 2px rgba(45,140,138,.25)}
+.pcard.tap-sel{border-color:var(--teal);background:var(--tl)}
+.pcard.out-win{border-style:dashed}
+.pcard-top{display:flex;align-items:center;gap:6px}
+.zone-pill{padding:2px 6px;border-radius:99px;font-size:9px;font-weight:800;
+  color:#fff;flex-shrink:0;letter-spacing:.3px}
+.pcard-name{font-size:12px;font-weight:700;color:var(--t);flex:1;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pcard-file{font-size:9px;color:var(--t3);flex-shrink:0}
+.pcard-addr{font-size:10px;color:var(--t2);margin-top:2px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.win-row{display:flex;gap:2px;margin-top:4px}
+.wd{width:26px;height:18px;border-radius:4px;display:flex;align-items:center;
+  justify-content:center;font-size:8px;font-weight:800;flex-shrink:0}
+.wd.in{background:var(--teal);color:#fff}
+.wd.out{background:var(--b2);color:var(--t3)}
+.wd.due{outline:2px solid var(--teal);outline-offset:1px}
+.wd.today{background:var(--gr);color:#fff}
 
-/* ── PATIENT CARD (pool) ────────────────────────────────── */
-.pt-card{background:var(--card);border:1.5px solid var(--b);border-radius:10px;
-  padding:10px 12px;cursor:grab;user-select:none;transition:all .15s;
-  display:flex;flex-direction:column;gap:4px;position:relative}
-.pt-card:hover,.pt-card.dragging{border-color:var(--teal);
-  box-shadow:0 0 0 2px rgba(45,140,138,.25);transform:scale(1.01)}
-.pt-card.selected{border-color:var(--teal);background:var(--tl);
-  box-shadow:0 0 0 3px rgba(45,140,138,.3)}
-.pt-card.outside-window{border-style:dashed;border-color:var(--t3)}
-.pt-card.outside-window .zone-tag::after{content:' ⚠';font-size:9px}
-
-.card-top{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
-.zone-tag{padding:2px 8px;border-radius:99px;font-size:10px;font-weight:800;
-  letter-spacing:.4px;color:#fff;flex-shrink:0}
-.pt-name{font-size:13px;font-weight:700;color:var(--t);flex:1}
-.pt-file{font-size:10px;color:var(--t3);flex-shrink:0}
-.pt-addr{font-size:11px;color:var(--t2);margin-top:1px}
-
-.win-dots{display:flex;gap:3px;margin-top:5px}
-.win-dot{width:20px;height:20px;border-radius:5px;display:flex;align-items:center;
-  justify-content:center;font-size:9px;font-weight:700;flex-shrink:0}
-.win-dot.in{background:var(--teal);color:#fff}
-.win-dot.out{background:var(--b2);color:var(--t3)}
-.win-dot.due{outline:2px solid var(--teal);outline-offset:1px}
-.win-dot.today{background:var(--gr);color:#fff}
-
-/* ── PATIENT CARD (day column — compact) ────────────────── */
-.slot-card{background:var(--card);border:1.5px solid var(--b);border-radius:8px;
-  padding:7px 10px;margin-bottom:5px;position:relative;cursor:default}
-.slot-card .card-top{gap:5px}
-.slot-card .pt-name{font-size:12px}
-.slot-time{font-size:10px;color:var(--teal);font-weight:700;margin-top:3px}
-.slot-remove{position:absolute;top:6px;right:6px;background:rgba(224,90,90,.15);
-  border:none;color:var(--re);width:20px;height:20px;border-radius:5px;
-  cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;
-  transition:background .15s}
-.slot-remove:hover{background:var(--re);color:#fff}
-
-/* ── GRID SECTION ───────────────────────────────────────── */
-.grid-section{padding:0}
-.grid-scroll{overflow-x:auto;padding-bottom:8px}
-.grid{display:grid;grid-template-columns:repeat(7,minmax(148px,1fr));gap:6px;
-  padding:10px 12px;min-width:1036px}
+/* ── GRID AREA ───────────────────────────────────────────── */
+.grid-area{flex:1;overflow:auto;display:flex;flex-direction:column;min-width:0}
+.grid{display:grid;grid-template-columns:repeat(7,minmax(170px,1fr));
+  min-width:1190px;flex:1;align-items:stretch}
 
 /* ── DAY COLUMN ─────────────────────────────────────────── */
-.day-col{display:flex;flex-direction:column;gap:0;min-height:180px}
-.day-hdr{background:var(--card2);border:1.5px solid var(--b);border-radius:10px 10px 0 0;
-  padding:8px 10px;text-align:center;transition:all .2s}
-.day-hdr.has-pts{border-color:var(--teal);background:var(--tl)}
-.day-hdr.drag-over{border-color:var(--teal);background:rgba(45,140,138,.2);
-  transform:scale(1.02)}
-.day-name{font-size:10px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;
-  color:var(--t2)}
-.day-date{font-size:18px;font-weight:800;color:var(--t);line-height:1.1;margin:2px 0}
-.day-count{font-size:10px;color:var(--teal);font-weight:700}
-.day-body{flex:1;background:var(--card);border:1.5px solid var(--b);border-top:none;
-  border-radius:0 0 10px 10px;padding:8px;min-height:140px;transition:all .2s}
-.day-body.drag-over{background:var(--tl);border-color:var(--teal)}
-.drop-hint{color:var(--t3);font-size:11px;text-align:center;padding:20px 8px;
-  border:1.5px dashed var(--b);border-radius:8px;line-height:1.5}
+.dcol{display:flex;flex-direction:column;border-right:1px solid var(--b);
+  min-height:0;height:100%}
+.dcol:last-child{border-right:none}
+.dhdr{background:var(--card2);border-bottom:1px solid var(--b);
+  padding:8px 10px;position:sticky;top:0;z-index:10;
+  display:flex;align-items:flex-start;justify-content:space-between;
+  transition:background .2s;flex-shrink:0}
+.dhdr.has{background:var(--tl);border-bottom-color:var(--teal)}
+.dhdr.over{background:rgba(45,140,138,.22)}
+.dname{font-size:9px;font-weight:800;letter-spacing:.8px;
+  text-transform:uppercase;color:var(--t2)}
+.ddate{font-size:22px;font-weight:800;color:var(--t);line-height:1}
+.dmon{font-size:10px;color:var(--t2);margin-top:1px}
+.dcnt{font-size:10px;color:var(--teal);font-weight:700;margin-top:2px}
+.undo-day-btn{background:rgba(224,90,90,.12);border:1px solid rgba(224,90,90,.3);
+  color:var(--re);border-radius:5px;padding:2px 6px;font-size:9px;
+  font-weight:700;cursor:pointer;font-family:inherit;flex-shrink:0;margin-left:4px}
+.undo-day-btn:hover{background:var(--re);color:#fff}
+.dbody{flex:1;overflow-y:auto;padding:6px;min-height:120px}
+.dbody.over{background:var(--tl)}
+.drop-hint{border:1.5px dashed var(--b);border-radius:7px;
+  color:var(--t3);font-size:10px;text-align:center;padding:18px 6px;
+  line-height:1.6;margin-top:2px}
+
+/* ── SLOT CARD (in day column) ───────────────────────────── */
+.scard{border-radius:7px;padding:6px 8px;margin-bottom:4px;
+  position:relative;display:flex;flex-direction:column;gap:2px;
+  border:1.5px solid var(--b);transition:all .15s}
+/* Confirmed (from DB or user confirmed) */
+.scard.conf{background:rgba(45,140,138,.1);border-color:var(--teal)}
+/* Suggested (auto-placed) */
+.scard.sugg{background:var(--card2);border-style:dashed;
+  border-color:var(--t3);opacity:.8}
+/* Manually placed (user dragged, not yet confirmed) */
+.scard.pending{background:var(--card2);border-color:var(--b2)}
+.scard:hover{opacity:1;border-color:var(--teal)}
+.scard-top{display:flex;align-items:center;gap:5px}
+.scard-name{font-size:11px;font-weight:700;color:var(--t);flex:1;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scard-time{font-size:9px;color:var(--teal);font-weight:700;margin-top:1px}
+.scard-addr{font-size:9px;color:var(--t2);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scard-label{font-size:8px;font-weight:700;letter-spacing:.3px;
+  padding:1px 5px;border-radius:3px;color:#fff;flex-shrink:0}
+.lbl-sugg{background:var(--t3)}
+.lbl-conf{background:var(--teal)}
+.scard-x{position:absolute;top:4px;right:4px;background:none;border:none;
+  color:var(--t3);font-size:11px;cursor:pointer;line-height:1;
+  width:16px;height:16px;display:flex;align-items:center;justify-content:center;
+  border-radius:3px}
+.scard-x:hover{background:var(--re);color:#fff}
+
+/* ── COLLAPSE TOGGLE ─────────────────────────────────────── */
+.collapse-tab{position:absolute;left:0;top:50%;transform:translateY(-50%);
+  background:var(--teal);color:#fff;border:none;border-radius:0 6px 6px 0;
+  width:16px;height:40px;cursor:pointer;font-size:10px;z-index:20;
+  writing-mode:horizontal-tb;display:flex;align-items:center;justify-content:center}
+.grid-area{position:relative}
 
 /* ── CONFIRM BAR ─────────────────────────────────────────── */
-.confirm-bar{position:sticky;bottom:0;background:var(--navy);
-  padding:12px 16px;border-top:1px solid var(--b);z-index:100;
-  display:flex;gap:10px;align-items:center}
+.cbar{background:var(--navy);border-top:1px solid var(--b);
+  padding:10px 14px;display:flex;gap:8px;align-items:center;flex-shrink:0}
+.time-in{background:var(--card2);border:1.5px solid var(--b);color:var(--t);
+  border-radius:7px;padding:7px 9px;font-size:13px;font-family:inherit;
+  font-weight:700;width:88px;text-align:center}
 .confirm-btn{flex:1;background:linear-gradient(135deg,var(--teal),var(--td));
-  border:none;color:#fff;border-radius:10px;padding:13px;font-size:15px;
+  border:none;color:#fff;border-radius:9px;padding:11px;font-size:14px;
   font-weight:700;cursor:pointer;font-family:inherit;transition:all .15s}
-.confirm-btn:hover{opacity:.9;transform:translateY(-1px)}
-.confirm-btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
-.start-time{background:var(--card2);border:1.5px solid var(--b);color:var(--t);
-  border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;
-  font-weight:600;width:90px;text-align:center}
+.confirm-btn:disabled{opacity:.45;cursor:not-allowed}
+.undo-week-btn{background:rgba(224,90,90,.12);border:1.5px solid rgba(224,90,90,.4);
+  color:var(--re);border-radius:9px;padding:11px 14px;font-size:12px;
+  font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}
+.undo-week-btn:hover{background:var(--re);color:#fff;border-color:var(--re)}
 
-/* ── TOAST ──────────────────────────────────────────────── */
-.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(60px);
-  background:var(--navy);color:#fff;padding:11px 20px;border-radius:12px;
-  font-size:13px;font-weight:600;transition:transform .3s;z-index:999;
-  box-shadow:0 6px 20px rgba(0,0,0,.4);white-space:nowrap;max-width:90vw;
-  text-align:center;pointer-events:none}
+/* ── STATUS ROW (below week bar) ─────────────────────────── */
+.status-row{background:var(--card2);border-bottom:1px solid var(--b);
+  padding:5px 14px;display:flex;align-items:center;gap:12px;font-size:11px;
+  color:var(--t2);flex-shrink:0;flex-wrap:wrap}
+.stat{display:flex;align-items:center;gap:4px}
+.stat .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+
+/* ── TOAST ───────────────────────────────────────────────── */
+.toast{position:fixed;bottom:72px;left:50%;
+  transform:translateX(-50%) translateY(60px);
+  background:#111;color:#fff;padding:10px 20px;border-radius:11px;
+  font-size:13px;font-weight:600;transition:transform .28s;z-index:999;
+  box-shadow:0 6px 20px rgba(0,0,0,.5);pointer-events:none;max-width:90vw;
+  text-align:center;white-space:nowrap}
 .toast.on{transform:translateX(-50%) translateY(0)}
 
-/* ── MOBILE TAP SELECT HINT ─────────────────────────────── */
-.mobile-hint{background:rgba(45,140,138,.12);border:1px solid var(--teal);
-  border-radius:8px;padding:8px 12px;margin:8px 12px 0;font-size:11px;
-  color:var(--teal);font-weight:600;display:none;text-align:center}
-.mobile-hint.show{display:block}
+/* ── AUTH SCREEN ─────────────────────────────────────────── */
+.auth{display:none;position:fixed;inset:0;background:var(--bg);
+  align-items:center;justify-content:center;flex-direction:column;
+  gap:14px;padding:32px;z-index:200;text-align:center}
+.auth.show{display:flex}
+.auth h2{font-size:20px;font-weight:800}
+.auth p{font-size:14px;color:var(--t2);max-width:300px;line-height:1.6}
+.auth a{color:var(--teal);font-weight:700;text-decoration:none}
 
-/* ── AUTH SCREEN ────────────────────────────────────────── */
-.auth-screen{display:none;position:fixed;inset:0;background:var(--bg);
-  align-items:center;justify-content:center;flex-direction:column;gap:16px;
-  text-align:center;padding:32px;z-index:200}
-.auth-screen.show{display:flex}
-.auth-screen h2{font-size:20px;font-weight:800;color:var(--t)}
-.auth-screen p{font-size:14px;color:var(--t2);max-width:280px;line-height:1.5}
-.auth-screen a{color:var(--teal);text-decoration:none;font-weight:700}
-
-@media(max-width:600px){
-  .grid{min-width:1036px}
-  .pool-help{display:none}
+/* ── MOBILE ──────────────────────────────────────────────── */
+@media(max-width:700px){
+  .layout{flex-direction:column}
+  .sidebar{width:100%!important;min-width:100%!important;max-height:240px;
+    border-right:none;border-bottom:1px solid var(--b)}
+  .sidebar.collapsed{max-height:0;min-width:0!important;width:0!important}
+  .grid{min-width:1190px}
+  .collapse-tab{display:none}
+  .sb-toggle-mob{display:flex!important}
 }
+.sb-toggle-mob{display:none;background:var(--card2);border:1px solid var(--b);
+  color:var(--t2);border-radius:7px;padding:5px 10px;font-size:11px;
+  font-weight:600;cursor:pointer;font-family:inherit}
 </style>
 </head>
 <body>
 
-<!-- Auth guard -->
-<div class="auth-screen" id="authScreen">
+<div class="auth" id="authScreen">
   <div style="font-size:48px">📅</div>
   <h2>Sign in required</h2>
-  <p>Please sign in to VaPiq first, then return here to use the Schedule Builder.</p>
-  <a href="./index.html">← Go to VaPiq</a>
+  <p>Please sign in to VaPiq first, then return here.</p>
+  <a href="./index.html">← Back to VaPiq</a>
 </div>
 
 <!-- Top bar -->
-<div class="bar">
-  <div class="bar-left">
-    <h1>📅 Schedule Builder</h1>
-    <p>Drag patients into days · Confirm appointments</p>
+<div class="topbar">
+  <h1>📅 Schedule Builder <span class="topbar-sub">VaPiq Clinical</span></h1>
+  <button class="sb-toggle-mob" id="mobToggle" onclick="toggleSidebar()">☰ Patients</button>
+  <button class="iBtn" onclick="toggleTheme()">🌙</button>
+  <a href="./index.html" style="text-decoration:none">
+    <button class="iBtn">🏠</button>
+  </a>
+</div>
+
+<!-- Week bar -->
+<div class="weekbar">
+  <button class="wBtn" onclick="shiftWeek(-1)">← Prev</button>
+  <div class="week-lbl" id="weekLbl">—</div>
+  <button class="wBtn" onclick="shiftWeek(1)">Next →</button>
+  <button class="wBtn go" onclick="loadWeek()">⟳ Load</button>
+</div>
+
+<!-- Status row -->
+<div class="status-row" id="statusRow">
+  <div class="stat"><div class="dot" style="background:var(--teal)"></div>Confirmed</div>
+  <div class="stat"><div class="dot" style="background:var(--t3);border:1px dashed var(--t3)"></div>Suggested (drag or confirm)</div>
+  <div class="stat"><div class="dot" style="background:var(--b2)"></div>Pending (manually placed)</div>
+  <div style="margin-left:auto;font-weight:700;color:var(--t)" id="statusTotals"></div>
+</div>
+
+<!-- Main layout -->
+<div class="layout">
+
+  <!-- Sidebar (pool) -->
+  <div class="sidebar" id="sidebar">
+    <div class="sb-hdr">
+      <h2>Eligible Pool</h2>
+      <div class="badge" id="poolBadge">0</div>
+      <button class="iBtn" onclick="toggleSidebar()" style="margin-left:auto"
+        title="Collapse panel">◀</button>
+    </div>
+    <div class="sb-search">
+      <input id="searchQ" type="search" placeholder="Search name, file, address…"
+        oninput="onSearch(this.value)">
+      <div class="sb-search-row">
+        <button class="sb-add-btn" onclick="addFromSearch()">+ Add outside window</button>
+      </div>
+    </div>
+    <div class="pool-list" id="poolList"></div>
   </div>
-  <div class="bar-right">
-    <button class="icon-btn" onclick="toggleTheme()" title="Toggle theme">🌙</button>
-    <a href="./index.html" style="text-decoration:none">
-      <button class="icon-btn" title="Back to VaPiq">🏠</button>
-    </a>
-  </div>
-</div>
 
-<!-- Week navigation -->
-<div class="week-bar">
-  <button class="wk-btn" onclick="shiftWeek(-1)">← Prev</button>
-  <div class="week-label" id="weekLabel">Loading…</div>
-  <button class="wk-btn" onclick="shiftWeek(1)">Next →</button>
-  <button class="wk-btn primary" onclick="loadWeek()">Load</button>
-</div>
-
-<!-- Custom search -->
-<div class="search-wrap">
-  <input id="searchQ" type="search" placeholder="Search any patient (including outside window)…"
-    oninput="onSearch(this.value)">
-  <button class="search-btn" onclick="addSearchResult()">+ Add</button>
-</div>
-
-<!-- Mobile tap hint -->
-<div class="mobile-hint" id="mobileHint">
-  Tap a patient to select · Then tap a day column to assign
-</div>
-
-<!-- Pool -->
-<div class="section-hdr">
-  <h2>Eligible patients</h2>
-  <div class="count-badge" id="poolCount">0</div>
-  <div class="pool-help">Drag into a day · or tap on mobile</div>
-</div>
-<div class="pool" id="pool"></div>
-
-<!-- Grid -->
-<div class="section-hdr" style="top:auto;position:static;background:var(--bg)">
-  <h2>Week schedule</h2>
-  <div id="gridCount" style="font-size:11px;color:var(--t3)"></div>
-</div>
-<div class="grid-section">
-  <div class="grid-scroll">
+  <!-- Grid area -->
+  <div class="grid-area" id="gridArea">
+    <!-- Collapse tab for desktop -->
+    <button class="collapse-tab" id="collapseTab" onclick="toggleSidebar()" title="Toggle panel">◀</button>
     <div class="grid" id="grid"></div>
   </div>
+
 </div>
 
 <!-- Confirm bar -->
-<div class="confirm-bar">
-  <input class="start-time" id="startTime" type="time" value="08:00" title="Start time">
+<div class="cbar">
+  <input class="time-in" id="startTime" type="time" value="08:00">
   <button class="confirm-btn" id="confirmBtn" onclick="confirmAll()" disabled>
-    ✓ Confirm All Appointments
+    ✓ Confirm All
   </button>
-  <button id="undoWeekBtn" onclick="undoAllWeek()"
-    style="background:rgba(224,90,90,.15);border:1.5px solid rgba(224,90,90,.5);
-           color:var(--re);border-radius:10px;padding:13px 14px;font-size:12px;
-           font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap"
-    title="Cancel all appointments for the entire week">
-    ↩ Undo Week
-  </button>
+  <button class="undo-week-btn" onclick="undoAllWeek()">↩ Undo Week</button>
 </div>
 
 <div class="toast" id="toast"></div>
-
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
 // ── Constants ─────────────────────────────────────────────
 const SB_URL  = 'https://wqlbmtjbjloxpvsbeqyb.supabase.co';
 const SB_KEY  = 'sb_publishable_gcyK2z_8lvbOgHNcJfdX1g_8QCWJ_Xi';
-const WINDOW_DAYS = 3;  // ±3 days window
-const SLOT_MIN    = 30; // 30 minutes apart
+const WIN     = 3;   // ±days window
+const SLOT    = 30;  // minutes between slots
+const DAYS    = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const MONTHS  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-// ── City zones (FSA postal code prefix → zone name + colour) ─
-const FSA_MAP = {
-  H7:'Laval',H8:'West Island',H9:'West Island',
-  H3:'Mtl West',H4:'Mtl West',H2:'Montréal',
-  H1:'Mtl North',H5:'Mtl East',H6:'Mtl East',
-  J4:'South Shore',J5:'South Shore',J3:'Longueuil',
-  J6:'Lanaudière',J7:'Laurentians',J8:'Nord',
-};
-const ZONE_COLORS = {
-  'Laval':       '#8B5BE8',
-  'West Island': '#5B73E8',
-  'Mtl West':    '#2D8C8A',
-  'Montréal':    '#1E6665',
-  'Mtl North':   '#3D9A6B',
-  'Mtl East':    '#4AA8A0',
-  'South Shore': '#E87A5B',
-  'Longueuil':   '#D4673E',
-  'Lanaudière':  '#8A96A3',
-  'Laurentians': '#6B7A8F',
-  'Nord':        '#4A5568',
-  'Unknown':     '#556070',
-};
+// ── City zone config ──────────────────────────────────────
+const FSA = {H7:'Laval',H8:'West Island',H9:'West Island',H3:'Mtl West',H4:'Mtl West',
+  H2:'Montréal',H1:'Mtl North',H5:'Mtl East',H6:'Mtl East',J4:'South Shore',
+  J5:'South Shore',J3:'Longueuil',J6:'Lanaudière',J7:'Laurentians',J8:'Nord'};
+const ZC = {Laval:'#8B5BE8','West Island':'#5B73E8','Mtl West':'#2D8C8A',
+  Montréal:'#1E6665','Mtl North':'#3D9A6B','Mtl East':'#4AA8A0',
+  'South Shore':'#E87A5B',Longueuil:'#D4673E',Lanaudière:'#8A96A3',
+  Laurentians:'#6B7A8F',Nord:'#4A5568',Unknown:'#556070'};
 
-function getZone(p) {
-  const addr = (p.address || '').toUpperCase();
-  // Extract postal code
-  const pcM = addr.match(/[A-Z]\d[A-Z]\s*\d[A-Z]\d/);
-  if (pcM) {
-    const fsa = pcM[0].replace(/\s/,'').substring(0,2);
-    const name = FSA_MAP[fsa] || 'Unknown';
-    return { name, color: ZONE_COLORS[name] || ZONE_COLORS.Unknown };
-  }
-  // City name fallback
-  const a = addr.toLowerCase();
-  if (/laval|chomedey/.test(a))       return { name:'Laval',       color:ZONE_COLORS.Laval };
-  if (/pointe.claire|dorval|beaconsfield|dollard|kirkland/.test(a))
-                                       return { name:'West Island', color:ZONE_COLORS['West Island'] };
-  if (/longueuil/.test(a))            return { name:'Longueuil',   color:ZONE_COLORS.Longueuil };
-  if (/brossard|greenfield|laprairie|boucherville/.test(a))
-                                       return { name:'South Shore', color:ZONE_COLORS['South Shore'] };
-  if (/blainville|saint.jerome|boisbriand|rosemere/.test(a))
-                                       return { name:'Laurentians', color:ZONE_COLORS.Laurentians };
-  return { name:'Montréal', color: ZONE_COLORS.Montréal };
+function getZone(p){
+  const a=(p.address||'').toUpperCase();
+  const m=a.match(/[A-Z]\d[A-Z]\s*\d[A-Z]\d/);
+  if(m){const fsa=m[0].replace(/\s/,'').substring(0,2);
+    const n=FSA[fsa]||'Unknown';return{n,c:ZC[n]||ZC.Unknown};}
+  const al=a.toLowerCase();
+  if(/laval|chomedey/.test(al))        return{n:'Laval',       c:ZC.Laval};
+  if(/pointe.claire|dorval|beaconsfield|dollard|kirkland/.test(al))
+                                        return{n:'West Island', c:ZC['West Island']};
+  if(/longueuil/.test(al))             return{n:'Longueuil',   c:ZC.Longueuil};
+  if(/brossard|greenfield|laprairie|boucherville/.test(al))
+                                        return{n:'South Shore', c:ZC['South Shore']};
+  if(/blainville|saint.jerome|boisbriand|rosemere/.test(al))
+                                        return{n:'Laurentians', c:ZC.Laurentians};
+  return{n:'Montréal',c:ZC.Montréal};
 }
 
-// ── State ─────────────────────────────────────────────────
-let _sb = null;
-let allPats = [];        // all active patients
-let weekStart = null;    // Date object (Monday)
-let pool = [];           // patients not yet assigned
-let days = [[],[],[],[],[],[],[]]; // 7 day buckets
-let dragId = null;       // currently dragging patient id
-let tapSelected = null;  // for mobile tap-select flow
+// ── Date utilities ────────────────────────────────────────
+function getMon(d){const r=new Date(d);const dw=r.getDay();
+  r.setDate(r.getDate()-(dw===0?6:dw-1));r.setHours(0,0,0,0);return r;}
+function addD(d,n){const r=new Date(d);r.setDate(r.getDate()+n);return r;}
+function toYMD(d){return`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;}
+function pad(n){return String(n).padStart(2,'0');}
 
-// ── Init ──────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', async () => {
-  _sb = window.supabase.createClient(SB_URL, SB_KEY);
-  const { data: { session } } = await _sb.auth.getSession();
-  if (!session) {
-    document.getElementById('authScreen').classList.add('show');
-    return;
-  }
-  // Detect mobile
-  if ('ontouchstart' in window) {
-    document.getElementById('mobileHint').classList.add('show');
-  }
-  weekStart = getMonday(new Date());
+// ── State ─────────────────────────────────────────────────
+let _sb=null, allPats=[], weekStart=null;
+// days[i] = {conf:[], sugg:[], pending:[]}
+// conf = already confirmed in DB
+// sugg = auto-suggested by system (dashed)
+// pending = manually placed by user (not yet confirmed)
+let days=Array.from({length:7},()=>({conf:[],sugg:[],pending:[]}));
+let pool=[];       // unassigned eligible patients
+let dragId=null;   // patient being dragged
+let tapSel=null;   // tap-selected patient id (mobile)
+let sidebarOpen=true;
+
+// ── Boot ──────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded',async()=>{
+  _sb=window.supabase.createClient(SB_URL,SB_KEY);
+  const{data:{session}}=await _sb.auth.getSession();
+  if(!session){document.getElementById('authScreen').classList.add('show');return;}
+  weekStart=getMon(new Date());
   renderWeekLabel();
   renderGrid();
   await loadWeek();
+  // Restore theme
+  const saved=localStorage.getItem('vapiq_sched_theme')
+    ||(window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark');
+  document.documentElement.setAttribute('data-theme',saved);
 });
 
-// ── Date helpers ───────────────────────────────────────────
-function getMonday(d) {
-  const day = new Date(d);
-  const dow = day.getDay();
-  day.setDate(day.getDate() - (dow === 0 ? 6 : dow - 1));
-  day.setHours(0,0,0,0);
-  return day;
-}
-function addDays(d, n) {
-  const r = new Date(d);
-  r.setDate(r.getDate() + n);
-  return r;
-}
-function toYMD(d) {
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-}
-function pad(n) { return String(n).padStart(2,'0'); }
-const DAYS  = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-const MONTHS= ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-
-function dayLabel(d) {
-  return `${DAYS[d.getDay()===0?6:d.getDay()-1]} ${d.getDate()} ${MONTHS[d.getMonth()]}`;
-}
-
-// ── Week navigation ────────────────────────────────────────
-function shiftWeek(dir) {
-  weekStart = addDays(weekStart, dir * 7);
-  renderWeekLabel();
-  clearSchedule();
-  loadWeek();
-}
-function renderWeekLabel() {
-  const end = addDays(weekStart, 6);
-  document.getElementById('weekLabel').textContent =
-    `${DAYS[0]} ${weekStart.getDate()} ${MONTHS[weekStart.getMonth()]} – ` +
-    `${DAYS[6]} ${end.getDate()} ${MONTHS[end.getMonth()]} ${end.getFullYear()}`;
-}
-function clearSchedule() {
-  days = [[],[],[],[],[],[],[]];
-  pool = [];
-}
-
 // ── Load week ──────────────────────────────────────────────
-async function loadWeek() {
-  const btn = document.querySelector('.wk-btn.primary');
-  btn.textContent = 'Loading…'; btn.disabled = true;
-  try {
-    const { data, error } = await _sb
-      .from('patients')
-      .select('*')
-      .eq('archived', false)
-      .eq('pending', false);
-    if (error) throw error;
-    allPats = data || [];
+async function loadWeek(){
+  const btn=document.querySelector('.wBtn.go');
+  btn.textContent='Loading…';btn.disabled=true;
+  try{
+    const{data,error}=await _sb.from('patients').select('*')
+      .eq('archived',false).eq('pending',false);
+    if(error)throw error;
+    allPats=data||[];
 
-    // Pre-populate day columns with already-confirmed appointments this week
-    days = [[],[],[],[],[],[],[]];
-    const weekDays = Array.from({length:7}, (_,i) => toYMD(addDays(weekStart, i)));
-    allPats.forEach(p => {
-      if (!p.appointment_confirmed || !p.appointment_date_time) return;
-      const apptDate = p.appointment_date_time.split('T')[0];
-      const idx = weekDays.indexOf(apptDate);
-      if (idx >= 0) days[idx].push(p);
+    // Reset day buckets
+    days=Array.from({length:7},()=>({conf:[],sugg:[],pending:[]}));
+    const weekDays=Array.from({length:7},(_,i)=>toYMD(addD(weekStart,i)));
+
+    // 1. Fill conf[] with patients already confirmed this week
+    const assigned=new Set();
+    allPats.forEach(p=>{
+      if(!p.appointment_confirmed||!p.appointment_date_time)return;
+      const d=p.appointment_date_time.split('T')[0];
+      const idx=weekDays.indexOf(d);
+      if(idx>=0){days[idx].conf.push(p);assigned.add(p.id);}
     });
-    // Sort each day by appointment time
-    days.forEach(d => d.sort((a,b) =>
+    // Sort confirmed slots by appointment time
+    days.forEach(d=>d.conf.sort((a,b)=>
       (a.appointment_date_time||'').localeCompare(b.appointment_date_time||'')));
 
-    // Find eligible for pool: due_date within window, not already in a day
-    const winFrom = addDays(weekStart, -WINDOW_DAYS);
-    const winTo   = addDays(weekStart,  6 + WINDOW_DAYS);
-    const assigned = new Set(days.flat().map(p => p.id));
+    // 2. Smart prefill: auto-suggest unconfirmed eligible patients
+    const winFrom=addD(weekStart,-WIN);
+    const winTo  =addD(weekStart, 6+WIN);
+    const suggested=new Set();
 
-    pool = allPats.filter(p => {
-      if (!p.due_date) return false;
-      if (assigned.has(p.id)) return false; // already scheduled this week
-      const due = new Date(p.due_date + 'T00:00:00');
-      return due >= winFrom && due <= winTo;
+    allPats.filter(p=>{
+      if(assigned.has(p.id))return false;
+      if(!p.due_date)return false;
+      const due=new Date(p.due_date+'T00:00:00');
+      return due>=winFrom&&due<=winTo;
+    }).forEach(p=>{
+      const bestDay=getBestDay(p,weekDays);
+      if(bestDay>=0){
+        days[bestDay].sugg.push(p);
+        suggested.add(p.id);
+      } else {
+        pool.push(p); // fallback to pool
+      }
+    });
+
+    // 3. Pool = patients eligible but couldn't be auto-suggested
+    pool=allPats.filter(p=>{
+      if(assigned.has(p.id)||suggested.has(p.id))return false;
+      const due=p.due_date?new Date(p.due_date+'T00:00:00'):null;
+      if(!due)return false;
+      return due>=winFrom&&due<=winTo;
     });
 
     // Sort pool by zone then due date
-    pool.sort((a, b) => {
-      const za = getZone(a).name, zb = getZone(b).name;
-      if (za !== zb) return za.localeCompare(zb);
-      return (a.due_date || '').localeCompare(b.due_date || '');
-    });
-
-    const existing = days.flat().length;
+    sortPool();
     renderPool();
     renderGrid();
-    toast(`✓ ${pool.length} eligible · ${existing} already confirmed this week`);
-  } catch(e) {
-    toast('Error loading patients: ' + e.message, 4000);
-  }
-  btn.textContent = 'Load'; btn.disabled = false;
+    updateStatus();
+    toast(`✓ ${suggested.size} suggested · ${assigned.size} already confirmed`);
+  }catch(e){toast('Error: '+e.message,4000);}
+  btn.textContent='⟳ Load';btn.disabled=false;
 }
 
-// ── Patient card HTML ──────────────────────────────────────
-function patCardHTML(p, compact = false) {
-  const zone = getZone(p);
-  const name = p.patient_name || p['Patient Name'] || '(Unknown)';
-  const file = p.file_number  || p['File Number']  || '';
-  const addr = p.address      || p['Address']       || '';
-  const due  = p.due_date     || p['Due Date']      || '';
-
-  if (compact) {
-    return `
-      <div class="card-top">
-        <span class="zone-tag" style="background:${zone.color}">${zone.name}</span>
-        <span class="pt-name">${esc(name)}</span>
-      </div>
-      <div class="pt-addr" style="font-size:10px">${esc(addr.split(',')[0])}</div>`;
-  }
-
-  // Window dots
-  let dots = '';
-  for (let i = 0; i < 7; i++) {
-    const d = addDays(weekStart, i);
-    const dStr = toYMD(d);
-    const isToday = dStr === toYMD(new Date());
-    const diff = due ? Math.round((new Date(dStr+'T00:00:00') - new Date(due+'T00:00:00')) / 86400000) : 99;
-    const inWin = Math.abs(diff) <= WINDOW_DAYS;
-    const isDue = diff === 0;
-    const cls = [isToday?'today':(inWin?'in':'out'), isDue?'due':''].filter(Boolean).join(' ');
-    dots += `<div class="win-dot ${cls}" title="${dayLabel(d)}">${DAYS[i][0]}</div>`;
-  }
-
-  const isOutside = !pool.some(pp => pp.id === p.id);
-  return `
-    <div class="card-top">
-      <span class="zone-tag" style="background:${zone.color}">${zone.name}</span>
-      <span class="pt-name">${esc(name)}</span>
-      <span class="pt-file">#${esc(file)}</span>
-    </div>
-    <div class="pt-addr">${esc(addr)}</div>
-    <div class="win-dots">${dots}</div>
-    ${due?`<div style="font-size:10px;color:var(--t3);margin-top:2px">Due: ${due}</div>`:''}`;
+// Find best day for auto-suggestion
+function getBestDay(p,weekDays){
+  if(!p.due_date)return-1;
+  const due=new Date(p.due_date+'T00:00:00');
+  let best=-1,bestDiff=Infinity;
+  weekDays.forEach((d,i)=>{
+    const dayDate=new Date(d+'T00:00:00');
+    const diff=Math.round((dayDate-due)/86400000);
+    if(Math.abs(diff)<=WIN&&Math.abs(diff)<bestDiff){bestDiff=Math.abs(diff);best=i;}
+  });
+  return best;
 }
+
+// ── Pool helpers ───────────────────────────────────────────
+function sortPool(){
+  pool.sort((a,b)=>{
+    const za=getZone(a).n,zb=getZone(b).n;
+    if(za!==zb)return za.localeCompare(zb);
+    return(a.due_date||'').localeCompare(b.due_date||'');
+  });
+}
+function allAssigned(){
+  const s=new Set();
+  days.forEach(d=>[...d.conf,...d.sugg,...d.pending].forEach(p=>s.add(p.id)));
+  return s;
+}
+function isAssigned(id){return allAssigned().has(id);}
 
 // ── Render pool ────────────────────────────────────────────
-function renderPool() {
-  const el = document.getElementById('pool');
-  // Exclude patients already in a day
-  const assigned = new Set(days.flat().map(p => p.id));
-  const visible = pool.filter(p => !assigned.has(p.id));
+let searchMode=false,searchResults=[];
+function renderPool(){
+  const el=document.getElementById('poolList');
+  const list=searchMode?searchResults:pool;
+  document.getElementById('poolBadge').textContent=pool.length;
+  if(!list.length){
+    el.innerHTML=`<div class="pool-empty">${searchMode?'No patients match your search.':'All eligible patients have been suggested or assigned.'}<br><small style="color:var(--t3)">Use search to add outside-window patients</small></div>`;
+    return;
+  }
+  el.innerHTML=list.map(p=>poolCardHTML(p)).join('');
+}
 
-  el.innerHTML = visible.map(p => `
-    <div class="pt-card${tapSelected===p.id?' selected':''}"
-      id="pc-${p.id}"
-      draggable="true"
-      ondragstart="onDragStart(event,'${p.id}')"
-      ondragend="onDragEnd(event)"
-      onclick="onTapCard('${p.id}')">
-      ${patCardHTML(p)}
-    </div>`).join('');
-
-  document.getElementById('poolCount').textContent = visible.length;
-  updateConfirmBtn();
+function poolCardHTML(p){
+  const z=getZone(p);
+  const nm=p.patient_name||'';
+  const fi=p.file_number||'';
+  const addr=(p.address||'').split(',')[0];
+  const due=p.due_date||'';
+  const isSel=tapSel===p.id;
+  const isOut=!pool.some(pp=>pp.id===p.id)&&!isAssigned(p.id);
+  // Window dots
+  let dots='';
+  const todayStr=toYMD(new Date());
+  for(let i=0;i<7;i++){
+    const d=addD(weekStart,i);
+    const ds=toYMD(d);
+    const diff=due?Math.round((new Date(ds+'T00:00:00')-new Date(due+'T00:00:00'))/86400000):99;
+    const inW=Math.abs(diff)<=WIN;
+    const isDue=diff===0;
+    const isTd=ds===todayStr;
+    const cls=isTd?'today':(inW?'in':'out');
+    dots+=`<div class="wd ${cls}${isDue?' due':''}">${DAYS[i][0]}</div>`;
+  }
+  return`<div class="pcard${isSel?' tap-sel':''}${isOut?' out-win':''}"
+    id="pc-${p.id}" draggable="true"
+    ondragstart="onDragStart(event,'${p.id}')"
+    ondragend="onDragEnd()"
+    onclick="onTapCard('${p.id}')">
+    <div class="pcard-top">
+      <span class="zone-pill" style="background:${z.c}">${z.n}</span>
+      <span class="pcard-name">${esc(nm)}</span>
+      <span class="pcard-file">#${esc(fi)}</span>
+    </div>
+    <div class="pcard-addr">${esc(addr)}</div>
+    <div class="win-row">${dots}</div>
+    ${due?`<div style="font-size:9px;color:var(--t3);margin-top:2px">Due ${due}</div>`:''}
+    ${isOut?'<div style="font-size:9px;color:var(--t3);margin-top:1px">⚠ Outside ±3 day window</div>':''}
+  </div>`;
 }
 
 // ── Render grid ────────────────────────────────────────────
-function renderGrid() {
-  const grid = document.getElementById('grid');
-  let html = '';
-  for (let i = 0; i < 7; i++) {
-    const d = addDays(weekStart, i);
-    const dStr = toYMD(d);
-    const isToday = dStr === toYMD(new Date());
-    const hasPts = days[i].length > 0;
-    const dayPats = days[i];
+function renderGrid(){
+  const grid=document.getElementById('grid');
+  const[sh,sm]=(document.getElementById('startTime')?.value||'08:00').split(':').map(Number);
+  const startMin=sh*60+sm;
+  let html='';
 
-    let slotsHTML = dayPats.length === 0
-      ? `<div class="drop-hint">Drop patients here<br><small style="color:var(--t3)">or tap if selected</small></div>`
-      : '';
+  for(let i=0;i<7;i++){
+    const d=addD(weekStart,i);
+    const ds=toYMD(d);
+    const isToday=ds===toYMD(new Date());
+    const total=days[i].conf.length+days[i].sugg.length+days[i].pending.length;
+    const hasPts=total>0;
 
-    const [sh,sm] = (document.getElementById('startTime')?.value||'08:00').split(':').map(Number);
-    dayPats.forEach((p, idx) => {
-      const tm = sh*60 + sm + idx*SLOT_MIN;
-      const h = Math.floor(tm/60), m = tm%60;
-      const zone = getZone(p);
-      const name = p.patient_name || p['Patient Name'] || '';
-      const addr = (p.address || '').split(',')[0];
-      slotsHTML += `
-        <div class="slot-card">
-          ${patCardHTML(p, true)}
-          <div class="slot-time">🕐 ${pad(h)}:${pad(m)}</div>
-          <button class="slot-remove" onclick="returnToPool(${i},'${p.id}')" title="Return to pool">✕</button>
-        </div>`;
+    // Build slot cards for all three buckets
+    let slots='';
+    // Calc total non-conf count for timing
+    let slotIdx=0;
+
+    // Confirmed (from DB) — already have times
+    days[i].conf.forEach(p=>{
+      const z=getZone(p);
+      const nm=p.patient_name||'';
+      const addr=(p.address||'').split(',')[0];
+      const existing=p.appointment_date_time?.split('T')[1]?.substring(0,5)||'';
+      slots+=`<div class="scard conf">
+        <div class="scard-top">
+          <span class="zone-pill" style="background:${z.c};font-size:8px">${z.n}</span>
+          <span class="scard-name">${esc(nm)}</span>
+          <span class="scard-label lbl-conf">✓</span>
+          <button class="scard-x" onclick="returnFromDay(${i},'${p.id}','conf')">✕</button>
+        </div>
+        <div class="scard-addr">${esc(addr)}</div>
+        ${existing?`<div class="scard-time">🕐 ${existing}</div>`:''}
+      </div>`;
     });
 
-    html += `
-      <div class="day-col">
-        <div class="day-hdr${hasPts?' has-pts':''}" id="dh-${i}">
-          <div style="display:flex;align-items:flex-start;justify-content:space-between">
-            <div>
-              <div class="day-name">${DAYS[i]}</div>
-              <div class="day-date">${d.getDate()}</div>
-              <div class="day-count">${hasPts?`${dayPats.length} patient${dayPats.length>1?'s':''}`:MONTHS[d.getMonth()]}</div>
-            </div>
-            ${hasPts?`<button id="undo-${i}" onclick="undoDay(${i})"
-              style="background:rgba(224,90,90,.15);border:1px solid rgba(224,90,90,.4);
-                     color:var(--re);border-radius:6px;padding:3px 7px;font-size:10px;
-                     font-weight:700;cursor:pointer;font-family:inherit;margin-top:2px;
-                     white-space:nowrap" title="Cancel all appointments this day">
-              ↩ Undo</button>`:''}
-          </div>
+    // Suggested (auto-placed) — calculate times
+    days[i].sugg.forEach(p=>{
+      const z=getZone(p);
+      const nm=p.patient_name||'';
+      const addr=(p.address||'').split(',')[0];
+      const tm=startMin+slotIdx*SLOT;
+      const h=Math.floor(tm/60),m=tm%60;
+      slotIdx++;
+      slots+=`<div class="scard sugg">
+        <div class="scard-top">
+          <span class="zone-pill" style="background:${z.c};font-size:8px">${z.n}</span>
+          <span class="scard-name">${esc(nm)}</span>
+          <span class="scard-label lbl-sugg">auto</span>
+          <button class="scard-x" onclick="returnFromDay(${i},'${p.id}','sugg')">✕</button>
         </div>
-        <div class="day-body" id="db-${i}"
-          ondragover="event.preventDefault();onDragOver(event,${i})"
-          ondragleave="onDragLeave(${i})"
-          ondrop="onDrop(event,${i})"
-          onclick="onTapDay(${i})">
-          ${slotsHTML}
-        </div>
+        <div class="scard-addr">${esc(addr)}</div>
+        <div class="scard-time">🕐 ${pad(h)}:${pad(m)}</div>
       </div>`;
+    });
+
+    // Pending (manually placed)
+    days[i].pending.forEach(p=>{
+      const z=getZone(p);
+      const nm=p.patient_name||'';
+      const addr=(p.address||'').split(',')[0];
+      const tm=startMin+slotIdx*SLOT;
+      const h=Math.floor(tm/60),m=tm%60;
+      slotIdx++;
+      slots+=`<div class="scard pending">
+        <div class="scard-top">
+          <span class="zone-pill" style="background:${z.c};font-size:8px">${z.n}</span>
+          <span class="scard-name">${esc(nm)}</span>
+          <button class="scard-x" onclick="returnFromDay(${i},'${p.id}','pending')">✕</button>
+        </div>
+        <div class="scard-addr">${esc(addr)}</div>
+        <div class="scard-time">🕐 ${pad(h)}:${pad(m)}</div>
+      </div>`;
+    });
+
+    if(!slots) slots=`<div class="drop-hint">Drop patients here<br><small>or tap after selecting</small></div>`;
+
+    html+=`<div class="dcol">
+      <div class="dhdr${hasPts?' has':''}${isToday?' has':''}" id="dh-${i}">
+        <div>
+          <div class="dname">${DAYS[i]}${isToday?' · TODAY':''}</div>
+          <div class="ddate" style="${isToday?'color:var(--teal)':''}">${d.getDate()}</div>
+          <div class="dmon">${MONTHS[d.getMonth()]} ${d.getFullYear()}</div>
+          ${hasPts?`<div class="dcnt">${total} patient${total>1?'s':''}</div>`:''}
+        </div>
+        ${hasPts?`<button class="undo-day-btn" onclick="undoDay(${i})">↩ Undo</button>`:''}
+      </div>
+      <div class="dbody" id="db-${i}"
+        ondragover="event.preventDefault();onDOver(${i})"
+        ondragleave="onDLeave(${i})"
+        ondrop="onDrop(event,${i})"
+        onclick="onTapDay(${i})">
+        ${slots}
+      </div>
+    </div>`;
   }
-  grid.innerHTML = html;
-
-  // Update grid summary
-  const total = days.flat().length;
-  document.getElementById('gridCount').textContent =
-    total ? `${total} patient${total>1?'s':''} scheduled` : '';
-
+  grid.innerHTML=html;
   updateConfirmBtn();
+  updateStatus();
+}
+
+// ── Status bar ─────────────────────────────────────────────
+function updateStatus(){
+  const conf=days.reduce((s,d)=>s+d.conf.length,0);
+  const sugg=days.reduce((s,d)=>s+d.sugg.length,0);
+  const pend=days.reduce((s,d)=>s+d.pending.length,0);
+  document.getElementById('statusTotals').textContent=
+    `${conf} confirmed · ${sugg} suggested · ${pend} pending · ${pool.length} in pool`;
 }
 
 // ── Drag & Drop ────────────────────────────────────────────
-function onDragStart(e, id) {
-  dragId = id;
-  e.target.classList.add('dragging');
-  e.dataTransfer.effectAllowed = 'move';
+function onDragStart(e,id){
+  dragId=id;e.target.classList.add('dragging');
+  e.dataTransfer.effectAllowed='move';
 }
-function onDragEnd(e) {
-  e.target?.classList.remove('dragging');
-  dragId = null;
+function onDragEnd(){
+  document.querySelectorAll('.dragging').forEach(el=>el.classList.remove('dragging'));
+  dragId=null;
 }
-function onDragOver(e, dayIdx) {
-  e.preventDefault();
-  document.getElementById('db-'+dayIdx)?.classList.add('drag-over');
-  document.getElementById('dh-'+dayIdx)?.classList.add('drag-over');
+function onDOver(i){
+  document.getElementById('db-'+i)?.classList.add('over');
+  document.getElementById('dh-'+i)?.classList.add('over');
 }
-function onDragLeave(dayIdx) {
-  document.getElementById('db-'+dayIdx)?.classList.remove('drag-over');
-  document.getElementById('dh-'+dayIdx)?.classList.remove('drag-over');
+function onDLeave(i){
+  document.getElementById('db-'+i)?.classList.remove('over');
+  document.getElementById('dh-'+i)?.classList.remove('over');
 }
-function onDrop(e, dayIdx) {
-  e.preventDefault();
-  onDragLeave(dayIdx);
-  if (!dragId) return;
-  assignToDay(dragId, dayIdx);
-  dragId = null;
+function onDrop(e,i){
+  e.preventDefault();onDLeave(i);
+  if(dragId)assignToDay(dragId,i);
+  dragId=null;
 }
 
-// ── Mobile tap flow ────────────────────────────────────────
-function onTapCard(id) {
-  if ('ontouchstart' in window || tapSelected) {
-    tapSelected = (tapSelected === id) ? null : id;
-    renderPool();
-    document.getElementById('mobileHint').textContent =
-      tapSelected ? '✓ Patient selected — now tap a day column' : 'Tap a patient to select · Then tap a day column';
-    document.getElementById('mobileHint').classList.add('show');
-  }
+// ── Mobile tap ─────────────────────────────────────────────
+function onTapCard(id){
+  tapSel=(tapSel===id)?null:id;
+  renderPool();
 }
-function onTapDay(dayIdx) {
-  if (tapSelected) {
-    assignToDay(tapSelected, dayIdx);
-    tapSelected = null;
-    document.getElementById('mobileHint').textContent = 'Tap a patient to select · Then tap a day column';
-  }
+function onTapDay(i){
+  if(tapSel){assignToDay(tapSel,i);tapSel=null;}
 }
 
 // ── Assign / return ────────────────────────────────────────
-function assignToDay(patId, dayIdx) {
-  // Find patient in pool or allPats
-  const assigned = new Set(days.flat().map(p => p.id));
-  if (assigned.has(patId)) return; // already assigned
-
-  const p = allPats.find(pp => String(pp.id) === String(patId))
-         || pool.find(pp => String(pp.id) === String(patId));
-  if (!p) return;
-
-  days[dayIdx].push(p);
-  // Remove from pool if present
-  pool = pool.filter(pp => String(pp.id) !== String(patId));
-  renderPool();
-  renderGrid();
-  toast(`Added to ${DAYS[dayIdx]}`);
+function assignToDay(patId,dayIdx){
+  if(isAssigned(patId)){toast('Already scheduled');return;}
+  const p=allPats.find(pp=>String(pp.id)===String(patId))
+         ||pool.find(pp=>String(pp.id)===String(patId));
+  if(!p)return;
+  // Move from sugg bucket if auto-placed elsewhere
+  days.forEach(d=>{
+    d.sugg=d.sugg.filter(pp=>String(pp.id)!==String(patId));
+    d.pending=d.pending.filter(pp=>String(pp.id)!==String(patId));
+  });
+  pool=pool.filter(pp=>String(pp.id)!==String(patId));
+  days[dayIdx].pending.push(p);
+  renderPool();renderGrid();
+  toast(`→ ${DAYS[dayIdx]}`);
 }
 
-function returnToPool(dayIdx, patId) {
-  const p = days[dayIdx].find(pp => String(pp.id) === String(patId));
-  if (!p) return;
-  days[dayIdx] = days[dayIdx].filter(pp => String(pp.id) !== String(patId));
-  // Re-add to pool if eligible
-  const winFrom = addDays(weekStart, -WINDOW_DAYS);
-  const winTo   = addDays(weekStart, 6 + WINDOW_DAYS);
-  const due = p.due_date ? new Date(p.due_date+'T00:00:00') : null;
-  if (due && due >= winFrom && due <= winTo) pool.push(p);
-  renderPool();
-  renderGrid();
+function returnFromDay(dayIdx,patId,bucket){
+  const p=days[dayIdx][bucket].find(pp=>String(pp.id)===String(patId));
+  if(!p)return;
+  days[dayIdx][bucket]=days[dayIdx][bucket].filter(pp=>String(pp.id)!==String(patId));
+  // Return to pool if eligible
+  const wf=addD(weekStart,-WIN),wt=addD(weekStart,6+WIN);
+  const due=p.due_date?new Date(p.due_date+'T00:00:00'):null;
+  if(due&&due>=wf&&due<=wt){pool.push(p);sortPool();}
+  renderPool();renderGrid();
 }
 
-// ── Custom search ──────────────────────────────────────────
-let searchTimer = null;
-function onSearch(q) {
+// ── Search ─────────────────────────────────────────────────
+let searchTimer=null;
+function onSearch(q){
   clearTimeout(searchTimer);
-  if (!q.trim()) { renderPool(); return; }
-  searchTimer = setTimeout(() => {
-    const ql = q.toLowerCase();
-    const results = allPats.filter(p => {
-      const name = (p.patient_name || '').toLowerCase();
-      const file = (p.file_number  || '').toLowerCase();
-      const addr = (p.address      || '').toLowerCase();
-      return name.includes(ql) || file.includes(ql) || addr.includes(ql);
+  if(!q.trim()){searchMode=false;renderPool();return;}
+  searchTimer=setTimeout(()=>{
+    const ql=q.toLowerCase();
+    searchResults=allPats.filter(p=>{
+      if(isAssigned(p.id))return false;
+      return(p.patient_name||'').toLowerCase().includes(ql)
+          ||(p.file_number||'').toLowerCase().includes(ql)
+          ||(p.address||'').toLowerCase().includes(ql);
     });
-    renderSearchResults(results);
-  }, 220);
+    searchMode=true;renderPool();
+  },200);
+}
+function addFromSearch(){
+  const q=document.getElementById('searchQ').value.trim();
+  if(!q){toast('Enter a name or file # first');return;}
+  const ql=q.toLowerCase();
+  const match=allPats.find(p=>
+    !isAssigned(p.id)&&(
+      (p.patient_name||'').toLowerCase().includes(ql)||
+      (p.file_number||'').toLowerCase()===ql
+    ));
+  if(!match){toast('Patient not found');return;}
+  if(pool.some(p=>p.id===match.id)){toast('Already in pool');return;}
+  pool.push(match);sortPool();
+  searchMode=false;
+  document.getElementById('searchQ').value='';
+  renderPool();
+  toast(`+ ${match.patient_name||'Patient'} added to pool`);
 }
 
-function renderSearchResults(results) {
-  const el = document.getElementById('pool');
-  const assigned = new Set(days.flat().map(p => p.id));
-  const eligible = new Set(pool.map(p => p.id));
-
-  el.innerHTML = results.map(p => {
-    const isAssigned = assigned.has(p.id);
-    const isEligible = eligible.has(p.id);
-    const isOutside  = !isEligible && !isAssigned;
-    return `
-      <div class="pt-card${isAssigned?' selected':''}${isOutside?' outside-window':''}"
-        id="pc-${p.id}" draggable="${!isAssigned}"
-        ondragstart="onDragStart(event,'${p.id}')"
-        ondragend="onDragEnd(event)"
-        onclick="onTapCard('${p.id}')">
-        ${patCardHTML(p)}
-        ${isAssigned?'<div style="font-size:10px;color:var(--gr);margin-top:3px">✓ Already scheduled</div>':''}
-        ${isOutside?'<div style="font-size:10px;color:var(--t3);margin-top:3px">⚠ Outside ±3 day window</div>':''}
-      </div>`;
-  }).join('') || '<div style="color:var(--t3);font-size:12px;padding:16px;text-align:center">No patients found</div>';
-}
-
-function addSearchResult() {
-  const q = document.getElementById('searchQ').value.trim();
-  if (!q) return;
-  const ql = q.toLowerCase();
-  const match = allPats.find(p =>
-    (p.patient_name||'').toLowerCase().includes(ql) ||
-    (p.file_number||'').toLowerCase() === ql
-  );
-  if (!match) { toast('Patient not found — try a different search', 3000); return; }
-  // Add to pool even if outside window
-  if (!pool.some(p => p.id === match.id) && !days.flat().some(p => p.id === match.id)) {
-    pool.push(match);
-    renderPool();
-    document.getElementById('searchQ').value = '';
-    toast(`Added ${match.patient_name||'patient'} to pool`);
-  } else {
-    toast('Already in pool or scheduled');
+// ── Confirm all ────────────────────────────────────────────
+async function confirmAll(){
+  const toConfirm=[];
+  for(let i=0;i<7;i++){
+    [...days[i].sugg,...days[i].pending].forEach(p=>toConfirm.push({p,day:i}));
   }
+  if(!toConfirm.length){toast('No unconfirmed patients to schedule');return;}
+  const btn=document.getElementById('confirmBtn');
+  btn.disabled=true;btn.textContent='Saving…';
+  const[sh,sm]=(document.getElementById('startTime').value||'08:00').split(':').map(Number);
+  const startMin=sh*60+sm;
+  try{
+    for(let i=0;i<7;i++){
+      const dateStr=toYMD(addD(weekStart,i));
+      let slotIdx=days[i].conf.length; // start after already-confirmed slots
+      const toBatch=[...days[i].sugg,...days[i].pending];
+      for(const p of toBatch){
+        const tm=startMin+slotIdx*SLOT;
+        const h=Math.floor(tm/60),m=tm%60;
+        const dt=`${dateStr}T${pad(h)}:${pad(m)}`;
+        await _sb.from('patients').update({
+          appointment_date_time:dt,
+          appointment_confirmed:true,
+        }).eq('id',p.id);
+        p.appointment_date_time=dt;
+        p.appointment_confirmed=true;
+        days[i].conf.push(p);
+        slotIdx++;
+      }
+      days[i].sugg=[];
+      days[i].pending=[];
+    }
+    renderPool();renderGrid();
+    toast(`✅ ${toConfirm.length} appointment${toConfirm.length>1?'s':''} confirmed!`,3500);
+    btn.textContent=`✓ Confirm All (${toConfirm.length} saved)`;
+    setTimeout(()=>{btn.textContent='✓ Confirm All';},3000);
+  }catch(e){
+    toast('Error: '+e.message,4000);
+  }
+  updateConfirmBtn();
 }
 
-// ── Undo day ──────────────────────────────────────────────
-async function undoDay(dayIdx) {
-  const pats = [...days[dayIdx]];
-  if (!pats.length) { toast('No appointments on this day'); return; }
-  const dayName = DAYS[dayIdx];
-  if (!confirm(`Cancel all ${pats.length} appointment(s) for ${dayName}?\nThis cannot be undone.`)) return;
-
-  const btn = document.getElementById('undo-'+dayIdx);
-  if (btn) { btn.disabled = true; btn.textContent = '…'; }
-
-  try {
-    for (const p of pats) {
+// ── Undo day ───────────────────────────────────────────────
+async function undoDay(i){
+  const allInDay=[...days[i].conf,...days[i].sugg,...days[i].pending];
+  if(!allInDay.length){toast('No appointments on this day');return;}
+  if(!confirm(`Cancel all ${allInDay.length} appointment(s) for ${DAYS[i]} ${toYMD(addD(weekStart,i))}?\nThis cannot be undone.`))return;
+  const btn=document.getElementById('dh-'+i)?.querySelector('.undo-day-btn');
+  if(btn){btn.disabled=true;btn.textContent='…';}
+  try{
+    for(const p of days[i].conf){
       await _sb.from('patients').update({
-        appointment_date_time: null,
-        appointment_confirmed: false,
-      }).eq('id', p.id);
+        appointment_date_time:null,appointment_confirmed:false}).eq('id',p.id);
     }
-    // Return patients to pool if eligible
-    const winFrom = addDays(weekStart, -WINDOW_DAYS);
-    const winTo   = addDays(weekStart, 6 + WINDOW_DAYS);
-    pats.forEach(p => {
-      const due = p.due_date ? new Date(p.due_date+'T00:00:00') : null;
-      if (due && due >= winFrom && due <= winTo) pool.push(p);
+    // Return eligible patients to pool
+    const wf=addD(weekStart,-WIN),wt=addD(weekStart,6+WIN);
+    allInDay.forEach(p=>{
+      const due=p.due_date?new Date(p.due_date+'T00:00:00'):null;
+      if(due&&due>=wf&&due<=wt)pool.push(p);
     });
-    days[dayIdx] = [];
-    pool.sort((a,b) => {
-      const za=getZone(a).name, zb=getZone(b).name;
-      if(za!==zb)return za.localeCompare(zb);
-      return(a.due_date||'').localeCompare(b.due_date||'');
-    });
-    renderPool(); renderGrid();
-    toast(`↩ ${pats.length} appointment${pats.length>1?'s':''} cancelled for ${dayName}`);
-  } catch(e) {
-    toast('Error: ' + e.message, 4000);
-    if (btn) { btn.disabled = false; btn.textContent = '↩ Undo'; }
-  }
+    days[i]={conf:[],sugg:[],pending:[]};
+    sortPool();renderPool();renderGrid();
+    toast(`↩ ${allInDay.length} appointment${allInDay.length>1?'s':''} cancelled`);
+  }catch(e){toast('Error: '+e.message,4000);}
 }
 
-async function undoAllWeek() {
-  const total = days.flat().length;
-  if (!total) { toast('No appointments set this week'); return; }
-  if (!confirm(`Cancel ALL ${total} appointments for the entire week?\nThis cannot be undone.`)) return;
-
-  const ubtn = document.getElementById('undoWeekBtn');
-  if (ubtn) { ubtn.disabled = true; ubtn.textContent = 'Cancelling…'; }
-
-  try {
-    for (let i = 0; i < 7; i++) {
-      for (const p of days[i]) {
-        await _sb.from('patients').update({
-          appointment_date_time: null,
-          appointment_confirmed: false,
-        }).eq('id', p.id);
-      }
+// ── Undo week ──────────────────────────────────────────────
+async function undoAllWeek(){
+  const confPats=days.flatMap(d=>d.conf);
+  const allInWeek=days.flatMap(d=>[...d.conf,...d.sugg,...d.pending]);
+  if(!allInWeek.length){toast('Nothing scheduled this week');return;}
+  if(!confirm(`Cancel ALL ${allInWeek.length} appointments for the entire week?\nThis cannot be undone.`))return;
+  const btn=document.querySelector('.undo-week-btn');
+  btn.disabled=true;btn.textContent='Cancelling…';
+  try{
+    for(const p of confPats){
+      await _sb.from('patients').update({
+        appointment_date_time:null,appointment_confirmed:false}).eq('id',p.id);
     }
-    // Return all to pool
-    const winFrom = addDays(weekStart, -WINDOW_DAYS);
-    const winTo   = addDays(weekStart, 6 + WINDOW_DAYS);
-    days.flat().forEach(p => {
-      const due = p.due_date ? new Date(p.due_date+'T00:00:00') : null;
-      if (due && due >= winFrom && due <= winTo) pool.push(p);
+    const wf=addD(weekStart,-WIN),wt=addD(weekStart,6+WIN);
+    allInWeek.forEach(p=>{
+      const due=p.due_date?new Date(p.due_date+'T00:00:00'):null;
+      if(due&&due>=wf&&due<=wt)pool.push(p);
     });
-    days = [[],[],[],[],[],[],[]];
-    pool.sort((a,b) => {
-      const za=getZone(a).name, zb=getZone(b).name;
-      if(za!==zb)return za.localeCompare(zb);
-      return(a.due_date||'').localeCompare(b.due_date||'');
-    });
-    renderPool(); renderGrid();
-    toast(`↩ All ${total} appointments cancelled for the week`, 3500);
-  } catch(e) {
-    toast('Error: ' + e.message, 4000);
-  }
-  if (ubtn) { ubtn.disabled = false; ubtn.textContent = '↩ Undo Week'; }
-}
-
-// ── Confirm all appointments ───────────────────────────────
-async function confirmAll() {
-  const totalPats = days.flat().length;
-  if (!totalPats) { toast('No patients scheduled yet'); return; }
-
-  const btn = document.getElementById('confirmBtn');
-  btn.disabled = true;
-  btn.textContent = 'Saving…';
-
-  const [sh, sm] = (document.getElementById('startTime').value || '08:00').split(':').map(Number);
-  const startMin = sh * 60 + sm;
-
-  try {
-    let saved = 0;
-    for (let i = 0; i < 7; i++) {
-      if (!days[i].length) continue;
-      const dateStr = toYMD(addDays(weekStart, i));
-      for (let j = 0; j < days[i].length; j++) {
-        const p = days[i][j];
-        const tm = startMin + j * SLOT_MIN;
-        const h = Math.floor(tm/60), m = tm%60;
-        const dt = `${dateStr}T${pad(h)}:${pad(m)}`;
-        await _sb.from('patients').update({
-          appointment_date_time: dt,
-          appointment_confirmed: true,
-        }).eq('id', p.id);
-        saved++;
-      }
-    }
-    toast(`✅ ${saved} appointment${saved>1?'s':''} confirmed!`, 3500);
-    btn.textContent = `✓ ${saved} appointments saved`;
-    setTimeout(() => {
-      btn.textContent = '✓ Confirm All Appointments';
-      btn.disabled = false;
-    }, 3000);
-  } catch(e) {
-    toast('Error saving: ' + e.message, 4000);
-    btn.textContent = '✓ Confirm All Appointments';
-    btn.disabled = false;
-  }
+    days=Array.from({length:7},()=>({conf:[],sugg:[],pending:[]}));
+    sortPool();renderPool();renderGrid();
+    toast(`↩ Entire week cleared (${allInWeek.length} appointments)`,3500);
+  }catch(e){toast('Error: '+e.message,4000);}
+  btn.disabled=false;btn.textContent='↩ Undo Week';
 }
 
 // ── Update confirm button ──────────────────────────────────
-function updateConfirmBtn() {
-  const total = days.flat().length;
-  const btn = document.getElementById('confirmBtn');
-  btn.disabled = total === 0;
-  btn.textContent = total > 0
-    ? `✓ Confirm All Appointments (${total} patient${total>1?'s':''})`
-    : '✓ Confirm All Appointments';
+function updateConfirmBtn(){
+  const n=days.reduce((s,d)=>s+d.sugg.length+d.pending.length,0);
+  const btn=document.getElementById('confirmBtn');
+  btn.disabled=n===0;
+  btn.textContent=n>0?`✓ Confirm All (${n} patient${n>1?'s':''})`:'✓ Confirm All';
+}
+
+// ── Sidebar collapse ───────────────────────────────────────
+function toggleSidebar(){
+  sidebarOpen=!sidebarOpen;
+  document.getElementById('sidebar').classList.toggle('collapsed',!sidebarOpen);
+  const tab=document.getElementById('collapseTab');
+  tab.textContent=sidebarOpen?'◀':'▶';
+  document.getElementById('mobToggle').textContent=sidebarOpen?'☰ Hide':'☰ Patients';
+}
+
+// ── Week nav ───────────────────────────────────────────────
+function shiftWeek(dir){
+  weekStart=addD(weekStart,dir*7);
+  renderWeekLabel();
+  days=Array.from({length:7},()=>({conf:[],sugg:[],pending:[]}));
+  pool=[];
+  loadWeek();
+}
+function renderWeekLabel(){
+  const end=addD(weekStart,6);
+  document.getElementById('weekLbl').textContent=
+    `${DAYS[0]} ${weekStart.getDate()} ${MONTHS[weekStart.getMonth()]} – `+
+    `${DAYS[6]} ${end.getDate()} ${MONTHS[end.getMonth()]} ${end.getFullYear()}`;
 }
 
 // ── Theme ──────────────────────────────────────────────────
-function toggleTheme() {
-  const cur = document.documentElement.getAttribute('data-theme');
-  document.documentElement.setAttribute('data-theme', cur === 'light' ? 'dark' : 'light');
-  localStorage.setItem('vapiq_sched_theme', document.documentElement.getAttribute('data-theme'));
+function toggleTheme(){
+  const cur=document.documentElement.getAttribute('data-theme');
+  const next=cur==='light'?'dark':'light';
+  document.documentElement.setAttribute('data-theme',next);
+  localStorage.setItem('vapiq_sched_theme',next);
 }
-(function() {
-  const saved = localStorage.getItem('vapiq_sched_theme')
-    || (window.matchMedia('(prefers-color-scheme:light)').matches ? 'light' : 'dark');
-  document.documentElement.setAttribute('data-theme', saved);
-})();
 
 // ── Toast ──────────────────────────────────────────────────
-function toast(msg, dur=2200) {
-  const el = document.getElementById('toast');
-  el.textContent = msg; el.classList.add('on');
-  clearTimeout(el._t);
-  el._t = setTimeout(() => el.classList.remove('on'), dur);
+function toast(msg,dur=2200){
+  const el=document.getElementById('toast');
+  el.textContent=msg;el.classList.add('on');
+  clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('on'),dur);
 }
 
-// ── Escape HTML ────────────────────────────────────────────
-function esc(s) {
-  return String(s||'').replace(/[&<>"']/g,c=>
-    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
+// ── XSS escape ────────────────────────────────────────────
+function esc(s){return String(s||'').replace(/[&<>"']/g,c=>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 </script>
 </body>
 </html>
