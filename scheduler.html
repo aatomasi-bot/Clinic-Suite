@@ -127,6 +127,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   color:var(--re);border-radius:5px;padding:2px 6px;font-size:9px;
   font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}
 .day-undo-btn:hover{background:var(--re);color:#fff}
+.day-conf-btn{background:linear-gradient(135deg,var(--teal),var(--td));
+  border:none;color:#fff;border-radius:5px;padding:4px 8px;font-size:10px;
+  font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;
+  margin-top:4px;width:100%;transition:opacity .15s}
+.day-conf-btn:hover{opacity:.85}
 .locked-badge{font-size:9px;color:var(--amber);font-weight:700}
 
 /* ── DAY BODY ────────────────────────────────────────────── */
@@ -141,36 +146,40 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   line-height:1.6;margin-top:2px;pointer-events:none}
 
 /* ── SLOT CARD ───────────────────────────────────────────── */
-.scard{border:1.5px solid var(--b);border-radius:7px;padding:6px 8px;
-  margin-bottom:4px;position:relative;cursor:grab;user-select:none;
+.scard{border:1.5px solid var(--b);border-left:4px solid var(--b);
+  border-radius:7px;padding:7px 26px 7px 10px;
+  margin-bottom:5px;position:relative;cursor:grab;user-select:none;
   touch-action:none;transition:all .15s}
-.scard:hover{border-color:var(--teal)}
+.scard:hover{border-color:var(--teal);border-left-color:inherit}
 .scard.conf-card{background:rgba(45,140,138,.09);border-color:var(--teal);cursor:default}
 .scard.conf-card.unlocked{cursor:grab}
 .scard.conf-card.locked-card{cursor:not-allowed}
-.scard.sugg-card{background:var(--card2);border-style:dashed;border-color:var(--t3)}
+.scard.sugg-card{background:var(--card2);border-style:dashed;border-left-style:solid;border-color:var(--t3)}
 .scard.pend-card{background:var(--card2)}
 .scard.drag-src{opacity:.3}
-.scard.drop-above{border-top:3px solid var(--teal);padding-top:3px}
-.scard.drop-below{border-bottom:3px solid var(--teal);padding-bottom:3px}
-.sc-top{display:flex;align-items:center;gap:5px;padding-right:20px}
-.sc-name{font-size:11px;font-weight:700;color:var(--t);flex:1;
+.scard.drop-above{border-top:3px solid var(--teal)}
+.scard.drop-below{border-bottom:3px solid var(--teal)}
+/* Name — full width, clearly visible */
+.sc-name{font-size:13px;font-weight:800;color:var(--t);display:block;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  line-height:1.2;margin-bottom:2px}
+.sc-meta{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.sc-zone{font-size:9px;font-weight:700;color:var(--t3);flex-shrink:0}
+.sc-addr{font-size:10px;color:var(--t2);flex:1;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sc-addr{font-size:9px;color:var(--t2);margin-top:2px;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sc-time{font-size:9px;color:var(--teal);font-weight:700;margin-top:2px}
+.sc-time{font-size:10px;color:var(--teal);font-weight:700;margin-top:3px;display:block}
 .sc-lbl{font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;
   color:#fff;flex-shrink:0}
 .lbl-conf{background:var(--teal)}
 .lbl-sugg{background:var(--t3)}
 .lbl-lock{background:var(--amber);font-size:9px}
 .sc-x{position:absolute;top:5px;right:5px;background:none;border:none;
-  color:var(--t3);cursor:pointer;font-size:11px;width:16px;height:16px;
+  color:var(--t3);cursor:pointer;font-size:12px;width:18px;height:18px;
   display:flex;align-items:center;justify-content:center;border-radius:3px;
   line-height:1;padding:0}
 .sc-x:hover{background:var(--re);color:#fff}
-.reorder-handle{position:absolute;left:3px;top:50%;transform:translateY(-50%);
-  color:var(--t3);font-size:10px;cursor:grab;padding:2px;line-height:1;
+.reorder-handle{position:absolute;right:5px;bottom:5px;
+  color:var(--t3);font-size:9px;cursor:grab;padding:2px;line-height:1;
   user-select:none;touch-action:none}
 
 /* ── GHOST (drag preview) ───────────────────────────────── */
@@ -539,6 +548,15 @@ function renderGrid(){
         </div>`;
     });
 
+    // Per-day confirm button — shown at top of dbody when active patients exist
+    if(days[i].active.length){
+      const aC=days[i].active.length;
+      html=html.replace(
+        `<div class="dbody" id="db-${i}">`,
+        `<div class="dbody" id="db-${i}"><button class="day-conf-btn" onclick="confirmDay(${i})">` +
+        `✓ Confirm ${DAYS[i]} (${aC} patient${aC>1?'s':''})</button>`
+      );
+    }
     if(!hasAny)html+=`<div class="drop-hint">Drop patients here</div>`;
     html+=`</div></div>`; // close dbody + dcol
   }
@@ -723,6 +741,39 @@ function reorderDay(dayIdx, fromIdx, toIdx){
 // ── isAssigned helper ────────────────────────────────────────
 function isAssigned(id){
   return days.some(d=>[...d.conf,...d.active].some(p=>String(p.id)===String(id)));
+}
+
+// ── Confirm single day ──────────────────────────────────────
+async function confirmDay(dayIdx){
+  const active = days[dayIdx].active;
+  if(!active.length){toast('No unconfirmed patients on this day');return;}
+  const dayName = `\${DAYS[dayIdx]} \${toYMD(addD(weekStart,dayIdx))}`;
+  const btn = document.querySelector('.day-conf-btn[onclick="confirmDay('+dayIdx+')"]')  || document.querySelector('.day-conf-btn');
+  if(btn){btn.disabled=true;btn.textContent='Saving…';}
+  const[sh,sm]=(document.getElementById('startTime').value||'08:00').split(':').map(Number);
+  const startMin=sh*60+sm;
+  const offset=days[dayIdx].conf.length;
+  const ds=toYMD(addD(weekStart,dayIdx));
+  let saved=0;
+  try{
+    for(let j=0;j<active.length;j++){
+      const p=active[j];
+      const tm=startMin+(offset+j)*SLOT;
+      const dt=`\${ds}T\${p2(Math.floor(tm/60))}:\${p2(tm%60)}`;
+      await _sb.from('patients').update({
+        appointment_date_time:dt,appointment_confirmed:true}).eq('id',p.id);
+      p.appointment_date_time=dt;p.appointment_confirmed=true;
+      days[dayIdx].conf.push(p);saved++;
+    }
+    days[dayIdx].active=[];
+    days[dayIdx].locked=true;
+    localStorage.setItem('vapiq_appts_updated',Date.now());
+    renderPool();renderGrid();
+    toast(`✅ \${saved} appointment\${saved>1?'s':''} confirmed for \${DAYS[dayIdx]}`,3000);
+  }catch(e){
+    toast('Error: '+e.message,4000);
+    if(btn){btn.disabled=false;btn.textContent=`✓ Confirm \${DAYS[dayIdx]}`;}
+  }
 }
 
 // ── Confirm all ──────────────────────────────────────────────
