@@ -134,7 +134,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 
 /* ── SLOT CARD ───────────── */
 .sc{border-left:4px solid var(--b);border:1.5px solid var(--b);
-  border-radius:7px;padding:8px 26px 7px 10px;margin-bottom:5px;
+  border-radius:7px;padding:8px 26px 8px 10px;margin-bottom:5px;
   position:relative;transition:all .15s;user-select:none;touch-action:none}
 .sc.conf-sc{background:rgba(45,140,138,.08);border-left:4px solid var(--teal);
   border-color:var(--teal);cursor:default}
@@ -148,11 +148,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 .sc.drop-below{box-shadow:0 3px 0 var(--teal)}
 .sc-name{font-size:13px;font-weight:800;color:var(--t);display:block;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px}
-.sc-row{display:flex;align-items:center;gap:5px}
-.sc-zone{font-size:9px;font-weight:700;color:var(--t3)}
+.sc-row{display:flex;align-items:center;gap:5px;margin-bottom:2px}
+.sc-bottom{display:flex;align-items:center;gap:6px;margin-top:3px}
+.sc-zone{display:inline-flex;align-items:center;padding:2px 7px;
+  border-radius:99px;font-size:9px;font-weight:800;color:#fff;
+  letter-spacing:.3px;flex-shrink:0;white-space:nowrap}
 .sc-addr{font-size:10px;color:var(--t2);flex:1;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sc-time{font-size:10px;color:var(--teal);font-weight:700;display:block;margin-top:3px}
+.sc-time{font-size:10px;color:var(--teal);font-weight:700;flex-shrink:0}
 .sc-badge{font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px;color:#fff;flex-shrink:0}
 .badge-conf{background:var(--teal)}
 .badge-lock{background:var(--amber)}
@@ -161,8 +164,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   color:var(--t3);cursor:pointer;font-size:12px;width:18px;height:18px;
   border-radius:3px;display:flex;align-items:center;justify-content:center}
 .sc-x:hover{background:var(--re);color:#fff}
-.rh{position:absolute;right:5px;bottom:5px;color:var(--t3);font-size:9px;cursor:grab;
-  user-select:none;touch-action:none}
+.rh{color:var(--t3);font-size:10px;cursor:grab;user-select:none;touch-action:none;
+  padding:1px 2px;flex-shrink:0}
+.rh:hover{color:var(--teal)}
 .drop-hint{border:1.5px dashed var(--b);border-radius:7px;color:var(--t3);
   font-size:10px;text-align:center;padding:16px 6px;line-height:1.5}
 
@@ -604,14 +608,16 @@ function renderGrid(){
           data-pid="${p.id}" data-day="${i}" data-bkt="conf" data-idx="${ci}">
           <span class="sc-name">${esc(nm)}</span>
           <div class="sc-row">
-            <span class="sc-zone">${z.n}</span>
             <span class="sc-addr">${esc(addr)}</span>
             ${editMode?`<span class="sc-badge badge-lock">Edit</span>
               <button class="sc-x" data-rm="${i}|conf|${ci}">✕</button>`:
               '<span class="sc-badge badge-conf">✓</span>'}
           </div>
-          <span class="sc-time">🕐 ${dispTime}</span>
-          ${canDrag?'<span class="rh" title="Drag to reorder">⠿</span>':''}
+          <div class="sc-bottom">
+            <span class="sc-zone" style="background:${z.c}">${z.n}</span>
+            <span class="sc-time">🕐 ${dispTime}</span>
+            ${canDrag?'<span class="rh" style="position:static;margin-left:auto" title="Drag to reorder">⠿</span>':''}
+          </div>
         </div>`;
       slotIdx++;
     });
@@ -626,13 +632,15 @@ function renderGrid(){
           data-pid="${p.id}" data-day="${i}" data-bkt="active" data-idx="${ai}">
           <span class="sc-name">${esc(nm)}</span>
           <div class="sc-row">
-            <span class="sc-zone">${z.n}</span>
             <span class="sc-addr">${esc(addr)}</span>
             ${isSugg?'<span class="sc-badge badge-sugg">auto</span>':''}
             <button class="sc-x" data-rm="${i}|active|${ai}">✕</button>
           </div>
-          <span class="sc-time">🕐 ${calcTime(i,slotIdx)}</span>
-          <span class="rh" title="Drag to reorder">⠿</span>
+          <div class="sc-bottom">
+            <span class="sc-zone" style="background:${z.c}">${z.n}</span>
+            <span class="sc-time">🕐 ${calcTime(i,slotIdx)}</span>
+            <span class="rh" style="position:static;margin-left:auto" title="Drag to reorder">⠿</span>
+          </div>
         </div>`;
       slotIdx++;
     });
