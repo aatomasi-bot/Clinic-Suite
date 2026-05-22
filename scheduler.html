@@ -400,18 +400,24 @@ async function reload(){
     pool=[];
     const winDates=windowDates();  // ['2026-06-09','2026-06-10',...]
 
-    // ── Step 1: Load CONFIRMED appointments from DB into their day column
-    //            These are IMMUTABLE until user clicks Edit on that day
+    // ── Step 1: Mark ALL confirmed patients globally —————————————
+    //    confirmedIds must include patients confirmed on ANY date,
+    //    not just the current window. This prevents them from being
+    //    re-suggested when the window scrolls past their appointment day.
     const confirmedIds=new Set();
     allPats.forEach(p=>{
+      if(p.appointment_confirmed&&p.appointment_date_time){
+        confirmedIds.add(p.id); // globally excluded from suggestions
+      }
+    });
+
+    // ── Step 1b: Place confirmed patients that fall in current window ──
+    allPats.forEach(p=>{
       if(!p.appointment_confirmed||!p.appointment_date_time)return;
-      // Extract local date from stored datetime
-      // appointment_date_time stored as "YYYY-MM-DDTHH:MM" (local, no timezone)
       const storedDate=p.appointment_date_time.substring(0,10);
       const idx=winDates.indexOf(storedDate);
       if(idx>=0){
-        days[idx].conf.push({...p});
-        confirmedIds.add(p.id);
+        days[idx].conf.push({...p}); // show in grid if in window
       }
     });
     // Sort confirmed slots by stored appointment time
