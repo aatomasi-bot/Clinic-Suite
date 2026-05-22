@@ -5,163 +5,179 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
 <title>VaPiq · Schedule Builder</title>
 <style>
+/* ── TOKENS ────────────────────────────────────────────── */
 :root{
   --bg:#0F1923;--card:#1B2638;--card2:#1D2B3E;--navy:#0B1420;
   --teal:#2D8C8A;--td:#1E6665;--tl:rgba(45,140,138,.14);
   --t:#E8EEF4;--t2:#8A96A3;--t3:#4A5568;
-  --b:#1F3050;--b2:#243044;--re:#E05A5A;--gr:#3D9A6B;
-  --sh:0 2px 12px rgba(0,0,0,.5);
-  --sidebar-w:300px;
+  --b:#1F3050;--b2:#243044;--re:#E05A5A;--gr:#3D9A6B;--amber:#E8A23A;
+  --sw:300px;
 }
 [data-theme=light]{
   --bg:#EEF2F8;--card:#fff;--card2:#F5F8FC;--navy:#1B2638;
   --t:#1B2638;--t2:#4A5568;--t3:#8A96A3;--b:#DDE3ED;--b2:#EEF2F8;
-  --sh:0 2px 10px rgba(0,0,0,.1);
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;overflow:hidden}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   background:var(--bg);color:var(--t);display:flex;flex-direction:column}
 
-/* ── TOP BAR ───────────────────────────────────────────── */
-.topbar{background:var(--navy);display:flex;align-items:center;
-  gap:10px;padding:0 14px;height:50px;flex-shrink:0;
-  border-bottom:1px solid var(--b)}
-.topbar h1{font-size:15px;font-weight:800;color:#fff;flex:1;white-space:nowrap}
-.topbar-sub{font-size:10px;color:rgba(255,255,255,.35);margin-left:6px}
+/* ── TOPBAR ─────────────────────────────────────────────── */
+.topbar{background:var(--navy);height:50px;display:flex;align-items:center;
+  gap:10px;padding:0 14px;flex-shrink:0;border-bottom:1px solid var(--b)}
+.topbar h1{font-size:15px;font-weight:800;color:#fff;flex:1}
+.topbar-sub{font-size:10px;color:rgba(255,255,255,.3);margin-left:6px}
 .iBtn{background:rgba(255,255,255,.08);border:none;color:rgba(255,255,255,.7);
   width:32px;height:32px;border-radius:7px;cursor:pointer;font-size:14px;
-  display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  display:flex;align-items:center;justify-content:center}
 .iBtn:hover{background:rgba(255,255,255,.16)}
 
 /* ── WEEK BAR ───────────────────────────────────────────── */
-.weekbar{background:var(--card);border-bottom:1px solid var(--b);
-  display:flex;align-items:center;gap:8px;padding:8px 12px;flex-shrink:0;
-  flex-wrap:wrap}
-.week-lbl{flex:1;text-align:center;font-size:13px;font-weight:700;color:var(--t);
-  min-width:200px}
-.wBtn{background:var(--card2);border:1px solid var(--b);color:var(--t2);
+.wkbar{background:var(--card);border-bottom:1px solid var(--b);
+  display:flex;align-items:center;gap:8px;padding:8px 12px;flex-shrink:0}
+.wklbl{flex:1;text-align:center;font-size:13px;font-weight:700;color:var(--t)}
+.wkBtn{background:var(--card2);border:1px solid var(--b);color:var(--t2);
   border-radius:7px;padding:6px 14px;cursor:pointer;font-size:12px;
   font-weight:600;font-family:inherit;transition:all .15s;white-space:nowrap}
-.wBtn:hover{border-color:var(--teal);color:var(--teal)}
-.wBtn.go{background:var(--teal);border-color:var(--teal);color:#fff}
-.wBtn.go:hover{opacity:.88}
+.wkBtn:hover{border-color:var(--teal);color:var(--teal)}
+.wkBtn.go{background:var(--teal);border-color:var(--teal);color:#fff}
 
-/* ── MAIN LAYOUT ────────────────────────────────────────── */
+/* ── STATUS ─────────────────────────────────────────────── */
+.statusbar{background:var(--card2);border-bottom:1px solid var(--b);
+  padding:5px 14px;display:flex;align-items:center;gap:12px;
+  font-size:11px;color:var(--t2);flex-shrink:0;flex-wrap:wrap}
+.sdot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.stot{margin-left:auto;font-weight:700;color:var(--t)}
+
+/* ── LAYOUT ──────────────────────────────────────────────── */
 .layout{display:flex;flex:1;overflow:hidden;min-height:0}
 
-/* ── SIDEBAR ────────────────────────────────────────────── */
-.sidebar{width:var(--sidebar-w);min-width:var(--sidebar-w);display:flex;
-  flex-direction:column;border-right:1px solid var(--b);
-  background:var(--card);transition:width .25s,min-width .25s;flex-shrink:0}
-.sidebar.collapsed{width:0;min-width:0;overflow:hidden}
-.sb-hdr{padding:8px 10px;background:var(--navy);display:flex;align-items:center;
-  gap:7px;flex-shrink:0;border-bottom:1px solid var(--b)}
-.sb-hdr h2{font-size:10px;font-weight:800;letter-spacing:.9px;text-transform:uppercase;
-  color:var(--t2);flex:1;white-space:nowrap}
-.badge{background:var(--teal);color:#fff;border-radius:99px;padding:1px 8px;
-  font-size:11px;font-weight:700}
+/* ── SIDEBAR ─────────────────────────────────────────────── */
+.sidebar{width:var(--sw);min-width:var(--sw);display:flex;flex-direction:column;
+  border-right:1px solid var(--b);background:var(--card);
+  transition:width .25s,min-width .25s;flex-shrink:0;overflow:hidden}
+.sidebar.closed{width:0;min-width:0}
+.sbhdr{background:var(--navy);padding:8px 10px;display:flex;align-items:center;
+  gap:7px;border-bottom:1px solid var(--b);flex-shrink:0}
+.sbhdr h2{font-size:10px;font-weight:800;letter-spacing:.9px;
+  text-transform:uppercase;color:var(--t2);flex:1;white-space:nowrap}
+.badge{background:var(--teal);color:#fff;border-radius:99px;
+  padding:1px 8px;font-size:11px;font-weight:700}
 .sb-search{padding:8px;flex-shrink:0;border-bottom:1px solid var(--b)}
 .sb-search input{width:100%;background:var(--bg);border:1.5px solid var(--b);
   color:var(--t);border-radius:7px;padding:7px 10px;font-size:12px;
   font-family:inherit;outline:none}
 .sb-search input:focus{border-color:var(--teal)}
 .sb-search input::placeholder{color:var(--t3)}
-.sb-search-row{display:flex;gap:5px;margin-top:5px}
-.sb-add-btn{flex:1;background:var(--teal);border:none;color:#fff;border-radius:7px;
-  padding:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit}
-.pool-list{flex:1;overflow-y:auto;padding:6px}
+.sb-add{width:100%;margin-top:5px;background:var(--teal);border:none;color:#fff;
+  border-radius:7px;padding:6px;font-size:11px;font-weight:700;
+  cursor:pointer;font-family:inherit}
+.pool{flex:1;overflow-y:auto;padding:6px}
 .pool-empty{color:var(--t3);font-size:11px;text-align:center;
   padding:24px 8px;line-height:1.6}
 
-/* ── POOL CARD (compact) ─────────────────────────────────── */
+/* ── POOL CARD ───────────────────────────────────────────── */
 .pcard{background:var(--card2);border:1.5px solid var(--b);border-radius:8px;
   padding:7px 9px;margin-bottom:5px;cursor:grab;user-select:none;
-  transition:all .15s}
-.pcard:hover,.pcard.dragging{border-color:var(--teal);
-  box-shadow:0 0 0 2px rgba(45,140,138,.25)}
-.pcard.tap-sel{border-color:var(--teal);background:var(--tl)}
-.pcard.out-win{border-style:dashed}
-.pcard-top{display:flex;align-items:center;gap:6px}
-.zone-pill{padding:2px 6px;border-radius:99px;font-size:9px;font-weight:800;
-  color:#fff;flex-shrink:0;letter-spacing:.3px}
-.pcard-name{font-size:12px;font-weight:700;color:var(--t);flex:1;
+  touch-action:none;transition:border-color .15s}
+.pcard:hover{border-color:var(--teal)}
+.pcard.tsel{border-color:var(--teal);background:var(--tl)}
+.pcard.outwin{border-style:dashed}
+.pcard.dragging-src{opacity:.35}
+.ptop{display:flex;align-items:center;gap:6px}
+.zpill{padding:2px 6px;border-radius:99px;font-size:9px;font-weight:800;
+  color:#fff;flex-shrink:0}
+.pname{font-size:12px;font-weight:700;color:var(--t);flex:1;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.pcard-file{font-size:9px;color:var(--t3);flex-shrink:0}
-.pcard-addr{font-size:10px;color:var(--t2);margin-top:2px;
+.pfile{font-size:9px;color:var(--t3);flex-shrink:0}
+.paddr{font-size:10px;color:var(--t2);margin-top:2px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.win-row{display:flex;gap:2px;margin-top:4px}
-.wd{width:26px;height:18px;border-radius:4px;display:flex;align-items:center;
-  justify-content:center;font-size:8px;font-weight:800;flex-shrink:0}
+.wdots{display:flex;gap:2px;margin-top:4px}
+.wd{width:26px;height:18px;border-radius:4px;font-size:8px;font-weight:800;
+  display:flex;align-items:center;justify-content:center}
 .wd.in{background:var(--teal);color:#fff}
 .wd.out{background:var(--b2);color:var(--t3)}
 .wd.due{outline:2px solid var(--teal);outline-offset:1px}
-.wd.today{background:var(--gr);color:#fff}
+.wd.tod{background:var(--gr);color:#fff}
 
-/* ── GRID AREA ───────────────────────────────────────────── */
-.grid-area{flex:1;overflow:auto;display:flex;flex-direction:column;min-width:0}
+/* ── GRID ────────────────────────────────────────────────── */
+.gridarea{flex:1;overflow:auto;position:relative;display:flex;flex-direction:column}
 .grid{display:grid;grid-template-columns:repeat(7,minmax(170px,1fr));
-  min-width:1190px;flex:1;align-items:stretch}
+  min-width:1190px;flex:1}
 
 /* ── DAY COLUMN ─────────────────────────────────────────── */
-.dcol{display:flex;flex-direction:column;border-right:1px solid var(--b);
-  min-height:0;height:100%}
+.dcol{display:flex;flex-direction:column;border-right:1px solid var(--b)}
 .dcol:last-child{border-right:none}
 .dhdr{background:var(--card2);border-bottom:1px solid var(--b);
-  padding:8px 10px;position:sticky;top:0;z-index:10;
-  display:flex;align-items:flex-start;justify-content:space-between;
-  transition:background .2s;flex-shrink:0}
+  padding:8px 10px;position:sticky;top:0;z-index:10;flex-shrink:0;
+  transition:background .2s}
 .dhdr.has{background:var(--tl);border-bottom-color:var(--teal)}
-.dhdr.over{background:rgba(45,140,138,.22)}
-.dname{font-size:9px;font-weight:800;letter-spacing:.8px;
-  text-transform:uppercase;color:var(--t2)}
+.dhdr.locked-day{background:rgba(232,162,58,.08);border-bottom-color:var(--amber)}
+.dhdr-top{display:flex;align-items:flex-start;justify-content:space-between}
+.dname{font-size:9px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--t2)}
 .ddate{font-size:22px;font-weight:800;color:var(--t);line-height:1}
 .dmon{font-size:10px;color:var(--t2);margin-top:1px}
 .dcnt{font-size:10px;color:var(--teal);font-weight:700;margin-top:2px}
-.undo-day-btn{background:rgba(224,90,90,.12);border:1px solid rgba(224,90,90,.3);
+.dhdr-btns{display:flex;flex-direction:column;gap:3px;align-items:flex-end}
+.day-edit-btn{background:rgba(232,162,58,.15);border:1px solid rgba(232,162,58,.4);
+  color:var(--amber);border-radius:5px;padding:2px 6px;font-size:9px;
+  font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}
+.day-edit-btn:hover{background:var(--amber);color:#fff}
+.day-undo-btn{background:rgba(224,90,90,.12);border:1px solid rgba(224,90,90,.3);
   color:var(--re);border-radius:5px;padding:2px 6px;font-size:9px;
-  font-weight:700;cursor:pointer;font-family:inherit;flex-shrink:0;margin-left:4px}
-.undo-day-btn:hover{background:var(--re);color:#fff}
-.dbody{flex:1;overflow-y:auto;padding:6px;min-height:120px}
-.dbody.over{background:var(--tl)}
+  font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}
+.day-undo-btn:hover{background:var(--re);color:#fff}
+.locked-badge{font-size:9px;color:var(--amber);font-weight:700}
+
+/* ── DAY BODY ────────────────────────────────────────────── */
+.dbody{flex:1;padding:6px;min-height:120px;overflow-y:auto;
+  transition:background .15s}
+.dbody.drop-over{background:var(--tl)}
+.droptarget{border:2px dashed var(--teal);border-radius:7px;
+  min-height:28px;margin-bottom:4px;transition:all .15s}
+.droptarget.active{background:var(--tl)}
 .drop-hint{border:1.5px dashed var(--b);border-radius:7px;
   color:var(--t3);font-size:10px;text-align:center;padding:18px 6px;
-  line-height:1.6;margin-top:2px}
+  line-height:1.6;margin-top:2px;pointer-events:none}
 
-/* ── SLOT CARD (in day column) ───────────────────────────── */
-.scard{border-radius:7px;padding:6px 8px;margin-bottom:4px;
-  position:relative;display:flex;flex-direction:column;gap:2px;
-  border:1.5px solid var(--b);transition:all .15s}
-/* Confirmed (from DB or user confirmed) */
-.scard.conf{background:rgba(45,140,138,.1);border-color:var(--teal)}
-/* Suggested (auto-placed) */
-.scard.sugg{background:var(--card2);border-style:dashed;
-  border-color:var(--t3);opacity:.8}
-/* Manually placed (user dragged, not yet confirmed) */
-.scard.pending{background:var(--card2);border-color:var(--b2)}
-.scard:hover{opacity:1;border-color:var(--teal)}
-.scard-top{display:flex;align-items:center;gap:5px}
-.scard-name{font-size:11px;font-weight:700;color:var(--t);flex:1;
+/* ── SLOT CARD ───────────────────────────────────────────── */
+.scard{border:1.5px solid var(--b);border-radius:7px;padding:6px 8px;
+  margin-bottom:4px;position:relative;cursor:grab;user-select:none;
+  touch-action:none;transition:all .15s}
+.scard:hover{border-color:var(--teal)}
+.scard.conf-card{background:rgba(45,140,138,.09);border-color:var(--teal);cursor:default}
+.scard.conf-card.unlocked{cursor:grab}
+.scard.conf-card.locked-card{cursor:not-allowed}
+.scard.sugg-card{background:var(--card2);border-style:dashed;border-color:var(--t3)}
+.scard.pend-card{background:var(--card2)}
+.scard.drag-src{opacity:.3}
+.scard.drop-above{border-top:3px solid var(--teal);padding-top:3px}
+.scard.drop-below{border-bottom:3px solid var(--teal);padding-bottom:3px}
+.sc-top{display:flex;align-items:center;gap:5px;padding-right:20px}
+.sc-name{font-size:11px;font-weight:700;color:var(--t);flex:1;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.scard-time{font-size:9px;color:var(--teal);font-weight:700;margin-top:1px}
-.scard-addr{font-size:9px;color:var(--t2);
+.sc-addr{font-size:9px;color:var(--t2);margin-top:2px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.scard-label{font-size:8px;font-weight:700;letter-spacing:.3px;
-  padding:1px 5px;border-radius:3px;color:#fff;flex-shrink:0}
-.lbl-sugg{background:var(--t3)}
+.sc-time{font-size:9px;color:var(--teal);font-weight:700;margin-top:2px}
+.sc-lbl{font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;
+  color:#fff;flex-shrink:0}
 .lbl-conf{background:var(--teal)}
-.scard-x{position:absolute;top:4px;right:4px;background:none;border:none;
-  color:var(--t3);font-size:11px;cursor:pointer;line-height:1;
-  width:16px;height:16px;display:flex;align-items:center;justify-content:center;
-  border-radius:3px}
-.scard-x:hover{background:var(--re);color:#fff}
+.lbl-sugg{background:var(--t3)}
+.lbl-lock{background:var(--amber);font-size:9px}
+.sc-x{position:absolute;top:5px;right:5px;background:none;border:none;
+  color:var(--t3);cursor:pointer;font-size:11px;width:16px;height:16px;
+  display:flex;align-items:center;justify-content:center;border-radius:3px;
+  line-height:1;padding:0}
+.sc-x:hover{background:var(--re);color:#fff}
+.reorder-handle{position:absolute;left:3px;top:50%;transform:translateY(-50%);
+  color:var(--t3);font-size:10px;cursor:grab;padding:2px;line-height:1;
+  user-select:none;touch-action:none}
 
-/* ── COLLAPSE TOGGLE ─────────────────────────────────────── */
-.collapse-tab{position:absolute;left:0;top:50%;transform:translateY(-50%);
-  background:var(--teal);color:#fff;border:none;border-radius:0 6px 6px 0;
-  width:16px;height:40px;cursor:pointer;font-size:10px;z-index:20;
-  writing-mode:horizontal-tb;display:flex;align-items:center;justify-content:center}
-.grid-area{position:relative}
+/* ── GHOST (drag preview) ───────────────────────────────── */
+.drag-ghost{position:fixed;pointer-events:none;z-index:1000;
+  opacity:.8;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.4);
+  background:var(--teal);color:#fff;padding:6px 10px;font-size:12px;
+  font-weight:700;white-space:nowrap;transform:translate(-50%,-50%)}
 
 /* ── CONFIRM BAR ─────────────────────────────────────────── */
 .cbar{background:var(--navy);border-top:1px solid var(--b);
@@ -169,32 +185,31 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 .time-in{background:var(--card2);border:1.5px solid var(--b);color:var(--t);
   border-radius:7px;padding:7px 9px;font-size:13px;font-family:inherit;
   font-weight:700;width:88px;text-align:center}
-.confirm-btn{flex:1;background:linear-gradient(135deg,var(--teal),var(--td));
+.conf-btn{flex:1;background:linear-gradient(135deg,var(--teal),var(--td));
   border:none;color:#fff;border-radius:9px;padding:11px;font-size:14px;
-  font-weight:700;cursor:pointer;font-family:inherit;transition:all .15s}
-.confirm-btn:disabled{opacity:.45;cursor:not-allowed}
-.undo-week-btn{background:rgba(224,90,90,.12);border:1.5px solid rgba(224,90,90,.4);
+  font-weight:700;cursor:pointer;font-family:inherit;transition:opacity .15s}
+.conf-btn:disabled{opacity:.4;cursor:not-allowed}
+.undo-wk-btn{background:rgba(224,90,90,.12);border:1.5px solid rgba(224,90,90,.4);
   color:var(--re);border-radius:9px;padding:11px 14px;font-size:12px;
   font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}
-.undo-week-btn:hover{background:var(--re);color:#fff;border-color:var(--re)}
+.undo-wk-btn:hover{background:var(--re);color:#fff;border-color:var(--re)}
 
-/* ── STATUS ROW (below week bar) ─────────────────────────── */
-.status-row{background:var(--card2);border-bottom:1px solid var(--b);
-  padding:5px 14px;display:flex;align-items:center;gap:12px;font-size:11px;
-  color:var(--t2);flex-shrink:0;flex-wrap:wrap}
-.stat{display:flex;align-items:center;gap:4px}
-.stat .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+/* ── COLLAPSE TAB ────────────────────────────────────────── */
+.ctab{position:absolute;left:0;top:50%;transform:translateY(-50%);
+  background:var(--teal);color:#fff;border:none;border-radius:0 6px 6px 0;
+  width:14px;height:36px;cursor:pointer;font-size:9px;z-index:20;
+  display:flex;align-items:center;justify-content:center}
 
 /* ── TOAST ───────────────────────────────────────────────── */
-.toast{position:fixed;bottom:72px;left:50%;
+.toast{position:fixed;bottom:74px;left:50%;
   transform:translateX(-50%) translateY(60px);
-  background:#111;color:#fff;padding:10px 20px;border-radius:11px;
-  font-size:13px;font-weight:600;transition:transform .28s;z-index:999;
-  box-shadow:0 6px 20px rgba(0,0,0,.5);pointer-events:none;max-width:90vw;
-  text-align:center;white-space:nowrap}
+  background:#0B1420;color:#fff;padding:10px 20px;border-radius:11px;
+  font-size:13px;font-weight:600;transition:transform .28s;z-index:9999;
+  box-shadow:0 6px 24px rgba(0,0,0,.6);pointer-events:none;
+  max-width:90vw;text-align:center}
 .toast.on{transform:translateX(-50%) translateY(0)}
 
-/* ── AUTH SCREEN ─────────────────────────────────────────── */
+/* ── AUTH ────────────────────────────────────────────────── */
 .auth{display:none;position:fixed;inset:0;background:var(--bg);
   align-items:center;justify-content:center;flex-direction:column;
   gap:14px;padding:32px;z-index:200;text-align:center}
@@ -206,650 +221,684 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 /* ── MOBILE ──────────────────────────────────────────────── */
 @media(max-width:700px){
   .layout{flex-direction:column}
-  .sidebar{width:100%!important;min-width:100%!important;max-height:240px;
+  .sidebar{width:100%!important;min-width:100%!important;max-height:220px;
     border-right:none;border-bottom:1px solid var(--b)}
-  .sidebar.collapsed{max-height:0;min-width:0!important;width:0!important}
+  .sidebar.closed{max-height:0!important;min-width:0!important;width:100%!important;overflow:hidden}
   .grid{min-width:1190px}
-  .collapse-tab{display:none}
-  .sb-toggle-mob{display:flex!important}
+  .ctab{display:none}
 }
-.sb-toggle-mob{display:none;background:var(--card2);border:1px solid var(--b);
-  color:var(--t2);border-radius:7px;padding:5px 10px;font-size:11px;
-  font-weight:600;cursor:pointer;font-family:inherit}
 </style>
 </head>
 <body>
 
-<div class="auth" id="authScreen">
+<div class="auth" id="authScr">
   <div style="font-size:48px">📅</div>
   <h2>Sign in required</h2>
-  <p>Please sign in to VaPiq first, then return here.</p>
+  <p>Please sign in to VaPiq first.</p>
   <a href="./index.html">← Back to VaPiq</a>
 </div>
 
-<!-- Top bar -->
 <div class="topbar">
-  <h1>📅 Schedule Builder <span class="topbar-sub">VaPiq Clinical</span></h1>
-  <button class="sb-toggle-mob" id="mobToggle" onclick="toggleSidebar()">☰ Patients</button>
+  <h1>📅 Schedule Builder<span class="topbar-sub"> · VaPiq</span></h1>
+  <button class="iBtn" id="mobToggle" onclick="toggleSB()"
+    style="font-size:11px;width:auto;padding:0 10px">☰</button>
   <button class="iBtn" onclick="toggleTheme()">🌙</button>
   <a href="./index.html" style="text-decoration:none">
     <button class="iBtn">🏠</button>
   </a>
 </div>
 
-<!-- Week bar -->
-<div class="weekbar">
-  <button class="wBtn" onclick="shiftWeek(-1)">← Prev</button>
-  <div class="week-lbl" id="weekLbl">—</div>
-  <button class="wBtn" onclick="shiftWeek(1)">Next →</button>
-  <button class="wBtn go" onclick="loadWeek()">⟳ Load</button>
+<div class="wkbar">
+  <button class="wkBtn" onclick="shiftWk(-1)">← Prev</button>
+  <div class="wklbl" id="wklbl">—</div>
+  <button class="wkBtn" onclick="shiftWk(1)">Next →</button>
+  <button class="wkBtn go" onclick="loadWeek()">⟳ Load</button>
 </div>
 
-<!-- Status row -->
-<div class="status-row" id="statusRow">
-  <div class="stat"><div class="dot" style="background:var(--teal)"></div>Confirmed</div>
-  <div class="stat"><div class="dot" style="background:var(--t3);border:1px dashed var(--t3)"></div>Suggested (drag or confirm)</div>
-  <div class="stat"><div class="dot" style="background:var(--b2)"></div>Pending (manually placed)</div>
-  <div style="margin-left:auto;font-weight:700;color:var(--t)" id="statusTotals"></div>
+<div class="statusbar">
+  <span style="display:flex;align-items:center;gap:4px">
+    <div class="sdot" style="background:var(--teal)"></div>Confirmed
+  </span>
+  <span style="display:flex;align-items:center;gap:4px">
+    <div class="sdot" style="background:var(--t3)"></div>Suggested
+  </span>
+  <span style="display:flex;align-items:center;gap:4px">
+    <div class="sdot" style="background:var(--b2)"></div>Pending
+  </span>
+  <span style="display:flex;align-items:center;gap:4px">
+    <div class="sdot" style="background:var(--amber)"></div>Locked
+  </span>
+  <div class="stot" id="stot"></div>
 </div>
 
-<!-- Main layout -->
 <div class="layout">
-
-  <!-- Sidebar (pool) -->
-  <div class="sidebar" id="sidebar">
-    <div class="sb-hdr">
+  <div class="sidebar" id="sb">
+    <div class="sbhdr">
       <h2>Eligible Pool</h2>
       <div class="badge" id="poolBadge">0</div>
-      <button class="iBtn" onclick="toggleSidebar()" style="margin-left:auto"
-        title="Collapse panel">◀</button>
+      <button class="iBtn" onclick="toggleSB()" style="margin-left:auto;width:26px;height:26px;font-size:11px">◀</button>
     </div>
     <div class="sb-search">
-      <input id="searchQ" type="search" placeholder="Search name, file, address…"
+      <input id="searchQ" type="search" placeholder="Search name, file#, address…"
         oninput="onSearch(this.value)">
-      <div class="sb-search-row">
-        <button class="sb-add-btn" onclick="addFromSearch()">+ Add outside window</button>
-      </div>
+      <button class="sb-add" onclick="addOutside()">+ Add outside ±3 day window</button>
     </div>
-    <div class="pool-list" id="poolList"></div>
+    <div class="pool" id="pool"></div>
   </div>
 
-  <!-- Grid area -->
-  <div class="grid-area" id="gridArea">
-    <!-- Collapse tab for desktop -->
-    <button class="collapse-tab" id="collapseTab" onclick="toggleSidebar()" title="Toggle panel">◀</button>
+  <div class="gridarea" id="ga">
+    <button class="ctab" id="ctab" onclick="toggleSB()">◀</button>
     <div class="grid" id="grid"></div>
   </div>
-
 </div>
 
-<!-- Confirm bar -->
 <div class="cbar">
-  <input class="time-in" id="startTime" type="time" value="08:00">
-  <button class="confirm-btn" id="confirmBtn" onclick="confirmAll()" disabled>
-    ✓ Confirm All
-  </button>
-  <button class="undo-week-btn" onclick="undoAllWeek()">↩ Undo Week</button>
+  <input class="time-in" id="startTime" type="time" value="08:00"
+    onchange="renderGrid()">
+  <button class="conf-btn" id="confBtn" onclick="confirmAll()" disabled>✓ Confirm All</button>
+  <button class="undo-wk-btn" onclick="undoWeek()">↩ Undo Week</button>
 </div>
 
 <div class="toast" id="toast"></div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
 // ── Constants ─────────────────────────────────────────────
-const SB_URL  = 'https://wqlbmtjbjloxpvsbeqyb.supabase.co';
-const SB_KEY  = 'sb_publishable_gcyK2z_8lvbOgHNcJfdX1g_8QCWJ_Xi';
-const WIN     = 3;   // ±days window
-const SLOT    = 30;  // minutes between slots
-const DAYS    = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-const MONTHS  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const SB_URL = 'https://wqlbmtjbjloxpvsbeqyb.supabase.co';
+const SB_KEY = 'sb_publishable_gcyK2z_8lvbOgHNcJfdX1g_8QCWJ_Xi';
+const WIN    = 3;   // ±days window
+const SLOT   = 30;  // min between patients
+const DAYS   = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-// ── City zone config ──────────────────────────────────────
-const FSA = {H7:'Laval',H8:'West Island',H9:'West Island',H3:'Mtl West',H4:'Mtl West',
-  H2:'Montréal',H1:'Mtl North',H5:'Mtl East',H6:'Mtl East',J4:'South Shore',
-  J5:'South Shore',J3:'Longueuil',J6:'Lanaudière',J7:'Laurentians',J8:'Nord'};
+// ── Zone config ────────────────────────────────────────────
+const FSA = {H7:'Laval',H8:'West Island',H9:'West Island',H3:'Mtl West',
+  H4:'Mtl West',H2:'Montréal',H1:'Mtl North',H5:'Mtl East',H6:'Mtl East',
+  J4:'South Shore',J5:'South Shore',J3:'Longueuil',J6:'Lanaudière',
+  J7:'Laurentians',J8:'Nord'};
 const ZC = {Laval:'#8B5BE8','West Island':'#5B73E8','Mtl West':'#2D8C8A',
   Montréal:'#1E6665','Mtl North':'#3D9A6B','Mtl East':'#4AA8A0',
   'South Shore':'#E87A5B',Longueuil:'#D4673E',Lanaudière:'#8A96A3',
   Laurentians:'#6B7A8F',Nord:'#4A5568',Unknown:'#556070'};
-
-function getZone(p){
+function zone(p){
   const a=(p.address||'').toUpperCase();
   const m=a.match(/[A-Z]\d[A-Z]\s*\d[A-Z]\d/);
-  if(m){const fsa=m[0].replace(/\s/,'').substring(0,2);
-    const n=FSA[fsa]||'Unknown';return{n,c:ZC[n]||ZC.Unknown};}
-  const al=a.toLowerCase();
-  if(/laval|chomedey/.test(al))        return{n:'Laval',       c:ZC.Laval};
-  if(/pointe.claire|dorval|beaconsfield|dollard|kirkland/.test(al))
-                                        return{n:'West Island', c:ZC['West Island']};
-  if(/longueuil/.test(al))             return{n:'Longueuil',   c:ZC.Longueuil};
-  if(/brossard|greenfield|laprairie|boucherville/.test(al))
-                                        return{n:'South Shore', c:ZC['South Shore']};
-  if(/blainville|saint.jerome|boisbriand|rosemere/.test(al))
-                                        return{n:'Laurentians', c:ZC.Laurentians};
+  if(m){const f=m[0].replace(/\s/,'').slice(0,2);const n=FSA[f]||'Unknown';return{n,c:ZC[n]||ZC.Unknown};}
+  const l=a.toLowerCase();
+  if(/laval/.test(l))return{n:'Laval',c:ZC.Laval};
+  if(/pointe.claire|dorval|beaconsfield|dollard|kirkland/.test(l))return{n:'West Island',c:ZC['West Island']};
+  if(/longueuil/.test(l))return{n:'Longueuil',c:ZC.Longueuil};
+  if(/brossard|greenfield|laprairie|boucherville/.test(l))return{n:'South Shore',c:ZC['South Shore']};
+  if(/blainville|saint.jerome|boisbriand|rosemere/.test(l))return{n:'Laurentians',c:ZC.Laurentians};
   return{n:'Montréal',c:ZC.Montréal};
 }
 
-// ── Date utilities ────────────────────────────────────────
-function getMon(d){const r=new Date(d);const dw=r.getDay();
-  r.setDate(r.getDate()-(dw===0?6:dw-1));r.setHours(0,0,0,0);return r;}
+// ── Date helpers ────────────────────────────────────────────
+function getMon(d){const r=new Date(d),dw=r.getDay();r.setDate(r.getDate()-(dw===0?6:dw-1));r.setHours(0,0,0,0);return r;}
 function addD(d,n){const r=new Date(d);r.setDate(r.getDate()+n);return r;}
-function toYMD(d){return`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;}
-function pad(n){return String(n).padStart(2,'0');}
+function toYMD(d){return`${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`;}
+function p2(n){return String(n).padStart(2,'0');}
 
-// ── State ─────────────────────────────────────────────────
+// ── Global state ────────────────────────────────────────────
 let _sb=null, allPats=[], weekStart=null;
-// days[i] = {conf:[], sugg:[], pending:[]}
-// conf = already confirmed in DB
-// sugg = auto-suggested by system (dashed)
-// pending = manually placed by user (not yet confirmed)
-let days=Array.from({length:7},()=>({conf:[],sugg:[],pending:[]}));
-let pool=[];       // unassigned eligible patients
-let dragId=null;   // patient being dragged
-let tapSel=null;   // tap-selected patient id (mobile)
-let sidebarOpen=true;
+// days[i] = {conf:[], active:[], locked:true}
+// conf  = DB-confirmed, locked by default
+// active = sugg+pending merged (ordered list), each has p._sugg flag
+let days = Array.from({length:7},()=>({conf:[],active:[],locked:true}));
+let pool = [];
+let sbOpen = true;
 
-// ── Boot ──────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded',async()=>{
-  _sb=window.supabase.createClient(SB_URL,SB_KEY);
-  const{data:{session}}=await _sb.auth.getSession();
-  if(!session){document.getElementById('authScreen').classList.add('show');return;}
-  weekStart=getMon(new Date());
-  renderWeekLabel();
+// ── Drag state (pointer-based — works on desktop + mobile) ──
+let drag = null; // {patId, fromPool, fromDay, fromIdx, ghost, ox, oy}
+
+// ── Init ────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async ()=>{
+  _sb = window.supabase.createClient(SB_URL, SB_KEY);
+  const {data:{session}} = await _sb.auth.getSession();
+  if(!session){document.getElementById('authScr').classList.add('show');return;}
+  const saved = localStorage.getItem('vapiq_sched_theme')
+    ||(window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark');
+  document.documentElement.setAttribute('data-theme', saved);
+  weekStart = getMon(new Date());
+  renderWkLabel();
   renderGrid();
   await loadWeek();
-  // Restore theme
-  const saved=localStorage.getItem('vapiq_sched_theme')
-    ||(window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark');
-  document.documentElement.setAttribute('data-theme',saved);
 });
 
-// ── Load week ──────────────────────────────────────────────
+// ── Load week ───────────────────────────────────────────────
 async function loadWeek(){
-  const btn=document.querySelector('.wBtn.go');
-  btn.textContent='Loading…';btn.disabled=true;
+  const lb = document.querySelector('.wkBtn.go');
+  lb.textContent='Loading…'; lb.disabled=true;
   try{
-    const{data,error}=await _sb.from('patients').select('*')
+    const {data,error} = await _sb.from('patients').select('*')
       .eq('archived',false).eq('pending',false);
     if(error)throw error;
-    allPats=data||[];
+    allPats = data||[];
+    days = Array.from({length:7},()=>({conf:[],active:[],locked:true}));
+    pool = [];
+    const wkDays = Array.from({length:7},(_,i)=>toYMD(addD(weekStart,i)));
+    const assignedIds = new Set();
 
-    // Reset day buckets
-    days=Array.from({length:7},()=>({conf:[],sugg:[],pending:[]}));
-    const weekDays=Array.from({length:7},(_,i)=>toYMD(addD(weekStart,i)));
-
-    // 1. Fill conf[] with patients already confirmed this week
-    const assigned=new Set();
+    // Pre-fill confirmed from DB
     allPats.forEach(p=>{
       if(!p.appointment_confirmed||!p.appointment_date_time)return;
-      const d=p.appointment_date_time.split('T')[0];
-      const idx=weekDays.indexOf(d);
-      if(idx>=0){days[idx].conf.push(p);assigned.add(p.id);}
+      const dt = p.appointment_date_time.split('T')[0];
+      const idx = wkDays.indexOf(dt);
+      if(idx>=0){days[idx].conf.push(p);assignedIds.add(p.id);}
     });
-    // Sort confirmed slots by appointment time
     days.forEach(d=>d.conf.sort((a,b)=>
       (a.appointment_date_time||'').localeCompare(b.appointment_date_time||'')));
 
-    // 2. Smart prefill: auto-suggest unconfirmed eligible patients
-    const winFrom=addD(weekStart,-WIN);
-    const winTo  =addD(weekStart, 6+WIN);
-    const suggested=new Set();
-
+    // Smart prefill into active[]
+    const sugId = new Set();
+    const wf = addD(weekStart,-WIN), wt = addD(weekStart,6+WIN);
     allPats.filter(p=>{
-      if(assigned.has(p.id))return false;
-      if(!p.due_date)return false;
-      const due=new Date(p.due_date+'T00:00:00');
-      return due>=winFrom&&due<=winTo;
+      if(assignedIds.has(p.id)||!p.due_date)return false;
+      return new Date(p.due_date+'T00:00:00')>=wf&&new Date(p.due_date+'T00:00:00')<=wt;
     }).forEach(p=>{
-      const bestDay=getBestDay(p,weekDays);
-      if(bestDay>=0){
-        days[bestDay].sugg.push(p);
-        suggested.add(p.id);
-      } else {
-        pool.push(p); // fallback to pool
-      }
+      const best = bestDay(p, wkDays);
+      if(best>=0){const pp={...p,_sugg:true};days[best].active.push(pp);sugId.add(p.id);}
+      else pool.push(p);
     });
 
-    // 3. Pool = patients eligible but couldn't be auto-suggested
-    pool=allPats.filter(p=>{
-      if(assigned.has(p.id)||suggested.has(p.id))return false;
-      const due=p.due_date?new Date(p.due_date+'T00:00:00'):null;
-      if(!due)return false;
-      return due>=winFrom&&due<=winTo;
+    // Remaining eligible → pool
+    allPats.forEach(p=>{
+      if(assignedIds.has(p.id)||sugId.has(p.id))return;
+      if(!p.due_date)return;
+      const due=new Date(p.due_date+'T00:00:00');
+      if(due>=wf&&due<=wt)pool.push(p);
     });
-
-    // Sort pool by zone then due date
     sortPool();
-    renderPool();
-    renderGrid();
-    updateStatus();
-    toast(`✓ ${suggested.size} suggested · ${assigned.size} already confirmed`);
+    renderPool(); renderGrid();
+    toast(`✓ ${sugId.size} suggested · ${assignedIds.size} already confirmed`);
   }catch(e){toast('Error: '+e.message,4000);}
-  btn.textContent='⟳ Load';btn.disabled=false;
+  lb.textContent='⟳ Load'; lb.disabled=false;
 }
 
-// Find best day for auto-suggestion
-function getBestDay(p,weekDays){
-  if(!p.due_date)return-1;
+function bestDay(p, wkDays){
+  if(!p.due_date)return -1;
   const due=new Date(p.due_date+'T00:00:00');
-  let best=-1,bestDiff=Infinity;
-  weekDays.forEach((d,i)=>{
-    const dayDate=new Date(d+'T00:00:00');
-    const diff=Math.round((dayDate-due)/86400000);
-    if(Math.abs(diff)<=WIN&&Math.abs(diff)<bestDiff){bestDiff=Math.abs(diff);best=i;}
+  let best=-1,bestD=Infinity;
+  wkDays.forEach((d,i)=>{
+    const diff=Math.abs(Math.round((new Date(d+'T00:00:00')-due)/86400000));
+    if(diff<=WIN&&diff<bestD){bestD=diff;best=i;}
   });
   return best;
 }
 
-// ── Pool helpers ───────────────────────────────────────────
-function sortPool(){
-  pool.sort((a,b)=>{
-    const za=getZone(a).n,zb=getZone(b).n;
-    if(za!==zb)return za.localeCompare(zb);
-    return(a.due_date||'').localeCompare(b.due_date||'');
-  });
+// ── Time calc ────────────────────────────────────────────────
+function slotTime(dayIdx, activeIdx){
+  const[sh,sm]=(document.getElementById('startTime').value||'08:00').split(':').map(Number);
+  const offset = days[dayIdx].conf.length; // start after confirmed slots
+  const tm = (sh*60+sm) + (offset+activeIdx)*SLOT;
+  return `${p2(Math.floor(tm/60))}:${p2(tm%60)}`;
 }
-function allAssigned(){
-  const s=new Set();
-  days.forEach(d=>[...d.conf,...d.sugg,...d.pending].forEach(p=>s.add(p.id)));
-  return s;
-}
-function isAssigned(id){return allAssigned().has(id);}
 
-// ── Render pool ────────────────────────────────────────────
-let searchMode=false,searchResults=[];
+// ── Render pool ──────────────────────────────────────────────
+let searchMode=false, searchList=[];
 function renderPool(){
-  const el=document.getElementById('poolList');
-  const list=searchMode?searchResults:pool;
+  const el=document.getElementById('pool');
+  const list=searchMode?searchList:pool;
   document.getElementById('poolBadge').textContent=pool.length;
   if(!list.length){
-    el.innerHTML=`<div class="pool-empty">${searchMode?'No patients match your search.':'All eligible patients have been suggested or assigned.'}<br><small style="color:var(--t3)">Use search to add outside-window patients</small></div>`;
+    el.innerHTML=`<div class="pool-empty">${searchMode?'No patients found.':'All eligible patients auto-suggested.'}<br><small style="color:var(--t3)">Use search to add others</small></div>`;
     return;
   }
-  el.innerHTML=list.map(p=>poolCardHTML(p)).join('');
+  el.innerHTML=list.map(p=>pcHTML(p)).join('');
+  el.querySelectorAll('.pcard').forEach(el=>attachPointer(el,'pool'));
 }
 
-function poolCardHTML(p){
-  const z=getZone(p);
-  const nm=p.patient_name||'';
-  const fi=p.file_number||'';
-  const addr=(p.address||'').split(',')[0];
-  const due=p.due_date||'';
-  const isSel=tapSel===p.id;
+function pcHTML(p){
+  const z=zone(p),nm=p.patient_name||'',fi=p.file_number||'';
+  const addr=(p.address||'').split(',')[0],due=p.due_date||'';
   const isOut=!pool.some(pp=>pp.id===p.id)&&!isAssigned(p.id);
-  // Window dots
   let dots='';
-  const todayStr=toYMD(new Date());
+  const tod=toYMD(new Date());
   for(let i=0;i<7;i++){
-    const d=addD(weekStart,i);
-    const ds=toYMD(d);
+    const ds=toYMD(addD(weekStart,i));
     const diff=due?Math.round((new Date(ds+'T00:00:00')-new Date(due+'T00:00:00'))/86400000):99;
-    const inW=Math.abs(diff)<=WIN;
-    const isDue=diff===0;
-    const isTd=ds===todayStr;
-    const cls=isTd?'today':(inW?'in':'out');
-    dots+=`<div class="wd ${cls}${isDue?' due':''}">${DAYS[i][0]}</div>`;
+    const cls=ds===tod?'tod':(Math.abs(diff)<=WIN?'in':'out');
+    dots+=`<div class="wd ${cls}${diff===0?' due':''}">${DAYS[i][0]}</div>`;
   }
-  return`<div class="pcard${isSel?' tap-sel':''}${isOut?' out-win':''}"
-    id="pc-${p.id}" draggable="true"
-    ondragstart="onDragStart(event,'${p.id}')"
-    ondragend="onDragEnd()"
-    onclick="onTapCard('${p.id}')">
-    <div class="pcard-top">
-      <span class="zone-pill" style="background:${z.c}">${z.n}</span>
-      <span class="pcard-name">${esc(nm)}</span>
-      <span class="pcard-file">#${esc(fi)}</span>
+  return`<div class="pcard${isOut?' outwin':''}" data-pid="${esc(String(p.id))}">
+    <div class="ptop">
+      <span class="zpill" style="background:${z.c}">${z.n}</span>
+      <span class="pname">${esc(nm)}</span>
+      <span class="pfile">#${esc(fi)}</span>
     </div>
-    <div class="pcard-addr">${esc(addr)}</div>
-    <div class="win-row">${dots}</div>
+    <div class="paddr">${esc(addr)}</div>
+    <div class="wdots">${dots}</div>
     ${due?`<div style="font-size:9px;color:var(--t3);margin-top:2px">Due ${due}</div>`:''}
-    ${isOut?'<div style="font-size:9px;color:var(--t3);margin-top:1px">⚠ Outside ±3 day window</div>':''}
+    ${isOut?'<div style="font-size:9px;color:var(--re);margin-top:1px">⚠ Outside ±3 day window</div>':''}
   </div>`;
 }
 
-// ── Render grid ────────────────────────────────────────────
+// ── Render grid ──────────────────────────────────────────────
 function renderGrid(){
   const grid=document.getElementById('grid');
-  const[sh,sm]=(document.getElementById('startTime')?.value||'08:00').split(':').map(Number);
-  const startMin=sh*60+sm;
   let html='';
-
   for(let i=0;i<7;i++){
-    const d=addD(weekStart,i);
-    const ds=toYMD(d);
+    const d=addD(weekStart,i),ds=toYMD(d);
     const isToday=ds===toYMD(new Date());
-    const total=days[i].conf.length+days[i].sugg.length+days[i].pending.length;
-    const hasPts=total>0;
+    const {conf,active,locked}=days[i];
+    const total=conf.length+active.length;
+    const hasAny=total>0;
 
-    // Build slot cards for all three buckets
-    let slots='';
-    // Calc total non-conf count for timing
-    let slotIdx=0;
-
-    // Confirmed (from DB) — already have times
-    days[i].conf.forEach(p=>{
-      const z=getZone(p);
-      const nm=p.patient_name||'';
-      const addr=(p.address||'').split(',')[0];
-      const existing=p.appointment_date_time?.split('T')[1]?.substring(0,5)||'';
-      slots+=`<div class="scard conf">
-        <div class="scard-top">
-          <span class="zone-pill" style="background:${z.c};font-size:8px">${z.n}</span>
-          <span class="scard-name">${esc(nm)}</span>
-          <span class="scard-label lbl-conf">✓</span>
-          <button class="scard-x" onclick="returnFromDay(${i},'${p.id}','conf')">✕</button>
+    // Day header
+    html+=`<div class="dcol" id="dc-${i}">
+      <div class="dhdr${hasAny?' has':''}${locked&&conf.length?' locked-day':''}" id="dh-${i}">
+        <div class="dhdr-top">
+          <div>
+            <div class="dname">${DAYS[i]}${isToday?' ·TODAY':''}</div>
+            <div class="ddate" style="${isToday?'color:var(--teal)':''}">${d.getDate()}</div>
+            <div class="dmon">${MONTHS[d.getMonth()]} ${d.getFullYear()}</div>
+            ${hasAny?`<div class="dcnt">${total} patient${total>1?'s':''}</div>`:''}
+          </div>
+          <div class="dhdr-btns">
+            ${conf.length?`<button class="day-edit-btn" onclick="toggleLock(${i})" id="lockBtn-${i}">${locked?'🔒 Edit':'🔓 Lock'}</button>`:''}
+            ${hasAny?`<button class="day-undo-btn" onclick="undoDay(${i})">↩ Undo</button>`:''}
+          </div>
         </div>
-        <div class="scard-addr">${esc(addr)}</div>
-        ${existing?`<div class="scard-time">🕐 ${existing}</div>`:''}
-      </div>`;
-    });
-
-    // Suggested (auto-placed) — calculate times
-    days[i].sugg.forEach(p=>{
-      const z=getZone(p);
-      const nm=p.patient_name||'';
-      const addr=(p.address||'').split(',')[0];
-      const tm=startMin+slotIdx*SLOT;
-      const h=Math.floor(tm/60),m=tm%60;
-      slotIdx++;
-      slots+=`<div class="scard sugg">
-        <div class="scard-top">
-          <span class="zone-pill" style="background:${z.c};font-size:8px">${z.n}</span>
-          <span class="scard-name">${esc(nm)}</span>
-          <span class="scard-label lbl-sugg">auto</span>
-          <button class="scard-x" onclick="returnFromDay(${i},'${p.id}','sugg')">✕</button>
-        </div>
-        <div class="scard-addr">${esc(addr)}</div>
-        <div class="scard-time">🕐 ${pad(h)}:${pad(m)}</div>
-      </div>`;
-    });
-
-    // Pending (manually placed)
-    days[i].pending.forEach(p=>{
-      const z=getZone(p);
-      const nm=p.patient_name||'';
-      const addr=(p.address||'').split(',')[0];
-      const tm=startMin+slotIdx*SLOT;
-      const h=Math.floor(tm/60),m=tm%60;
-      slotIdx++;
-      slots+=`<div class="scard pending">
-        <div class="scard-top">
-          <span class="zone-pill" style="background:${z.c};font-size:8px">${z.n}</span>
-          <span class="scard-name">${esc(nm)}</span>
-          <button class="scard-x" onclick="returnFromDay(${i},'${p.id}','pending')">✕</button>
-        </div>
-        <div class="scard-addr">${esc(addr)}</div>
-        <div class="scard-time">🕐 ${pad(h)}:${pad(m)}</div>
-      </div>`;
-    });
-
-    if(!slots) slots=`<div class="drop-hint">Drop patients here<br><small>or tap after selecting</small></div>`;
-
-    html+=`<div class="dcol">
-      <div class="dhdr${hasPts?' has':''}${isToday?' has':''}" id="dh-${i}">
-        <div>
-          <div class="dname">${DAYS[i]}${isToday?' · TODAY':''}</div>
-          <div class="ddate" style="${isToday?'color:var(--teal)':''}">${d.getDate()}</div>
-          <div class="dmon">${MONTHS[d.getMonth()]} ${d.getFullYear()}</div>
-          ${hasPts?`<div class="dcnt">${total} patient${total>1?'s':''}</div>`:''}
-        </div>
-        ${hasPts?`<button class="undo-day-btn" onclick="undoDay(${i})">↩ Undo</button>`:''}
       </div>
-      <div class="dbody" id="db-${i}"
-        ondragover="event.preventDefault();onDOver(${i})"
-        ondragleave="onDLeave(${i})"
-        ondrop="onDrop(event,${i})"
-        onclick="onTapDay(${i})">
-        ${slots}
-      </div>
-    </div>`;
+      <div class="dbody" id="db-${i}">`;
+
+    // Confirmed slots (locked by default)
+    conf.forEach((p,ci)=>{
+      const z=zone(p),nm=p.patient_name||'',addr=(p.address||'').split(',')[0];
+      const existing=p.appointment_date_time?.split('T')[1]?.slice(0,5)||'';
+      const isLocked=locked;
+      html+=`<div class="scard conf-card${isLocked?' locked-card':' unlocked'}"
+          data-pid="${p.id}" data-day="${i}" data-bucket="conf" data-idx="${ci}">
+          <div class="sc-top">
+            <span class="zpill" style="background:${z.c};font-size:8px">${z.n}</span>
+            <span class="sc-name">${esc(nm)}</span>
+            ${isLocked?'<span class="sc-lbl lbl-lock">🔒</span>':'<span class="sc-lbl lbl-conf">✓</span>'}
+            ${!isLocked?`<button class="sc-x" data-remove="${i}|conf|${ci}">✕</button>`:''}
+          </div>
+          <div class="sc-addr">${esc(addr)}</div>
+          ${existing?`<div class="sc-time">🕐 ${existing}</div>`:''}
+        </div>`;
+    });
+
+    // Active (sugg + pending) slots — draggable, reorderable
+    active.forEach((p,ai)=>{
+      const z=zone(p),nm=p.patient_name||'',addr=(p.address||'').split(',')[0];
+      const tm=slotTime(i,ai);
+      const isSugg=p._sugg;
+      html+=`<div class="scard${isSugg?' sugg-card':' pend-card'}"
+          data-pid="${p.id}" data-day="${i}" data-bucket="active" data-idx="${ai}">
+          <span class="reorder-handle" title="Drag to reorder">⋮⋮</span>
+          <div class="sc-top">
+            <span class="zpill" style="background:${z.c};font-size:8px">${z.n}</span>
+            <span class="sc-name" style="padding-left:14px">${esc(nm)}</span>
+            ${isSugg?'<span class="sc-lbl lbl-sugg">auto</span>':''}
+            <button class="sc-x" data-remove="${i}|active|${ai}">✕</button>
+          </div>
+          <div class="sc-addr" style="padding-left:14px">${esc(addr)}</div>
+          <div class="sc-time">🕐 ${tm}</div>
+        </div>`;
+    });
+
+    if(!hasAny)html+=`<div class="drop-hint">Drop patients here</div>`;
+    html+=`</div></div>`; // close dbody + dcol
   }
   grid.innerHTML=html;
-  updateConfirmBtn();
+
+  // Attach pointer drag to all active scards
+  grid.querySelectorAll('.scard[data-bucket="active"]').forEach(el=>attachPointer(el,'scard'));
+  // Attach pointer drag to unlocked conf scards
+  grid.querySelectorAll('.scard.unlocked').forEach(el=>attachPointer(el,'conf-scard'));
+
+  // Event delegation for ✕ buttons (stopPropagation handled in handler)
+  grid.addEventListener('click', onGridClick, {once:false});
+
+  updateConfBtn();
   updateStatus();
 }
 
-// ── Status bar ─────────────────────────────────────────────
-function updateStatus(){
-  const conf=days.reduce((s,d)=>s+d.conf.length,0);
-  const sugg=days.reduce((s,d)=>s+d.sugg.length,0);
-  const pend=days.reduce((s,d)=>s+d.pending.length,0);
-  document.getElementById('statusTotals').textContent=
-    `${conf} confirmed · ${sugg} suggested · ${pend} pending · ${pool.length} in pool`;
+// ── Grid click delegation (remove buttons) ───────────────────
+function onGridClick(e){
+  const rmBtn = e.target.closest('.sc-x');
+  if(!rmBtn)return;
+  e.stopPropagation();
+  const [di,bucket,idx] = rmBtn.dataset.remove.split('|');
+  removeFromDay(+di, bucket, +idx);
 }
 
-// ── Drag & Drop ────────────────────────────────────────────
-function onDragStart(e,id){
-  dragId=id;e.target.classList.add('dragging');
-  e.dataTransfer.effectAllowed='move';
-}
-function onDragEnd(){
-  document.querySelectorAll('.dragging').forEach(el=>el.classList.remove('dragging'));
-  dragId=null;
-}
-function onDOver(i){
-  document.getElementById('db-'+i)?.classList.add('over');
-  document.getElementById('dh-'+i)?.classList.add('over');
-}
-function onDLeave(i){
-  document.getElementById('db-'+i)?.classList.remove('over');
-  document.getElementById('dh-'+i)?.classList.remove('over');
-}
-function onDrop(e,i){
-  e.preventDefault();onDLeave(i);
-  if(dragId)assignToDay(dragId,i);
-  dragId=null;
-}
-
-// ── Mobile tap ─────────────────────────────────────────────
-function onTapCard(id){
-  tapSel=(tapSel===id)?null:id;
-  renderPool();
-}
-function onTapDay(i){
-  if(tapSel){assignToDay(tapSel,i);tapSel=null;}
-}
-
-// ── Assign / return ────────────────────────────────────────
-function assignToDay(patId,dayIdx){
-  if(isAssigned(patId)){toast('Already scheduled');return;}
-  const p=allPats.find(pp=>String(pp.id)===String(patId))
-         ||pool.find(pp=>String(pp.id)===String(patId));
-  if(!p)return;
-  // Move from sugg bucket if auto-placed elsewhere
-  days.forEach(d=>{
-    d.sugg=d.sugg.filter(pp=>String(pp.id)!==String(patId));
-    d.pending=d.pending.filter(pp=>String(pp.id)!==String(patId));
-  });
-  pool=pool.filter(pp=>String(pp.id)!==String(patId));
-  days[dayIdx].pending.push(p);
-  renderPool();renderGrid();
-  toast(`→ ${DAYS[dayIdx]}`);
-}
-
-function returnFromDay(dayIdx,patId,bucket){
-  const p=days[dayIdx][bucket].find(pp=>String(pp.id)===String(patId));
-  if(!p)return;
-  days[dayIdx][bucket]=days[dayIdx][bucket].filter(pp=>String(pp.id)!==String(patId));
+function removeFromDay(dayIdx, bucket, idx){
+  const arr = days[dayIdx][bucket];
+  if(!arr||!arr[idx])return;
+  const p = arr[idx];
+  days[dayIdx][bucket] = arr.filter((_,i)=>i!==idx);
   // Return to pool if eligible
   const wf=addD(weekStart,-WIN),wt=addD(weekStart,6+WIN);
   const due=p.due_date?new Date(p.due_date+'T00:00:00'):null;
-  if(due&&due>=wf&&due<=wt){pool.push(p);sortPool();}
-  renderPool();renderGrid();
+  if(due&&due>=wf&&due<=wt)pool.push({...p,_sugg:false});
+  sortPool();
+  renderPool(); renderGrid();
 }
 
-// ── Search ─────────────────────────────────────────────────
-let searchTimer=null;
-function onSearch(q){
-  clearTimeout(searchTimer);
-  if(!q.trim()){searchMode=false;renderPool();return;}
-  searchTimer=setTimeout(()=>{
-    const ql=q.toLowerCase();
-    searchResults=allPats.filter(p=>{
-      if(isAssigned(p.id))return false;
-      return(p.patient_name||'').toLowerCase().includes(ql)
-          ||(p.file_number||'').toLowerCase().includes(ql)
-          ||(p.address||'').toLowerCase().includes(ql);
-    });
-    searchMode=true;renderPool();
-  },200);
-}
-function addFromSearch(){
-  const q=document.getElementById('searchQ').value.trim();
-  if(!q){toast('Enter a name or file # first');return;}
-  const ql=q.toLowerCase();
-  const match=allPats.find(p=>
-    !isAssigned(p.id)&&(
-      (p.patient_name||'').toLowerCase().includes(ql)||
-      (p.file_number||'').toLowerCase()===ql
-    ));
-  if(!match){toast('Patient not found');return;}
-  if(pool.some(p=>p.id===match.id)){toast('Already in pool');return;}
-  pool.push(match);sortPool();
-  searchMode=false;
-  document.getElementById('searchQ').value='';
-  renderPool();
-  toast(`+ ${match.patient_name||'Patient'} added to pool`);
-}
-
-// ── Confirm all ────────────────────────────────────────────
-async function confirmAll(){
-  const toConfirm=[];
-  for(let i=0;i<7;i++){
-    [...days[i].sugg,...days[i].pending].forEach(p=>toConfirm.push({p,day:i}));
+// ── Lock / Edit toggle ────────────────────────────────────────
+function toggleLock(dayIdx){
+  const d = days[dayIdx];
+  if(d.locked){
+    if(!confirm('Unlock confirmed appointments for editing?\nChanges will update the database when you confirm.'))return;
+    d.locked=false;
+  } else {
+    d.locked=true;
   }
-  if(!toConfirm.length){toast('No unconfirmed patients to schedule');return;}
-  const btn=document.getElementById('confirmBtn');
+  renderGrid();
+}
+
+// ── Pointer-based drag (desktop + mobile) ────────────────────
+function attachPointer(el, type){
+  el.addEventListener('pointerdown', e=>{
+    // Ignore if clicking ✕ or other buttons
+    if(e.target.closest('.sc-x')||e.target.closest('.day-undo-btn')||
+       e.target.closest('.day-edit-btn')||e.target.tagName==='BUTTON')return;
+    e.preventDefault();
+    startDrag(e, el, type);
+  }, {passive:false});
+}
+
+function startDrag(e, el, type){
+  const patId = el.dataset.pid;
+  const fromDay = el.dataset.day !== undefined ? +el.dataset.day : -1;
+  const fromBucket = el.dataset.bucket;
+  const fromIdx = el.dataset.idx !== undefined ? +el.dataset.idx : -1;
+  const nm = allPats.find(p=>String(p.id)===String(patId))?.patient_name||patId;
+  const z = zone(allPats.find(p=>String(p.id)===String(patId))||{});
+
+  // Create ghost
+  const ghost = document.createElement('div');
+  ghost.className = 'drag-ghost';
+  ghost.textContent = nm;
+  ghost.style.background = z.c||'var(--teal)';
+  document.body.appendChild(ghost);
+  ghost.style.left = e.clientX+'px';
+  ghost.style.top  = e.clientY+'px';
+
+  el.classList.add('dragging-src');
+  drag = {patId, fromPool:type==='pool', fromDay, fromBucket, fromIdx, ghost, el};
+
+  document.addEventListener('pointermove', onPointerMove, {passive:false});
+  document.addEventListener('pointerup',   onPointerUp,   {passive:false});
+}
+
+function onPointerMove(e){
+  if(!drag)return;
+  e.preventDefault();
+  drag.ghost.style.left = e.clientX+'px';
+  drag.ghost.style.top  = e.clientY+'px';
+  // Highlight drop target
+  document.querySelectorAll('.dbody.drop-over,.scard.drop-above,.scard.drop-below')
+    .forEach(el=>el.classList.remove('drop-over','drop-above','drop-below'));
+  const under = document.elementFromPoint(e.clientX, e.clientY);
+  if(!under)return;
+  const db = under.closest('.dbody');
+  if(db) db.classList.add('drop-over');
+  const sc = under.closest('.scard[data-bucket="active"]');
+  if(sc) sc.classList.add('drop-above');
+}
+
+function onPointerUp(e){
+  if(!drag)return;
+  e.preventDefault();
+  drag.ghost.remove();
+  drag.el?.classList.remove('dragging-src');
+  document.querySelectorAll('.dbody.drop-over,.scard.drop-above,.scard.drop-below')
+    .forEach(el=>el.classList.remove('drop-over','drop-above','drop-below'));
+  document.removeEventListener('pointermove', onPointerMove);
+  document.removeEventListener('pointerup',   onPointerUp);
+
+  const under = document.elementFromPoint(e.clientX, e.clientY);
+  if(!under){drag=null;return;}
+  const db  = under.closest('.dbody');
+  const sc  = under.closest('.scard[data-bucket="active"]');
+  const dayIdx = db ? +db.id.replace('db-','') : -1;
+
+  if(dayIdx<0){drag=null;return;}
+
+  const {patId,fromPool,fromDay,fromBucket,fromIdx} = drag;
+  drag = null;
+
+  // Drop target scard (for ordering)
+  const toIdx = sc ? +sc.dataset.idx : -1;
+
+  if(fromPool){
+    // Pool → day
+    doAssign(patId, dayIdx, toIdx);
+  } else if(fromDay===dayIdx && fromBucket==='active'){
+    // Reorder within same day
+    if(toIdx>=0 && toIdx!==fromIdx) reorderDay(dayIdx, fromIdx, toIdx);
+    else renderGrid();
+  } else if(fromDay!==dayIdx){
+    // Move between days
+    moveBetweenDays(fromDay, fromBucket, fromIdx, dayIdx, toIdx);
+  }
+}
+
+// ── Assign from pool → day ───────────────────────────────────
+function doAssign(patId, dayIdx, insertIdx){
+  if(isAssigned(patId)){toast('Already scheduled');return;}
+  const p = allPats.find(pp=>String(pp.id)===String(patId))
+          ||pool.find(pp=>String(pp.id)===String(patId));
+  if(!p)return;
+  pool = pool.filter(pp=>String(pp.id)!==String(patId));
+  const pp = {...p,_sugg:false};
+  if(insertIdx>=0 && insertIdx<days[dayIdx].active.length){
+    days[dayIdx].active.splice(insertIdx,0,pp);
+  } else {
+    days[dayIdx].active.push(pp);
+  }
+  renderPool(); renderGrid();
+  toast(`→ ${DAYS[dayIdx]}`);
+}
+
+// ── Move between days ────────────────────────────────────────
+function moveBetweenDays(fromDay, fromBucket, fromIdx, toDay, toInsert){
+  const arr = days[fromDay][fromBucket];
+  if(!arr||arr[fromIdx]===undefined)return;
+  const p = {...arr[fromIdx], _sugg:false};
+  days[fromDay][fromBucket] = arr.filter((_,i)=>i!==fromIdx);
+  if(toInsert>=0 && toInsert<days[toDay].active.length){
+    days[toDay].active.splice(toInsert,0,p);
+  } else {
+    days[toDay].active.push(p);
+  }
+  renderPool(); renderGrid();
+  toast(`${DAYS[fromDay]} → ${DAYS[toDay]}`);
+}
+
+// ── Reorder within same day ──────────────────────────────────
+function reorderDay(dayIdx, fromIdx, toIdx){
+  const arr = days[dayIdx].active;
+  const [item] = arr.splice(fromIdx,1);
+  const insertAt = toIdx > fromIdx ? toIdx-1 : toIdx;
+  arr.splice(Math.max(0,insertAt),0,item);
+  renderGrid();
+  toast(`Reordered — times updated`);
+}
+
+// ── isAssigned helper ────────────────────────────────────────
+function isAssigned(id){
+  return days.some(d=>[...d.conf,...d.active].some(p=>String(p.id)===String(id)));
+}
+
+// ── Confirm all ──────────────────────────────────────────────
+async function confirmAll(){
+  let toConf = [];
+  days.forEach((d,i)=>{if(d.active.length)toConf.push(i);});
+  if(!toConf.length){toast('No unconfirmed patients to schedule');return;}
+  const btn=document.getElementById('confBtn');
   btn.disabled=true;btn.textContent='Saving…';
   const[sh,sm]=(document.getElementById('startTime').value||'08:00').split(':').map(Number);
   const startMin=sh*60+sm;
+  let saved=0;
   try{
     for(let i=0;i<7;i++){
-      const dateStr=toYMD(addD(weekStart,i));
-      let slotIdx=days[i].conf.length; // start after already-confirmed slots
-      const toBatch=[...days[i].sugg,...days[i].pending];
-      for(const p of toBatch){
-        const tm=startMin+slotIdx*SLOT;
-        const h=Math.floor(tm/60),m=tm%60;
-        const dt=`${dateStr}T${pad(h)}:${pad(m)}`;
+      if(!days[i].active.length)continue;
+      const ds=toYMD(addD(weekStart,i));
+      const offset=days[i].conf.length;
+      for(let j=0;j<days[i].active.length;j++){
+        const p=days[i].active[j];
+        const tm=startMin+(offset+j)*SLOT;
+        const dt=`${ds}T${p2(Math.floor(tm/60))}:${p2(tm%60)}`;
         await _sb.from('patients').update({
-          appointment_date_time:dt,
-          appointment_confirmed:true,
-        }).eq('id',p.id);
-        p.appointment_date_time=dt;
-        p.appointment_confirmed=true;
-        days[i].conf.push(p);
-        slotIdx++;
+          appointment_date_time:dt,appointment_confirmed:true}).eq('id',p.id);
+        p.appointment_date_time=dt;p.appointment_confirmed=true;
+        days[i].conf.push(p);saved++;
       }
-      days[i].sugg=[];
-      days[i].pending=[];
+      days[i].active=[];
+      days[i].locked=true; // auto-lock after confirming
     }
+    // Signal index.html to reload
+    localStorage.setItem('vapiq_appts_updated', Date.now());
     renderPool();renderGrid();
-    toast(`✅ ${toConfirm.length} appointment${toConfirm.length>1?'s':''} confirmed!`,3500);
-    btn.textContent=`✓ Confirm All (${toConfirm.length} saved)`;
+    toast(`✅ ${saved} appointment${saved>1?'s':''} confirmed!`,3500);
+    btn.textContent=`✓ ${saved} saved`;
     setTimeout(()=>{btn.textContent='✓ Confirm All';},3000);
-  }catch(e){
-    toast('Error: '+e.message,4000);
-  }
-  updateConfirmBtn();
+  }catch(e){toast('Error: '+e.message,4000);}
+  updateConfBtn();
 }
 
-// ── Undo day ───────────────────────────────────────────────
+// ── Undo day ──────────────────────────────────────────────────
 async function undoDay(i){
-  const allInDay=[...days[i].conf,...days[i].sugg,...days[i].pending];
-  if(!allInDay.length){toast('No appointments on this day');return;}
-  if(!confirm(`Cancel all ${allInDay.length} appointment(s) for ${DAYS[i]} ${toYMD(addD(weekStart,i))}?\nThis cannot be undone.`))return;
-  const btn=document.getElementById('dh-'+i)?.querySelector('.undo-day-btn');
-  if(btn){btn.disabled=true;btn.textContent='…';}
+  const all=[...days[i].conf,...days[i].active];
+  if(!all.length){toast('Nothing on this day');return;}
+  if(!confirm(`Cancel all ${all.length} patient(s) for ${DAYS[i]}?`))return;
   try{
     for(const p of days[i].conf){
       await _sb.from('patients').update({
         appointment_date_time:null,appointment_confirmed:false}).eq('id',p.id);
     }
-    // Return eligible patients to pool
     const wf=addD(weekStart,-WIN),wt=addD(weekStart,6+WIN);
-    allInDay.forEach(p=>{
+    all.forEach(p=>{
       const due=p.due_date?new Date(p.due_date+'T00:00:00'):null;
-      if(due&&due>=wf&&due<=wt)pool.push(p);
+      if(due&&due>=wf&&due<=wt)pool.push({...p,_sugg:false});
     });
-    days[i]={conf:[],sugg:[],pending:[]};
+    days[i]={conf:[],active:[],locked:true};
     sortPool();renderPool();renderGrid();
-    toast(`↩ ${allInDay.length} appointment${allInDay.length>1?'s':''} cancelled`);
+    localStorage.setItem('vapiq_appts_updated',Date.now());
+    toast(`↩ ${all.length} cancelled`);
   }catch(e){toast('Error: '+e.message,4000);}
 }
 
-// ── Undo week ──────────────────────────────────────────────
-async function undoAllWeek(){
-  const confPats=days.flatMap(d=>d.conf);
-  const allInWeek=days.flatMap(d=>[...d.conf,...d.sugg,...d.pending]);
-  if(!allInWeek.length){toast('Nothing scheduled this week');return;}
-  if(!confirm(`Cancel ALL ${allInWeek.length} appointments for the entire week?\nThis cannot be undone.`))return;
-  const btn=document.querySelector('.undo-week-btn');
+// ── Undo week ─────────────────────────────────────────────────
+async function undoWeek(){
+  const total=days.reduce((s,d)=>s+d.conf.length+d.active.length,0);
+  if(!total){toast('Nothing scheduled this week');return;}
+  if(!confirm(`Cancel ALL ${total} appointments for the week?`))return;
+  const btn=document.querySelector('.undo-wk-btn');
   btn.disabled=true;btn.textContent='Cancelling…';
   try{
-    for(const p of confPats){
-      await _sb.from('patients').update({
-        appointment_date_time:null,appointment_confirmed:false}).eq('id',p.id);
-    }
     const wf=addD(weekStart,-WIN),wt=addD(weekStart,6+WIN);
-    allInWeek.forEach(p=>{
-      const due=p.due_date?new Date(p.due_date+'T00:00:00'):null;
-      if(due&&due>=wf&&due<=wt)pool.push(p);
-    });
-    days=Array.from({length:7},()=>({conf:[],sugg:[],pending:[]}));
+    for(const d of days){
+      for(const p of d.conf){
+        await _sb.from('patients').update({
+          appointment_date_time:null,appointment_confirmed:false}).eq('id',p.id);
+      }
+      [...d.conf,...d.active].forEach(p=>{
+        const due=p.due_date?new Date(p.due_date+'T00:00:00'):null;
+        if(due&&due>=wf&&due<=wt)pool.push({...p,_sugg:false});
+      });
+    }
+    days=Array.from({length:7},()=>({conf:[],active:[],locked:true}));
     sortPool();renderPool();renderGrid();
-    toast(`↩ Entire week cleared (${allInWeek.length} appointments)`,3500);
+    localStorage.setItem('vapiq_appts_updated',Date.now());
+    toast(`↩ ${total} appointments cleared`,3500);
   }catch(e){toast('Error: '+e.message,4000);}
   btn.disabled=false;btn.textContent='↩ Undo Week';
 }
 
-// ── Update confirm button ──────────────────────────────────
-function updateConfirmBtn(){
-  const n=days.reduce((s,d)=>s+d.sugg.length+d.pending.length,0);
-  const btn=document.getElementById('confirmBtn');
+// ── Search ────────────────────────────────────────────────────
+let _st=null;
+function onSearch(q){
+  clearTimeout(_st);
+  if(!q.trim()){searchMode=false;renderPool();return;}
+  _st=setTimeout(()=>{
+    const ql=q.toLowerCase();
+    searchList=allPats.filter(p=>!isAssigned(p.id)&&(
+      (p.patient_name||'').toLowerCase().includes(ql)||
+      (p.file_number||'').toLowerCase().includes(ql)||
+      (p.address||'').toLowerCase().includes(ql)
+    ));
+    searchMode=true;renderPool();
+  },200);
+}
+function addOutside(){
+  const q=document.getElementById('searchQ').value.trim();
+  if(!q){toast('Enter a name or file # first');return;}
+  const ql=q.toLowerCase();
+  const match=allPats.find(p=>!isAssigned(p.id)&&!pool.some(pp=>pp.id===p.id)&&(
+    (p.patient_name||'').toLowerCase().includes(ql)||(p.file_number||'').toLowerCase()===ql));
+  if(!match){toast('Not found or already scheduled');return;}
+  pool.push({...match,_sugg:false});
+  sortPool();searchMode=false;
+  document.getElementById('searchQ').value='';
+  renderPool();
+  toast(`+ ${match.patient_name||'Patient'} added to pool`);
+}
+
+// ── Helpers ────────────────────────────────────────────────────
+function sortPool(){
+  pool.sort((a,b)=>{
+    const za=zone(a).n,zb=zone(b).n;
+    if(za!==zb)return za.localeCompare(zb);
+    return(a.due_date||'').localeCompare(b.due_date||'');
+  });
+}
+function updateConfBtn(){
+  const n=days.reduce((s,d)=>s+d.active.length,0);
+  const btn=document.getElementById('confBtn');
   btn.disabled=n===0;
   btn.textContent=n>0?`✓ Confirm All (${n} patient${n>1?'s':''})`:'✓ Confirm All';
 }
-
-// ── Sidebar collapse ───────────────────────────────────────
-function toggleSidebar(){
-  sidebarOpen=!sidebarOpen;
-  document.getElementById('sidebar').classList.toggle('collapsed',!sidebarOpen);
-  const tab=document.getElementById('collapseTab');
-  tab.textContent=sidebarOpen?'◀':'▶';
-  document.getElementById('mobToggle').textContent=sidebarOpen?'☰ Hide':'☰ Patients';
+function updateStatus(){
+  const conf=days.reduce((s,d)=>s+d.conf.length,0);
+  const sugg=days.reduce((s,d)=>s+d.active.filter(p=>p._sugg).length,0);
+  const pend=days.reduce((s,d)=>s+d.active.filter(p=>!p._sugg).length,0);
+  document.getElementById('stot').textContent=
+    `${conf} confirmed · ${sugg} suggested · ${pend} pending · ${pool.length} in pool`;
 }
 
-// ── Week nav ───────────────────────────────────────────────
-function shiftWeek(dir){
+// ── Week nav ──────────────────────────────────────────────────
+function shiftWk(dir){
   weekStart=addD(weekStart,dir*7);
-  renderWeekLabel();
-  days=Array.from({length:7},()=>({conf:[],sugg:[],pending:[]}));
+  renderWkLabel();
+  days=Array.from({length:7},()=>({conf:[],active:[],locked:true}));
   pool=[];
   loadWeek();
 }
-function renderWeekLabel(){
-  const end=addD(weekStart,6);
-  document.getElementById('weekLbl').textContent=
+function renderWkLabel(){
+  const e=addD(weekStart,6);
+  document.getElementById('wklbl').textContent=
     `${DAYS[0]} ${weekStart.getDate()} ${MONTHS[weekStart.getMonth()]} – `+
-    `${DAYS[6]} ${end.getDate()} ${MONTHS[end.getMonth()]} ${end.getFullYear()}`;
+    `${DAYS[6]} ${e.getDate()} ${MONTHS[e.getMonth()]} ${e.getFullYear()}`;
 }
 
-// ── Theme ──────────────────────────────────────────────────
+// ── Sidebar ────────────────────────────────────────────────────
+function toggleSB(){
+  sbOpen=!sbOpen;
+  document.getElementById('sb').classList.toggle('closed',!sbOpen);
+  document.getElementById('ctab').textContent=sbOpen?'◀':'▶';
+}
+
+// ── Theme ──────────────────────────────────────────────────────
 function toggleTheme(){
-  const cur=document.documentElement.getAttribute('data-theme');
-  const next=cur==='light'?'dark':'light';
-  document.documentElement.setAttribute('data-theme',next);
-  localStorage.setItem('vapiq_sched_theme',next);
+  const n=document.documentElement.getAttribute('data-theme')==='light'?'dark':'light';
+  document.documentElement.setAttribute('data-theme',n);
+  localStorage.setItem('vapiq_sched_theme',n);
 }
 
-// ── Toast ──────────────────────────────────────────────────
+// ── Toast ──────────────────────────────────────────────────────
 function toast(msg,dur=2200){
   const el=document.getElementById('toast');
   el.textContent=msg;el.classList.add('on');
   clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('on'),dur);
 }
 
-// ── XSS escape ────────────────────────────────────────────
+// ── XSS escape ────────────────────────────────────────────────
 function esc(s){return String(s||'').replace(/[&<>"']/g,c=>
   ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 </script>
