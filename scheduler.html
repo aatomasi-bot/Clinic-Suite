@@ -516,7 +516,8 @@ function renderPool(){
     winD.forEach((d,i)=>{
       const diff=due?dayDiff(d,due):99;
       const cls=d===tod?'tod':(Math.abs(diff)<=WIN?'in':'out');
-      dots+=`<div class="wd ${cls}${diff===0?' due':''}">${DAYS[i][0]}</div>`;
+      const dayLetter=DAYS[(fromYMD(d).getDay()+6)%7][0]; // actual day letter
+      dots+=`<div class="wd ${cls}${diff===0?' due':''}">${dayLetter}</div>`;
     });
     const outside=!pool.some(pp=>pp.id===p.id)&&!isAssigned(p.id);
     return`<div class="pc${outside?' outw':''}" data-pid="${p.id}">
@@ -572,7 +573,7 @@ function renderGrid(){
       <div class="${hdrCls}" id="dh-${i}">
         <div class="dh-top">
           <div class="dh-left">
-            <div class="dname">${DAYS[i]}${isToday?' · TODAY':''}</div>
+            <div class="dname">${DAYS[(d.getDay()+6)%7]}${isToday?' · TODAY':''}</div>
             <div class="ddate${isToday?' today-date':''}">${d.getDate()}</div>
             <div class="dinfo">${MONTHS[d.getMonth()]} ${d.getFullYear()}</div>
             ${total?`<div class="dinfo" style="color:var(--teal);font-weight:700">${total} patient${total>1?'s':''}</div>`:''}
