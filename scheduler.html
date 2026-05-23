@@ -177,6 +177,21 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   border:1px solid rgba(124,58,237,.35);font-size:9px}
 .btn-cluster:hover{background:#7C3AED;color:#fff;border-color:#7C3AED}
 .btn-cluster.active{background:#7C3AED;color:#fff;border-color:#7C3AED}
+/* Merge buttons */
+.btn-merge{background:rgba(59,130,246,.12);color:#3B82F6;
+  border:1px solid rgba(59,130,246,.35);font-size:9px}
+.btn-merge:hover{background:#3B82F6;color:#fff;border-color:#3B82F6}
+.btn-merge.disabled{opacity:.3;cursor:not-allowed;pointer-events:none}
+/* Block drag handle on day header */
+.block-drag-handle{display:flex;align-items:center;gap:3px;cursor:grab;
+  background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.3);
+  border-radius:5px;padding:2px 6px;font-size:9px;font-weight:700;
+  color:#3B82F6;user-select:none;touch-action:none;white-space:nowrap}
+.block-drag-handle:hover{background:#3B82F6;color:#fff;border-color:#3B82F6}
+/* Day col highlight when block is dragged over it */
+.dcol.block-over .dhdr{background:rgba(59,130,246,.15)!important;
+  border-bottom-color:#3B82F6!important}
+.dcol.block-over .dbody{background:rgba(59,130,246,.08)}
 /* Cluster header */
 .dhdr.cluster-day{background:rgba(124,58,237,.08);border-bottom-color:#7C3AED}
 /* Undo batch button */
@@ -660,6 +675,17 @@ function renderGrid(){
       hdrBtns+=`<button class="btn-sm btn-conf-day" onclick="confirmDay(${i})">
         ✓ Confirm (${active.length})</button>`;
     }
+    // Merge buttons — show ← prev and → next eligibility
+    if(total>0){
+      const mL=i>0?checkMerge(i,i-1):null;
+      const mR=i<6?checkMerge(i,i+1):null;
+      if(mL) hdrBtns+=`<button class="btn-sm btn-merge${mL.ok?'':' disabled'}"
+        onclick="mergeDay(${i},${i-1})" title="${mL.ok?'Move all '+total+' patients to '+DAYS[(fromYMD(winD[i-1]).getDay()+6)%7]:mL.reason}">
+        ← Merge</button>`;
+      if(mR) hdrBtns+=`<button class="btn-sm btn-merge${mR.ok?'':' disabled'}"
+        onclick="mergeDay(${i},${i+1})" title="${mR.ok?'Move all '+total+' patients to '+DAYS[(fromYMD(winD[i+1]).getDay()+6)%7]:mR.reason}">
+        Merge →</button>`;
+    }
 
     html+=`<div class="dcol" id="dc-${i}">
       <div class="${hdrCls}" id="dh-${i}">
@@ -674,6 +700,9 @@ function renderGrid(){
           </div>
           <div class="dh-right">${hdrBtns}</div>
         </div>
+        ${total>0?`<div class="block-drag-handle" data-blockday="${i}"
+          title="Drag this entire day block to an adjacent day column">
+          ⣿ Drag entire day block</div>`:''}
       </div>
       <div class="dbody" id="db-${i}">`;
 
@@ -744,6 +773,9 @@ function renderGrid(){
   grid.querySelectorAll('.sc[data-bkt="active"]').forEach(el=>ptDown(el,'scard'));
   grid.querySelectorAll('.sc.edit-sc').forEach(el=>ptDown(el,'scard'));
 
+  // Block drag handles on day headers
+  attachBlockDrags();
+
   updateConfAllBtn(totalUnconf);
   updateStatus();
 }
@@ -800,6 +832,30 @@ function toggleEdit(dayIdx){
 // ════════════════════════════════════════════════════════════
 let drag=null;
 
+// Attach block drag to day headers after render
+function attachBlockDrags(){
+  document.querySelectorAll('.block-drag-handle').forEach(el=>{
+    el.addEventListener('pointerdown',e=>{
+      e.preventDefault();
+      const fromDay=+el.dataset.blockday;
+      const winD=windowDates();
+      const nm=DAYS[(fromYMD(winD[fromDay]).getDay()+6)%7]+' '+winD[fromDay];
+      const total=days[fromDay].conf.length+days[fromDay].active.length;
+      const g=document.createElement('div');
+      g.className='ghost';
+      g.style.background='#3B82F6';
+      g.textContent=`⣿ ${nm} (${total} patients)`;
+      document.body.appendChild(g);
+      g.style.left=e.clientX+'px';g.style.top=e.clientY+'px';
+      el.style.opacity='.4';
+      drag={pid:null,fromPool:false,fromDay:-1,fromBkt:null,fromIdx:-1,
+            ghost:g,el,isBlock:true,blockDay:fromDay};
+      document.addEventListener('pointermove',ptMove,{passive:false});
+      document.addEventListener('pointerup',ptUp,{passive:false});
+    },{passive:false});
+  });
+}
+
 function ptDown(el,type){
   el.addEventListener('pointerdown',e=>{
     if(e.target.closest('.sc-x,.btn-sm,button'))return;
@@ -832,8 +888,14 @@ function ptMove(e){
   clearDropFeedback();
   const t=document.elementFromPoint(e.clientX,e.clientY);
   if(!t)return;
-  t.closest('.dbody')?.classList.add('over');
-  t.closest('.sc[data-bkt="active"],.sc.edit-sc')?.classList.add('drop-above');
+  if(drag.isBlock){
+    // Highlight entire day column for block drag
+    const dcol=t.closest('.dcol');
+    if(dcol)dcol.classList.add('block-over');
+  } else {
+    t.closest('.dbody')?.classList.add('over');
+    t.closest('.sc[data-bkt="active"],.sc.edit-sc')?.classList.add('drop-above');
+  }
 }
 
 function ptUp(e){
@@ -1317,6 +1379,71 @@ async function closeOptModal(){
   if(modal)modal.classList.remove('show');
   try{ await reload(); }
   catch(e){ toast('Error loading schedule: '+e.message,4000); }
+}
+
+// ── Cap helper ────────────────────────────────────────────────
+function effectiveCapFor(dayIdx){
+  const d=fromYMD(windowDates()[dayIdx]);
+  return clusterDays.has(dayIdx)?18:(d.getDay()===5?12:15);
+}
+
+// ── Merge eligibility check ───────────────────────────────────
+function checkMerge(fromIdx,toIdx){
+  if(fromIdx<0||fromIdx>6||toIdx<0||toIdx>6)return{ok:false,reason:'Invalid day'};
+  const fromPats=[...days[fromIdx].conf,...days[fromIdx].active];
+  if(!fromPats.length)return{ok:false,reason:'No patients on this day'};
+  const toDate=windowDates()[toIdx];
+  const targetCap=effectiveCapFor(toIdx);
+  const existingCount=days[toIdx].conf.length+days[toIdx].active.length;
+  const totalAfter=existingCount+fromPats.length;
+  if(totalAfter>targetCap)return{ok:false,reason:`Would exceed cap of ${targetCap} (${totalAfter} total)`};
+  const blocked=fromPats.filter(p=>p.due_date&&Math.abs(dayDiff(toDate,p.due_date))>WIN);
+  if(blocked.length)return{ok:false,reason:`${blocked.length} patient(s) outside ±3 day window for that date`};
+  return{ok:true,total:totalAfter,cap:targetCap};
+}
+
+// ── Merge entire day into adjacent day ────────────────────────
+async function mergeDay(fromIdx,toIdx){
+  const chk=checkMerge(fromIdx,toIdx);
+  if(!chk.ok){toast('Cannot merge: '+chk.reason,3500);return;}
+  const fromPats=[...days[fromIdx].conf,...days[fromIdx].active];
+  const winD=windowDates();
+  const fromName=DAYS[(fromYMD(winD[fromIdx]).getDay()+6)%7]+' '+winD[fromIdx];
+  const toName  =DAYS[(fromYMD(winD[toIdx]  ).getDay()+6)%7]+' '+winD[toIdx];
+  const toDir   =toIdx>fromIdx?'→ next':'← previous';
+  if(!confirm(
+    `Move ALL ${fromPats.length} patient${fromPats.length>1?'s':''} from ${fromName} ${toDir} to ${toName}?
+
+`+
+    `Target day: ${chk.total} / ${chk.cap} patients total
+`+
+    `Times will be recalculated. Any confirmed appointments from ${fromName} will be unconfirmed first.
+
+`+
+    `Tap OK to proceed.`
+  ))return;
+
+  // Show progress
+  const btn=document.querySelector(`[onclick="mergeDay(${fromIdx},${toIdx})"]`);
+  if(btn){btn.disabled=true;btn.textContent='Moving…';}
+
+  try{
+    // Unconfirm any confirmed patients from source day
+    for(const p of days[fromIdx].conf){
+      await _sb.from('patients').update({
+        appointment_date_time:null,appointment_confirmed:false}).eq('id',p.id);
+    }
+    // Move all to target day active[]
+    fromPats.forEach(p=>days[toIdx].active.push({...p,_sugg:false,appointment_confirmed:false,appointment_date_time:null}));
+    // Clear source day
+    days[fromIdx]={conf:[],active:[],editMode:false,circ:days[fromIdx].circ};
+    localStorage.setItem('vapiq_appts_updated',Date.now());
+    renderPool();renderGrid();
+    toast(`✓ ${fromPats.length} patients moved to ${toName} — review & confirm`,3500);
+  }catch(e){
+    toast('Error: '+e.message,4000);
+    if(btn){btn.disabled=false;btn.textContent='Merge';}
+  }
 }
 
 // ── Cluster mode toggle ───────────────────────────────────────
