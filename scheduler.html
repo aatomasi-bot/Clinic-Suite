@@ -442,12 +442,13 @@ async function reload(){
 
     // Reset per-day state
     days=mkDays();
-    // Set circuit per day based on day-of-week
-    Array.from({length:7},(_,i)=>addDays(fromYMD(winDates[0]),i)).forEach((d,i)=>{
-      days[i].circ=d.getDay()===5?'B':'A'; // Friday=Laval, else Montreal
-    });
     pool=[];
+    // Declare winDates FIRST, then use it everywhere
     const winDates=windowDates();  // ['2026-06-09','2026-06-10',...]
+    // Set circuit per day (Friday=Laval/NS, all others=Montreal)
+    winDates.forEach((ds,i)=>{
+      days[i].circ=fromYMD(ds).getDay()===5?'B':'A';
+    });
 
     // ── Step 1: Mark ALL confirmed patients globally —————————————
     //    confirmedIds must include patients confirmed on ANY date,
@@ -620,21 +621,23 @@ function renderGrid(){
     const total=conf.length+active.length;
     totalUnconf+=active.length;
 
-    // Day header class
+    // Day header class — derive cap from day-of-week + cluster mode
     const isCluster=clusterDays.has(i);
-    const effectiveCap=isCluster&&days[i].circ!=='B'?18:days[i].cap||(dow===5?12:15);
+    const dayDow=d.getDay();                        // 0=Sun,5=Fri,6=Sat
+    const dayCap=isCluster?18:(dayDow===5?12:15);   // Fri=12, cluster=18, else=15
     const hdrCls=(editMode?'dhdr edit-hdr':conf.length?'dhdr locked-hdr has':'dhdr'+(active.length?' has':''))+(isCluster?' cluster-day':'');
 
     // Cluster mode: auto-detect from FSA concentration (Montreal days only)
-    const dayCirc = d.getDay()===5?'B':'A';
+    const dayCirc=dayDow===5?'B':'A';
     if(dayCirc==='A'&&total>=6&&!isCluster){
       const allPts=[...conf,...active];
       const f2s=allPts.map(p=>{const m=(p.address||'').toUpperCase().match(/([A-Z]\d[A-Z])/);return m?m[1].slice(0,2):'';});
-      const dominant=f2s.reduce((acc,f)=>{acc[f]=(acc[f]||0)+1;return acc;},{});
-      const topCount=Math.max(...Object.values(dominant));
-      if(topCount/f2s.length>=0.75)clusterDays.add(i); // 75% same zone = cluster
+      if(f2s.length>0){
+        const dominant=f2s.reduce((acc,f)=>{acc[f]=(acc[f]||0)+1;return acc;},{});
+        const topCount=Math.max(...Object.values(dominant));
+        if(topCount/f2s.length>=0.75)clusterDays.add(i);
+      }
     }
-    const effectiveCap2=clusterDays.has(i)?18:(dayCirc==='B'?12:15);
 
     // Header buttons
     let hdrBtns='';
@@ -642,7 +645,7 @@ function renderGrid(){
       hdrBtns+=`<button class="btn-sm btn-lock" onclick="toggleEdit(${i})">
         ${editMode?'🔓 Editing':'🔒 Edit'}</button>`;
     }
-    if(dayCirc==='A'){
+    if(dayCirc==='A'&&total>0){
       hdrBtns+=`<button class="btn-sm btn-cluster${isCluster?' active':''}"
         onclick="toggleCluster(${i})" title="Cluster mode: extend cap to 18">
         ${isCluster?'⊞ Cluster ×':'⊞ Cluster'}</button>`;
@@ -662,7 +665,7 @@ function renderGrid(){
             <div class="dname">${DAYS[(d.getDay()+6)%7]}${isToday?' · TODAY':''}</div>
             <div class="ddate${isToday?' today-date':''}">${d.getDate()}</div>
             <div class="dinfo">${MONTHS[d.getMonth()]} ${d.getFullYear()}</div>
-            ${total?`<div class="dinfo" style="color:var(--teal);font-weight:700">${total} patient${total>1?'s':''} / ${effectiveCap2}</div>`:''}
+            ${total?`<div class="dinfo" style="color:var(--teal);font-weight:700">${total} patient${total>1?'s':''} / ${dayCap}</div>`:''}
             ${isCluster?'<div class="cluster-badge" style="margin-top:2px">⊞ Cluster</div>':''}
           </div>
           <div class="dh-right">${hdrBtns}</div>
@@ -1317,10 +1320,11 @@ async function optimizeRoutes(){
   }
 }
 
-function closeOptModal(){
+async function closeOptModal(){
   const modal=document.getElementById('optModal');
   if(modal)modal.classList.remove('show');
-  reload();
+  try{ await reload(); }
+  catch(e){ toast('Error loading schedule: '+e.message,4000); }
 }
 
 // ── Cluster mode toggle ───────────────────────────────────────
