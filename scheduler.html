@@ -1,5 +1,3 @@
-<!DOCTYPE html>
-<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
@@ -182,12 +180,26 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   border:1px solid rgba(59,130,246,.35);font-size:9px}
 .btn-merge:hover{background:#3B82F6;color:#fff;border-color:#3B82F6}
 .btn-merge.disabled{opacity:.3;cursor:not-allowed;pointer-events:none}
+.btn-resort{background:rgba(132,204,22,.15);color:#84CC16;
+  border:1.5px solid rgba(132,204,22,.5);font-size:9px;font-weight:800}
+.btn-resort:hover{background:#84CC16;color:#1a1a00;border-color:#84CC16}
+/* Re-sort button — lime green, clearly distinct from all other buttons */
+.btn-resort{background:rgba(132,204,22,.15);color:#84CC16;
+  border:1.5px solid rgba(132,204,22,.5);font-size:9px;font-weight:800}
+.btn-resort:hover{background:#84CC16;color:#1a1a00;border-color:#84CC16}
 /* Block drag handle on day header */
 .block-drag-handle{display:flex;align-items:center;gap:3px;cursor:grab;
   background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.3);
   border-radius:5px;padding:2px 6px;font-size:9px;font-weight:700;
   color:#3B82F6;user-select:none;touch-action:none;white-space:nowrap}
 .block-drag-handle:hover{background:#3B82F6;color:#fff;border-color:#3B82F6}
+.block-drag-handle.edit-handle{background:rgba(232,162,58,.15);
+  border-color:rgba(232,162,58,.5);color:var(--amber)}
+.block-drag-handle.edit-handle:hover{background:var(--amber);color:#fff;border-color:var(--amber)}
+/* In edit mode: block handle turns amber to signal confirmed block move */
+.block-drag-handle.edit-handle{background:rgba(232,162,58,.15);
+  border-color:rgba(232,162,58,.5);color:var(--amber)}
+.block-drag-handle.edit-handle:hover{background:var(--amber);color:#fff;border-color:var(--amber)}
 /* Day col highlight when block is dragged over it */
 .dcol.block-over .dhdr{background:rgba(59,130,246,.15)!important;
   border-bottom-color:#3B82F6!important}
@@ -328,6 +340,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     <div class="sbsearch">
       <input id="sq" type="search" placeholder="Search name, file#, address…" oninput="onSearch(this.value)">
       <button class="addbtn" onclick="addOutside()">+ Add patient outside window</button>
+<div style="display:flex;gap:5px;margin-top:5px">
+  <button class="addbtn" style="background:rgba(224,90,90,.15);color:var(--re);border:1px solid rgba(224,90,90,.4);flex:1"
+    onclick="enterCancelMode()">🗑 Cancel Mode</button>
+</div>
     </div>
     <div class="pool" id="pool"></div>
   </div>
@@ -346,6 +362,24 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- New patient fit modal -->
+<div class="fit-modal" id="fitModal">
+  <div class="fit-box">
+    <div class="fit-hdr">
+      <h3>📍 Find a Slot</h3>
+      <button onclick="closeFitModal()">✕</button>
+    </div>
+    <div class="fit-body" id="fitBody"></div>
+  </div>
+</div>
+
+<!-- Cancel selection bar -->
+<div class="cancel-bar" id="cancelBar">
+  <span class="cancel-bar-label" id="cancelLabel">0 selected for cancellation</span>
+  <button class="cancel-dismiss-btn" onclick="exitCancelMode()">✕ Cancel</button>
+  <button class="cancel-confirm-btn" onclick="executeCancellation()">🗑 Cancel Appointments</button>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
@@ -614,6 +648,9 @@ function renderPool(){
         <span class="pc-addr">${esc(addr)}</span>
       </div>
       ${due?`<div class="pc-due">Due ${due}${outside?' · ⚠ Outside window':''}</div>`:''}
+      <button style="margin-top:4px;width:100%;background:rgba(45,140,138,.1);border:1px solid rgba(45,140,138,.3);
+        color:var(--teal);border-radius:5px;padding:3px;font-size:9px;font-weight:700;cursor:pointer;font-family:inherit"
+        onclick="findSlotForPatient('${p.id}')">📍 Find Slot</button>
       <div class="wdots">${dots}</div>
     </div>`;
   }).join('');
@@ -675,6 +712,18 @@ function renderGrid(){
       hdrBtns+=`<button class="btn-sm btn-conf-day" onclick="confirmDay(${i})">
         ✓ Confirm (${active.length})</button>`;
     }
+    // Re-sort button — lime green, shown when active patients exist
+    if(active.length>0){
+      hdrBtns+=`<button class="btn-sm btn-resort"
+        onclick="resortDay(${i})"
+        title="Re-sort these patients by your circuit route order (step 0→6)">
+        ↺ Re-sort</button>`;
+    }
+    // Re-sort button (lime green) — after merge, re-apply circuit order
+    if(active.length>0){
+      hdrBtns+=`<button class="btn-sm btn-resort" onclick="resortDay(${i})"
+        title="Re-sort by circuit route step 0→6">↺ Re-sort</button>`;
+    }
     // Merge buttons — show ← prev and → next eligibility
     if(total>0){
       const mL=i>0?checkMerge(i,i-1):null;
@@ -700,9 +749,9 @@ function renderGrid(){
           </div>
           <div class="dh-right">${hdrBtns}</div>
         </div>
-        ${total>0?`<div class="block-drag-handle" data-blockday="${i}"
-          title="Drag this entire day block to an adjacent day column">
-          ⣿ Drag entire day block</div>`:''}
+        ${total>0?`<div class="block-drag-handle${editMode?' edit-handle':''}" data-blockday="${i}"
+          title="${editMode?'Drag confirmed block to adjacent day — unconfirms & re-places':'Drag entire day to adjacent column'}">
+          ⣿ ${editMode?'Drag confirmed block':'Drag entire day block'}</div>`:''}
       </div>
       <div class="dbody" id="db-${i}">`;
 
@@ -716,7 +765,7 @@ function renderGrid(){
       const storedTime=p.appointment_date_time?.substring(11,16)||'';
       const dispTime=editMode?calcTime(i,slotIdx):storedTime;
       const canDrag=editMode;
-      html+=`<div class="sc${editMode?' edit-sc':' conf-sc'}${canDrag?'':' locked-card'}"
+      html+=`<div class="sc${editMode?' edit-sc':' conf-sc'}${canDrag?'':' locked-card'}${cancelMode?' cancel-mode':''}${cancelSelected.has(String(p.id))?' selected-cancel':''}"
           style="border-left-color:${z.c}"
           data-pid="${p.id}" data-day="${i}" data-bkt="conf" data-idx="${ci}">
           <span class="sc-name">${esc(nm)}</span>
@@ -781,6 +830,15 @@ function renderGrid(){
 }
 
 function onGridClick(e){
+  // Cancel mode: tap card to select/deselect
+  if(cancelMode){
+    const sc=e.target.closest('.sc.conf-sc,.sc.edit-sc');
+    if(sc){
+      const pid=String(sc.dataset.pid);
+      toggleCancelSelect(pid);
+      return;
+    }
+  }
   // Remove button (active/edit slots)
   const x=e.target.closest('.sc-x');
   if(x){
@@ -841,10 +899,11 @@ function attachBlockDrags(){
       const winD=windowDates();
       const nm=DAYS[(fromYMD(winD[fromDay]).getDay()+6)%7]+' '+winD[fromDay];
       const total=days[fromDay].conf.length+days[fromDay].active.length;
+      const hasConf=days[fromDay].conf.length>0&&days[fromDay].editMode;
       const g=document.createElement('div');
       g.className='ghost';
-      g.style.background='#3B82F6';
-      g.textContent=`⣿ ${nm} (${total} patients)`;
+      g.style.background=hasConf?'#E8A23A':'#3B82F6';
+      g.textContent='⣿ '+nm+' ('+total+' patient'+(total>1?'s':'')+(hasConf?' — confirmed block':'')+')';
       document.body.appendChild(g);
       g.style.left=e.clientX+'px';g.style.top=e.clientY+'px';
       el.style.opacity='.4';
@@ -1446,6 +1505,22 @@ async function mergeDay(fromIdx,toIdx){
   }
 }
 
+// ── Re-sort day by circuit step order ────────────────────────
+function resortDay(dayIdx){
+  const active=days[dayIdx].active;
+  if(!active.length){toast('No unconfirmed patients to sort');return;}
+  const dayName=DAYS[(fromYMD(windowDates()[dayIdx]).getDay()+6)%7];
+  // Sort by circuit step — same logic as optimizer pass 3
+  active.sort((a,b)=>{
+    const ca=optClassify(a),cb=optClassify(b);
+    const sa=ca.isSS?-1:ca.s;  // South Shore always first
+    const sb=cb.isSS?-1:cb.s;
+    return sa-sb;
+  });
+  renderGrid();
+  toast(`↺ ${dayName} re-sorted by circuit route order`);
+}
+
 // ── Cluster mode toggle ───────────────────────────────────────
 function toggleCluster(dayIdx){
   if(clusterDays.has(dayIdx))clusterDays.delete(dayIdx);
@@ -1516,6 +1591,240 @@ async function undoLastBatch(){
     if(btn){btn.disabled=false;btn.textContent='↩ Undo Last Batch';}
   }
 }
+
+
+// ════════════════════════════════════════════════════════════
+// RE-SORT DAY — re-apply circuit step order to active patients
+// ════════════════════════════════════════════════════════════
+function resortDay(dayIdx){
+  const active=days[dayIdx].active;
+  if(!active.length){toast('No unconfirmed patients to re-sort');return;}
+  const dayName=DAYS[(fromYMD(windowDates()[dayIdx]).getDay()+6)%7];
+  active.sort((a,b)=>{
+    const ca=optClassify(a),cb=optClassify(b);
+    return (ca.isSS?-1:ca.s)-(cb.isSS?-1:cb.s);
+  });
+  renderGrid();
+  toast('↺ '+dayName+' re-sorted by circuit route order');
+}
+
+// ════════════════════════════════════════════════════════════
+// BLOCK DRAG for edit mode — amber handle in attachBlockDrags
+// ════════════════════════════════════════════════════════════
+function attachBlockDrags(){
+  document.querySelectorAll('.block-drag-handle').forEach(el=>{
+    el.addEventListener('pointerdown',e=>{
+      e.preventDefault();
+      const fromDay=+el.dataset.blockday;
+      const winD=windowDates();
+      const nm=DAYS[(fromYMD(winD[fromDay]).getDay()+6)%7]+' '+winD[fromDay];
+      const total=days[fromDay].conf.length+days[fromDay].active.length;
+      const hasConf=days[fromDay].conf.length>0&&days[fromDay].editMode;
+      const g=document.createElement('div');
+      g.className='ghost';
+      g.style.background=hasConf?'#E8A23A':'#3B82F6';
+      g.textContent='⣿ '+nm+' ('+total+' patient'+(total>1?'s':'')+(hasConf?' \u2014 confirmed block':'')+')';;
+      document.body.appendChild(g);
+      g.style.left=e.clientX+'px';g.style.top=e.clientY+'px';
+      el.style.opacity='.4';
+      drag={pid:null,fromPool:false,fromDay:-1,fromBkt:null,fromIdx:-1,
+            ghost:g,el,isBlock:true,blockDay:fromDay};
+      document.addEventListener('pointermove',ptBlockMove,{passive:false});
+      document.addEventListener('pointerup',ptBlockUp,{passive:false});
+    },{passive:false});
+  });
+}
+
+function ptBlockMove(e){
+  if(!drag||!drag.isBlock)return;
+  e.preventDefault();
+  drag.ghost.style.left=e.clientX+'px';
+  drag.ghost.style.top=e.clientY+'px';
+  document.querySelectorAll('.dcol.block-over').forEach(el=>el.classList.remove('block-over'));
+  const t=document.elementFromPoint(e.clientX,e.clientY);
+  if(t)t.closest('.dcol')?.classList.add('block-over');
+}
+
+function ptBlockUp(e){
+  if(!drag||!drag.isBlock)return;
+  e.preventDefault();
+  drag.ghost.remove();
+  drag.el.style.opacity='';
+  document.querySelectorAll('.dcol.block-over').forEach(el=>el.classList.remove('block-over'));
+  document.removeEventListener('pointermove',ptBlockMove);
+  document.removeEventListener('pointerup',ptBlockUp);
+  const bd=drag.blockDay;
+  drag=null;
+  const under=document.elementFromPoint(e.clientX,e.clientY);
+  if(!under)return;
+  const dcol=under.closest('.dcol');
+  if(dcol){
+    const tDay=+dcol.id.replace('dc-','');
+    if(!isNaN(tDay)&&tDay!==bd)mergeDay(bd,tDay);
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// NEW PATIENT FIT — evaluate where a new patient can slot in
+// ════════════════════════════════════════════════════════════
+async function findSlotForPatient(patId){
+  // Get fresh patient data
+  const{data:p}=await _sb.from('patients').select('*').eq('id',patId).single();
+  if(!p){toast('Patient not found');return;}
+  const cl=optClassify(p);
+  const winD=windowDates();
+  const slots=[];
+
+  // Check each day in current window
+  for(let i=0;i<7;i++){
+    const ds=winD[i];
+    const d=fromYMD(ds);
+    const dow=d.getDay();
+    if(dow===0||dow===1)continue; // Skip Sun/Mon
+    if(p.due_date&&Math.abs(dayDiff(ds,p.due_date))>WIN)continue;
+    const dayCirc=dow===5?'B':'A';
+    if(cl.c!==dayCirc&&!cl.isSS&&!cl.isWI)continue; // circuit mismatch
+
+    const conf=days[i].conf.length;
+    const act =days[i].active.length;
+    const cap =effectiveCapFor(i);
+    const total=conf+act;
+    const hasRoom=total<cap;
+    const dayName=DAYS[(dow+6)%7]+' '+ds;
+    const inConf=conf>0;
+
+    slots.push({i,ds,dayName,total,cap,hasRoom,inConf,
+      editNeeded:inConf&&!days[i].editMode,
+      time:calcTime(i,total)
+    });
+  }
+
+  // Build modal content
+  const body=document.getElementById('fitBody');
+  if(!slots.length){
+    body.innerHTML='<div style="color:var(--t2);font-size:13px;padding:8px 0">'+
+      'No eligible days found in current window for '+esc(p.patient_name||'this patient')+'.<br>'+
+      '<small style="color:var(--t3)">Try navigating to a different week or adjusting the due date.</small></div>';
+  } else {
+    const cl_=optClassify(p);
+    const zone=zoneOf(p);
+    body.innerHTML='<div style="font-size:12px;color:var(--t2);margin-bottom:12px">'+
+      '<b style="color:var(--t)">'+esc(p.patient_name||'Patient')+'</b> · '+
+      '<span class="zpill" style="background:'+zone.c+'">'+zone.n+'</span> '+
+      (p.due_date?'· Due '+p.due_date:'')+
+      '</div>'+
+      slots.map(sl=>`
+        <div class="fit-slot" data-day="${sl.i}" onclick="selectFitSlot(this)">
+          <div class="fit-slot-day">${esc(sl.dayName)}</div>
+          <div class="fit-slot-info">
+            ${sl.total} / ${sl.cap} patients · Slot time: <b>${sl.time}</b>
+            ${sl.hasRoom?'<span style="color:var(--gr)"> ✓ Room available</span>':'<span style="color:var(--re)"> ✗ At cap</span>'}
+          </div>
+          ${sl.editNeeded?'<div class="fit-slot-warn">⚠ Day has confirmed patients — Edit mode required to modify order</div>':''}
+        </div>`).join('')+
+      '<div class="fit-actions">'+
+        '<button class="fit-btn cancel" onclick="closeFitModal()">Cancel</button>'+
+        '<button class="fit-btn go" id="fitGoBtn" onclick="assignToFitSlot('+patId+')" disabled>Place Patient</button>'+
+      '</div>';
+  }
+  document.getElementById('fitModal').classList.add('show');
+}
+
+function selectFitSlot(el){
+  document.querySelectorAll('.fit-slot').forEach(s=>s.classList.remove('selected'));
+  el.classList.add('selected');
+  document.getElementById('fitGoBtn').disabled=false;
+}
+
+async function assignToFitSlot(patId){
+  const sel=document.querySelector('.fit-slot.selected');
+  if(!sel){toast('Select a day first');return;}
+  const dayIdx=+sel.dataset.day;
+  const d=days[dayIdx];
+  const dayName=DAYS[(fromYMD(windowDates()[dayIdx]).getDay()+6)%7];
+
+  if(d.conf.length>0&&!d.editMode){
+    if(!confirm('This day has confirmed appointments.\nEdit mode is required to add a patient here.\n\nEnable Edit mode for '+dayName+'?'))return;
+    d.editMode=true;
+  }
+  const{data:p}=await _sb.from('patients').select('*').eq('id',patId).single();
+  if(!p){toast('Patient not found');return;}
+  d.active.push({...p,_sugg:false});
+  closeFitModal();
+  pool=pool.filter(pp=>String(pp.id)!==String(patId));
+  sortPool();renderPool();renderGrid();
+  toast('+ '+esc(p.patient_name||'Patient')+' added to '+dayName+' — ↺ Re-sort if needed');
+}
+
+function closeFitModal(){
+  document.getElementById('fitModal').classList.remove('show');
+}
+
+// ════════════════════════════════════════════════════════════
+// CANCELLATION MODE — select confirmed appointments to cancel
+// ════════════════════════════════════════════════════════════
+let cancelMode=false;
+let cancelSelected=new Set(); // patient IDs selected for cancellation
+
+function enterCancelMode(){
+  cancelMode=true;
+  cancelSelected.clear();
+  document.getElementById('cancelBar').classList.add('show');
+  document.getElementById('cancelLabel').textContent='0 patients selected — tap to select';
+  renderGrid();
+  toast('Tap confirmed appointments to select for cancellation');
+}
+
+function exitCancelMode(){
+  cancelMode=false;
+  cancelSelected.clear();
+  document.getElementById('cancelBar').classList.remove('show');
+  renderGrid();
+}
+
+function toggleCancelSelect(patId){
+  if(cancelSelected.has(patId))cancelSelected.delete(patId);
+  else cancelSelected.add(patId);
+  const n=cancelSelected.size;
+  document.getElementById('cancelLabel').textContent=
+    n===0?'0 patients selected — tap to select':
+    n+' patient'+(n>1?'s':'')+' selected for cancellation';
+  renderGrid();
+}
+
+async function executeCancellation(){
+  if(!cancelSelected.size){toast('No patients selected');return;}
+  const n=cancelSelected.size;
+  // Find names for confirmation
+  const names=[];
+  days.forEach(d=>[...d.conf,...d.active].forEach(p=>{
+    if(cancelSelected.has(String(p.id)))names.push(p.patient_name||'Patient');
+  }));
+  if(!confirm(
+    'CANCEL '+n+' appointment'+(n>1?'s':'')+' permanently?\n\n'+
+    names.join('\n')+
+    '\n\nThis will unschedule these patients. They return to the pool.\nTap OK to confirm.'
+  ))return;
+  const btn=document.querySelector('.cancel-confirm-btn');
+  if(btn){btn.disabled=true;btn.textContent='Cancelling…';}
+  try{
+    for(const id of cancelSelected){
+      await _sb.from('patients').update({
+        appointment_date_time:null,appointment_confirmed:false}).eq('id',id);
+    }
+    localStorage.setItem('vapiq_appts_updated',Date.now());
+    toast('✓ '+n+' appointment'+(n>1?'s':'')+' cancelled — patients returned to pool',3500);
+    exitCancelMode();
+    await reload();
+  }catch(e){
+    toast('Error: '+e.message,4000);
+    if(btn){btn.disabled=false;btn.textContent='🗑 Cancel Appointments';}
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// WIRE CANCEL MODE INTO GRID CLICK
+// ════════════════════════════════════════════════════════════
 
 </script>
 </body>
