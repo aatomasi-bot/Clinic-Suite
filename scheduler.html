@@ -164,6 +164,27 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   color:var(--t3);cursor:pointer;font-size:12px;width:18px;height:18px;
   border-radius:3px;display:flex;align-items:center;justify-content:center}
 .sc-x:hover{background:var(--re);color:#fff}
+/* Individual confirmed slot undo — shows bottom-right on conf cards */
+.sc-undo{position:absolute;bottom:4px;right:4px;background:rgba(224,90,90,.1);
+  border:1px solid rgba(224,90,90,.25);color:var(--re);cursor:pointer;
+  font-size:9px;font-weight:700;border-radius:3px;padding:1px 5px;
+  font-family:inherit;transition:all .15s;white-space:nowrap}
+.sc-undo:hover{background:var(--re);color:#fff;border-color:var(--re)}
+/* Cluster mode badge + toggle */
+.cluster-badge{background:rgba(124,58,237,.15);border:1px solid rgba(124,58,237,.4);
+  color:#7C3AED;border-radius:99px;padding:1px 7px;font-size:9px;font-weight:800}
+.btn-cluster{background:rgba(124,58,237,.12);color:#7C3AED;
+  border:1px solid rgba(124,58,237,.35);font-size:9px}
+.btn-cluster:hover{background:#7C3AED;color:#fff;border-color:#7C3AED}
+.btn-cluster.active{background:#7C3AED;color:#fff;border-color:#7C3AED}
+/* Cluster header */
+.dhdr.cluster-day{background:rgba(124,58,237,.08);border-bottom-color:#7C3AED}
+/* Undo batch button */
+.undo-batch-btn{background:rgba(232,162,58,.12);border:1.5px solid rgba(232,162,58,.4);
+  color:var(--amber);border-radius:9px;padding:11px 14px;font-size:12px;
+  font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;display:none}
+.undo-batch-btn:hover{background:var(--amber);color:#fff;border-color:var(--amber)}
+.undo-batch-btn.show{display:block}
 .rh{color:var(--t3);font-size:10px;cursor:grab;user-select:none;touch-action:none;
   padding:1px 2px;flex-shrink:0}
 .rh:hover{color:var(--teal)}
@@ -242,6 +263,25 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   <button class="navBtn" onclick="nav(7)">7 days →</button>
   <button class="navBtn today" onclick="navToday()">Today</button>
   <button class="navBtn go" onclick="reload()">⟳ Reload</button>
+  <button class="opt-btn" onclick="optimizeRoutes()" id="optBtn">🧠 Optimize 2 Wks</button>
+  <button class="opt-btn clear" id="clearOptBtn" onclick="clearOptimizer()" style="display:none">✕ Clear Plan</button>
+</div>
+
+<!-- Optimizer modal -->
+<div class="opt-modal" id="optModal">
+  <div class="opt-box">
+    <h3>🧠 Route Optimizer</h3>
+    <p>Planning 2 weeks based on your circuits &amp; rules…</p>
+    <div class="opt-bar"><div class="opt-fill" id="optFill"></div></div>
+    <div class="opt-step" id="os1">⏳ Classifying patients by zone…</div>
+    <div class="opt-step" id="os2">⏳ Planning days &amp; circuits…</div>
+    <div class="opt-step" id="os3">⏳ Sorting routes by step order…</div>
+    <div class="opt-step" id="os4">⏳ Balancing capacity limits…</div>
+    <div class="opt-summary" id="optSummary" style="display:none"></div>
+    <button class="opt-close" id="optClose" onclick="closeOptModal()" style="display:none">
+      ✓ Apply to Scheduler
+    </button>
+  </div>
 </div>
 
 <div class="sbar">
@@ -283,6 +323,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 <div class="cbar">
   <input class="time-in" id="st" type="time" value="08:00" onchange="renderGrid()">
   <button class="conf-all-btn" id="cab" onclick="confirmAll()" disabled>✓ Confirm All Unconfirmed</button>
+  <button class="undo-batch-btn" id="undoBatchBtn" onclick="undoLastBatch()" title="Undo only the patients confirmed in the last batch">↩ Undo Last Batch</button>
   <button class="undo-wk-btn" onclick="undoWindow()">↩ Undo Window</button>
 </div>
 
@@ -368,7 +409,7 @@ let pool = [];
 let sbOpen = true;
 
 function mkDays(){
-  return Array.from({length:7},()=>({conf:[],active:[],editMode:false}));
+  return Array.from({length:7},()=>({conf:[],active:[],editMode:false,circ:'A'}));
 }
 
 // ════════════════════════════════════════════════════════════
@@ -401,6 +442,10 @@ async function reload(){
 
     // Reset per-day state
     days=mkDays();
+    // Set circuit per day based on day-of-week
+    Array.from({length:7},(_,i)=>addDays(fromYMD(winDates[0]),i)).forEach((d,i)=>{
+      days[i].circ=d.getDay()===5?'B':'A'; // Friday=Laval, else Montreal
+    });
     pool=[];
     const winDates=windowDates();  // ['2026-06-09','2026-06-10',...]
 
@@ -428,29 +473,38 @@ async function reload(){
     days.forEach(d=>d.conf.sort((a,b)=>
       (a.appointment_date_time||'').localeCompare(b.appointment_date_time||'')));
 
-    // ── Step 2: Smart-suggest eligible unconfirmed patients
-    //            into their best matching day (closest to due date)
+    // ── Step 2: Place patients via optimizer plan or smart-suggest ──
     const wStart=fromYMD(winDates[0]);
     const wEnd  =fromYMD(winDates[6]);
     const eligFrom=addDays(wStart,-WIN);
     const eligTo  =addDays(wEnd,   WIN);
     const suggestedIds=new Set();
-
-    allPats
-      .filter(p=>{
-        if(confirmedIds.has(p.id)||!p.due_date)return false;
-        const due=fromYMD(p.due_date);
-        return due>=eligFrom&&due<=eligTo;
-      })
-      .forEach(p=>{
-        const best=bestDayIdx(p.due_date,winDates);
-        if(best>=0){
-          days[best].active.push({...p,_sugg:true});
-          suggestedIds.add(p.id);
-        } else {
-          pool.push({...p,_sugg:false});
-        }
+    const optPlan=loadPlan();
+    const useOpt=!!(optPlan&&optPlan.asgn);
+    const optPlaced=new Set();
+    if(useOpt){
+      winDates.forEach((ds,i)=>{
+        const ordered=optPlan.asgn[ds];
+        if(!ordered)return;
+        ordered.forEach(id=>{
+          const p=allPats.find(pp=>String(pp.id)===String(id));
+          if(!p||confirmedIds.has(p.id))return;
+          days[i].active.push({...p,_sugg:false});
+          suggestedIds.add(p.id);optPlaced.add(p.id);
+        });
       });
+    }
+    allPats.filter(p=>{
+      if(confirmedIds.has(p.id)||!p.due_date)return false;
+      if(useOpt&&optPlaced.has(p.id))return false;
+      return fromYMD(p.due_date)>=eligFrom&&fromYMD(p.due_date)<=eligTo;
+    }).forEach(p=>{
+      const best=bestDayIdx(p.due_date,winDates);
+      if(best>=0){days[best].active.push({...p,_sugg:!useOpt});suggestedIds.add(p.id);}
+      else pool.push({...p,_sugg:false});
+    });
+    const _cb=document.getElementById('clearOptBtn');
+    if(_cb)_cb.style.display=useOpt?'':'none'
 
     // ── Step 3: Pool = eligible patients not placed anywhere
     allPats.forEach(p=>{
@@ -461,6 +515,10 @@ async function reload(){
     });
 
     sortPool();
+    // Restore Undo Last Batch button visibility
+    const batchData=loadBatch();
+    const batchBtn=document.getElementById('undoBatchBtn');
+    if(batchBtn)batchBtn.classList.toggle('show',!!(batchData&&batchData.ids&&batchData.ids.length));
     renderPool();
     renderGrid();
     const cCount=confirmedIds.size,sCount=suggestedIds.size;
@@ -563,13 +621,31 @@ function renderGrid(){
     totalUnconf+=active.length;
 
     // Day header class
-    const hdrCls=editMode?'dhdr edit-hdr':conf.length?'dhdr locked-hdr has':'dhdr'+(active.length?' has':'');
+    const isCluster=clusterDays.has(i);
+    const effectiveCap=isCluster&&days[i].circ!=='B'?18:days[i].cap||(dow===5?12:15);
+    const hdrCls=(editMode?'dhdr edit-hdr':conf.length?'dhdr locked-hdr has':'dhdr'+(active.length?' has':''))+(isCluster?' cluster-day':'');
+
+    // Cluster mode: auto-detect from FSA concentration (Montreal days only)
+    const dayCirc = d.getDay()===5?'B':'A';
+    if(dayCirc==='A'&&total>=6&&!isCluster){
+      const allPts=[...conf,...active];
+      const f2s=allPts.map(p=>{const m=(p.address||'').toUpperCase().match(/([A-Z]\d[A-Z])/);return m?m[1].slice(0,2):'';});
+      const dominant=f2s.reduce((acc,f)=>{acc[f]=(acc[f]||0)+1;return acc;},{});
+      const topCount=Math.max(...Object.values(dominant));
+      if(topCount/f2s.length>=0.75)clusterDays.add(i); // 75% same zone = cluster
+    }
+    const effectiveCap2=clusterDays.has(i)?18:(dayCirc==='B'?12:15);
 
     // Header buttons
     let hdrBtns='';
     if(conf.length){
       hdrBtns+=`<button class="btn-sm btn-lock" onclick="toggleEdit(${i})">
         ${editMode?'🔓 Editing':'🔒 Edit'}</button>`;
+    }
+    if(dayCirc==='A'){
+      hdrBtns+=`<button class="btn-sm btn-cluster${isCluster?' active':''}"
+        onclick="toggleCluster(${i})" title="Cluster mode: extend cap to 18">
+        ${isCluster?'⊞ Cluster ×':'⊞ Cluster'}</button>`;
     }
     if(total>0){
       hdrBtns+=`<button class="btn-sm btn-undo" onclick="undoDay(${i})">↩ Undo</button>`;
@@ -586,7 +662,8 @@ function renderGrid(){
             <div class="dname">${DAYS[(d.getDay()+6)%7]}${isToday?' · TODAY':''}</div>
             <div class="ddate${isToday?' today-date':''}">${d.getDate()}</div>
             <div class="dinfo">${MONTHS[d.getMonth()]} ${d.getFullYear()}</div>
-            ${total?`<div class="dinfo" style="color:var(--teal);font-weight:700">${total} patient${total>1?'s':''}</div>`:''}
+            ${total?`<div class="dinfo" style="color:var(--teal);font-weight:700">${total} patient${total>1?'s':''} / ${effectiveCap2}</div>`:''}
+            ${isCluster?'<div class="cluster-badge" style="margin-top:2px">⊞ Cluster</div>':''}
           </div>
           <div class="dh-right">${hdrBtns}</div>
         </div>
@@ -616,7 +693,8 @@ function renderGrid(){
           <div class="sc-bottom">
             <span class="sc-zone" style="background:${z.c}">${z.n}</span>
             <span class="sc-time">🕐 ${dispTime}</span>
-            ${canDrag?'<span class="rh" style="position:static;margin-left:auto" title="Drag to reorder">⠿</span>':''}
+            ${!editMode?`<button class="sc-undo" data-undo1="${i}|${ci}" title="Undo this single appointment">↩</button>`:''}
+            ${canDrag?'<span class="rh" style="position:static;margin-left:auto">⠿</span>':''}
           </div>
         </div>`;
       slotIdx++;
@@ -663,11 +741,22 @@ function renderGrid(){
 }
 
 function onGridClick(e){
+  // Remove button (active/edit slots)
   const x=e.target.closest('.sc-x');
-  if(!x)return;
-  e.stopPropagation();
-  const[di,bkt,idx]=x.dataset.rm.split('|');
-  removeSlot(+di,bkt,+idx);
+  if(x){
+    e.stopPropagation();
+    const[di,bkt,idx]=x.dataset.rm.split('|');
+    removeSlot(+di,bkt,+idx);
+    return;
+  }
+  // Individual undo button (confirmed slots)
+  const u=e.target.closest('.sc-undo');
+  if(u){
+    e.stopPropagation();
+    const[di,ci]=u.dataset.undo1.split('|');
+    undoOneConf(+di,+ci);
+    return;
+  }
 }
 
 // ════════════════════════════════════════════════════════════
@@ -844,6 +933,7 @@ async function confirmDay(dayIdx){
     }
     // Signal index.html
     localStorage.setItem('vapiq_appts_updated',Date.now());
+    storeBatch(batchIds); // enable Undo Last Batch
     toast(`✅ ${saved} confirmed for ${dayName}`,3000);
     // Reload this day from DB by triggering full reload
     await reload();
@@ -863,7 +953,7 @@ async function confirmAll(){
   btn.disabled=true;btn.textContent='Saving…';
   const winD=windowDates();
   const startMin=getStartMin();
-  let saved=0;
+  let saved=0;const allBatchIds=[];
   try{
     for(let i=0;i<7;i++){
       const d=days[i];
@@ -876,10 +966,11 @@ async function confirmAll(){
         const dt=`${ds}T${p2(Math.floor(tm/60))}:${p2(tm%60)}`;
         await _sb.from('patients').update({
           appointment_date_time:dt,appointment_confirmed:true}).eq('id',p.id);
-        saved++;
+        allBatchIds.push(p.id);saved++;
       }
     }
     localStorage.setItem('vapiq_appts_updated',Date.now());
+    storeBatch(allBatchIds); // enable Undo Last Batch
     toast(`✅ ${saved} appointments confirmed!`,3500);
     await reload();
   }catch(e){toast('Error: '+e.message,4000);}
@@ -999,6 +1090,310 @@ function toast(msg,dur=2200){
 }
 function esc(s){return String(s||'').replace(/[&<>"']/g,c=>
   ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+// ════════════════════════════════════════════════════════════
+// ROUTE OPTIMIZER — two-week intelligent scheduler
+// Circuits, start points, cap rules, FSA classification
+// ════════════════════════════════════════════════════════════
+
+const OPT_STARTS={6:'H4N',_:'H4J'}; // Sat=H4N, else H4J
+let clusterDays=new Set(); // day indices with cluster mode enabled (cap 18)
+
+// FSA3: 3-char postal prefix → {c:circuit, s:step}
+// Circuit A=Montreal(Tue-Thu,Sat)  B=Laval/NorthShore(Fri)
+// Steps 0-6 define route order within circuit
+const FSA3={
+  'H2B':{c:'A',s:6},'H2C':{c:'A',s:6},'H2M':{c:'A',s:6},'H2N':{c:'A',s:6},
+  'H3L':{c:'A',s:6},'H3M':{c:'A',s:6},'H3N':{c:'A',s:6},
+  'H4J':{c:'A',s:6},'H4K':{c:'A',s:6},'H4L':{c:'A',s:6},
+  'H4M':{c:'A',s:6},'H4N':{c:'A',s:6},'H4R':{c:'A',s:6},'H4S':{c:'A',s:6},
+  'J5Y':{c:'A',s:5},'J5Z':{c:'A',s:5},'J6A':{c:'A',s:5},
+  'J6Y':{c:'A',s:5},'J6Z':{c:'A',s:5}, // Terrebonne E → near Repentigny
+  'J6W':{c:'B',s:2},'J6X':{c:'B',s:2}, // Terrebonne W → Laval circuit
+  'J7K':{c:'B',s:2}, // Mascouche
+  'J7C':{c:'B',s:3},'J7E':{c:'B',s:3},'J7G':{c:'B',s:3},'J7H':{c:'B',s:3},
+  'J7P':{c:'B',s:4},'J7R':{c:'B',s:4},'J7V':{c:'B',s:4},'J7X':{c:'B',s:4},
+  'H8S':{c:'B',s:5},'H8T':{c:'B',s:5},'H8Y':{c:'B',s:5},'H8Z':{c:'B',s:5},
+  'H9A':{c:'B',s:5},'H9B':{c:'B',s:5},'H9C':{c:'B',s:5},'H9E':{c:'B',s:5},
+  'H9G':{c:'B',s:5},'H9H':{c:'B',s:5},'H9J':{c:'B',s:5},'H9K':{c:'B',s:5},
+  'H9P':{c:'B',s:5},'H9R':{c:'B',s:5},'H9S':{c:'B',s:5},'H9W':{c:'B',s:5},'H9X':{c:'B',s:5},
+};
+const FSA2={
+  'J3':{c:'A',s:0},'J4':{c:'A',s:0},  // South Shore → step 0 (always first)
+  'H8':{c:'A',s:1},  // SW Launch: Lachine/LaSalle/CSL/Dorval
+  'H3':{c:'A',s:2},'H4':{c:'A',s:2},  // Central: NDG/Westmount/CDN
+  'H2':{c:'A',s:3},  // East: Plateau/Rosemont/Hochelaga
+  'H1':{c:'A',s:4},  // Far East: PTX/MTL-Est/Anjou/RDP
+  'J5':{c:'A',s:5},'J6':{c:'A',s:5},  // NE apex: Repentigny
+  'H7':{c:'B',s:1},  // Laval
+  'H9':{c:'B',s:5},  // West Island (2-char fallback)
+};
+const RIVER_BANK=new Set(['H7A','H7B','H7C','H7E','H7G']); // Laval river-bank (mixed circuit)
+const SS_FSA=new Set(['J3','J4']); // South Shore prefixes
+
+function optClassify(p){
+  const addr=(p.address||'').toUpperCase();
+  const m=addr.match(/([A-Z]\d[A-Z])\s*\d[A-Z]\d/);
+  if(!m)return{c:'A',s:3,isSS:false,isWI:false,isRB:false};
+  const f3=m[1],f2=f3.slice(0,2);
+  const info=FSA3[f3]||FSA2[f2]||{c:'A',s:3};
+  return{
+    c:info.c,s:info.s,
+    isSS:SS_FSA.has(f2)||SS_FSA.has(f3),
+    isWI:info.c==='B'&&info.s===5,   // West Island = circuit B step 5
+    isRB:RIVER_BANK.has(f3),         // River-bank Laval
+    f3,f2
+  };
+}
+
+function buildSlots(fromDate){
+  return Array.from({length:14},(_,i)=>{
+    const d=addDays(fromYMD(fromDate),i);
+    const dow=d.getDay();
+    return{
+      date:toYMD(d),dow,
+      isWork:dow!==0&&dow!==1,       // Skip Sun+Mon
+      dayLabel:['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][dow],
+      patients:[],
+      cap:dow===5?12:15,             // Friday hard cap 12
+      circ:dow===5?'B':'A',          // Friday=Laval, else Montreal
+    };
+  });
+}
+
+function runPlanner(pats,fromDate){
+  const slots=buildSlots(fromDate);
+  const confIds=new Set(pats.filter(p=>p.appointment_confirmed).map(p=>p.id));
+  const rangeStart=addDays(fromYMD(fromDate),-WIN);
+  const rangeEnd  =addDays(fromYMD(fromDate),13+WIN);
+
+  const eligible=pats
+    .filter(p=>{
+      if(confIds.has(p.id)||!p.due_date)return false;
+      const d=fromYMD(p.due_date);
+      return d>=rangeStart&&d<=rangeEnd;
+    })
+    .map(p=>({...p,_cl:optClassify(p)}))
+    .sort((a,b)=>a.due_date.localeCompare(b.due_date));
+
+  const placed=new Set();
+
+  // ── Pass 1: assign each patient to best circuit day ──────
+  eligible.forEach(p=>{
+    if(placed.has(p.id))return;
+    const{c,isSS,isWI}=p._cl;
+    const cands=slots.filter(sl=>{
+      if(!sl.isWork||sl.patients.length>=sl.cap)return false;
+      if(Math.abs(dayDiff(sl.date,p.due_date))>WIN)return false;
+      if(isSS)return true;              // South Shore → any day (prefer Sat)
+      if(isWI)return true;              // West Island → any circuit day (flexible)
+      return sl.circ===c;               // Normal → must match circuit
+    }).sort((a,b)=>{
+      if(isSS){                         // Prefer Saturday for South Shore
+        const s=a.dow===6?-1:0,t=b.dow===6?-1:0;
+        if(s!==t)return s-t;
+      }
+      if(isWI){                         // Prefer prior Friday for West Island
+        const af=a.dow===5&&dayDiff(a.date,p.due_date)<=0?-1:0;
+        const bf=b.dow===5&&dayDiff(b.date,p.due_date)<=0?-1:0;
+        if(af!==bf)return af-bf;
+      }
+      return Math.abs(dayDiff(a.date,p.due_date))-Math.abs(dayDiff(b.date,p.due_date));
+    });
+    if(!cands.length)return;
+    cands[0].patients.push(p);
+    placed.add(p.id);
+  });
+
+  // ── Pass 2: validate mixed circuit rule on Fridays ───────
+  slots.filter(sl=>sl.dow===5).forEach(fri=>{
+    const mtl=fri.patients.filter(p=>p._cl.c==='A'&&!p._cl.isRB);
+    const rb =fri.patients.filter(p=>p._cl.isRB);
+    const mixOK=mtl.length>=3&&fri.patients.length<7&&rb.length>=3&&rb.length<=5;
+    if(!mixOK&&mtl.length>0){
+      mtl.forEach(p=>{
+        fri.patients=fri.patients.filter(x=>x.id!==p.id);
+        const alt=slots.find(sl=>sl.circ==='A'&&sl.isWork&&sl!==fri&&
+          sl.patients.length<sl.cap&&Math.abs(dayDiff(sl.date,p.due_date))<=WIN);
+        if(alt)alt.patients.push(p);
+      });
+    }
+  });
+
+  // ── Pass 3: sort each day by circuit step ─────────────────
+  slots.forEach(sl=>{
+    sl.patients.sort((a,b)=>{
+      const sa=a._cl.isSS?-1:a._cl.s;
+      const sb=b._cl.isSS?-1:b._cl.s;
+      return sa-sb;
+    });
+  });
+
+  // ── Pass 4: balance capacity overflow ────────────────────
+  slots.forEach((sl,si)=>{
+    if(sl.patients.length<=sl.cap)return;
+    const overflow=sl.patients.splice(sl.cap);
+    overflow.forEach(p=>{
+      const alt=slots.find((s2,j)=>j!==si&&s2.isWork&&
+        s2.patients.length<s2.cap&&s2.circ===sl.circ&&
+        Math.abs(dayDiff(s2.date,p.due_date))<=WIN);
+      if(alt)alt.patients.push(p);
+    });
+  });
+
+  return slots;
+}
+
+// ── Session storage ───────────────────────────────────────────
+function storePlan(slots){
+  const asgn={};
+  slots.forEach(sl=>{if(sl.patients.length)asgn[sl.date]=sl.patients.map(p=>String(p.id));});
+  sessionStorage.setItem('vapiq_opt_plan',JSON.stringify({ts:Date.now(),asgn}));
+  const cb=document.getElementById('clearOptBtn');
+  if(cb)cb.style.display='';
+}
+function loadPlan(){
+  try{const r=sessionStorage.getItem('vapiq_opt_plan');return r?JSON.parse(r):null;}
+  catch{return null;}
+}
+function clearOptimizer(){
+  sessionStorage.removeItem('vapiq_opt_plan');
+  const cb=document.getElementById('clearOptBtn');
+  if(cb)cb.style.display='none';
+  toast('Optimizer plan cleared');reload();
+}
+
+// ── Optimizer UI handler ──────────────────────────────────────
+async function optimizeRoutes(){
+  const modal=document.getElementById('optModal');
+  const fill =document.getElementById('optFill');
+  const sum  =document.getElementById('optSummary');
+  const cls  =document.getElementById('optClose');
+  ['os1','os2','os3','os4'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el){el.className='opt-step';el.textContent=el.textContent.replace(/[✓🔄]/,'⏳');}
+  });
+  if(sum)sum.style.display='none';
+  if(cls)cls.style.display='none';
+  if(fill)fill.style.width='0';
+  modal.classList.add('show');
+
+  async function prog(n,msg,pct){
+    for(let i=1;i<=4;i++){
+      const el=document.getElementById('os'+i);
+      if(!el)continue;
+      if(i<n)el.classList.add('done');
+      else if(i===n){el.classList.add('active');el.textContent='🔄 '+msg;}
+    }
+    if(fill)fill.style.width=pct+'%';
+    await new Promise(r=>setTimeout(r,300));
+  }
+
+  try{
+    if(!allPats.length){
+      const{data}=await _sb.from('patients').select('*').eq('archived',false).eq('pending',false);
+      allPats=data||[];
+    }
+    await prog(1,'Classifying patients by zone & circuit…',20);
+    await prog(2,'Planning 14 days — circuits, windows & caps…',45);
+    const plan=runPlanner(allPats,windowStart);
+    await prog(3,'Sorting routes by circuit step order…',70);
+    await prog(4,'Balancing capacity — shifting overflow…',90);
+    storePlan(plan);
+    if(fill)fill.style.width='100%';
+    ['os1','os2','os3','os4'].forEach(id=>{
+      const el=document.getElementById(id);if(el)el.classList.add('done');
+    });
+    // Summary
+    const placed=plan.reduce((s,d)=>s+d.patients.length,0);
+    const byDay=plan.filter(d=>d.patients.length)
+      .map(d=>`<b>${d.dayLabel} ${d.date}:</b> ${d.patients.length} patient${d.patients.length>1?'s':''}`)
+      .join('<br>');
+    if(sum){sum.innerHTML=`<b>✅ ${placed} patients planned across 14 days</b><br>${byDay}`;sum.style.display='';}
+    if(cls)cls.style.display='';
+  }catch(e){
+    toast('Optimizer error: '+e.message,4000);
+    modal.classList.remove('show');
+  }
+}
+
+function closeOptModal(){
+  const modal=document.getElementById('optModal');
+  if(modal)modal.classList.remove('show');
+  reload();
+}
+
+// ── Cluster mode toggle ───────────────────────────────────────
+function toggleCluster(dayIdx){
+  if(clusterDays.has(dayIdx))clusterDays.delete(dayIdx);
+  else clusterDays.add(dayIdx);
+  renderGrid();
+  const cap=clusterDays.has(dayIdx)?18:15;
+  toast(clusterDays.has(dayIdx)?`⊞ Cluster mode ON — cap extended to 18`:`⊞ Cluster mode OFF — cap back to 15`);
+}
+
+// ── Individual confirmed slot undo (one-by-one) ───────────────
+// Triggered by data-undo1="dayIdx|confIdx" on ↩ button
+async function undoOneConf(dayIdx,confIdx){
+  const p=days[dayIdx].conf[confIdx];
+  if(!p)return;
+  const nm=p.patient_name||'Patient';
+  if(!confirm(`Undo appointment for ${nm}?
+This removes their confirmed slot and returns them to the pool.`))return;
+  try{
+    await _sb.from('patients').update({
+      appointment_date_time:null,appointment_confirmed:false}).eq('id',p.id);
+    days[dayIdx].conf=days[dayIdx].conf.filter((_,i)=>i!==confIdx);
+    // Return to pool if eligible
+    const wf=addDays(fromYMD(windowDates()[0]),-WIN);
+    const wt=addDays(fromYMD(windowDates()[6]), WIN);
+    const due=p.due_date?fromYMD(p.due_date):null;
+    if(due&&due>=wf&&due<=wt)pool.push({...p,_sugg:false});
+    sortPool();
+    localStorage.setItem('vapiq_appts_updated',Date.now());
+    renderPool();renderGrid();
+    toast(`↩ ${nm} unscheduled — returned to pool`);
+  }catch(e){toast('Error: '+e.message,4000);}
+}
+
+// ── Grid click: handle ↩ undo1 buttons ───────────────────────
+// (merged into existing onGridClick delegation)
+
+// ── Batch undo: only the last confirmed batch ─────────────────
+function storeBatch(ids){
+  sessionStorage.setItem('vapiq_last_batch',JSON.stringify({ts:Date.now(),ids}));
+  const btn=document.getElementById('undoBatchBtn');
+  if(btn)btn.classList.add('show');
+}
+function loadBatch(){
+  try{const r=sessionStorage.getItem('vapiq_last_batch');return r?JSON.parse(r):null;}
+  catch{return null;}
+}
+async function undoLastBatch(){
+  const batch=loadBatch();
+  if(!batch||!batch.ids||!batch.ids.length){toast('No batch found to undo');return;}
+  const n=batch.ids.length;
+  if(!confirm(`Undo the last confirmed batch of ${n} patient${n>1?'s':''}?\nOnly these ${n} appointments will be reversed. Other confirmed appointments stay intact.`))return;
+  const btn=document.getElementById('undoBatchBtn');
+  if(btn){btn.disabled=true;btn.textContent='Reversing…';}
+  let undone=0;
+  try{
+    for(const id of batch.ids){
+      await _sb.from('patients').update({
+        appointment_date_time:null,appointment_confirmed:false}).eq('id',id);
+      undone++;
+    }
+    sessionStorage.removeItem('vapiq_last_batch');
+    if(btn){btn.classList.remove('show');btn.disabled=false;btn.textContent='↩ Undo Last Batch';}
+    localStorage.setItem('vapiq_appts_updated',Date.now());
+    toast(`↩ ${undone} appointments reversed — returned to pool`,3500);
+    await reload();
+  }catch(e){
+    toast('Error: '+e.message,4000);
+    if(btn){btn.disabled=false;btn.textContent='↩ Undo Last Batch';}
+  }
+}
+
 </script>
 </body>
 </html>
