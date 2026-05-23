@@ -3772,6 +3772,11 @@ function renderCard(p, idx) {
         <div class="card-due ${dueClass}">
           <span>📅</span> ${dueDisplay}
         </div>
+        ${confirmed && apptTime ? `<div style="display:flex;align-items:center;gap:4px;margin-top:2px">
+          <span style="font-size:9px;background:rgba(45,140,138,.12);color:var(--teal-dark);
+            border:1px solid rgba(45,140,138,.3);border-radius:4px;padding:1px 6px;font-weight:700">
+            ✓ ${apptTime}</span>
+        </div>` : ''}
         ${addr ? `<div class="card-addr">${mapSVG}<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(formatAddrDisplay(addr))}</span></div>` : ''}
         ${special ? `<div class="card-special"><span>⚠️</span> Special note</div>` : ''}
       </div>
@@ -9103,6 +9108,16 @@ window.setTheme = setTheme;
     }
   });
 })();
+
+
+  // ── Scheduler sync: auto-refresh when appointments change ──
+  window.addEventListener('storage', e => {
+    if (e.key === 'vapiq_appts_updated') {
+      loadPatients().then(() => {
+        showToast('📅 Schedule updated from Scheduler', 'success');
+      }).catch(()=>{});
+    }
+  });
 
 </script>
 
