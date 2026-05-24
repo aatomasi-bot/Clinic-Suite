@@ -855,28 +855,42 @@ function renderGrid(){
       }
     }
 
-    // ── Row 1 toggles: Edit lock + Cluster (compact icons) ──
+    // ── Row 1 toggles ─────────────────────────────────────────
     const mL=i>0?checkMerge(i,i-1):null;
     const mR=i<6?checkMerge(i,i+1):null;
-    const toggleBtns=[
-      conf.length?`<button class="btn-sm btn-lock" onclick="toggleEdit(${i})" title="${editMode?'Lock day':'Unlock to edit confirmed'}">
-        ${editMode?'🔓':'🔒'}</button>`:'',
-      dayCirc==='A'&&total>0?`<button class="btn-sm btn-cluster${isCluster?' active':''}"
-        onclick="toggleCluster(${i})" title="Cluster mode: cap → 18">⊞</button>`:'',
-    ].filter(Boolean).join('');
+    let toggleBtns='';
+    if(conf.length){
+      toggleBtns+=`<button class="btn-sm btn-lock" onclick="toggleEdit(${i})"
+        title="${editMode?'Lock day':'Unlock to edit'}">${editMode?'🔓':'🔒'}</button>`;
+    }
+    if(dayCirc==='A'&&total>0){
+      toggleBtns+=`<button class="btn-sm btn-cluster${isCluster?' active':''}"
+        onclick="toggleCluster(${i})" title="Cluster: cap 18">⊞</button>`;
+    }
 
-    // ── Row 2 actions: Undo | ← Merge | Re-sort | Merge → ──
-    const actionBtns=[
-      total?`<button class="btn-sm btn-undo" onclick="undoDay(${i})" title="Undo all this day">↩</button>`:'',
-      mL?`<button class="btn-sm btn-merge${mL.ok?'':' disabled'}" onclick="mergeDay(${i},${i-1})"
-        title="${mL.ok?'Merge → '+DAYS[(fromYMD(winD[i-1]).getDay()+6)%7]:mL.reason}">← Mg</button>`:'',
-      active.length?`<button class="btn-sm btn-resort" onclick="resortDay(${i})" title="Re-sort by circuit step">↺</button>`:'',
-      mR?`<button class="btn-sm btn-merge${mR.ok?'':' disabled'}" onclick="mergeDay(${i},${i+1})"
-        title="${mR.ok?'Merge → '+DAYS[(fromYMD(winD[i+1]).getDay()+6)%7]:mR.reason}">Mg →</button>`:'',
-    ].filter(Boolean).join('');
+    // ── Row 2 action buttons ───────────────────────────────────
+    let actionBtns='';
+    if(total>0){
+      actionBtns+=`<button class="btn-sm btn-undo" onclick="undoDay(${i})" title="Undo day">↩</button>`;
+    }
+    if(mL&&mL.ok){
+      actionBtns+=`<button class="btn-sm btn-merge" onclick="mergeDay(${i},${i-1})"
+        title="Merge to prev day">←</button>`;
+    } else if(mL){
+      actionBtns+=`<button class="btn-sm btn-merge disabled" title="${mL.reason}">←</button>`;
+    }
+    if(active.length>0){
+      actionBtns+=`<button class="btn-sm btn-resort" onclick="resortDay(${i})" title="Re-sort route">↺</button>`;
+    }
+    if(mR&&mR.ok){
+      actionBtns+=`<button class="btn-sm btn-merge" onclick="mergeDay(${i},${i+1})"
+        title="Merge to next day">→</button>`;
+    } else if(mR){
+      actionBtns+=`<button class="btn-sm btn-merge disabled" title="${mR.reason}">→</button>`;
+    }
 
-    // ── Row 3 confirm (full-width, prominent) ──
-    const confirmBtn=active.length?
+    // ── Row 3 confirm ──────────────────────────────────────────
+    const confirmBtn=active.length>0?
       `<button class="btn-conf-day" onclick="confirmDay(${i})">✓ Confirm (${active.length})</button>`:'';
 
     html+=`<div class="dcol" id="dc-${i}">
