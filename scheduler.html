@@ -895,19 +895,26 @@ function renderGrid(){
 
     html+=`<div class="dcol" id="dc-${i}">
       <div class="${hdrCls}" id="dh-${i}">
-        <div class="dh-top">
+        <!-- Row 1: compact date + toggles -->
+        <div class="dh-row1">
           <div class="dh-left">
-            <div class="dname">${DAYS[(d.getDay()+6)%7]}${isToday?' · TODAY':''}</div>
-            <div class="ddate${isToday?' today-date':''}">${d.getDate()}</div>
-            <div class="dinfo">${MONTHS[d.getMonth()]} ${d.getFullYear()}</div>
-            ${total?`<div class="dinfo" style="color:var(--teal);font-weight:700">${total} patient${total>1?'s':''} / ${dayCap}</div>`:''}
-            ${isCluster?'<div class="cluster-badge" style="margin-top:2px">⊞ Cluster</div>':''}
-            ${(()=>{const _op=loadPlan();return _op&&_op.asgn&&_op.asgn[ds]?'<div style="font-size:8px;color:#7C3AED;font-weight:800;margin-top:1px">🧠 opt</div>':''})()}
+            <span class="dname">${DAYS[(d.getDay()+6)%7]}${isToday?'<span style="color:var(--teal)"> ·NOW</span>':''}</span>
+            <span class="ddate${isToday?' today-date':''}">${d.getDate()}</span>
+            <span class="dmonth">${MONTHS[d.getMonth()]}</span>
+            ${total?`<span class="dcount">${total}/${dayCap}</span>`:''}
+            ${isOpt?`<span style="font-size:7px;color:#7C3AED;font-weight:800">🧠</span>`:''}
           </div>
+          <div class="dh-toggles">${toggleBtns}</div>
         </div>
+        <!-- Row 2: action buttons (undo, merge, re-sort) -->
+        ${actionBtns?`<div class="dh-row2">${actionBtns}</div>`:''}
+        <!-- Row 3: confirm (full width, only when unconfirmed exist) -->
+        ${confirmBtn?`<div class="dh-row3">${confirmBtn}</div>`:''}
+        <!-- Drag handle -->
         ${total>0?`<div class="block-drag-handle${editMode?' edit-handle':''}" data-blockday="${i}"
-          title="${editMode?'Drag confirmed block to adjacent day — unconfirms & re-places':'Drag entire day to adjacent column'}">
-          ⣿ ${editMode?'Drag confirmed block':'Drag entire day block'}</div>`:''}
+          title="${editMode?'Drag confirmed block to adjacent day':'Drag day to adjacent column'}"
+          style="margin-top:3px;font-size:8px;padding:2px 5px">
+          ⣿ ${editMode?'Confirmed block':'Drag block'}</div>`:''}
       </div>
       <div class="dbody" id="db-${i}">`;
 
