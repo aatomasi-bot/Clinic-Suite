@@ -5797,37 +5797,55 @@ function openNoRepeatsModal(pats) {
 function sendConsolidatedEmail() {
   const pats = window._nrPatients || [];
   if (!pats.length) return;
-  const today  = new Date().toLocaleDateString('en-CA',{month:'long',day:'numeric',year:'numeric'});
-  const to     = 'reports@medicum.ca';
-  const from   = 'abdulmedicum@yahoo.com';
-  const subj   = encodeURIComponent('No More Repeats — ' + pats.length + ' Patient' + (pats.length>1?'s':'') + ' — ' + today);
-  // Use \r\n (CRLF) for mailto body — more compatible with email clients
-  const CRLF = '\r\n';
-  const lines  = pats.map(p =>
-    '\u2022 ' + (p['Patient Name']||'') + '   |   File #' + (p['File Number']||'')
-  ).join(CRLF);
-  const body   = encodeURIComponent(
-    'Hello,' +
-    CRLF + CRLF +
-    'Please be advised that the following patient' + (pats.length > 1 ? 's have' : ' has') +
-    ' no more repeats left as per the pharmacy label.' +
-    CRLF + CRLF +
-    lines +
-    CRLF + CRLF +
-    'Please contact the doctor\u2019s office for the continuity of their treatment.' +
-    CRLF + CRLF +
-    'Thank you!' +
-    CRLF + CRLF +
-    'Regards,' +
-    CRLF + CRLF +
-    'Abdul'
+  const today = new Date().toLocaleDateString('en-CA',{month:'long',day:'numeric',year:'numeric'});
+  const to    = 'reports@medicum.ca';
+
+  // Subject line
+  const subj  = encodeURIComponent(
+    'No More Repeats \u2014 ' + pats.length + ' Patient' + (pats.length > 1 ? 's' : '') +
+    ' \u2014 ' + today
   );
+
+  // Yahoo Mail compose URL uses %0A (\n) for line breaks, NOT %0D%0A
+  // Using \r\n encodes to %0D%0A which Yahoo Mail ignores, collapsing everything to one line
+  const NL = '\n';
+
+  // One patient per line with bullet, file number, dose
+  const patientLines = pats.map(p =>
+    '\u2022 ' +
+    (p['Patient Name'] || '') +
+    '  |  File #' + (p['File Number'] || '') +
+    (p['Dose Prescribed'] ? '  |  ' + p['Dose Prescribed'] + 'mg' : '')
+  ).join(NL);
+
+  // Full email body — blank line = two \n
+  const rawBody =
+    'Hello,' +
+    NL + NL +
+    'Please be advised that the following patient' +
+    (pats.length > 1 ? 's have' : ' has') +
+    ' no more repeats left as per the pharmacy label.' +
+    NL + NL +
+    patientLines +
+    NL + NL +
+    'Please contact the doctor\u2019s office for the continuity of their treatment.' +
+    NL + NL +
+    'Thank you!' +
+    NL + NL +
+    'Regards,' +
+    NL + NL +
+    'Abdul';
+
+  const body = encodeURIComponent(rawBody);
+
+  // Yahoo Mail compose URL — 'from' param is not supported, omit it
   const url = 'https://compose.mail.yahoo.com/?to=' + encodeURIComponent(to)
-            + '&from=' + encodeURIComponent(from)
-            + '&subject=' + subj + '&body=' + body;
+            + '&subject=' + subj
+            + '&body=' + body;
+
   window.open(url, '_blank');
   closeModal('noRepeatsModal');
-  toast('Email draft opened for ' + pats.length + ' patients', 'success', '📧');
+  toast('Email draft opened for ' + pats.length + ' patient' + (pats.length > 1 ? 's' : ''), 'success', '\ud83d\udce7');
 }
 
 // ── End of Day modal ──
