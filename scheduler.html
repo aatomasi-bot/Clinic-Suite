@@ -106,24 +106,36 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 .dcol{display:flex;flex-direction:column;border-right:1px solid var(--b);min-height:0}
 .dcol:last-child{border-right:none}
 .dhdr{background:var(--card2);border-bottom:1px solid var(--b);
-  padding:8px 10px;position:sticky;top:0;z-index:10;flex-shrink:0}
+  padding:6px 8px;position:sticky;top:0;z-index:10;flex-shrink:0}
 .dhdr.has{background:var(--tl);border-bottom-color:var(--teal)}
 .dhdr.locked-hdr{background:rgba(232,162,58,.07);border-bottom-color:var(--amber)}
 .dhdr.edit-hdr{background:rgba(224,90,90,.06);border-bottom-color:var(--re)}
-.dh-top{display:flex;align-items:flex-start;justify-content:space-between;gap:4px}
-.dh-left .dname{font-size:9px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--t2)}
-.dh-left .ddate{font-size:22px;font-weight:800;color:var(--t);line-height:1}
+.dhdr.cluster-day{background:rgba(124,58,237,.08);border-bottom-color:#7C3AED}
+/* Row 1: date + toggles */
+.dh-row1{display:flex;align-items:center;justify-content:space-between;gap:4px;margin-bottom:4px}
+.dh-left{display:flex;align-items:baseline;gap:6px;flex:1;min-width:0}
+.dh-left .dname{font-size:8px;font-weight:800;letter-spacing:.7px;
+  text-transform:uppercase;color:var(--t2);white-space:nowrap}
+.dh-left .ddate{font-size:18px;font-weight:800;color:var(--t);line-height:1}
 .dh-left .ddate.today-date{color:var(--teal)}
-.dh-left .dinfo{font-size:10px;color:var(--t2)}
+.dh-left .dmonth{font-size:9px;color:var(--t2)}
+.dh-left .dcount{font-size:9px;color:var(--teal);font-weight:700;margin-left:2px}
+.dh-toggles{display:flex;gap:3px;align-items:center;flex-shrink:0}
+/* Row 2: action buttons */
+.dh-row2{display:flex;gap:3px;flex-wrap:nowrap;align-items:center}
+/* Row 3: confirm (full width) */
+.dh-row3{margin-top:3px}
+.dh-top{display:flex;align-items:flex-start;justify-content:space-between;gap:4px}
+.dh-left .dinfo{font-size:9px;color:var(--t2)}
 .dh-right{display:flex;flex-direction:column;gap:3px;align-items:flex-end;flex-shrink:0}
-.btn-sm{border:none;border-radius:5px;padding:3px 7px;font-size:9px;font-weight:700;
-  cursor:pointer;font-family:inherit;white-space:nowrap;transition:all .15s}
+.btn-sm{border:none;border-radius:4px;padding:2px 5px;font-size:8px;font-weight:700;
+  cursor:pointer;font-family:inherit;white-space:nowrap;transition:all .15s;line-height:1.4}
 .btn-lock{background:rgba(232,162,58,.15);color:var(--amber);border:1px solid rgba(232,162,58,.35)}
 .btn-lock:hover{background:var(--amber);color:#fff}
 .btn-undo{background:rgba(224,90,90,.12);color:var(--re);border:1px solid rgba(224,90,90,.3)}
 .btn-undo:hover{background:var(--re);color:#fff}
 .btn-conf-day{background:linear-gradient(135deg,var(--teal),var(--td));color:#fff;
-  border:none;margin-top:4px;width:100%}
+  border:none;width:100%;font-size:9px;padding:4px 6px;border-radius:5px}
 .btn-conf-day:hover{opacity:.88}
 
 /* ── DAY BODY ────────────── */
@@ -292,9 +304,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   align-items:center;justify-content:center;flex-direction:column;
   gap:14px;padding:32px;z-index:200;text-align:center}
 .auth.show{display:flex}
-.auth h2{font-size:20px;font-weight:800}
-.auth p{font-size:14px;color:var(--t2);max-width:300px;line-height:1.6}
-.auth a{color:var(--teal);font-weight:700;text-decoration:none}
+.auth h2{font-size:22px;font-weight:800;color:var(--t)}
+.auth p{font-size:14px;color:var(--t2);max-width:340px;line-height:1.7}
+.auth a{font-weight:700;text-decoration:none}
 
 @media(max-width:700px){
   .layout{flex-direction:column}
@@ -309,10 +321,18 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 <body>
 
 <div class="auth" id="authScr">
-  <div style="font-size:48px">📅</div>
+  <div style="font-size:52px">📅</div>
   <h2>Sign in required</h2>
-  <p>Please sign in to VaPiq first.</p>
-  <a href="./index.html">← Back to VaPiq</a>
+  <p>Your session has expired or you haven't signed in yet.<br>
+  Sign in to VaPiq, then return here — the page will load automatically.</p>
+  <a href="./index.html" style="background:var(--teal);color:#fff;padding:12px 28px;
+    border-radius:10px;text-decoration:none;font-weight:700;font-size:15px;
+    display:inline-block;margin-top:4px">
+    → Sign in to VaPiq
+  </a>
+  <p style="font-size:11px;color:var(--t3);margin-top:12px" id="authWaiting">
+    Waiting for sign-in… this page will reload automatically.
+  </p>
 </div>
 
 <div class="topbar">
@@ -376,7 +396,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     </div>
     <div class="sbsearch">
       <input id="sq" type="search" placeholder="Search name, file#, address…" oninput="onSearch(this.value)">
-      <button class="addbtn" onclick="addOutside()">+ Add patient outside window</button>
+      <button class="addbtn" onclick="addOutside()">+ Add outside window</button>
 <div style="display:flex;gap:5px;margin-top:5px">
   <button class="addbtn" style="background:rgba(224,90,90,.15);color:var(--re);border:1px solid rgba(224,90,90,.4);flex:1"
     onclick="enterCancelMode()">🗑 Cancel Mode</button>
@@ -506,14 +526,49 @@ function mkDays(){
 // ════════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded',async()=>{
   _sb = window.supabase.createClient(SB_URL,SB_KEY);
+
+  // Try to get existing session
   const{data:{session}}=await _sb.auth.getSession();
-  if(!session){document.getElementById('authScr').classList.add('show');return;}
+
+  if(!session){
+    // Show auth screen
+    document.getElementById('authScr').classList.add('show');
+
+    // Auto-proceed when user signs in on another tab
+    // Method 1: Supabase auth state change
+    _sb.auth.onAuthStateChange((event,sess)=>{
+      if(sess&&event==='SIGNED_IN'){
+        document.getElementById('authScr').classList.remove('show');
+        bootApp();
+      }
+    });
+
+    // Method 2: localStorage storage event (cross-tab)
+    window.addEventListener('storage',e=>{
+      if(e.key&&e.key.includes('supabase')&&e.newValue){
+        // Supabase wrote a new auth token — retry
+        setTimeout(async()=>{
+          const{data:{session:s2}}=await _sb.auth.getSession();
+          if(s2){
+            document.getElementById('authScr').classList.remove('show');
+            bootApp();
+          }
+        },300);
+      }
+    });
+    return;
+  }
+
+  bootApp();
+});
+
+async function bootApp(){
   const saved=localStorage.getItem('vapiq_sched_theme')
     ||(window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark');
   document.documentElement.setAttribute('data-theme',saved);
-  windowStart=todayYMD();
+  if(!windowStart)windowStart=todayYMD();
   await reload();
-});
+}
 
 // ════════════════════════════════════════════════════════════
 // RELOAD  —  fetch DB, rebuild grid from scratch
@@ -731,47 +786,29 @@ function renderGrid(){
       }
     }
 
-    // Header buttons
-    let hdrBtns='';
-    if(conf.length){
-      hdrBtns+=`<button class="btn-sm btn-lock" onclick="toggleEdit(${i})">
-        ${editMode?'🔓 Editing':'🔒 Edit'}</button>`;
-    }
-    if(dayCirc==='A'&&total>0){
-      hdrBtns+=`<button class="btn-sm btn-cluster${isCluster?' active':''}"
-        onclick="toggleCluster(${i})" title="Cluster mode: extend cap to 18">
-        ${isCluster?'⊞ Cluster ×':'⊞ Cluster'}</button>`;
-    }
-    if(total>0){
-      hdrBtns+=`<button class="btn-sm btn-undo" onclick="undoDay(${i})">↩ Undo</button>`;
-    }
-    if(active.length>0){
-      hdrBtns+=`<button class="btn-sm btn-conf-day" onclick="confirmDay(${i})">
-        ✓ Confirm (${active.length})</button>`;
-    }
-    // Re-sort button — lime green, shown when active patients exist
-    if(active.length>0){
-      hdrBtns+=`<button class="btn-sm btn-resort"
-        onclick="resortDay(${i})"
-        title="Re-sort these patients by your circuit route order (step 0→6)">
-        ↺ Re-sort</button>`;
-    }
-    // Re-sort button (lime green) — after merge, re-apply circuit order
-    if(active.length>0){
-      hdrBtns+=`<button class="btn-sm btn-resort" onclick="resortDay(${i})"
-        title="Re-sort by circuit route step 0→6">↺ Re-sort</button>`;
-    }
-    // Merge buttons — show ← prev and → next eligibility
-    if(total>0){
-      const mL=i>0?checkMerge(i,i-1):null;
-      const mR=i<6?checkMerge(i,i+1):null;
-      if(mL) hdrBtns+=`<button class="btn-sm btn-merge${mL.ok?'':' disabled'}"
-        onclick="mergeDay(${i},${i-1})" title="${mL.ok?'Move all '+total+' patients to '+DAYS[(fromYMD(winD[i-1]).getDay()+6)%7]:mL.reason}">
-        ← Merge</button>`;
-      if(mR) hdrBtns+=`<button class="btn-sm btn-merge${mR.ok?'':' disabled'}"
-        onclick="mergeDay(${i},${i+1})" title="${mR.ok?'Move all '+total+' patients to '+DAYS[(fromYMD(winD[i+1]).getDay()+6)%7]:mR.reason}">
-        Merge →</button>`;
-    }
+    // ── Row 1 toggles: Edit lock + Cluster (compact icons) ──
+    const mL=i>0?checkMerge(i,i-1):null;
+    const mR=i<6?checkMerge(i,i+1):null;
+    const toggleBtns=[
+      conf.length?`<button class="btn-sm btn-lock" onclick="toggleEdit(${i})" title="${editMode?'Lock day':'Unlock to edit confirmed'}">
+        ${editMode?'🔓':'🔒'}</button>`:'',
+      dayCirc==='A'&&total>0?`<button class="btn-sm btn-cluster${isCluster?' active':''}"
+        onclick="toggleCluster(${i})" title="Cluster mode: cap → 18">⊞</button>`:'',
+    ].filter(Boolean).join('');
+
+    // ── Row 2 actions: Undo | ← Merge | Re-sort | Merge → ──
+    const actionBtns=[
+      total?`<button class="btn-sm btn-undo" onclick="undoDay(${i})" title="Undo all this day">↩</button>`:'',
+      mL?`<button class="btn-sm btn-merge${mL.ok?'':' disabled'}" onclick="mergeDay(${i},${i-1})"
+        title="${mL.ok?'Merge → '+DAYS[(fromYMD(winD[i-1]).getDay()+6)%7]:mL.reason}">← Mg</button>`:'',
+      active.length?`<button class="btn-sm btn-resort" onclick="resortDay(${i})" title="Re-sort by circuit step">↺</button>`:'',
+      mR?`<button class="btn-sm btn-merge${mR.ok?'':' disabled'}" onclick="mergeDay(${i},${i+1})"
+        title="${mR.ok?'Merge → '+DAYS[(fromYMD(winD[i+1]).getDay()+6)%7]:mR.reason}">Mg →</button>`:'',
+    ].filter(Boolean).join('');
+
+    // ── Row 3 confirm (full-width, prominent) ──
+    const confirmBtn=active.length?
+      `<button class="btn-conf-day" onclick="confirmDay(${i})">✓ Confirm (${active.length})</button>`:'';
 
     html+=`<div class="dcol" id="dc-${i}">
       <div class="${hdrCls}" id="dh-${i}">
@@ -1795,6 +1832,22 @@ async function assignToFitSlot(patId){
 
 function closeFitModal(){
   document.getElementById('fitModal').classList.remove('show');
+}
+
+// Find slot via search (when pool is empty)
+async function findSlotBySearch(){
+  const q=document.getElementById('sq').value.trim();
+  if(!q){
+    toast('Type a patient name or file # in the search box first');
+    document.getElementById('sq').focus();
+    return;
+  }
+  const ql=q.toLowerCase();
+  const match=allPats.find(p=>
+    (p.patient_name||'').toLowerCase().includes(ql)||
+    (p.file_number||'').toLowerCase()===ql);
+  if(!match){toast('Patient not found — check the name or file #');return;}
+  await findSlotForPatient(match.id);
 }
 
 // ════════════════════════════════════════════════════════════
