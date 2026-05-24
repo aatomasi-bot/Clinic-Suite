@@ -3480,7 +3480,8 @@ function getDueCounts() {
     const isToday = apptDate === today;
     const isFuture = apptDate && apptDate > today;
     const overdue = apptDate && apptDate < today && confirmed && !p['Injection Administered'];
-    if (isToday && confirmed) counts.today++;
+    if (isToday && confirmed && p['Injection Administered']) counts.administered++;
+    else if (isToday && confirmed) counts.today++;
     else if (isFuture && confirmed) counts.scheduled++;
     else if (overdue) counts.overdue++;
     else counts.all++;
@@ -3518,7 +3519,7 @@ function getFilteredPatients() {
     const isFuture = apptDate && apptDate > today;
     const overdue = apptDate && apptDate < today && confirmed && !p['Injection Administered'];
 
-    if (currentTab === 'today') return isToday && confirmed;
+    if (currentTab === 'today') return isToday && confirmed && !p['Injection Administered'];
     if (currentTab === 'scheduled') return isFuture && confirmed;
     if (currentTab === 'overdue') return !!overdue;
     if (currentTab === 'all') return !isToday && !isFuture && !overdue && !confirmed;
