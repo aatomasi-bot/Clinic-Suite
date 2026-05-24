@@ -3732,7 +3732,12 @@ function renderCard(p, idx) {
   const overdue = apptDate && apptDate < today && confirmed && !p['Injection Administered'];
   const dueStr = p['Due Date'];
   const dueDisplay = formatDate(dueStr || '');
-  const dueClass = dueStr === today ? '' : (dueStr < today ? 'card-due--overdue' : 'card-due--future');
+  // Don't show overdue badge if patient has a confirmed appointment (today or future)
+  const hasActiveAppt = confirmed && apptDate && apptDate >= today;
+  let dueClass = hasActiveAppt ? 'card-due--future'
+           : dueStr === today ? ''
+           : dueStr < today ? 'card-due--overdue'
+           : 'card-due--future';
   const _name = p['Patient Name'] || 'Unknown';
   const color = avatarColor(_name);
   const special = (p['Special Instructions'] || '').trim();
@@ -3740,8 +3745,7 @@ function renderCard(p, idx) {
   let cardClass = '';
   if (p['Archived'])                         cardClass = 'patient-card--archived';
   else if (p['Pending'])                     cardClass = 'patient-card--pending';
-  else if (overdue)                          cardClass = 'patient-card--overdue';
-  else if (apptDate === today && confirmed)  cardClass = 'patient-card--today';
+  else if (apptDate === today && confirmed)  cardClass = 'patient-card--today';   // today appointment always wins
   else if (apptDate && apptDate > today && confirmed) cardClass = 'patient-card--scheduled';
   else if (currentTab === 'all')             cardClass = 'patient-card--all';
   const cppClass  = p['CPP Patient'] ? 'patient-card--cpp' : '';
