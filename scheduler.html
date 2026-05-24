@@ -354,9 +354,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     <div id="loginErr" style="display:none;background:rgba(224,90,90,.12);
       border:1px solid rgba(224,90,90,.3);border-radius:7px;padding:9px 12px;
       font-size:12px;color:var(--re);text-align:center"></div>
+
+    <button onclick="doForgot()" style="background:none;border:none;
+      color:#4DD9D6;font-size:13px;cursor:pointer;font-weight:600;
+      margin-top:4px;font-family:inherit">Forgot password?</button>
   </div>
 
-  <a href="./index.html" style="margin-top:16px;font-size:11px;color:var(--t3);
+  <a href="./index.html" style="margin-top:12px;font-size:11px;color:var(--t3);
     text-decoration:none">← Back to VaPiq</a>
 </div>
 
@@ -586,6 +590,23 @@ document.addEventListener('DOMContentLoaded',async()=>{
 
   bootApp();
 });
+
+async function doForgot(){
+  const email=(document.getElementById('loginEmail').value||'').trim();
+  const err=document.getElementById('loginErr');
+  if(!email){
+    err.textContent='Enter your email above first, then click Forgot password.';
+    err.style.display='block';return;
+  }
+  const{error}=await _sb.auth.resetPasswordForEmail(email,{
+    redirectTo:window.location.href
+  });
+  err.style.color=error?'var(--re)':'#4DD9D6';
+  err.textContent=error
+    ?'Error: '+error.message
+    :'✓ Reset link sent to '+email+' — check your inbox.';
+  err.style.display='block';
+}
 
 async function doLogin(){
   const email=(document.getElementById('loginEmail').value||'').trim();
