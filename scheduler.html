@@ -890,7 +890,6 @@ function renderGrid(){
             ${isCluster?'<div class="cluster-badge" style="margin-top:2px">⊞ Cluster</div>':''}
             ${(()=>{const _op=loadPlan();return _op&&_op.asgn&&_op.asgn[ds]?'<div style="font-size:8px;color:#7C3AED;font-weight:800;margin-top:1px">🧠 opt</div>':''})()}
           </div>
-          <div class="dh-right">${hdrBtns}</div>
         </div>
         ${total>0?`<div class="block-drag-handle${editMode?' edit-handle':''}" data-blockday="${i}"
           title="${editMode?'Drag confirmed block to adjacent day — unconfirms & re-places':'Drag entire day to adjacent column'}">
