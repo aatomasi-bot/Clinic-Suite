@@ -893,6 +893,9 @@ function renderGrid(){
     const confirmBtn=active.length>0?
       `<button class="btn-conf-day" onclick="confirmDay(${i})">✓ Confirm (${active.length})</button>`:'';
 
+    // Optimizer badge for this day
+    const optPlan2=loadPlan();
+    const isOpt=!!(optPlan2&&optPlan2.asgn&&optPlan2.asgn[ds]);
     html+=`<div class="dcol" id="dc-${i}">
       <div class="${hdrCls}" id="dh-${i}">
         <!-- Row 1: compact date + toggles -->
