@@ -1228,7 +1228,8 @@ async function confirmDay(dayIdx){
     }
     // Signal index.html
     localStorage.setItem('vapiq_appts_updated',Date.now());
-    storeBatch(batchIds); // enable Undo Last Batch
+    const batchIds=toSave.map(p=>p.id); // track for Undo Last Batch
+    storeBatch(batchIds);
     toast(`✅ ${saved} confirmed for ${dayName}`,3000);
     // Reload this day from DB by triggering full reload
     await reload();
