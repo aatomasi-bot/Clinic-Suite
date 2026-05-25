@@ -121,3 +121,61 @@ When sharing a new route comparison:
 
 *Maintained by Claude. Part of VaPiq Clinical Suite.*
 *Last updated: May 25, 2026 — Vermette trigger rule added. Laval horseshoe circuit documented.*
+
+---
+
+## SATURDAY SPECIAL RULES
+
+> **Saturday is the INVERSE of weekday routing.**
+
+### Core Saturday Rule
+- **Start at the FARTHEST patient from home** — not the closest
+- First appointment = **8:00 AM** → leave home early enough to reach the far patient on time
+- Route sweeps progressively BACK toward home throughout the day
+- Last patients of the day are the ones closest to home (H4N area)
+- This way fatigue at end of day = short drive home
+
+### Saturday Arc Pattern (confirmed May 25, 2026 — 14-stop route)
+`Far west apex → West Island → LaSalle south → LaSalle → NDG → Verdun → Nun's Island → St-Henri → Westmount → Far east (Old Port) → Plateau → Villeray → Snowdon (end near home)`
+
+**Confirmed stop order:**
+1. 490 Av du Parc, Vaudreuil (J7V) ← **START — absolute farthest**
+2. 145 Av Cartier, Pointe-Claire (H9S)
+3. 8318 Av des Rapides, LaSalle (H8P)
+4. 6261 Rue Jogues, LaSalle (H4E)
+5. 2219 Av Prud'Homme, NDG (H4A)
+6. 779 Rue Hickson, Verdun (H4G)
+7. 325 Ch. Pointe-Sud, Nun's Island (H3E) ← after Verdun on Saturdays
+8. 2700 Rue Rufus-Rockhead, St-Henri (H3J)
+9. 464 Av Elm, Westmount (H3Y)
+10. 1000 Rue Commune Est, Old Port (H2L) ← far east visited mid-route
+11. 2547 Rue Chapleau, Plateau (H2K)
+12. 524 Rue Castelnau E, Villeray (H2R)
+13. 8511 Av Chateaubriand, Villeray (H2P)
+14. 4080 Av Kindersley, Snowdon (H4P) ← **END — closest to home**
+
+### How to Identify the "Farthest" Patient
+- Compare straight-line distance from H4N to each patient
+- Vaudreuil (J7V), Repentigny (J5Y), Mascouche (J7K), Brossard (J4W) = candidates for far starts
+- If two patients are equally far in opposite directions → pick the westernmost first (west→east sweep)
+
+### Saturday vs Weekday Comparison
+| Rule | Weekday | Saturday |
+|------|---------|----------|
+| Start | Near home (local first) | Farthest patient |
+| End | Far apex or north cluster | Near home (Snowdon/local) |
+| First appt | Morning, any time | 8:00 AM |
+| Direction | Home → outward | Outward → home |
+
+---
+
+## ROUTE COMPARISONS LOG (updated)
+
+| # | Date | Route | Key learning | In scheduler? |
+|---|------|-------|--------------|---------------|
+| 1 | May 24, 2026 | Jun 10 Montreal | South Shore middle; far east last; home base error corrected | ❌ Pending |
+| 2 | May 24, 2026 | Same 12 Montreal addresses | North last confirmed; J5Y apex confirmed; home = H4N confirmed | ❌ Pending |
+| 3 | May 25, 2026 | 9-stop Laval/NE circuit | Horseshoe shape; Vermette = stop #1 rule | ❌ Pending |
+| 4 | May 25, 2026 | 14-stop Saturday Jun 6 | **Saturday rule: start farthest, end near home; 8 AM first patient** | ❌ Pending |
+
+*Last updated: May 25, 2026 — Saturday routing rules added.*
