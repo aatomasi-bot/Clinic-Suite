@@ -389,10 +389,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     <h3>🧠 Route Optimizer</h3>
     <p>Planning 2 weeks — Circuit A: Montreal Inner · Circuit B: Fri border+Laval+West Island</p>
     <div class="opt-bar"><div class="opt-fill" id="optFill"></div></div>
-    <div class="opt-step" id="os1">⏳ Classifying patients by zone…</div>
-    <div class="opt-step" id="os2">⏳ Planning days &amp; circuits…</div>
-    <div class="opt-step" id="os3">⏳ Sorting routes by step order…</div>
-    <div class="opt-step" id="os4">⏳ Balancing capacity limits…</div>
+    <div class="opt-step" id="os1">⏳ Classifying patients by zone &amp; circuit…</div>
+    <div class="opt-step" id="os2">⏳ Assigning patients · geographic affinity scoring…</div>
+    <div class="opt-step" id="os3">⏳ Consolidating geographic clusters…</div>
+    <div class="opt-step" id="os4">⏳ Sorting routes · balancing caps…</div>
     <div class="opt-summary" id="optSummary" style="display:none"></div>
     <button class="opt-close" id="optClose" onclick="closeOptModal()" style="display:none">
       ✓ Apply to Scheduler
@@ -1519,78 +1519,134 @@ function buildSlots(fromDate){
   });
 }
 
+// ════════════════════════════════════════════════════════════
+// VERMETTE TRIGGER RULE
+// 32 Rue Vermette, Saint-Eustache → always placed FIRST on its day
+// regardless of step order. All other Vermette addresses unaffected.
+// ════════════════════════════════════════════════════════════
+function applyVermetteRule(patients){
+  const idx=patients.findIndex(p=>
+    /\b32\b[^,]*vermette|vermette[^,]*\b32\b/i.test(p.address||''));
+  if(idx>0)patients.unshift(patients.splice(idx,1)[0]);
+}
+
+// ════════════════════════════════════════════════════════════
+// RUN PLANNER — Proactive Day-Centric Route Builder
+// ════════════════════════════════════════════════════════════
+// APPROACH: day-centric greedy merge (not patient-by-patient)
+//
+// Old approach (broken): each patient independently picks nearest day
+//   → scatters patients thinly, creates many 1-2 patient "routes"
+//
+// New approach (proactive merge):
+//   REPEAT:
+//     Score every work day by how many unplaced patients it can absorb
+//     Fill the highest-scoring day with ALL its compatible patients (up to cap)
+//     Mark placed, recalculate scores
+//   UNTIL no more patients can be placed
+//
+// Within each day, patients are sorted by confirmed route step order:
+//   Circuit A weekday  → step ascending  (NDG→Lachine→…→Anjou→Mtl-Est)
+//   Circuit A Saturday → step descending (farthest first, local last)
+//   Circuit B Friday   → step ascending  (home border→Ahuntsic→Laval→WI)
+//   + Vermette trigger (32 Rue Vermette always stop #1 on its day)
+// ════════════════════════════════════════════════════════════
 function runPlanner(pats,fromDate){
   const slots=buildSlots(fromDate);
   const confIds=new Set(pats.filter(p=>p.appointment_confirmed).map(p=>p.id));
   const rangeStart=addDays(fromYMD(fromDate),-WIN);
   const rangeEnd  =addDays(fromYMD(fromDate),13+WIN);
 
+  // ── Classify & filter eligible patients ──────────────────
   const eligible=pats
     .filter(p=>{
       if(confIds.has(p.id)||!p.due_date)return false;
       const d=fromYMD(p.due_date);
       return d>=rangeStart&&d<=rangeEnd;
     })
-    .map(p=>({...p,_cl:optClassify(p)}))
-    .sort((a,b)=>a.due_date.localeCompare(b.due_date));
+    .map(p=>({...p,_cl:optClassify(p)}));
 
   const placed=new Set();
 
-  // ── Pass 1: assign each patient to best circuit day ──────
-  eligible.forEach(p=>{
-    if(placed.has(p.id))return;
-    const{c,isSS,isWI}=p._cl;
-    const cands=slots.filter(sl=>{
-      if(!sl.isWork||sl.patients.length>=sl.cap)return false;
+  // ── Helper: patients that can go on slot sl ───────────────
+  function candidatesFor(sl){
+    return eligible.filter(p=>{
+      if(placed.has(p.id))return false;
       if(Math.abs(dayDiff(sl.date,p.due_date))>WIN)return false;
-      if(isSS)return true;              // South Shore → any day (prefer Sat)
-      if(isWI)return true;              // West Island → any circuit day (flexible)
-      return sl.circ===c;               // Normal → must match circuit
-    }).sort((a,b)=>{
-      if(isSS){                         // Prefer Saturday for South Shore
-        const s=a.dow===6?-1:0,t=b.dow===6?-1:0;
-        if(s!==t)return s-t;
-      }
-      if(isWI){                         // Prefer prior Friday for West Island
-        const af=a.dow===5&&dayDiff(a.date,p.due_date)<=0?-1:0;
-        const bf=b.dow===5&&dayDiff(b.date,p.due_date)<=0?-1:0;
-        if(af!==bf)return af-bf;
-      }
-      return Math.abs(dayDiff(a.date,p.due_date))-Math.abs(dayDiff(b.date,p.due_date));
+      const{c,isSS,isWI}=p._cl;
+      if(isSS)return sl.dow===6||sl.dow===2||sl.dow===3||sl.dow===4; // SS: prefer Sat/weekday A
+      if(isWI)return sl.dow===5||sl.dow===6; // West Island: prefer Fri or Sat
+      return c===sl.circ;
     });
-    if(!cands.length)return;
-    cands[0].patients.push(p);
-    placed.add(p.id);
-  });
+  }
 
-  // ── Pass 2: validate mixed circuit rule on Fridays ───────
+  // ── Helper: day score ─────────────────────────────────────
+  // More candidates = higher score.
+  // Tie-break: day closest to median due-date of its candidates wins.
+  function scoreSlot(sl,cands){
+    if(!cands.length)return-1;
+    const room=sl.cap-sl.patients.length;
+    const effective=Math.min(cands.length,room); // can't exceed cap
+    const medDist=cands.reduce((s,p)=>s+Math.abs(dayDiff(sl.date,p.due_date)),0)/cands.length;
+    return effective*100-medDist; // patients fill is primary, due-date proximity is tie-break
+  }
+
+  // ── PROACTIVE MERGE LOOP ──────────────────────────────────
+  // Keep filling the "richest" day until nothing left to place.
+  const MAX_ROUNDS=200;
+  for(let round=0;round<MAX_ROUNDS;round++){
+    // Score all work slots with remaining capacity
+    const scored=slots
+      .filter(sl=>sl.isWork&&sl.patients.length<sl.cap)
+      .map(sl=>{
+        const cands=candidatesFor(sl);
+        return{sl,cands,score:scoreSlot(sl,cands)};
+      })
+      .filter(x=>x.score>=0)
+      .sort((a,b)=>b.score-a.score);
+
+    if(!scored.length)break; // nothing more to place
+
+    const{sl,cands}=scored[0];
+    const isSat=sl.dow===6;
+    const room=sl.cap-sl.patients.length;
+
+    // Sort candidates by confirmed route step order
+    cands.sort((a,b)=>isSat?(b._cl.s-a._cl.s):(a._cl.s-b._cl.s));
+
+    // Place up to available room
+    cands.slice(0,room).forEach(p=>{
+      sl.patients.push(p);
+      placed.add(p.id);
+    });
+  }
+
+  // ── Pass 2: Friday circuit guard ─────────────────────────
+  // If a Friday accidentally received Circuit A patients that don't
+  // qualify as river-bank mixed, move them to a Circuit A day.
   slots.filter(sl=>sl.dow===5).forEach(fri=>{
-    const mtl=fri.patients.filter(p=>p._cl.c==='A'&&!p._cl.isRB);
-    const rb =fri.patients.filter(p=>p._cl.isRB);
-    const mixOK=mtl.length>=3&&fri.patients.length<7&&rb.length>=3&&rb.length<=5;
-    if(!mixOK&&mtl.length>0){
+    const mtl=fri.patients.filter(p=>p._cl.c==='A'&&!p._cl.isRB&&!p._cl.isSS);
+    if(mtl.length){
       mtl.forEach(p=>{
         fri.patients=fri.patients.filter(x=>x.id!==p.id);
         const alt=slots.find(sl=>sl.circ==='A'&&sl.isWork&&sl!==fri&&
           sl.patients.length<sl.cap&&Math.abs(dayDiff(sl.date,p.due_date))<=WIN);
-        if(alt)alt.patients.push(p);
+        if(alt){alt.patients.push(p);}
       });
     }
   });
 
-  // ── Pass 3: sort each day by circuit step ─────────────────
-  // Saturday (dow=6): descending step = farthest patient FIRST, local last
-  // Weekdays: ascending step = local/NDG first, Mtl-Est last
+  // ── Pass 3: Route sort + special trigger rules ────────────
   slots.forEach(sl=>{
     const isSat=sl.dow===6;
-    sl.patients.sort((a,b)=>{
-      const sa=a._cl.s;
-      const sb=b._cl.s;
-      return isSat?(sb-sa):(sa-sb);
-    });
+    // Step sort: ascending weekday, descending Saturday
+    sl.patients.sort((a,b)=>isSat?(b._cl.s-a._cl.s):(a._cl.s-b._cl.s));
+    // Vermette trigger: 32 Rue Vermette always goes first regardless of step
+    applyVermetteRule(sl.patients);
   });
 
-  // ── Pass 4: balance capacity overflow ────────────────────
+  // ── Pass 4: Overflow safety net ───────────────────────────
+  // Shouldn't be needed (proactive loop respects caps) but kept as guard.
   slots.forEach((sl,si)=>{
     if(sl.patients.length<=sl.cap)return;
     const overflow=sl.patients.splice(sl.cap);
@@ -1649,10 +1705,10 @@ async function optimizeRoutes(){
       allPats=data||[];
     }
     await prog(1,'Classifying by zone & circuit…',20);
-    await prog(2,'Planning 14 days…',45);
+    await prog(2,'Assigning with geographic affinity…',40);
     const plan=runPlanner(allPats,windowStart);
-    await prog(3,'Sorting by route step…',70);
-    await prog(4,'Balancing caps…',90);
+    await prog(3,'Consolidating geographic clusters…',70);
+    await prog(4,'Sorting routes &amp; balancing caps…',90);
     storePlan(plan);
     if(fill)fill.style.width='100%';
     const placed=plan.reduce((s,d)=>s+d.patients.length,0);
@@ -1741,16 +1797,16 @@ async function mergeDay(fromIdx,toIdx){
 function resortDay(dayIdx){
   const active=days[dayIdx].active;
   if(!active.length){toast('No unconfirmed patients to sort');return;}
-  const dayName=DAYS[(fromYMD(windowDates()[dayIdx]).getDay()+6)%7];
-  // Sort by circuit step — same logic as optimizer pass 3
+  const dow=fromYMD(windowDates()[dayIdx]).getDay();
+  const dayName=DAYS[(dow+6)%7];
+  const isSat=dow===6;
   active.sort((a,b)=>{
     const ca=optClassify(a),cb=optClassify(b);
-    const sa=ca.s;  // Use actual step (South Shore = step 4, middle — not first)
-    const sb=cb.s;
-    return sa-sb;
+    return isSat?(cb.s-ca.s):(ca.s-cb.s);
   });
+  applyVermetteRule(active);
   renderGrid();
-  toast(`↺ ${dayName} re-sorted by circuit route order`);
+  toast(`↺ ${dayName} re-sorted by route order${isSat?' (Sat: farthest first)':''}`);
 }
 
 // ── Cluster mode toggle ───────────────────────────────────────
@@ -1831,14 +1887,16 @@ async function undoLastBatch(){
 function resortDay(dayIdx){
   const active=days[dayIdx].active;
   if(!active.length){toast('No unconfirmed patients to re-sort');return;}
-  const dayName=DAYS[(fromYMD(windowDates()[dayIdx]).getDay()+6)%7];
+  const dow=fromYMD(windowDates()[dayIdx]).getDay();
+  const dayName=DAYS[(dow+6)%7];
+  const isSat=dow===6;
   active.sort((a,b)=>{
     const ca=optClassify(a),cb=optClassify(b);
-    const isSat=fromYMD(windowDates()[dayIdx]).getDay()===6;
     return isSat?(cb.s-ca.s):(ca.s-cb.s);
   });
+  applyVermetteRule(active);
   renderGrid();
-  toast('↺ '+dayName+' re-sorted by circuit route order');
+  toast('↺ '+dayName+' re-sorted by route order'+(isSat?' (Sat: farthest first)':''));
 }
 
 // ════════════════════════════════════════════════════════════
