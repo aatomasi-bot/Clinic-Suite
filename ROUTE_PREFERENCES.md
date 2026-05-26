@@ -179,3 +179,77 @@ When sharing a new route comparison:
 | 4 | May 25, 2026 | 14-stop Saturday Jun 6 | **Saturday rule: start farthest, end near home; 8 AM first patient** | ❌ Pending |
 
 *Last updated: May 25, 2026 — Saturday routing rules added.*
+
+---
+
+## CIRCUIT SEPARATION RULES (new — May 25, 2026)
+
+When a day has too many patients, split by circuit. Each circuit runs on a specific day type.
+
+---
+
+### CIRCUIT A — Montreal Inner
+**Day**: Mon/Tue/Wed/Thu (non-Friday weekday)
+**FSAs covered**: H3W, H4B, H8S, H8R, H3E, H4C, H4G, H3J, H3H, H2X, H2V, H2T, H1Y, H1X, H1J, H1B, J5R (south shore)
+**Does NOT include**: near-home (H4N, H4R), Ahuntsic (H2B, H1Z), Laval (H7V), Pierrefonds (H8Z), West Island (J7W)
+
+**Confirmed step order (Image 1 — May 25, 2026):**
+| Step | FSA | Neighbourhood |
+|------|-----|---------------|
+| 1 | H3W | NDG / Côte-St-Luc |
+| 2 | H4B | NDG south / Cavendish |
+| 3 | H8S | Lachine |
+| 4 | H8R | LaSalle |
+| 5 | J5R | South Shore (La Prairie) — middle |
+| 6 | H3H | Downtown W / Westmount |
+| 7 | H2X | Downtown Sherbrooke O |
+| 8 | H2V | Outremont |
+| 9 | H2T | Plateau |
+| 10 | H1Y, H1X | Rosemont |
+| 11 | H1J | Anjou |
+| 12 | H1B | Montréal-Est ← **FAR EAST apex, absolute last** |
+
+> ⚠️ CORRECTION: Previous rule said "H2V (Outremont) is last" — THIS WAS WRONG.
+> H2V is late (step 8) but FAR EAST (H1B Montréal-Est, H1J Anjou) is the true last cluster.
+> H2V only appears "last" on days where there are no H1B/H1J patients.
+
+---
+
+### CIRCUIT B — Friday / Laval + Montreal Border + West Island
+**Day**: Friday (and overflow days when needed)
+**User's rule**: *"I start in Montreal, enter Laval, finish in West Island"*
+**FSAs covered**: H4N, H4R (near home / Montreal border) + H1Z, H2B (Ahuntsic) + H7V (west Laval) + H8Z (Pierrefonds) + J7W (Pincourt / West Island)
+
+**Confirmed step order (Image 2 — May 25, 2026):**
+| Step | FSA | Neighbourhood |
+|------|-----|---------------|
+| 1 | H4R, H4N | Near home / Montreal border — START |
+| 2 | H1Z | Villeray / Ahuntsic north |
+| 3 | H2B | Ahuntsic / Gouin Est |
+| 4 | H7V | West Laval (Belle-Rive) ← cross to Laval |
+| 5 | H8Z | Pierrefonds / Gouin Ouest ← back on island west |
+| 6 | J7W | Pincourt / West Island ← **FAR WEST, absolute last** |
+
+**Shape**: Montreal border (home area) → north Ahuntsic → cross to Laval → swing west Pierrefonds → far West Island
+
+---
+
+### CIRCUIT C — Laval + Northeast (previously documented)
+**Day**: Varies (often paired with Friday or a separate day)
+**FSAs covered**: Laval (H7L, H7N, H7G, H7K etc.) + Saint-Eustache (J7P, J7R) + Deux-Montagnes (J0N) + Terrebonne (J6W) + Mascouche (J7K)
+**Special rule**: 32 Rue Vermette = always stop #1 when present
+
+---
+
+## UPDATED ROUTE COMPARISONS LOG
+
+| # | Date | Circuit | Key learning | Applied? |
+|---|------|---------|--------------|----------|
+| 1 | May 24 | Montreal | South Shore middle; north last | ❌ |
+| 2 | May 24 | Montreal | H4N home confirmed; north last confirmed | ❌ |
+| 3 | May 25 | Laval/NE | Horseshoe; Vermette = stop #1 | ❌ |
+| 4 | May 25 | Saturday | Start farthest; end near home; 8 AM | ❌ |
+| 5 | May 25 | Montreal Inner | H1B/H1J = true last; H2V is step 8 not last | ❌ |
+| 6 | May 25 | Friday | Start Montreal border → Laval → West Island end | ❌ |
+
+*Last updated: May 25, 2026 — Circuit A/B/C separation rules added. H2V "last" error corrected.*
