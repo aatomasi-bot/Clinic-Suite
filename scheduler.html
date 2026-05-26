@@ -387,7 +387,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 <div class="opt-modal" id="optModal">
   <div class="opt-box">
     <h3>🧠 Route Optimizer</h3>
-    <p>Planning 2 weeks based on your circuits &amp; rules…</p>
+    <p>Planning 2 weeks — Circuit A: Montreal Inner · Circuit B: Fri border+Laval+West Island</p>
     <div class="opt-bar"><div class="opt-fill" id="optFill"></div></div>
     <div class="opt-step" id="os1">⏳ Classifying patients by zone…</div>
     <div class="opt-step" id="os2">⏳ Planning days &amp; circuits…</div>
@@ -658,7 +658,7 @@ async function reload(){
     pool=[];
     // Declare winDates FIRST, then use it everywhere
     const winDates=windowDates();  // ['2026-06-09','2026-06-10',...]
-    // Set circuit per day (Friday=Laval/NS, all others=Montreal)
+    // Set circuit per day (Fri=Border+Laval+West Island [B], else Montreal Inner [A])
     winDates.forEach((ds,i)=>{
       days[i].circ=fromYMD(ds).getDay()===5?'B':'A';
     });
@@ -1392,40 +1392,102 @@ function esc(s){return String(s||'').replace(/[&<>"']/g,c=>
 // Circuits, start points, cap rules, FSA classification
 // ════════════════════════════════════════════════════════════
 
-const OPT_STARTS={6:'H4N',_:'H4J'}; // Sat=H4N, else H4J
+const OPT_STARTS={_:'H4N'}; // Home always H4N 1N4 (Cartierville) — confirmed May 2026
 let clusterDays=new Set(); // day indices with cluster mode enabled (cap 18)
 
-// FSA3: 3-char postal prefix → {c:circuit, s:step}
-// Circuit A=Montreal(Tue-Thu,Sat)  B=Laval/NorthShore(Fri)
-// Steps 0-6 define route order within circuit
+// ── ROUTE CLASSIFICATION ─────────────────────────────────────
+// Home base: H4N 1N4, Cartierville/Saint-Laurent
+// Circuit A = Montreal Inner  (Tue–Thu + Sat)
+// Circuit B = Friday circuit  (Montreal border H4N/H4R + Ahuntsic + Laval + West Island)
+//
+// CIRCUIT A step order (confirmed from MapQuest comparisons):
+//   1→NDG/Côte-St-Luc  2→NDG-south/Cavendish  3→Lachine/LaSalle + Nun's Island
+//   4→Verdun/St-Henri + South Shore(middle)  5→Downtown/Westmount/CDN
+//   6→Snowdon/NDG-upper  7→Outremont + Plateau  8→Rosemont
+//   9→Ahuntsic/Park-Ex/Chabanel  10→Anjou  11→Montréal-Est (FAR EAST — absolute last)
+//
+// CIRCUIT B step order (confirmed — Image 2, May 25 2026):
+//   1→near home (H4N/H4R border)  2→Ahuntsic north (H1Z/H2B)
+//   3→Laval (H7x)  4→Pierrefonds/Saint-Eustache (H8Z/J7P/J7R)
+//   5→West Island + Pincourt (H9x/J7W) — FAR WEST — absolute last
+//
+// SATURDAY rule: sort descending by step (farthest first, local last)
+// SOUTH SHORE correction: step 4 (middle), NOT step 0 (was wrong)
+// H8S/H8T/H8Y = Lachine → Circuit A (were wrongly in Circuit B)
+// H4N/H4R/H2B/H1Z → Circuit B (were wrongly in Circuit A)
+// ────────────────────────────────────────────────────────────
+
 const FSA3={
-  'H2B':{c:'A',s:6},'H2C':{c:'A',s:6},'H2M':{c:'A',s:6},'H2N':{c:'A',s:6},
-  'H3L':{c:'A',s:6},'H3M':{c:'A',s:6},'H3N':{c:'A',s:6},
-  'H4J':{c:'A',s:6},'H4K':{c:'A',s:6},'H4L':{c:'A',s:6},
-  'H4M':{c:'A',s:6},'H4N':{c:'A',s:6},'H4R':{c:'A',s:6},'H4S':{c:'A',s:6},
-  'J5Y':{c:'A',s:5},'J5Z':{c:'A',s:5},'J6A':{c:'A',s:5},
-  'J6Y':{c:'A',s:5},'J6Z':{c:'A',s:5}, // Terrebonne E → near Repentigny
-  'J6W':{c:'B',s:2},'J6X':{c:'B',s:2}, // Terrebonne W → Laval circuit
-  'J7K':{c:'B',s:2}, // Mascouche
-  'J7C':{c:'B',s:3},'J7E':{c:'B',s:3},'J7G':{c:'B',s:3},'J7H':{c:'B',s:3},
-  'J7P':{c:'B',s:4},'J7R':{c:'B',s:4},'J7V':{c:'B',s:4},'J7X':{c:'B',s:4},
-  'H8S':{c:'B',s:5},'H8T':{c:'B',s:5},'H8Y':{c:'B',s:5},'H8Z':{c:'B',s:5},
+  // ══ CIRCUIT B — Friday: Montreal Border + Laval + West Island ══
+  // Step 1: Near home / Montreal–Laval border — START of Friday route
+  'H4N':{c:'B',s:1},'H4R':{c:'B',s:1},
+  'H4J':{c:'B',s:1},'H4K':{c:'B',s:1},'H4L':{c:'B',s:1},
+  // Step 2: Ahuntsic north (Gouin Est, 25e Ave)
+  'H2B':{c:'B',s:2},'H1Z':{c:'B',s:2},
+  // Step 3: Laval specifics (H7V confirmed — west Laval)
+  'H7V':{c:'B',s:3},'H7W':{c:'B',s:3},
+  // Step 4: Pierrefonds + Saint-Eustache cluster
+  'H8Z':{c:'B',s:4},                                     // Pierrefonds (confirmed)
+  'J7P':{c:'B',s:4},'J7R':{c:'B',s:4},'J7V':{c:'B',s:4},'J7X':{c:'B',s:4}, // Saint-Eustache
+  'J7C':{c:'B',s:3},'J7E':{c:'B',s:3},'J7G':{c:'B',s:3},'J7H':{c:'B',s:3}, // Deux-Montagnes area
+  'J7K':{c:'B',s:3},                                     // Mascouche
+  'J6W':{c:'B',s:3},'J6X':{c:'B',s:3},                  // Terrebonne W
+  // Step 5: West Island + Pincourt — FAR WEST, absolute last on Friday
+  'J7W':{c:'B',s:5},                                     // Pincourt (confirmed)
   'H9A':{c:'B',s:5},'H9B':{c:'B',s:5},'H9C':{c:'B',s:5},'H9E':{c:'B',s:5},
   'H9G':{c:'B',s:5},'H9H':{c:'B',s:5},'H9J':{c:'B',s:5},'H9K':{c:'B',s:5},
   'H9P':{c:'B',s:5},'H9R':{c:'B',s:5},'H9S':{c:'B',s:5},'H9W':{c:'B',s:5},'H9X':{c:'B',s:5},
+
+  // ══ CIRCUIT A — Montreal Inner ══
+  // Step 1: NDG / Côte-St-Luc — first cluster after home departure
+  'H3W':{c:'A',s:1},'H4A':{c:'A',s:1},
+  // Step 2: NDG south / Cavendish
+  'H4B':{c:'A',s:2},
+  // Step 3: Lachine + LaSalle + Nun's Island (H3E early — confirmed rule)
+  'H8S':{c:'A',s:3},'H8R':{c:'A',s:3},'H8P':{c:'A',s:3},'H8N':{c:'A',s:3},
+  'H8T':{c:'A',s:3},'H8Y':{c:'A',s:3},                  // fixed: was wrongly Circuit B
+  'H3E':{c:'A',s:3},                                     // Nun's Island — early rule
+  // Step 4: Verdun / St-Henri + South Shore (middle — confirmed NOT first)
+  'H4G':{c:'A',s:4},'H4C':{c:'A',s:4},'H4E':{c:'A',s:4},
+  'H3J':{c:'A',s:4},                                     // St-Henri
+  'J5R':{c:'A',s:4},'J4W':{c:'A',s:4},'J4G':{c:'A',s:4}, // South Shore — middle step 4
+  // Step 5: Downtown W + Westmount + CDN
+  'H3H':{c:'A',s:5},'H3Y':{c:'A',s:5},                  // Westmount / Sherbrooke W
+  'H3T':{c:'A',s:5},'H3S':{c:'A',s:5},'H3X':{c:'A',s:5}, // CDN
+  // Step 6: Downtown + Snowdon
+  'H2X':{c:'A',s:6},                                     // Sherbrooke O / downtown
+  'H4P':{c:'A',s:6},                                     // Snowdon
+  // Step 7: Outremont + Plateau/HoMa — NOT last (H1B/H1J are later)
+  'H2V':{c:'A',s:7},                                     // Outremont (fixed: was "last")
+  'H2T':{c:'A',s:7},'H2K':{c:'A',s:7},                  // Plateau / HoMa
+  // Step 8: Rosemont
+  'H1Y':{c:'A',s:8},'H1X':{c:'A',s:8},
+  // Step 9: Ahuntsic / Chabanel / Park-Ex (late north cluster)
+  'H2M':{c:'A',s:9},'H2N':{c:'A',s:9},'H2C':{c:'A',s:9},
+  'H3N':{c:'A',s:9},'H3L':{c:'A',s:9},'H3M':{c:'A',s:9},
+  'H4M':{c:'A',s:9},'H4S':{c:'A',s:9},
+  // Step 10: Anjou
+  'H1J':{c:'A',s:10},
+  // Step 11: Montréal-Est — FAR EAST, absolute last on Montreal circuit
+  'H1B':{c:'A',s:11},
+  // NE apex (Repentigny) — confirmed step 9 from early comparisons
+  'J5Y':{c:'A',s:9},'J5Z':{c:'A',s:9},'J6A':{c:'A',s:9},
+  'J6Y':{c:'A',s:9},'J6Z':{c:'A',s:9},
 };
 const FSA2={
-  'J3':{c:'A',s:0},'J4':{c:'A',s:0},  // South Shore → step 0 (always first)
-  'H8':{c:'A',s:1},  // SW Launch: Lachine/LaSalle/CSL/Dorval
-  'H3':{c:'A',s:2},'H4':{c:'A',s:2},  // Central: NDG/Westmount/CDN
-  'H2':{c:'A',s:3},  // East: Plateau/Rosemont/Hochelaga
-  'H1':{c:'A',s:4},  // Far East: PTX/MTL-Est/Anjou/RDP
-  'J5':{c:'A',s:5},'J6':{c:'A',s:5},  // NE apex: Repentigny
-  'H7':{c:'B',s:1},  // Laval
-  'H9':{c:'B',s:5},  // West Island (2-char fallback)
+  // South Shore J3/J4 → step 4 MIDDLE (was step 0 = first — WRONG)
+  'J3':{c:'A',s:4},'J4':{c:'A',s:4},
+  'H8':{c:'A',s:3},  // Lachine/LaSalle fallback (H8Z handled above)
+  'H3':{c:'A',s:5},  // Central Montreal fallback
+  'H4':{c:'A',s:4},  // Central Montreal fallback
+  'H2':{c:'A',s:7},  // East Montreal fallback
+  'H1':{c:'A',s:8},  // Far east fallback
+  'J5':{c:'A',s:9},'J6':{c:'A',s:9},  // NE apex fallback
+  'H7':{c:'B',s:3},  // Laval (all H7 → Circuit B step 3)
+  'H9':{c:'B',s:5},  // West Island fallback
 };
-const RIVER_BANK=new Set(['H7A','H7B','H7C','H7E','H7G']); // Laval river-bank (mixed circuit)
-const SS_FSA=new Set(['J3','J4']); // South Shore prefixes
+const RIVER_BANK=new Set(['H7A','H7B','H7C','H7E','H7G']); // Laval river-bank
+const SS_FSA=new Set(['J3','J4','J5R']); // South Shore FSA prefixes
 
 function optClassify(p){
   const addr=(p.address||'').toUpperCase();
@@ -1452,7 +1514,7 @@ function buildSlots(fromDate){
       dayLabel:['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][dow],
       patients:[],
       cap:dow===5?12:15,             // Friday hard cap 12
-      circ:dow===5?'B':'A',          // Friday=Laval, else Montreal
+      circ:dow===5?'B':'A',          // Fri=Circuit B (border+Laval+WI), else A (Montreal Inner)
     };
   });
 }
@@ -1517,11 +1579,14 @@ function runPlanner(pats,fromDate){
   });
 
   // ── Pass 3: sort each day by circuit step ─────────────────
+  // Saturday (dow=6): descending step = farthest patient FIRST, local last
+  // Weekdays: ascending step = local/NDG first, Mtl-Est last
   slots.forEach(sl=>{
+    const isSat=sl.dow===6;
     sl.patients.sort((a,b)=>{
-      const sa=a._cl.isSS?-1:a._cl.s;
-      const sb=b._cl.isSS?-1:b._cl.s;
-      return sa-sb;
+      const sa=a._cl.s;
+      const sb=b._cl.s;
+      return isSat?(sb-sa):(sa-sb);
     });
   });
 
@@ -1680,8 +1745,8 @@ function resortDay(dayIdx){
   // Sort by circuit step — same logic as optimizer pass 3
   active.sort((a,b)=>{
     const ca=optClassify(a),cb=optClassify(b);
-    const sa=ca.isSS?-1:ca.s;  // South Shore always first
-    const sb=cb.isSS?-1:cb.s;
+    const sa=ca.s;  // Use actual step (South Shore = step 4, middle — not first)
+    const sb=cb.s;
     return sa-sb;
   });
   renderGrid();
@@ -1769,7 +1834,8 @@ function resortDay(dayIdx){
   const dayName=DAYS[(fromYMD(windowDates()[dayIdx]).getDay()+6)%7];
   active.sort((a,b)=>{
     const ca=optClassify(a),cb=optClassify(b);
-    return (ca.isSS?-1:ca.s)-(cb.isSS?-1:cb.s);
+    const isSat=fromYMD(windowDates()[dayIdx]).getDay()===6;
+    return isSat?(cb.s-ca.s):(ca.s-cb.s);
   });
   renderGrid();
   toast('↺ '+dayName+' re-sorted by circuit route order');
