@@ -5794,58 +5794,79 @@ function openNoRepeatsModal(pats) {
   openModal('noRepeatsModal');
 }
 
-function sendConsolidatedEmail() {
+async function sendConsolidatedEmail() {
   const pats = window._nrPatients || [];
   if (!pats.length) return;
   const today = new Date().toLocaleDateString('en-CA',{month:'long',day:'numeric',year:'numeric'});
   const to    = 'reports@medicum.ca';
 
-  // Subject line
-  const subj  = encodeURIComponent(
-    'No More Repeats \u2014 ' + pats.length + ' Patient' + (pats.length > 1 ? 's' : '') +
-    ' \u2014 ' + today
-  );
+  // ── Why clipboard instead of URL body param? ─────────────
+  // Yahoo Mail compose uses a rich-text contenteditable editor.
+  // URL body params (%0A or %0D%0A) are stripped — everything
+  // collapses to one line. Clipboard paste preserves newlines.
+  // Solution: pre-fill to + subject via URL, copy body to clipboard.
+  // User pastes once with Ctrl+V (Cmd+V on Mac) → perfect formatting.
+  // ─────────────────────────────────────────────────────────
 
-  // Yahoo Mail compose URL uses %0A (\n) for line breaks, NOT %0D%0A
-  // Using \r\n encodes to %0D%0A which Yahoo Mail ignores, collapsing everything to one line
-  const NL = '\n';
+  const subjectText =
+    'No More Repeats \u2014 ' + pats.length +
+    ' Patient' + (pats.length > 1 ? 's' : '') +
+    ' \u2014 ' + today;
 
-  // One patient per line with bullet, file number, dose
+  // One patient per line — Name | File # | Dose
   const patientLines = pats.map(p =>
-    '\u2022 ' +
     (p['Patient Name'] || '') +
     '  |  File #' + (p['File Number'] || '') +
     (p['Dose Prescribed'] ? '  |  ' + p['Dose Prescribed'] + 'mg' : '')
-  ).join(NL);
+  ).join('\n');
 
-  // Full email body — blank line = two \n
+  // Properly formatted body with real newlines (for clipboard)
   const rawBody =
-    'Hello,' +
-    NL + NL +
+    'Hello,\n\n' +
     'Please be advised that the following patient' +
     (pats.length > 1 ? 's have' : ' has') +
-    ' no more repeats left as per the pharmacy label.' +
-    NL + NL +
-    patientLines +
-    NL + NL +
-    'Please contact the doctor\u2019s office for the continuity of their treatment.' +
-    NL + NL +
-    'Thank you!' +
-    NL + NL +
-    'Regards,' +
-    NL + NL +
+    ' no more repeats left as per the pharmacy label.\n\n' +
+    patientLines + '\n\n' +
+    'Please contact the doctor\u2019s office for the continuity of their treatment.\n\n' +
+    'Thank you!\n\n' +
     'Abdul';
 
-  const body = encodeURIComponent(rawBody);
+  // ── Copy body to clipboard ────────────────────────────────
+  let copied = false;
+  try {
+    await navigator.clipboard.writeText(rawBody);
+    copied = true;
+  } catch {
+    // Fallback for browsers without clipboard API permission
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = rawBody;
+      Object.assign(ta.style, {position:'fixed',opacity:'0',top:'0',left:'0',width:'1px',height:'1px'});
+      document.body.appendChild(ta);
+      ta.focus(); ta.select();
+      copied = document.execCommand('copy');
+      document.body.removeChild(ta);
+    } catch {}
+  }
 
-  // Yahoo Mail compose URL — 'from' param is not supported, omit it
+  // ── Open Yahoo compose — to + subject pre-filled ─────────
   const url = 'https://compose.mail.yahoo.com/?to=' + encodeURIComponent(to)
-            + '&subject=' + subj
-            + '&body=' + body;
+            + '&subject='  + encodeURIComponent(subjectText);
 
   window.open(url, '_blank');
   closeModal('noRepeatsModal');
-  toast('Email draft opened for ' + pats.length + ' patient' + (pats.length > 1 ? 's' : ''), 'success', '\ud83d\udce7');
+
+  if (copied) {
+    toast(
+      '\ud83d\udce7 Yahoo Mail opened \u2014 body copied! Press Ctrl+V (or \u2318V) to paste.',
+      'success', '\ud83d\udccb', 8000
+    );
+  } else {
+    toast(
+      '\ud83d\udce7 Yahoo Mail opened \u2014 clipboard unavailable, type body manually.',
+      'warning', '\u26a0\ufe0f', 6000
+    );
+  }
 }
 
 // ── End of Day modal ──
