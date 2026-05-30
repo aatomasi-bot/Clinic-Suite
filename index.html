@@ -2528,6 +2528,12 @@ a:focus:not(:focus-visible) { outline: none; }
     <button id="rptTabMireview" class="rpt-tab" onclick="switchReportTab('mireview')">
       🔎 Quick Look
     </button>
+    <button id="rptTabConfirmed" class="rpt-tab" onclick="switchReportTab('confirmed')">
+      📌 Confirmed Appts
+    </button>
+    <button id="rptTabAddresses" class="rpt-tab" onclick="switchReportTab('addresses')">
+      📍 Addresses
+    </button>
   </div>
 
   <!-- DAILY controls -->
@@ -2719,6 +2725,94 @@ a:focus:not(:focus-visible) { outline: none; }
              background:linear-gradient(135deg,var(--teal),var(--teal-dark));
              color:#fff;font-size:13px;font-weight:700;cursor:pointer">
       📆 Generate Next Month Review
+    </button>
+  </div>
+
+  <!-- CONFIRMED APPOINTMENTS controls -->
+  <div id="rptControlsConfirmed" class="report-controls hidden">
+    <div style="font-size:11px;color:var(--text-2);margin-bottom:10px">
+      Shows all patients with a <strong>confirmed appointment</strong> within the selected period.
+    </div>
+    <div class="form-row-2">
+      <div class="form-row">
+        <label class="form-label">Month</label>
+        <select class="form-control" id="confMonth">
+          <option value="">— Any —</option>
+          <option value="01">January</option><option value="02">February</option>
+          <option value="03">March</option><option value="04">April</option>
+          <option value="05">May</option><option value="06">June</option>
+          <option value="07">July</option><option value="08">August</option>
+          <option value="09">September</option><option value="10">October</option>
+          <option value="11">November</option><option value="12">December</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Year</label>
+        <select class="form-control" id="confYear">
+          <option value="">— Any —</option>
+          <option value="2025">2025</option>
+          <option value="2026" selected>2026</option>
+          <option value="2027">2027</option>
+          <option value="2028">2028</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row-2 date-range-row" style="margin-top:8px">
+      <div class="form-row">
+        <label class="form-label">Appt Date From</label>
+        <input class="form-control date-input-mobile" type="date" id="confDateFrom">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Appt Date To</label>
+        <input class="form-control date-input-mobile" type="date" id="confDateTo">
+      </div>
+    </div>
+    <button class="run-report-btn" onclick="generateConfirmedReport()" style="margin-top:10px">
+      📌 Generate Confirmed Appointments Report
+    </button>
+  </div>
+
+  <!-- ADDRESSES EXTRACTION controls -->
+  <div id="rptControlsAddresses" class="report-controls hidden">
+    <div style="font-size:11px;color:var(--text-2);margin-bottom:10px">
+      Extracts patient <strong>Name · File # · Address</strong> for any period. Copy addresses as plain text with one click.
+    </div>
+    <div class="form-row-2">
+      <div class="form-row">
+        <label class="form-label">Month</label>
+        <select class="form-control" id="addrMonth">
+          <option value="">— Any —</option>
+          <option value="01">January</option><option value="02">February</option>
+          <option value="03">March</option><option value="04">April</option>
+          <option value="05">May</option><option value="06">June</option>
+          <option value="07">July</option><option value="08">August</option>
+          <option value="09">September</option><option value="10">October</option>
+          <option value="11">November</option><option value="12">December</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Year</label>
+        <select class="form-control" id="addrYear">
+          <option value="">— Any —</option>
+          <option value="2025">2025</option>
+          <option value="2026" selected>2026</option>
+          <option value="2027">2027</option>
+          <option value="2028">2028</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row-2 date-range-row" style="margin-top:8px">
+      <div class="form-row">
+        <label class="form-label">Due Date From</label>
+        <input class="form-control date-input-mobile" type="date" id="addrDateFrom">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Due Date To</label>
+        <input class="form-control date-input-mobile" type="date" id="addrDateTo">
+      </div>
+    </div>
+    <button class="run-report-btn" onclick="generateAddressesReport()" style="margin-top:10px">
+      📍 Addresses Extraction
     </button>
   </div>
 
@@ -4462,7 +4556,7 @@ let _reportTab = 'daily';
 
 function switchReportTab(tab) {
   _reportTab = tab;
-  ['daily','monthly','custom','nextmonth','mireview'].forEach(t => {
+  ['daily','monthly','custom','nextmonth','mireview','confirmed','addresses'].forEach(t => {
     document.getElementById('rptControls' + t.charAt(0).toUpperCase() + t.slice(1))
       .classList.toggle('hidden', t !== tab);
     document.getElementById('rptTab' + t.charAt(0).toUpperCase() + t.slice(1))
@@ -4925,26 +5019,200 @@ function generateReport() {
 }
 
 // ── TABLE BUILDER ──
-function buildReportTable(data, cols) {
+function buildReportTable(data, cols, {rowClick=true}={}) {
   const headCells = cols.map(c =>
-    `<th style="padding:9px 12px;text-align:left;font-weight:700;white-space:nowrap">${c.label}</th>`
+    `<th style="padding:9px 12px;text-align:left;font-weight:700;white-space:nowrap;color:inherit">${c.label}</th>`
   ).join('');
 
   const bodyRows = data.map((p, i) => {
-    const bg = i % 2 === 0 ? '#fff' : '#F8FAFC';
+    // Use CSS variables — NEVER hardcode #fff (breaks dark mode)
+    const isConf = !!(p['Appointment Confirmed']);
+    const bg = isConf
+      ? 'rgba(61,154,107,.09)'
+      : (i % 2 === 0 ? 'var(--bg)' : 'var(--card)');
     const cells = cols.map(c => {
       let v = p[c.key];
       const display = c.fmt ? c.fmt(v, p) : esc(String(v||''));
-      return `<td style="padding:8px 12px;border-bottom:1px solid var(--border);vertical-align:middle">${display}</td>`;
+      return `<td style="padding:8px 12px;border-bottom:1px solid var(--border);vertical-align:middle;color:var(--text)">${display}</td>`;
     }).join('');
-    return `<tr style="background:${bg};cursor:pointer" onclick="openEditModal(${p.id})">${cells}</tr>`;
+    const click = rowClick ? `onclick="openEditModal(${p.id})"` : '';
+    return `<tr style="background:${bg};cursor:${rowClick?'pointer':'default'}" ${click}>${cells}</tr>`;
   }).join('');
 
   return `<div style="background:var(--card);border-radius:var(--radius);overflow:auto;border:1.5px solid var(--border);box-shadow:var(--shadow)">
-    <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:500px">
+    <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:500px;color:var(--text)">
       <thead><tr style="background:var(--navy);color:#fff">${headCells}</tr></thead>
       <tbody>${bodyRows}</tbody>
     </table></div>`;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  CONFIRMED APPOINTMENTS REPORT
+//  Shows patients with Appointment Confirmed, filterable by
+//  month/year and/or date range.
+// ══════════════════════════════════════════════════════════════
+function generateConfirmedReport() {
+  const month    = document.getElementById('confMonth').value;
+  const year     = document.getElementById('confYear').value;
+  const dateFrom = document.getElementById('confDateFrom').value;
+  const dateTo   = document.getElementById('confDateTo').value;
+  const prefix   = (year && month) ? `${year}-${month}` : (year || '');
+
+  const monthNames = ['','January','February','March','April','May','June',
+    'July','August','September','October','November','December'];
+
+  let filtered = patients.filter(p => !p['Archived'] && p['Appointment Confirmed']);
+
+  // Filter by appointment date/time if set
+  if (prefix) {
+    filtered = filtered.filter(p => {
+      const appt = (p['Appointment Date Time'] || p['Due Date'] || '');
+      return appt.startsWith(prefix);
+    });
+  }
+  if (dateFrom) filtered = filtered.filter(p => {
+    const d = (p['Appointment Date Time'] || p['Due Date'] || '').slice(0,10);
+    return d >= dateFrom;
+  });
+  if (dateTo) filtered = filtered.filter(p => {
+    const d = (p['Appointment Date Time'] || p['Due Date'] || '').slice(0,10);
+    return d <= dateTo;
+  });
+
+  filtered.sort((a,b) => {
+    const da = a['Appointment Date Time'] || a['Due Date'] || '';
+    const db = b['Appointment Date Time'] || b['Due Date'] || '';
+    return da.localeCompare(db);
+  });
+
+  window._lastReport = filtered;
+  const label = prefix
+    ? `${monthNames[parseInt(month)||0] || ''} ${year}`.trim()
+    : (dateFrom || dateTo ? `${dateFrom||'…'} → ${dateTo||'…'}` : 'All');
+  window._reportTitle = `Confirmed Appointments — ${label}`;
+
+  const out = document.getElementById('reportOutput');
+  const bar = document.getElementById('reportExportBar');
+
+  if (!filtered.length) {
+    bar.style.display = 'none';
+    out.innerHTML = `<div class="empty-state"><div class="empty-state__icon">📌</div>
+      <div class="empty-state__title">No confirmed appointments found</div>
+      <p class="empty-state__sub">Adjust the period or filters and try again.</p></div>`;
+    return;
+  }
+
+  document.getElementById('reportCount').textContent =
+    `${filtered.length} confirmed appointment${filtered.length!==1?'s':''} — ${label}`;
+  bar.style.display = 'flex';
+
+  const cols = [
+    { key:'Patient Name',          label:'Patient' },
+    { key:'File Number',           label:'File #' },
+    { key:'Address',               label:'Address' },
+    { key:'Dose Prescribed',       label:'Dose (mg)' },
+    { key:'Due Date',              label:'Due Date' },
+    { key:'Appointment Date Time', label:'Appt Date/Time',
+      fmt: v => v ? `<span style="color:var(--teal-dark);font-weight:700">${esc(v.slice(0,16).replace('T',' '))}</span>` : '—' },
+    { key:'Doses Remaining',       label:'Doses Left' },
+    { key:'CPP Patient',           label:'CPP', fmt: v => v ? '🩺' : '' },
+  ];
+  out.innerHTML = buildReportTable(filtered, cols);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  ADDRESSES EXTRACTION REPORT
+//  Name · File # · Address — filterable by month/year or date
+//  range. Includes a one-click "Copy Addresses" button.
+// ══════════════════════════════════════════════════════════════
+function generateAddressesReport() {
+  const month    = document.getElementById('addrMonth').value;
+  const year     = document.getElementById('addrYear').value;
+  const dateFrom = document.getElementById('addrDateFrom').value;
+  const dateTo   = document.getElementById('addrDateTo').value;
+  const prefix   = (year && month) ? `${year}-${month}` : (year || '');
+
+  const monthNames = ['','January','February','March','April','May','June',
+    'July','August','September','October','November','December'];
+
+  let filtered = patients.filter(p => !p['Archived'] && p['Address']);
+
+  if (prefix) filtered = filtered.filter(p => (p['Due Date']||'').startsWith(prefix));
+  if (dateFrom) filtered = filtered.filter(p => (p['Due Date']||'').slice(0,10) >= dateFrom);
+  if (dateTo)   filtered = filtered.filter(p => (p['Due Date']||'').slice(0,10) <= dateTo);
+
+  filtered.sort((a,b) => (a['Patient Name']||'').localeCompare(b['Patient Name']||''));
+
+  window._lastReport = filtered;
+  const label = prefix
+    ? `${monthNames[parseInt(month)||0] || ''} ${year}`.trim()
+    : (dateFrom || dateTo ? `${dateFrom||'…'} → ${dateTo||'…'}` : 'All active');
+  window._reportTitle = `Addresses Extraction — ${label}`;
+
+  const out = document.getElementById('reportOutput');
+  const bar = document.getElementById('reportExportBar');
+
+  if (!filtered.length) {
+    bar.style.display = 'none';
+    out.innerHTML = `<div class="empty-state"><div class="empty-state__icon">📍</div>
+      <div class="empty-state__title">No patients found for this period</div>
+      <p class="empty-state__sub">Try a different month/year or date range.</p></div>`;
+    return;
+  }
+
+  document.getElementById('reportCount').textContent =
+    `${filtered.length} patient address${filtered.length!==1?'es':''} — ${label}`;
+  bar.style.display = 'flex';
+
+  // Copy button — injected above the table
+  const copyBtn = `<div style="margin-bottom:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <button onclick="copyAddressesAsText()" style="display:flex;align-items:center;gap:6px;
+      padding:8px 16px;border-radius:8px;background:linear-gradient(135deg,var(--teal),var(--teal-dark));
+      color:#fff;font-size:12px;font-weight:700;border:none;cursor:pointer">
+      📋 Copy Addresses as Text
+    </button>
+    <span id="addrCopyFeedback" style="font-size:11px;color:var(--green);font-weight:700;display:none">✓ Copied!</span>
+  </div>`;
+
+  const cols = [
+    { key:'Patient Name',    label:'Patient Name' },
+    { key:'File Number',     label:'File #' },
+    { key:'Address',         label:'Address' },
+    { key:'Due Date',        label:'Due Date' },
+    { key:'Dose Prescribed', label:'Dose (mg)' },
+  ];
+  out.innerHTML = copyBtn + buildReportTable(filtered, cols);
+}
+
+// Copies just the address strings as plain text (one per line) for pasting into
+// route planners, maps, or notification tools.
+async function copyAddressesAsText() {
+  if (!window._lastReport || !window._lastReport.length) return;
+  const text = window._lastReport
+    .map(p => p['Address'] || '')
+    .filter(Boolean)
+    .join('\n');
+
+  let ok = false;
+  try { await navigator.clipboard.writeText(text); ok = true; }
+  catch {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      Object.assign(ta.style,{position:'fixed',opacity:'0',top:'0',left:'0',width:'1px',height:'1px'});
+      document.body.appendChild(ta); ta.focus(); ta.select();
+      ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+    } catch {}
+  }
+
+  const fb = document.getElementById('addrCopyFeedback');
+  if (fb) {
+    fb.style.display = 'inline';
+    fb.textContent = ok ? `✓ ${window._lastReport.length} addresses copied!` : '⚠ Copy failed — use Ctrl+A on table';
+    setTimeout(() => { fb.style.display = 'none'; }, 3500);
+  }
+  if (ok) toast(`📋 ${window._lastReport.length} addresses copied to clipboard`, 'success', '📍');
 }
 
 // ── PRINT REPORT ──
@@ -8869,9 +9137,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (mirY) mirY.value = String(now.getFullYear());
   // Expose all report functions for inline onclick and quick-report buttons
   window.switchReportTab       = switchReportTab;
-  window.generateDailyReport   = generateDailyReport;
-  window.generateMonthlyReport = generateMonthlyReport;
-  window.printReport           = printReport;
+  window.generateDailyReport      = generateDailyReport;
+  window.generateMonthlyReport    = generateMonthlyReport;
+  window.generateConfirmedReport  = generateConfirmedReport;
+  window.generateAddressesReport  = generateAddressesReport;
+  window.copyAddressesAsText      = copyAddressesAsText;
+  window.printReport              = printReport;
   window.openGoogleSheets      = openGoogleSheets;
   window.exportReportXLSX      = exportReportXLSX;
   window.exportReportCSV       = exportReportCSV;
