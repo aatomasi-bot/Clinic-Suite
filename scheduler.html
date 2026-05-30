@@ -1448,7 +1448,8 @@ const FSA3={
   'H8T':{c:'A',s:3},'H8Y':{c:'A',s:3},                  // fixed: was wrongly Circuit B
   'H3E':{c:'A',s:3},                                     // Nun's Island — early rule
   // Step 4: Verdun / St-Henri + South Shore (middle — confirmed NOT first)
-  'H4G':{c:'A',s:4},'H4C':{c:'A',s:4},'H4E':{c:'A',s:4},
+  'H4G':{c:'A',s:4},'H4C':{c:'A',s:4},
+  'H4E':{c:'A',s:3},                                     // LaSalle-East (Jogues) — same cluster as H8S/H8P
   'H3J':{c:'A',s:4},                                     // St-Henri
   'J5R':{c:'A',s:4},'J4W':{c:'A',s:4},'J4G':{c:'A',s:4}, // South Shore — middle step 4
   // Step 5: Downtown W + Westmount + CDN
@@ -1476,6 +1477,7 @@ const FSA3={
 };
 const FSA2={
   // South Shore J3/J4 → step 4 MIDDLE (was step 0 = first — WRONG)
+  'J0':{c:'B',s:4},                // J0N Saint-Joseph-du-Lac, Deux-Montagnes area
   'J3':{c:'A',s:4},'J4':{c:'A',s:4},
   'H8':{c:'A',s:3},  // Lachine/LaSalle fallback (H8Z handled above)
   'H3':{c:'A',s:5},  // Central Montreal fallback
@@ -1492,7 +1494,7 @@ const SS_FSA=new Set(['J3','J4','J5R']); // South Shore FSA prefixes
 function optClassify(p){
   const addr=(p.address||'').toUpperCase();
   const m=addr.match(/([A-Z]\d[A-Z])\s*\d[A-Z]\d/);
-  if(!m)return{c:'A',s:3,isSS:false,isWI:false,isRB:false};
+  if(!m)return{c:'A',s:3,isSS:false,isWI:false,isRB:false,f3:'',f2:''};
   const f3=m[1],f2=f3.slice(0,2);
   const info=FSA3[f3]||FSA2[f2]||{c:'A',s:3};
   return{
@@ -1502,6 +1504,32 @@ function optClassify(p){
     isRB:RIVER_BANK.has(f3),         // River-bank Laval
     f3,f2
   };
+}
+
+// ── Saturday "near home" FSAs ─────────────────────────────
+// These patients are geographically close to H4N (Cartierville).
+// On Saturday they go LAST (you end near home after a long day).
+const SAT_NEAR_HOME=new Set(['H4P','H4N','H4R','H4J','H4K','H4L','H4S']);
+
+// ── Saturday sort key ─────────────────────────────────────
+// Saturday rule: start at farthest patient, sweep back, end near home.
+// Problem with raw desc-step sort: Circuit A step 7 (Old Port) > Circuit B
+// step 5 (West Island) → Old Port goes first. WRONG.
+// Fix: separate circuits. B patients always before A. Within B: higher
+// step = farther west = lower key = goes first. Within A: ascending step,
+// but SAT_NEAR_HOME FSAs (Snowdon H4P etc.) pushed to very end.
+//
+// Key scale:
+//   Circuit B step 5 (West Island) → -5  ← FIRST on Saturday
+//   Circuit B step 4 (Pierrefonds) → -4
+//   Circuit B step 1 (border H4N)  → -1  ← last among B (but still before A)
+//   Circuit A step 1 (NDG H4A)     → 11  ← first among A
+//   Circuit A step 11 (Mtl-Est)    → 21
+//   SAT_NEAR_HOME (H4P Snowdon)    → 100 ← LAST
+function satKey(cl){
+  if(cl.c==='B') return -cl.s;                        // B: higher step=farther=first
+  if(SAT_NEAR_HOME.has(cl.f3||'')) return 100;        // near home → last
+  return 10+cl.s;                                     // A: ascending step
 }
 
 function buildSlots(fromDate){
@@ -1612,7 +1640,7 @@ function runPlanner(pats,fromDate){
     const room=sl.cap-sl.patients.length;
 
     // Sort candidates by confirmed route step order
-    cands.sort((a,b)=>isSat?(b._cl.s-a._cl.s):(a._cl.s-b._cl.s));
+    cands.sort((a,b)=>isSat?(satKey(a._cl)-satKey(b._cl)):(a._cl.s-b._cl.s));
 
     // Place up to available room
     cands.slice(0,room).forEach(p=>{
@@ -1639,8 +1667,8 @@ function runPlanner(pats,fromDate){
   // ── Pass 3: Route sort + special trigger rules ────────────
   slots.forEach(sl=>{
     const isSat=sl.dow===6;
-    // Step sort: ascending weekday, descending Saturday
-    sl.patients.sort((a,b)=>isSat?(b._cl.s-a._cl.s):(a._cl.s-b._cl.s));
+    // Step sort: ascending weekday / satKey Saturday
+    sl.patients.sort((a,b)=>isSat?(satKey(a._cl)-satKey(b._cl)):(a._cl.s-b._cl.s));
     // Vermette trigger: 32 Rue Vermette always goes first regardless of step
     applyVermetteRule(sl.patients);
   });
@@ -1802,7 +1830,7 @@ function resortDay(dayIdx){
   const isSat=dow===6;
   active.sort((a,b)=>{
     const ca=optClassify(a),cb=optClassify(b);
-    return isSat?(cb.s-ca.s):(ca.s-cb.s);
+    return isSat?(satKey(ca)-satKey(cb)):(ca.s-cb.s);
   });
   applyVermetteRule(active);
   renderGrid();
@@ -1892,7 +1920,7 @@ function resortDay(dayIdx){
   const isSat=dow===6;
   active.sort((a,b)=>{
     const ca=optClassify(a),cb=optClassify(b);
-    return isSat?(cb.s-ca.s):(ca.s-cb.s);
+    return isSat?(satKey(ca)-satKey(cb)):(ca.s-cb.s);
   });
   applyVermetteRule(active);
   renderGrid();
