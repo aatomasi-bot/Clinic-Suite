@@ -5800,47 +5800,47 @@ async function sendConsolidatedEmail() {
   const today = new Date().toLocaleDateString('en-CA',{month:'long',day:'numeric',year:'numeric'});
   const to    = 'reports@medicum.ca';
 
-  // ── Why clipboard instead of URL body param? ─────────────
-  // Yahoo Mail compose uses a rich-text contenteditable editor.
-  // URL body params (%0A or %0D%0A) are stripped — everything
-  // collapses to one line. Clipboard paste preserves newlines.
-  // Solution: pre-fill to + subject via URL, copy body to clipboard.
-  // User pastes once with Ctrl+V (Cmd+V on Mac) → perfect formatting.
-  // ─────────────────────────────────────────────────────────
-
   const subjectText =
     'No More Repeats \u2014 ' + pats.length +
     ' Patient' + (pats.length > 1 ? 's' : '') +
     ' \u2014 ' + today;
 
-  // One patient per line — Name | File # | Dose
+  // One patient per line — Name | File # | Dose (no bullet, clean format)
   const patientLines = pats.map(p =>
     (p['Patient Name'] || '') +
     '  |  File #' + (p['File Number'] || '') +
     (p['Dose Prescribed'] ? '  |  ' + p['Dose Prescribed'] + 'mg' : '')
-  ).join('\n');
+  ).join('\r\n');
 
-  // Properly formatted body with real newlines (for clipboard)
-  const rawBody =
-    'Hello,\n\n' +
+  // Properly formatted body
+  const bodyText =
+    'Hello,\r\n\r\n' +
     'Please be advised that the following patient' +
     (pats.length > 1 ? 's have' : ' has') +
-    ' no more repeats left as per the pharmacy label.\n\n' +
-    patientLines + '\n\n' +
-    'Please contact the doctor\u2019s office for the continuity of their treatment.\n\n' +
-    'Thank you!\n\n' +
+    ' no more repeats left as per the pharmacy label.\r\n\r\n' +
+    patientLines + '\r\n\r\n' +
+    'Please contact the doctor\u2019s office for the continuity of their treatment.\r\n\r\n' +
+    'Thank you!\r\n\r\n' +
     'Abdul';
 
-  // ── Copy body to clipboard ────────────────────────────────
+  // ── Strategy: mobile vs desktop ────────────────────────────
+  // Mobile Yahoo Mail (iOS Safari): CRLF in URL body param renders properly
+  //   because mobile Yahoo uses a simpler input field, not the richtext editor
+  // Desktop Yahoo Mail: richtext editor strips %0D%0A → use clipboard instead
+  // Detection: touch device + narrow screen = mobile
+  const isMobile = (('ontouchstart' in window) || (navigator.maxTouchPoints > 0))
+                && window.innerWidth < 900;
+
+  // Always copy to clipboard (works as fallback everywhere)
+  const clipboardBody = bodyText.replace(/\r\n/g, '\n'); // plain \n for clipboard
   let copied = false;
   try {
-    await navigator.clipboard.writeText(rawBody);
+    await navigator.clipboard.writeText(clipboardBody);
     copied = true;
   } catch {
-    // Fallback for browsers without clipboard API permission
     try {
       const ta = document.createElement('textarea');
-      ta.value = rawBody;
+      ta.value = clipboardBody;
       Object.assign(ta.style, {position:'fixed',opacity:'0',top:'0',left:'0',width:'1px',height:'1px'});
       document.body.appendChild(ta);
       ta.focus(); ta.select();
@@ -5849,21 +5849,31 @@ async function sendConsolidatedEmail() {
     } catch {}
   }
 
-  // ── Open Yahoo compose — to + subject pre-filled ─────────
-  const url = 'https://compose.mail.yahoo.com/?to=' + encodeURIComponent(to)
-            + '&subject='  + encodeURIComponent(subjectText);
+  // Build Yahoo compose URL
+  // Mobile: include body (%0D%0A works on mobile Yahoo Mail)
+  // Desktop: omit body (clipboard paste gives proper formatting)
+  let url = 'https://compose.mail.yahoo.com/?to=' + encodeURIComponent(to)
+          + '&subject=' + encodeURIComponent(subjectText);
+  if (isMobile) {
+    url += '&body=' + encodeURIComponent(bodyText);
+  }
 
   window.open(url, '_blank');
   closeModal('noRepeatsModal');
 
-  if (copied) {
+  if (isMobile) {
     toast(
-      '\ud83d\udce7 Yahoo Mail opened \u2014 body copied! Press Ctrl+V (or \u2318V) to paste.',
+      '\ud83d\udce7 Yahoo Mail opened with ' + pats.length + ' patient' + (pats.length > 1 ? 's' : '') + ' — body pre-filled.',
+      'success', '\ud83d\udccb', 6000
+    );
+  } else if (copied) {
+    toast(
+      '\ud83d\udce7 Yahoo Mail opened \u2014 body copied. Press Ctrl+V (\u2318V) to paste.',
       'success', '\ud83d\udccb', 8000
     );
   } else {
     toast(
-      '\ud83d\udce7 Yahoo Mail opened \u2014 clipboard unavailable, type body manually.',
+      '\ud83d\udce7 Yahoo Mail opened \u2014 type the body manually (clipboard unavailable).',
       'warning', '\u26a0\ufe0f', 6000
     );
   }
