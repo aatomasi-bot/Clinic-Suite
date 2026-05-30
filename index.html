@@ -2857,7 +2857,7 @@ a:focus:not(:focus-visible) { outline: none; }
   <div class="drawer-section" style="border-bottom:2px solid var(--border)">
     <h4 style="color:var(--teal-dark)">Quick Access</h4>
     <div class="drawer-btn-list">
-      <a class="drawer-btn drawer-scheduler-btn" href="scheduler.html" style="text-decoration:none;color:inherit;border-color:var(--teal)">
+      <a class="drawer-btn drawer-scheduler-btn" href="scheduler.html" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;border-color:var(--teal)">
         <span class="drawer-btn-icon">🗺️</span>
         <span style="flex:1">Route Scheduler</span>
         <span style="font-size:10px;font-weight:700;background:var(--teal);color:#fff;padding:2px 9px;border-radius:20px">Open →</span>
@@ -3920,7 +3920,7 @@ function renderCard(p, idx) {
           ${ph2 ? `<a href="tel:${esc(ph2)}" class="phone-link">📞 ${esc(ph2)}</a>` : ''}
         </div>
       </div>` : ''}
-      ${addr ? `<div class="detail-item detail-item--full"><label>Address</label><p>${esc(addr)}</p></div>` : ''}
+      ${addr ? `<div class="detail-item detail-item--full"><label>Address</label><p>${esc(formatAddrDisplay(addr))}</p></div>` : ''}
       <div class="detail-item"><label>Type</label><p>${esc(p['Assignment Type']||'Permanent')}</p></div>
       <div class="detail-item"><label>Last Site</label><p>${esc(p['Injection Site'] || p['Previous Injection Site'] || 'Not recorded')}</p></div>
       <div class="detail-item">
