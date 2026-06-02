@@ -662,6 +662,23 @@ input, select, textarea { font: inherit; }
   color: var(--orange);
   margin-top: 2px;
 }
+/* ── Special Instructions Flag Strip ── */
+.card-flag-strip {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  background: #FFF4E0;
+  border-left: 2.5px solid #BA7517;
+  border-radius: 0 4px 4px 0;
+  padding: 4px 7px;
+  margin-top: 3px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #633806;
+  line-height: 1.35;
+  word-break: break-word;
+}
+.card-flag-icon { flex-shrink: 0; font-size: 11px; margin-top: 1px; }
 
 /* Progress */
 .card-progress { padding: 0 0.875rem 0.5rem; }
@@ -1808,6 +1825,7 @@ stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
 [data-theme="dark"] .stat-card--red   { background:linear-gradient(135deg,#1A2335,#2A0F0F) !important; }
 [data-theme="dark"] .dose-chart,[data-theme="dark"] .quick-actions,[data-theme="dark"] .report-controls { background:#1A2335 !important; border-color:#2A3A55 !important; }
 [data-theme="dark"] .card-btn { background:#1E2A40 !important; border-color:#2A3A55 !important; }
+[data-theme="dark"] .card-flag-strip { background:rgba(186,119,23,.12) !important; color:#EF9F27 !important; border-left-color:#BA7517 !important; }
 [data-theme="dark"] .quick-action-btn { background:linear-gradient(135deg,#1A2335,#1E2A40) !important; border-color:#2A3A55 !important; }
 [data-theme="dark"] .date-sep__badge { background:#263146 !important; }
 [data-theme="dark"] .report-item { background:linear-gradient(135deg,#1A2335,#1E2A40) !important; border-color:#2A3A55 !important; }
@@ -3880,7 +3898,10 @@ function renderCard(p, idx) {
             ✓ ${apptTime}</span>
         </div>` : ''}
         ${addr ? `<div class="card-addr">${mapSVG}<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(formatAddrDisplay(addr))}</span></div>` : ''}
-        ${special ? `<div class="card-special"><span>⚠️</span> Special note</div>` : ''}
+        ${special ? `<div class="card-flag-strip">
+          <span class="card-flag-icon">⚑</span>
+          <span>${esc(special.length>80?special.substring(0,78)+'\u2026':special)}</span>
+        </div>` : ''}
       </div>
     </div>
   </div>
@@ -9447,16 +9468,6 @@ window.setTheme = setTheme;
     }
   });
 
-  // ── Window exports (restored: had leaked outside </body> due to malformed tail) ──
-  window.applyFixInjectionDate      = applyFixInjectionDate;
-  window.fixDateLoadPatientsForDate = fixDateLoadPatientsForDate;
-  window.fixDateSearchByName        = fixDateSearchByName;
-  window.fixDateTogglePat           = fixDateTogglePat;
-  window.fixDateSelectAllPats       = fixDateSelectAllPats;
-  window.fixDateGoBack              = fixDateGoBack;
-  window.renderFixDatePatList       = renderFixDatePatList;
-  window.confirmRemoveDuplicates    = confirmRemoveDuplicates;
-  window.openDedupeModal            = openDedupeModal;
 </script>
 
 
@@ -9675,6 +9686,17 @@ window.setTheme = setTheme;
   </div>
 </div>
 
+</body>
+</html  window.applyFixInjectionDate = applyFixInjectionDate;
+  window.fixDateLoadPatientsForDate = fixDateLoadPatientsForDate;
+  window.fixDateSearchByName    = fixDateSearchByName;
+  window.fixDateTogglePat       = fixDateTogglePat;
+  window.fixDateSelectAllPats   = fixDateSelectAllPats;
+  window.fixDateGoBack          = fixDateGoBack;
+  window.renderFixDatePatList   = renderFixDatePatList;
+  window.confirmRemoveDuplicates = confirmRemoveDuplicates;
+  window.openDedupeModal = openDedupeModal;
+
 <!-- PDF drag-drop overlay -->
 <div class="pdf-drop-overlay" id="pdfDropOverlay">
   <div class="pdf-drop-inner">
@@ -9683,6 +9705,4 @@ window.setTheme = setTheme;
     <small>Release to extract patient data</small>
   </div>
 </div>
-
-</body>
-</html>
+>
