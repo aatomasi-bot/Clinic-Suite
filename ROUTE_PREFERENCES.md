@@ -253,3 +253,52 @@ When a day has too many patients, split by circuit. Each circuit runs on a speci
 | 6 | May 25 | Friday | Start Montreal border → Laval → West Island end | ❌ |
 
 *Last updated: May 25, 2026 — Circuit A/B/C separation rules added. H2V "last" error corrected.*
+
+---
+
+## 325 BOULEVARD DEGUIRE RULE  (confirmed Jun 1, 2026)
+
+> **325 Boul Deguire is a PATIENT address. When it appears on any day's schedule → it goes LAST.**
+> This is the reverse of the Vermette rule (Vermette = always first, Deguire = always last).
+> Note: 42 Boul Deguire = home departure point (different address, not a patient).
+
+---
+
+## H3M FSA CORRECTION  (confirmed Jun 1, 2026)
+
+**H3M (Cartierville / Salaberry-de-Valleyfield border area) → Circuit B (Friday)**
+
+Previously misclassified as Circuit A step 9. The user explicitly moved:
+- 2320 Rue de Salaberry (H3M) → Friday route
+- 12140 Rue Joseph-Casavant (H3M) → Friday route
+
+These are in the Cartierville borough, adjacent to H4L and H4N (both Circuit B step 1).
+They border Laval and naturally belong to the Friday circuit.
+
+**FSA table updated:** `H3M → Circuit B step 1` (same zone as H4L, H4N, H4R)
+
+---
+
+## H1H CORRECTION  (confirmed Jun 1, 2026)
+
+**H1H (Montreal-Nord / Blvd St-Michel area) → Circuit A step 10**
+
+Previously fell to FSA2 H1 → step 8 (far east fallback). But Montreal-Nord is NORTH, not east.
+It should come AFTER Ahuntsic (H2M step 9) but BEFORE Anjou (H1J step 10) / Montreal-Est (H1B step 11).
+Confirmed: 10901 Boul St-Michel was the last Montreal Inner stop in the Jun 18 route.
+
+---
+
+## ROUTE COMPARISONS LOG (updated)
+
+| # | Date | Circuit | Key learning | Applied? |
+|---|------|---------|--------------|----------|
+| 1 | May 24 | Montreal | South Shore middle; north last | ❌ |
+| 2 | May 24 | Montreal | H4N home confirmed; north last confirmed | ❌ |
+| 3 | May 25 | Laval/NE | Horseshoe; Vermette = stop #1 | ✅ |
+| 4 | May 25 | Saturday | Start farthest; end near home; 8 AM | ✅ |
+| 5 | May 25 | Montreal Inner | H1B/H1J true last; H2V is step 7 | ✅ |
+| 6 | May 25 | Friday | Start border→Laval→West Island end | ✅ |
+| 7 | Jun 1 | Montreal/Friday | H3M→Circuit B; 325 Deguire last; H1H step 10 | ✅ |
+
+*Last updated: Jun 1, 2026 — H3M reclassified; 325 Deguire last rule added; H1H corrected.*
