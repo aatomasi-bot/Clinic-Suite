@@ -1465,7 +1465,10 @@ const FSA3={
   'H1Y':{c:'A',s:8},'H1X':{c:'A',s:8},
   // Step 9: Ahuntsic / Chabanel / Park-Ex (late north cluster)
   'H2M':{c:'A',s:9},'H2N':{c:'A',s:9},'H2C':{c:'A',s:9},
-  'H3N':{c:'A',s:9},'H3L':{c:'A',s:9},'H3M':{c:'A',s:9},
+  'H3N':{c:'A',s:9},'H3L':{c:'A',s:9},
+  'H3M':{c:'B',s:1},                                     // Cartierville/Salaberry border → Friday circuit (confirmed May 2026)
+  // Step 10: Montreal-Nord / Anjou
+  'H1H':{c:'A',s:10},'H1G':{c:'A',s:10},                // Montreal-Nord (after Ahuntsic step 9)
   'H4M':{c:'A',s:9},'H4S':{c:'A',s:9},
   // Step 10: Anjou
   'H1J':{c:'A',s:10},
@@ -1556,6 +1559,20 @@ function applyVermetteRule(patients){
   const idx=patients.findIndex(p=>
     /\b32\b[^,]*vermette|vermette[^,]*\b32\b/i.test(p.address||''));
   if(idx>0)patients.unshift(patients.splice(idx,1)[0]);
+}
+
+// ════════════════════════════════════════════════════════════
+// 325 BOULEVARD DEGUIRE RULE  (confirmed Jun 2026)
+// 325 Boul Deguire is a PATIENT near home (H4N). Goes LAST
+// on whatever day it appears — any circuit, any day.
+// Note: 42 Boul Deguire is the HOME departure, not a patient.
+// ════════════════════════════════════════════════════════════
+function applyDeguireLastRule(patients){
+  const idx=patients.findIndex(p=>
+    /\b325\b[^,]*d[eé]guire|d[eé]guire[^,]*\b325\b/i.test(p.address||''));
+  if(idx>=0&&idx<patients.length-1){
+    patients.push(patients.splice(idx,1)[0]);
+  }
 }
 
 // ════════════════════════════════════════════════════════════
@@ -1671,6 +1688,7 @@ function runPlanner(pats,fromDate){
     sl.patients.sort((a,b)=>isSat?(satKey(a._cl)-satKey(b._cl)):(a._cl.s-b._cl.s));
     // Vermette trigger: 32 Rue Vermette always goes first regardless of step
     applyVermetteRule(sl.patients);
+    applyDeguireLastRule(sl.patients);  // 325 Deguire always last
   });
 
   // ── Pass 4: Overflow safety net ───────────────────────────
@@ -1833,6 +1851,7 @@ function resortDay(dayIdx){
     return isSat?(satKey(ca)-satKey(cb)):(ca.s-cb.s);
   });
   applyVermetteRule(active);
+  applyDeguireLastRule(active);  // 325 Deguire always last
   renderGrid();
   toast(`↺ ${dayName} re-sorted by route order${isSat?' (Sat: farthest first)':''}`);
 }
@@ -1923,6 +1942,7 @@ function resortDay(dayIdx){
     return isSat?(satKey(ca)-satKey(cb)):(ca.s-cb.s);
   });
   applyVermetteRule(active);
+  applyDeguireLastRule(active);  // 325 Deguire always last
   renderGrid();
   toast('↺ '+dayName+' re-sorted by route order'+(isSat?' (Sat: farthest first)':''));
 }
