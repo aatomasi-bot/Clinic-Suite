@@ -383,21 +383,18 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   <button class="opt-btn clear" id="clearOptBtn" onclick="clearOptimizer()" style="display:none">✕ Clear Plan</button>
 </div>
 
-<!-- Optimizer modal -->
-<div class="opt-modal" id="optModal">
-  <div class="opt-box">
-    <h3>🧠 Route Optimizer</h3>
-    <p>Planning 2 weeks — Circuit A: Montreal Inner · Circuit B: Fri border+Laval+West Island</p>
-    <div class="opt-bar"><div class="opt-fill" id="optFill"></div></div>
-    <div class="opt-step" id="os1">⏳ Classifying patients by zone &amp; circuit…</div>
-    <div class="opt-step" id="os2">⏳ Assigning patients · geographic affinity scoring…</div>
-    <div class="opt-step" id="os3">⏳ Consolidating geographic clusters…</div>
-    <div class="opt-step" id="os4">⏳ Sorting routes · balancing caps…</div>
-    <div class="opt-summary" id="optSummary" style="display:none"></div>
-    <button class="opt-close" id="optClose" onclick="closeOptModal()" style="display:none">
-      ✓ Apply to Scheduler
-    </button>
+<!-- Optimizer compact status banner (replaces old multi-line modal) -->
+<div id="optModal" style="display:none;background:var(--card);border-bottom:1.5px solid var(--b);
+  padding:5px 12px;align-items:center;gap:8px;flex-shrink:0;min-height:0">
+  <span style="font-size:10px;font-weight:800;color:var(--teal);white-space:nowrap;flex-shrink:0">🧠</span>
+  <div style="flex:1;background:var(--b);border-radius:99px;height:3px;overflow:hidden;min-width:40px">
+    <div id="optFill" style="height:100%;background:var(--teal);width:0%;transition:width .3s;border-radius:99px"></div>
   </div>
+  <span id="optStatusText" style="font-size:10px;color:var(--t2);white-space:nowrap;
+    overflow:hidden;text-overflow:ellipsis;max-width:340px;flex:1;text-align:right">Starting…</span>
+  <button id="optClose" onclick="closeOptModal()" style="display:none;background:var(--teal);
+    border:none;color:#fff;border-radius:5px;padding:3px 9px;font-size:10px;
+    font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0">✓ Apply</button>
 </div>
 
 <div class="sbar">
@@ -906,6 +903,10 @@ function renderGrid(){
             <span class="dmonth">${MONTHS[d.getMonth()]}</span>
             ${total?`<span class="dcount">${total}/${dayCap}</span>`:''}
             ${isOpt?`<span style="font-size:7px;color:#7C3AED;font-weight:800">🧠</span>`:''}
+            ${total>0?`<button onclick="copyDayAddresses(${i})" title="Copy all addresses for this day"
+              style="background:none;border:none;color:var(--t3);cursor:pointer;font-size:9px;
+                padding:0 2px;line-height:1;flex-shrink:0" onmouseover="this.style.color='var(--teal)'"
+              onmouseout="this.style.color='var(--t3)'">📋</button>`:''}
           </div>
           <div class="dh-toggles">${toggleBtns}</div>
         </div>
@@ -1728,15 +1729,13 @@ function clearOptimizer(){
 
 // ── Optimizer UI handler ──────────────────────────────────────
 async function optimizeRoutes(){
-  const banner=document.getElementById('optBanner');
+  const banner=document.getElementById('optModal');  // compact banner
   const fill  =document.getElementById('optFill');
-  const sum   =document.getElementById('optSummary');
   const cls   =document.getElementById('optClose');
   const stxt  =document.getElementById('optStatusText');
-  if(sum){sum.style.display='none';sum.innerHTML='';}
   if(cls)cls.style.display='none';
   if(fill)fill.style.width='0';
-  if(banner)banner.style.display='';
+  if(banner){banner.style.display='flex';}  // show compact banner
   if(stxt)stxt.textContent='Starting…';
 
   async function prog(n,msg,pct){
@@ -1754,12 +1753,12 @@ async function optimizeRoutes(){
     await prog(2,'Assigning with geographic affinity…',40);
     const plan=runPlanner(allPats,windowStart);
     await prog(3,'Consolidating geographic clusters…',70);
-    await prog(4,'Sorting routes &amp; balancing caps…',90);
+    await prog(4,'Sorting routes & balancing caps…',90);
     storePlan(plan);
     if(fill)fill.style.width='100%';
     const placed=plan.reduce((s,d)=>s+d.patients.length,0);
-    const days14=plan.filter(d=>d.patients.length).map(d=>`${d.dayLabel} ${d.date}: ${d.patients.length}`).join(' · ');
-    if(stxt)stxt.textContent=`✅ ${placed} patients · ${days14}`;
+    const busyDays=plan.filter(d=>d.patients.length).length;
+    if(stxt)stxt.textContent=`✅ ${placed} patients · ${busyDays} days planned — click Apply`;
     if(cls)cls.style.display='';
   }catch(e){
     toast('Optimizer error: '+e.message,4000);
@@ -1769,7 +1768,7 @@ async function optimizeRoutes(){
 
 async function closeOptModal(){
   const modal=document.getElementById('optModal');
-  if(modal)modal.classList.remove('show');
+  if(modal)modal.style.display='none';
   try{ await reload(); }
   catch(e){ toast('Error loading schedule: '+e.message,4000); }
 }
@@ -1837,6 +1836,30 @@ async function mergeDay(fromIdx,toIdx){
     toast('Error: '+e.message,4000);
     if(btn){btn.disabled=false;btn.textContent='Merge';}
   }
+}
+
+
+// ════════════════════════════════════════════════════════════
+// COPY DAY ADDRESSES  (📋 button on each day header)
+// Copies all patient addresses for that day as plain text,
+// one per line, in route order — ready to paste into MapQuest.
+// ════════════════════════════════════════════════════════════
+async function copyDayAddresses(dayIdx){
+  const day=days[dayIdx];if(!day)return;
+  const all=[...(day.conf||[]),...(day.active||[])];
+  const addrs=all.map(p=>p.address||p['Address']||'').filter(Boolean);
+  if(!addrs.length){toast('No addresses on this day');return;}
+  const text=addrs.join('\n');
+  let ok=false;
+  try{await navigator.clipboard.writeText(text);ok=true;}
+  catch{try{
+    const ta=document.createElement('textarea');
+    ta.value=text;
+    Object.assign(ta.style,{position:'fixed',opacity:'0',top:'0',left:'0',width:'1px',height:'1px'});
+    document.body.appendChild(ta);ta.focus();ta.select();ok=document.execCommand('copy');document.body.removeChild(ta);
+  }catch{}}
+  const dow=DAYS[(fromYMD(windowDates()[dayIdx]).getDay()+6)%7];
+  toast(ok?`📋 ${addrs.length} addresses copied for ${dow}`:'\u26a0 Copy failed',ok?2500:3500);
 }
 
 // ── Re-sort day by circuit step order ────────────────────────
