@@ -1427,6 +1427,13 @@ const FSA3={
   'H2B':{c:'B',s:2},'H1Z':{c:'B',s:2},
   // Step 3: Laval specifics (H7V confirmed — west Laval)
   'H7V':{c:'B',s:3},'H7W':{c:'B',s:3},
+  // Laval sub-steps for smooth arc (confirmed Jun 26 2026 route)
+  // Step 2: west/south Laval — first Laval stops closest to H4N home
+  'H7N':{c:'B',s:2},'H7G':{c:'B',s:2},'H7R':{c:'B',s:2},
+  // Step 3: central Laval (Chomedey, Sainte-Rose)
+  'H7A':{c:'B',s:3},'H7T':{c:'B',s:3},'H7S':{c:'B',s:3},'H7K':{c:'B',s:3},
+  // Step 4: northeast Laval (Auteuil, Duvernay, Saint-Vincent-de-Paul)
+  'H7E':{c:'B',s:4},'H7C':{c:'B',s:4},'H7M':{c:'B',s:4},'H7P':{c:'B',s:4},'H7L':{c:'B',s:4},
   // Step 4: Pierrefonds + Saint-Eustache cluster
   'H8Z':{c:'B',s:4},                                     // Pierrefonds (confirmed)
   'J7P':{c:'B',s:4},'J7R':{c:'B',s:4},'J7V':{c:'B',s:4},'J7X':{c:'B',s:4}, // Saint-Eustache
@@ -1489,25 +1496,72 @@ const FSA2={
   'H2':{c:'A',s:7},  // East Montreal fallback
   'H1':{c:'A',s:8},  // Far east fallback
   'J5':{c:'A',s:9},'J6':{c:'A',s:9},  // NE apex fallback
-  'H7':{c:'B',s:3},  // Laval (all H7 → Circuit B step 3)
+  'H7':{c:'B',s:3},  // Laval generic fallback → Circuit B step 3
   'H9':{c:'B',s:5},  // West Island fallback
 };
 const RIVER_BANK=new Set(['H7A','H7B','H7C','H7E','H7G']); // Laval river-bank
 const SS_FSA=new Set(['J3','J4','J5R']); // South Shore FSA prefixes
 
+// ── City-name classification ──────────────────────────────
+// Used as FALLBACK when no postal code is in the address,
+// and as OVERRIDE when postal code disagrees with city
+// (e.g. address says "Laval" but FSA falls to Circuit A).
+// Critical fix: prevents Laval/Terrebonne patients from being
+// placed on the Montreal circuit just because postal code is missing.
+const CITY_CLASSIFY=[
+  // Circuit B — Laval (ALWAYS Friday circuit, highest priority)
+  {re:/\blaval\b/i,                              cl:{c:'B',s:3}},
+  // Circuit B — Laval northeast cluster (farthest Laval stops)
+  {re:/\bterrebonne\b/i,                         cl:{c:'B',s:3}},
+  {re:/\bmascouche\b/i,                          cl:{c:'B',s:3}},
+  // Circuit B — Saint-Eustache / Deux-Montagnes
+  {re:/saint-eustache|st-eustache/i,             cl:{c:'B',s:4}},
+  {re:/deux-montagnes|saint-joseph-du-lac/i,     cl:{c:'B',s:4}},
+  // Circuit B — West Island
+  {re:/\bkirkland\b|\bbeaconsfield\b|\bpincourt\b/i, cl:{c:'B',s:5}},
+  {re:/pointe-claire|dollard-des-ormeaux/i,      cl:{c:'B',s:5}},
+  {re:/\bvaudreuil\b|\bhudson\b/i,               cl:{c:'B',s:5}},
+  // Circuit A — South Shore (middle, step 4)
+  {re:/la prairie|laprairie/i,                   cl:{c:'A',s:4}},
+  {re:/\bbrossard\b/i,                           cl:{c:'A',s:4}},
+  {re:/\blongueuil\b/i,                          cl:{c:'A',s:4}},
+  // Circuit A — NE apex (Repentigny allowed on Montreal circuit)
+  {re:/\brepentigny\b/i,                         cl:{c:'A',s:9}},
+];
+
 function optClassify(p){
   const addr=(p.address||'').toUpperCase();
+
+  // ── Step 1: Try postal code regex (most precise) ──────
   const m=addr.match(/([A-Z]\d[A-Z])\s*\d[A-Z]\d/);
-  if(!m)return{c:'A',s:3,isSS:false,isWI:false,isRB:false,f3:'',f2:''};
-  const f3=m[1],f2=f3.slice(0,2);
-  const info=FSA3[f3]||FSA2[f2]||{c:'A',s:3};
-  return{
-    c:info.c,s:info.s,
-    isSS:SS_FSA.has(f2)||SS_FSA.has(f3),
-    isWI:info.c==='B'&&info.s===5,   // West Island = circuit B step 5
-    isRB:RIVER_BANK.has(f3),         // River-bank Laval
-    f3,f2
-  };
+  if(m){
+    const f3=m[1],f2=f3.slice(0,2);
+    const info=FSA3[f3]||FSA2[f2]||{c:'A',s:3};
+    // Safety override: if address says "Laval" but FSA gives Circuit A → force B
+    // (happens when FSA is ambiguous or stored differently)
+    if(/\blaval\b/i.test(addr)&&info.c==='A'){
+      return{c:'B',s:3,isSS:false,isWI:false,isRB:false,f3,f2};
+    }
+    return{
+      c:info.c,s:info.s,
+      isSS:SS_FSA.has(f2)||SS_FSA.has(f3),
+      isWI:info.c==='B'&&info.s===5,
+      isRB:RIVER_BANK.has(f3),
+      f3,f2
+    };
+  }
+
+  // ── Step 2: City-name fallback (no postal code found) ─
+  // Critical: prevents Laval/Terrebonne patients from defaulting
+  // to Montreal circuit when address lacks postal code.
+  for(const{re,cl} of CITY_CLASSIFY){
+    if(re.test(addr)){
+      return{...cl,isSS:false,isWI:cl.c==='B'&&cl.s===5,isRB:false,f3:'',f2:''};
+    }
+  }
+
+  // ── Step 3: Default — Montreal Inner circuit ───────────
+  return{c:'A',s:3,isSS:false,isWI:false,isRB:false,f3:'',f2:''};
 }
 
 // ── Saturday "near home" FSAs ─────────────────────────────
