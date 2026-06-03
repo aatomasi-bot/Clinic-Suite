@@ -302,3 +302,60 @@ Confirmed: 10901 Boul St-Michel was the last Montreal Inner stop in the Jun 18 r
 | 7 | Jun 1 | Montreal/Friday | H3M→Circuit B; 325 Deguire last; H1H step 10 | ✅ |
 
 *Last updated: Jun 1, 2026 — H3M reclassified; 325 Deguire last rule added; H1H corrected.*
+
+---
+
+## ROUTE COMPARISON LOG #8 — Jun 3, 2026 (4 screenshots)
+
+### Key Learning: City-Name Fallback (critical fix)
+
+**Root cause of wrong routes:** When patient addresses lack full postal codes,
+`optClassify` fell back to `{c:'A', s:3}` — putting Laval and Terrebonne patients
+on the Montreal circuit, causing back-and-forth crossing lines.
+
+**Fix applied:** City-name detection added to `optClassify`:
+- If address contains **"Laval"** → Circuit B step 3 (regardless of postal code)
+- If address contains **"Terrebonne"** → Circuit B step 3
+- If address contains **"Mascouche"** → Circuit B step 3
+- If address contains **"Saint-Eustache"** → Circuit B step 4
+- If address contains **"Pincourt"/"Kirkland"/"Vaudreuil"** → Circuit B step 5
+- If address contains **"Pointe-Claire"** → Circuit B step 5
+- If address contains **"La Prairie"/"Brossard"** → Circuit A step 4 (South Shore)
+
+**Safety override:** Even when postal code IS found, if address says "Laval" but
+FSA resolves to Circuit A → force Circuit B.
+
+---
+
+### Laval Circuit Arc Order (confirmed Jun 26 route)
+
+User's preferred Laval/Friday order:
+1. McNamara (central Laval, H7G area) — entry from home H4N
+2. 18e Rue (H7N — west Laval near bridge)
+3. Port-au-Persil (northeast Laval — far apex)
+4. Hennessy (central Laval)
+5. Cageux (south-central Laval)
+6. Larivière (southwest border area — near home return)
+
+**Laval sub-steps added to FSA3:**
+- H7N, H7G, H7R → step 2 (west/south Laval, closest to H4N)
+- H7A, H7T, H7S, H7K → step 3 (central Laval)
+- H7E, H7C, H7M, H7P, H7L → step 4 (northeast Laval, far apex)
+
+---
+
+### Montreal Circuit — Terrebonne as NE Apex (confirmed)
+
+**Wrong:** Claude put 265 Pierre-Laporte, Terrebonne at position B (second stop)
+on the Montreal circuit — massive back-and-forth to northeast then back south.
+
+**Correct:** When Terrebonne appears on a Montreal-circuit day, it goes
+NEAR LAST as the NE apex (confirmed position K of 13 stops in Jun 24 route).
+
+Laval patients removed from that circuit entirely (moved to Friday Jun 26).
+
+| # | Date | Circuit | Learning | Applied? |
+|---|------|---------|----------|----------|
+| 8 | Jun 3, 2026 | Both | City-name fallback; Laval H7 sub-steps; Terrebonne NE apex | ✅ |
+
+*Last updated: Jun 3, 2026*
