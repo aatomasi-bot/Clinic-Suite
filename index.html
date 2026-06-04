@@ -3031,8 +3031,34 @@ a:focus:not(:focus-visible) { outline: none; }
           </div>
         </div>
         <div class="form-group">
-          <label>Address</label>
-          <input type="text" id="f-addr" placeholder="221 Baker St, Springfield, IL">
+          <label>Address
+            <span style="font-size:10px;font-weight:400;color:var(--text-2);margin-left:4px">
+              — include postal code for accurate route circuit
+            </span>
+          </label>
+          <div style="position:relative">
+            <div style="display:flex;gap:6px;align-items:center">
+              <input type="text" id="f-addr" placeholder="221 Baker St, Montréal, QC H4N 1N4" style="flex:1">
+              <button type="button" onclick="lookupPostalCode()"
+                id="postalLookupBtn" title="Find postal code from address"
+                style="flex-shrink:0;padding:0 10px;height:38px;border-radius:8px;
+                  border:1.5px solid var(--border);background:var(--bg-2);
+                  color:var(--text-2);font-size:12px;cursor:pointer;
+                  display:flex;align-items:center;gap:5px;white-space:nowrap;
+                  font-family:inherit;transition:all .15s"
+                onmouseover="this.style.borderColor='var(--teal)';this.style.color='var(--teal)'"
+                onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-2)'">
+                🔍 Find postal code
+              </button>
+            </div>
+            <!-- Postal code suggestion dropdown -->
+            <div id="postalSuggestions" style="display:none;position:absolute;top:calc(100% + 4px);
+              left:0;right:0;z-index:300;background:var(--card);border:1.5px solid var(--teal);
+              border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.15);overflow:hidden;max-height:220px;overflow-y:auto">
+              <div id="postalSuggestionsInner"></div>
+            </div>
+          </div>
+          <div id="postalStatus" style="font-size:11px;color:var(--text-2);margin-top:4px;display:none"></div>
         </div>
         <div class="form-row-2">
           <div class="form-group">
@@ -5234,6 +5260,144 @@ async function copyAddressesAsText() {
     setTimeout(() => { fb.style.display = 'none'; }, 3500);
   }
   if (ok) toast(`📋 ${window._lastReport.length} addresses copied to clipboard`, 'success', '📍');
+}
+
+// ════════════════════════════════════════════════════════════
+//  POSTAL CODE LOOKUP  (Nominatim / OpenStreetMap — free, no key)
+//  Usage: user types address in f-addr field, clicks "Find postal code"
+//  → API returns candidates with postal code + full formatted address
+//  → User sees a dropdown, clicks to accept → address field updated
+//  → Postal code is then used by scheduler for accurate circuit routing
+// ════════════════════════════════════════════════════════════
+
+async function lookupPostalCode() {
+  const addrInput = document.getElementById('f-addr');
+  const btn       = document.getElementById('postalLookupBtn');
+  const status    = document.getElementById('postalStatus');
+  const sugg      = document.getElementById('postalSuggestions');
+  const inner     = document.getElementById('postalSuggestionsInner');
+
+  const raw = (addrInput?.value || '').trim();
+  if (!raw) {
+    _showPostalStatus('Enter an address first.', 'warn'); return;
+  }
+
+  // Already has a Canadian postal code (X0X 0X0 format)?
+  if (/[A-Z]\d[A-Z]\s*\d[A-Z]\d/i.test(raw)) {
+    _showPostalStatus('✓ Address already contains a postal code.', 'ok'); return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Searching…';
+  _showPostalStatus('Looking up postal code via OpenStreetMap…', 'info');
+  if (sugg) sugg.style.display = 'none';
+
+  try {
+    // Nominatim geocoding — free, OSM-based, 1 req/sec limit
+    // Bias to Canada; limit 5 results; request full address details
+    const q = encodeURIComponent(raw + ', Canada');
+    const url = `https://nominatim.openstreetmap.org/search?q=${q}&format=json&addressdetails=1&limit=5&countrycodes=ca`;
+
+    const res  = await fetch(url, {
+      headers: { 'Accept-Language': 'en', 'User-Agent': 'VaPiq-ClinicalSuite/1.0' }
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+
+    // Filter results that have a postal code
+    const hits = data.filter(d => d.address?.postcode);
+
+    if (!hits.length) {
+      _showPostalStatus('No postal code found — try adding city/province to the address.', 'warn');
+      return;
+    }
+
+    // Build suggestion items
+    inner.innerHTML = hits.map((h, i) => {
+      const pc  = h.address.postcode.toUpperCase().replace(/\s+/g,'').replace(/(.{3})/,'$1 ');
+      const city = h.address.city || h.address.town || h.address.village || h.address.municipality || '';
+      const prov = h.address.state || '';
+      const full = h.display_name;
+      // Build the suggested complete address
+      const baseAddr = raw.replace(/,?\s*canada$/i,'').trim();
+      const suggested = _mergePostalCode(baseAddr, pc, city, prov);
+      return `<div onclick="acceptPostalSuggestion('${esc(suggested).replace(/'/g,"&#39;")}','${pc}')"
+        style="padding:10px 14px;cursor:pointer;border-bottom:0.5px solid var(--border);
+          font-size:12px;line-height:1.4;transition:background .1s"
+        onmouseover="this.style.background='var(--bg-2)'"
+        onmouseout="this.style.background=''">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:13px;font-weight:700;color:var(--teal);font-family:monospace;
+            background:rgba(45,140,138,.1);padding:2px 7px;border-radius:5px;white-space:nowrap">${pc}</span>
+          <span style="color:var(--text-2);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(city)}${prov?', '+esc(prov):''}</span>
+        </div>
+        <div style="font-size:10px;color:var(--text-3);margin-top:3px;overflow:hidden;
+          text-overflow:ellipsis;white-space:nowrap" title="${esc(full)}">${esc(full)}</div>
+        <div style="font-size:10px;color:var(--teal-dark);margin-top:2px;font-style:italic">
+          → Will set address to: <strong>${esc(suggested)}</strong>
+        </div>
+      </div>`;
+    }).join('') +
+    `<div style="padding:8px 14px;font-size:10px;color:var(--text-3);border-top:0.5px solid var(--border)">
+      Source: OpenStreetMap Nominatim · Click a result to apply · <span style="cursor:pointer;color:var(--text-2)" onclick="closePostalSuggestions()">✕ Close</span>
+    </div>`;
+
+    sugg.style.display = 'block';
+    status.style.display = 'none';
+
+    // Close if user clicks outside
+    setTimeout(() => {
+      const handler = e => {
+        if (!sugg.contains(e.target) && e.target !== btn) {
+          closePostalSuggestions(); document.removeEventListener('click', handler);
+        }
+      };
+      document.addEventListener('click', handler);
+    }, 100);
+
+  } catch (e) {
+    _showPostalStatus(`Lookup failed: ${e.message}. Check your internet connection.`, 'warn');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🔍 Find postal code';
+  }
+}
+
+// Merge the postal code cleanly into the existing address string
+function _mergePostalCode(addr, pc, city, prov) {
+  // Remove any existing incomplete postal fragment at end
+  let cleaned = addr.replace(/,?\s*[A-Z]\d[A-Z]\s*$/i,'').trim();
+  // Add province if not already there
+  const provShort = {'Quebec':'QC','Ontario':'ON','British Columbia':'BC','Alberta':'AB',
+    'Manitoba':'MB','Saskatchewan':'SK','Nova Scotia':'NS','New Brunswick':'NB',
+    'Newfoundland':'NL','Prince Edward Island':'PE'};
+  const provCode = provShort[prov] || prov?.slice(0,2).toUpperCase() || '';
+  if (provCode && !new RegExp(`\\b${provCode}\\b`,'i').test(cleaned)) {
+    cleaned = cleaned + ', QC'; // default province for this app
+  }
+  return cleaned + ' ' + pc;
+}
+
+function acceptPostalSuggestion(fullAddress, postalCode) {
+  const input = document.getElementById('f-addr');
+  if (input) { input.value = fullAddress; input.focus(); }
+  closePostalSuggestions();
+  _showPostalStatus(`✅ Postal code ${postalCode} applied — save the patient to confirm.`, 'ok');
+  toast(`📮 Postal code ${postalCode} added to address`, 'success', '✅', 3000);
+}
+
+function closePostalSuggestions() {
+  const s = document.getElementById('postalSuggestions');
+  if (s) s.style.display = 'none';
+}
+
+function _showPostalStatus(msg, type) {
+  const el = document.getElementById('postalStatus');
+  if (!el) return;
+  el.style.display = 'block';
+  const colors = { ok:'var(--green)', warn:'var(--orange)', info:'var(--text-2)' };
+  el.style.color = colors[type] || 'var(--text-2)';
+  el.textContent = msg;
 }
 
 // ── PRINT REPORT ──
@@ -9164,6 +9328,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   window.generateAddressesReport  = generateAddressesReport;
   window.copyAddressesAsText      = copyAddressesAsText;
   window.printReport              = printReport;
+  window.lookupPostalCode         = lookupPostalCode;
+  window.acceptPostalSuggestion   = acceptPostalSuggestion;
+  window.closePostalSuggestions   = closePostalSuggestions;
   window.openGoogleSheets      = openGoogleSheets;
   window.exportReportXLSX      = exportReportXLSX;
   window.exportReportCSV       = exportReportCSV;
