@@ -3242,11 +3242,58 @@ a:focus:not(:focus-visible) { outline: none; }
       </div>
       <div id="nrPatientList" style="max-height:260px;overflow-y:auto"></div>
     </div>
-    <div class="modal-footer">
+    <div class="modal-footer" style="gap:6px">
       <button class="btn-secondary" onclick="closeModal('noRepeatsModal')">Later</button>
-      <button class="btn-primary" onclick="sendConsolidatedEmail()"
-        style="background:linear-gradient(135deg,#CC0000,#990000);border:none">
-        📧 Send Email to Pharmacy
+      <button class="btn-secondary" onclick="sendViaYahooWeb()"
+        title="2-step: copy body then paste in Yahoo Mail web"
+        style="font-size:11px;padding:8px 10px">🌐 Yahoo&nbsp;Web</button>
+      <button class="btn-primary" onclick="sendViaMailApp()"
+        style="flex:1;background:linear-gradient(135deg,#CC0000,#990000);border:none">
+        📧 Send Email
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- NMR EMAIL PREVIEW MODAL (step 2 — shown after "Send Email" is tapped) -->
+<div class="modal-overlay" id="nrEmailPreviewModal">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title">📧 Email Preview — Ready to Send</div>
+      <button class="modal-close" onclick="closeModal('nrEmailPreviewModal')">✕</button>
+    </div>
+    <div class="modal-body" style="padding:14px">
+
+      <!-- Subject line display -->
+      <div style="font-size:11px;font-weight:600;color:var(--text-2);text-transform:uppercase;
+        letter-spacing:.5px;margin-bottom:4px">Subject</div>
+      <div id="nrPreviewSubject" style="font-size:12px;background:var(--bg-2);border-radius:6px;
+        padding:7px 10px;margin-bottom:12px;color:var(--text);font-weight:500"></div>
+
+      <!-- Body preview with proper line breaks -->
+      <div style="font-size:11px;font-weight:600;color:var(--text-2);text-transform:uppercase;
+        letter-spacing:.5px;margin-bottom:4px">Body</div>
+      <pre id="nrPreviewBody" style="font-size:12px;font-family:inherit;white-space:pre-wrap;
+        background:var(--bg-2);border-radius:6px;padding:12px;margin:0 0 14px;
+        color:var(--text);line-height:1.7;max-height:240px;overflow-y:auto;
+        border:1.5px solid var(--border)"></pre>
+
+      <!-- Paste instructions — prominently shown -->
+      <div id="nrPasteInstructions" style="background:rgba(45,140,138,.08);border:1px solid rgba(45,140,138,.25);
+        border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:var(--text)">
+        <div style="font-weight:700;margin-bottom:5px;color:var(--teal)">📋 Body copied to clipboard!</div>
+        <div id="nrPasteSteps"></div>
+      </div>
+
+    </div>
+    <div class="modal-footer" style="gap:8px">
+      <button class="btn-secondary" onclick="nrCopyAgain()" style="flex-shrink:0">
+        📋 Copy again
+      </button>
+      <button class="btn-primary" onclick="nrOpenYahoo()"
+        style="flex:1;background:linear-gradient(135deg,#CC0000,#990000);border:none;font-size:13px">
+        📧 Open Yahoo Mail →
       </button>
     </div>
   </div>
@@ -6247,89 +6294,126 @@ function openNoRepeatsModal(pats) {
   openModal('noRepeatsModal');
 }
 
-async function sendConsolidatedEmail() {
-  const pats = window._nrPatients || [];
-  if (!pats.length) return;
-  const today = new Date().toLocaleDateString('en-CA',{month:'long',day:'numeric',year:'numeric'});
-  const to    = 'reports@medicum.ca';
+// ════════════════════════════════════════════════════════════
+// NMR EMAIL HELPERS
+// ════════════════════════════════════════════════════════════
 
-  const subjectText =
-    'No More Repeats \u2014 ' + pats.length +
-    ' Patient' + (pats.length > 1 ? 's' : '') +
-    ' \u2014 ' + today;
-
-  // One patient per line — Name | File # | Dose (no bullet, clean format)
-  const patientLines = pats.map(p =>
-    (p['Patient Name'] || '') +
-    '  |  File #' + (p['File Number'] || '') +
+// Shared: build email subject + body from current NMR patients
+function _buildNMREmail() {
+  const pats   = window._nrPatients || [];
+  const today  = new Date().toLocaleDateString('en-CA',{month:'long',day:'numeric',year:'numeric'});
+  const to     = 'reports@medicum.ca';
+  const subject = 'No More Repeats \u2014 ' + pats.length + ' Patient' + (pats.length>1?'s':'') + ' \u2014 ' + today;
+  const lines   = pats.map(p =>
+    (p['Patient Name']||'') + '  |  File #' + (p['File Number']||'') +
     (p['Dose Prescribed'] ? '  |  ' + p['Dose Prescribed'] + 'mg' : '')
   ).join('\r\n');
-
-  // Properly formatted body
-  const bodyText =
+  const body =
     'Hello,\r\n\r\n' +
-    'Please be advised that the following patient' +
-    (pats.length > 1 ? 's have' : ' has') +
+    'Please be advised that the following patient' + (pats.length>1?' have':' has') +
     ' no more repeats left as per the pharmacy label.\r\n\r\n' +
-    patientLines + '\r\n\r\n' +
+    lines + '\r\n\r\n' +
     'Please contact the doctor\u2019s office for the continuity of their treatment.\r\n\r\n' +
-    'Thank you!\r\n\r\n' +
-    'Abdul';
+    'Thank you!\r\n\r\nAbdul';
+  return { to, subject, body, pats };
+}
 
-  // ── Strategy: mobile vs desktop ────────────────────────────
-  // Mobile Yahoo Mail (iOS Safari): CRLF in URL body param renders properly
-  //   because mobile Yahoo uses a simpler input field, not the richtext editor
-  // Desktop Yahoo Mail: richtext editor strips %0D%0A → use clipboard instead
-  // Detection: touch device + narrow screen = mobile
-  const isMobile = (('ontouchstart' in window) || (navigator.maxTouchPoints > 0))
-                && window.innerWidth < 900;
+// ── PRIMARY: mailto: approach (ONE step) ──────────────────────
+// Opens device default mail app (Yahoo Mail app if set as default,
+// Apple Mail otherwise). mailto: DOES preserve \r\n line breaks —
+// the body appears fully formatted. User just taps Send. Done.
+// One-time setup if not yet done: iOS Settings > Default Apps > Mail > Yahoo Mail
+function sendViaMailApp() {
+  const { to, subject, body, pats } = _buildNMREmail();
+  if (!pats.length) return;
 
-  // Always copy to clipboard (works as fallback everywhere)
-  const clipboardBody = bodyText.replace(/\r\n/g, '\n'); // plain \n for clipboard
-  let copied = false;
-  try {
-    await navigator.clipboard.writeText(clipboardBody);
-    copied = true;
-  } catch {
-    try {
-      const ta = document.createElement('textarea');
-      ta.value = clipboardBody;
-      Object.assign(ta.style, {position:'fixed',opacity:'0',top:'0',left:'0',width:'1px',height:'1px'});
-      document.body.appendChild(ta);
-      ta.focus(); ta.select();
-      copied = document.execCommand('copy');
-      document.body.removeChild(ta);
-    } catch {}
-  }
+  const mailtoUrl = 'mailto:' + encodeURIComponent(to)
+    + '?subject=' + encodeURIComponent(subject)
+    + '&body='    + encodeURIComponent(body);
 
-  // Build Yahoo compose URL
-  // Mobile: include body (%0D%0A works on mobile Yahoo Mail)
-  // Desktop: omit body (clipboard paste gives proper formatting)
-  let url = 'https://compose.mail.yahoo.com/?to=' + encodeURIComponent(to)
-          + '&subject=' + encodeURIComponent(subjectText);
-  if (isMobile) {
-    url += '&body=' + encodeURIComponent(bodyText);
-  }
+  // Use anchor click — most reliable method on iOS + desktop
+  const a = document.createElement('a');
+  a.href = mailtoUrl;
+  a.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => document.body.removeChild(a), 500);
 
-  window.open(url, '_blank');
   closeModal('noRepeatsModal');
+  toast('\ud83d\udce7 Mail app opened \u2014 formatted and ready. Just tap Send!', 'success', '\ud83d\udce7', 4000);
+}
 
-  if (isMobile) {
-    toast(
-      '\ud83d\udce7 Yahoo Mail opened with ' + pats.length + ' patient' + (pats.length > 1 ? 's' : '') + ' — body pre-filled.',
-      'success', '\ud83d\udccb', 6000
-    );
-  } else if (copied) {
-    toast(
-      '\ud83d\udce7 Yahoo Mail opened \u2014 body copied. Press Ctrl+V (\u2318V) to paste.',
-      'success', '\ud83d\udccb', 8000
-    );
-  } else {
-    toast(
-      '\ud83d\udce7 Yahoo Mail opened \u2014 type the body manually (clipboard unavailable).',
-      'warning', '\u26a0\ufe0f', 6000
-    );
+// ── FALLBACK: Yahoo Mail web approach (2 steps) ──────────────
+// For users who prefer Yahoo Mail web over the mail app.
+// Step 1: body copied to clipboard + preview shown
+// Step 2: user opens Yahoo Mail web and pastes body (long-press → Paste)
+// Kept as fallback via the "🌐 Yahoo Web" button on the NMR modal.
+async function sendViaYahooWeb() {
+  const { to, subject, body, pats } = _buildNMREmail();
+  if (!pats.length) return;
+
+  // Use \n (not \r\n) for clipboard — paste into Yahoo web
+  const clipBody = body.replace(/\r\n/g, '\n');
+
+  window._nrYahooUrl = 'https://compose.mail.yahoo.com/?to=' + encodeURIComponent(to)
+                     + '&subject=' + encodeURIComponent(subject);
+  window._nrBodyText = clipBody;
+  window._nrSubject  = subject;
+
+  window._nrCopied = false;
+  try { await navigator.clipboard.writeText(clipBody); window._nrCopied = true; }
+  catch { try {
+    const ta = document.createElement('textarea');
+    ta.value = clipBody;
+    Object.assign(ta.style,{position:'fixed',opacity:'0',top:'0',left:'0',width:'1px',height:'1px'});
+    document.body.appendChild(ta); ta.focus(); ta.select();
+    window._nrCopied = document.execCommand('copy'); document.body.removeChild(ta);
+  } catch {} }
+
+  // Populate preview modal
+  const subjEl  = document.getElementById('nrPreviewSubject');
+  const bodyEl  = document.getElementById('nrPreviewBody');
+  const stepsEl = document.getElementById('nrPasteSteps');
+  const instrEl = document.getElementById('nrPasteInstructions');
+  if (subjEl) subjEl.textContent = subject;
+  if (bodyEl) bodyEl.textContent = clipBody;
+  const isMobile = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+  if (stepsEl) stepsEl.innerHTML = isMobile
+    ? '<b>1.</b> Tap "Open Yahoo Mail" below<br><b>2.</b> Tap inside the email body<br><b>3.</b> Long-press \u2192 tap <b>Paste</b>'
+    : '<b>1.</b> Click "Open Yahoo Mail" below<br><b>2.</b> Click inside the email body<br><b>3.</b> Press <b>Ctrl+V</b> or <b>\u2318V</b>';
+  const hdr = instrEl?.querySelector('div:first-child');
+  if (hdr) {
+    hdr.textContent = window._nrCopied ? '\ud83d\udccb Body copied to clipboard!' : '\u26a0\ufe0f Could not auto-copy \u2014 tap "Copy again" first';
+    instrEl.style.borderColor = window._nrCopied ? 'rgba(45,140,138,.25)' : 'rgba(200,100,0,.4)';
   }
+  closeModal('noRepeatsModal');
+  openModal('nrEmailPreviewModal');
+}
+
+// Kept for backward compat (was wired to modal Send button)
+async function sendConsolidatedEmail() { sendViaMailApp(); }
+
+function nrOpenYahoo() {
+  window.open(window._nrYahooUrl || 'https://compose.mail.yahoo.com/', '_blank');
+  closeModal('nrEmailPreviewModal');
+  toast('\ud83d\udce7 Yahoo Mail opened \u2014 paste the body you copied', 'success', '\ud83d\udccb', 6000);
+}
+
+async function nrCopyAgain() {
+  const body = window._nrBodyText || '';
+  if (!body) return;
+  let ok = false;
+  try { await navigator.clipboard.writeText(body); ok = true; }
+  catch { try {
+    const ta = document.createElement('textarea');
+    ta.value = body;
+    Object.assign(ta.style,{position:'fixed',opacity:'0',top:'0',left:'0',width:'1px',height:'1px'});
+    document.body.appendChild(ta); ta.focus(); ta.select();
+    ok = document.execCommand('copy'); document.body.removeChild(ta);
+  } catch {} }
+  const hdr = document.getElementById('nrPasteInstructions')?.querySelector('div:first-child');
+  if (hdr) hdr.textContent = ok ? '\ud83d\udccb Copied! Open Yahoo Mail and paste.' : '\u26a0\ufe0f Copy failed.';
+  toast(ok ? '\ud83d\udccb Copied!' : 'Copy failed', ok?'success':'warning', ok?'\ud83d\udccb':'\u26a0\ufe0f', 2500);
 }
 
 // ── End of Day modal ──
@@ -9331,6 +9415,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   window.lookupPostalCode         = lookupPostalCode;
   window.acceptPostalSuggestion   = acceptPostalSuggestion;
   window.closePostalSuggestions   = closePostalSuggestions;
+  window.sendConsolidatedEmail    = sendConsolidatedEmail;
+  window.sendViaMailApp           = sendViaMailApp;
+  window.sendViaYahooWeb          = sendViaYahooWeb;
+  window.nrOpenYahoo              = nrOpenYahoo;
+  window.nrCopyAgain              = nrCopyAgain;
   window.openGoogleSheets      = openGoogleSheets;
   window.exportReportXLSX      = exportReportXLSX;
   window.exportReportCSV       = exportReportCSV;
