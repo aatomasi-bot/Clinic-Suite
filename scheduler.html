@@ -136,6 +136,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 .btn-undo:hover{background:var(--re);color:#fff}
 .btn-conf-day{background:linear-gradient(135deg,var(--teal),var(--td));color:#fff;
   border:none;width:100%;font-size:9px;padding:4px 6px;border-radius:5px}
+.btn-conf-edit{background:linear-gradient(135deg,#BA7517,#E9A23A)!important;box-shadow:0 1px 4px rgba(186,117,23,.3)}
 .btn-conf-day:hover{opacity:.88}
 
 /* ── DAY BODY ────────────── */
@@ -876,7 +877,7 @@ function renderGrid(){
     } else if(mL){
       actionBtns+=`<button class="btn-sm btn-merge disabled" title="${mL.reason}">←</button>`;
     }
-    if(active.length>0){
+    if(active.length>0||editMode){
       actionBtns+=`<button class="btn-sm btn-resort" onclick="resortDay(${i})" title="Re-sort route">↺</button>`;
     }
     if(mR&&mR.ok){
@@ -887,8 +888,21 @@ function renderGrid(){
     }
 
     // ── Row 3 confirm ──────────────────────────────────────────
-    const confirmBtn=active.length>0?
-      `<button class="btn-conf-day" onclick="confirmDay(${i})">✓ Confirm (${active.length})</button>`:'';
+    // Normal mode:  show when there are unconfirmed (active) patients
+    // Edit mode:    show whenever ANY patient is on this day — user
+    //               may have reordered conf patients and needs to save
+    //               the new order. Label changes to "Save order".
+    const confirmTotal = conf.length + active.length;
+    const confirmBtn = editMode
+      ? (confirmTotal > 0
+          ? `<button class="btn-conf-day btn-conf-edit" onclick="confirmDay(${i})"
+              title="Save the new order and re-confirm all patients for this day"
+              style="background:linear-gradient(135deg,#BA7517,#E9A23A)">
+              ✓ Save new order (${confirmTotal})</button>`
+          : '')
+      : (active.length > 0
+          ? `<button class="btn-conf-day" onclick="confirmDay(${i})">✓ Confirm (${active.length})</button>`
+          : '');
 
     // Optimizer badge for this day
     const optPlan2=loadPlan();
@@ -1044,9 +1058,12 @@ function removeSlot(dayIdx,bkt,idx){
 function toggleEdit(dayIdx){
   const d=days[dayIdx];
   if(d.editMode){
+    // Locking — warn if there are unsaved changes (still in editMode means not yet saved)
+    if((d.conf.length+d.active.length)>0&&
+      !confirm('Lock this day without saving?\nUnsaved order changes will be lost.'))return;
     d.editMode=false;
   } else {
-    if(!confirm('Unlock confirmed appointments for editing?\nChanges only save when you click Confirm for this day.'))return;
+    if(!confirm('Unlock this day for editing?\n\nYou can reorder, add or remove patients.\nPress "Save new order" when done to apply changes.'))return;
     d.editMode=true;
   }
   renderGrid();
@@ -1193,50 +1210,56 @@ function insert(arr,at,item){
 // ════════════════════════════════════════════════════════════
 async function confirmDay(dayIdx){
   const d=days[dayIdx];
-  // When in editMode, ALL patients (conf + active) get re-written
-  // When NOT in editMode, only active patients get confirmed
+  // editMode: re-save ALL patients (conf + active) in their current display order
+  // Normal:   save only the unconfirmed (active) patients
   const toSave = d.editMode
     ? [...d.conf,...d.active]
     : d.active;
 
-  if(!toSave.length){toast('No unconfirmed patients on this day');return;}
+  if(!toSave.length){
+    toast(d.editMode
+      ? 'No patients on this day to save'
+      : 'No unconfirmed patients on this day');
+    return;
+  }
   const ds=windowDates()[dayIdx];
-  const dayName=`${DAYS[dayIdx]} ${ds}`;
+  const dayName=`${DAYS[(fromYMD(ds).getDay()+6)%7]} ${ds}`;
   const btn=document.querySelector(`#dh-${dayIdx} .btn-conf-day`);
   if(btn){btn.disabled=true;btn.textContent='Saving…';}
   const startMin=getStartMin();
-  // Offset: if not in editMode, confirmed slots keep their existing times
-  // If in editMode, ALL slots get recalculated from position 0
+  // editMode: all slots recalculated from position 0 (new order)
+  // Normal:   confirmed slots keep existing times; active slots start after
   const confOffset=d.editMode?0:d.conf.length;
   let saved=0;
   try{
-    // In editMode: first clear all existing conf patients' appointments for this day
+    // editMode: first unconfirm all existing conf patients so we can re-assign times
     if(d.editMode){
       for(const p of d.conf){
         await _sb.from('patients').update({
           appointment_date_time:null,appointment_confirmed:false}).eq('id',p.id);
       }
     }
-    // Save all toSave patients
+    // Confirm all patients in toSave with recalculated times
     for(let j=0;j<toSave.length;j++){
       const p=toSave[j];
-      const slotPos = d.editMode ? j : confOffset+j;
+      const slotPos=confOffset+j;
       const tm=startMin+slotPos*SLOT;
       const dt=`${ds}T${p2(Math.floor(tm/60))}:${p2(tm%60)}`;
       await _sb.from('patients').update({
         appointment_date_time:dt,appointment_confirmed:true}).eq('id',p.id);
       saved++;
     }
-    // Signal index.html
+    // Exit editMode on success so day is locked again with new order
+    d.editMode=false;
     localStorage.setItem('vapiq_appts_updated',Date.now());
-    const batchIds=toSave.map(p=>p.id); // track for Undo Last Batch
+    const batchIds=toSave.map(p=>p.id);
     storeBatch(batchIds);
-    toast(`✅ ${saved} confirmed for ${dayName}`,3000);
-    // Reload this day from DB by triggering full reload
+    const verb=d.editMode?'re-ordered':'confirmed';  // already reset, just for context
+    toast(`✅ ${saved} patients saved for ${dayName}`,3000);
     await reload();
   }catch(e){
-    toast('Error: '+e.message,4000);
-    if(btn){btn.disabled=false;btn.textContent=`✓ Confirm (${d.active.length})`;}
+    toast('Error saving: '+e.message,4000);
+    if(btn){btn.disabled=false;btn.textContent=d.editMode?`✓ Save new order (${toSave.length})`:`✓ Confirm (${d.active.length})`;}
   }
 }
 
