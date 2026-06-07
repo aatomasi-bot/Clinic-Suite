@@ -3245,7 +3245,7 @@ a:focus:not(:focus-visible) { outline: none; }
     <div class="modal-footer" style="gap:6px">
       <button class="btn-secondary" onclick="closeModal('noRepeatsModal')">Later</button>
       <button class="btn-secondary" onclick="sendViaYahooWeb()"
-        title="2-step: copy body then paste in Yahoo Mail web"
+        title="Copy body then paste in Yahoo Mail web"
         style="font-size:11px;padding:8px 10px">🌐 Yahoo&nbsp;Web</button>
       <button class="btn-primary" onclick="sendViaMailApp()"
         style="flex:1;background:linear-gradient(135deg,#CC0000,#990000);border:none">
@@ -4293,9 +4293,13 @@ async function performInjection() {
   p['Doses Remaining'] = newLeft;
 
   // Calculate next due date
+  // ── Capture ACTUAL VISIT DATE before clearing appointment fields ──
+  // When an injection is recorded the next day, we still want the
+  // injection_date = the appointment date (when the nurse visited),
+  // NOT today (when the record button was pressed).
   const apptDate = p['Appointment Date & Time'] ? p['Appointment Date & Time'].split('T')[0] : null;
-  const refDate = (p['Appointment Confirmed'] && apptDate) ? apptDate : today;  // use appt date regardless of recording day
-  p['Due Date'] = addWeeks(refDate, DOSE_TO_WEEKS[p['Dose Prescribed']] || 4);
+  const visitDate = (p['Appointment Confirmed'] && apptDate) ? apptDate : today;
+  p['Due Date'] = addWeeks(visitDate, DOSE_TO_WEEKS[p['Dose Prescribed']] || 4);
   p['Injection Administered'] = true;
   p['Appointment Confirmed'] = false;
   p['Appointment Date & Time'] = null;
@@ -4312,7 +4316,7 @@ async function performInjection() {
     const { data: { user } } = await _sb.auth.getUser();
     const { error: injErr } = await _sb.from('injections').upsert({
       file_number:     String(p['File Number']),
-      injection_date:  today,
+      injection_date:  visitDate,           // actual visit date, not recording date
       site:            site,
       dose_mg:         parseFloat(p['Dose Prescribed']) || null,
       notes:           comments || null,
@@ -4327,9 +4331,9 @@ async function performInjection() {
       // Update in-memory cache immediately so UI reflects change without reload
       const fn = String(p['File Number']).trim();
       if (!_injectionHistory[fn]) _injectionHistory[fn] = [];
-      const existingIdx = _injectionHistory[fn].findIndex(r => r.date === today);
+      const existingIdx = _injectionHistory[fn].findIndex(r => r.date === visitDate);
       const newRecord = {
-        date:            today,
+        date:            visitDate,         // actual visit date
         site:            site,
         dose_mg:         parseFloat(p['Dose Prescribed']) || null,
         notes:           comments || '',
@@ -6318,48 +6322,35 @@ function _buildNMREmail() {
   return { to, subject, body, pats };
 }
 
-// ── PRIMARY: mailto: approach (ONE step) ──────────────────────
-// Opens device default mail app (Yahoo Mail app if set as default,
-// Apple Mail otherwise). mailto: DOES preserve \r\n line breaks —
-// the body appears fully formatted. User just taps Send. Done.
-// One-time setup if not yet done: iOS Settings > Default Apps > Mail > Yahoo Mail
+// ── PRIMARY: mailto: — opens device default mail app ─────────
+// Works perfectly on iMac. On iPhone: depends on which mail app
+// is set as default (Apple Mail preserves line breaks; Yahoo app
+// may not). Use 🌐 Yahoo Web as fallback when on iPhone.
 function sendViaMailApp() {
   const { to, subject, body, pats } = _buildNMREmail();
   if (!pats.length) return;
-
   const mailtoUrl = 'mailto:' + encodeURIComponent(to)
     + '?subject=' + encodeURIComponent(subject)
     + '&body='    + encodeURIComponent(body);
-
-  // Use anchor click — most reliable method on iOS + desktop
   const a = document.createElement('a');
   a.href = mailtoUrl;
   a.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
   document.body.appendChild(a);
   a.click();
   setTimeout(() => document.body.removeChild(a), 500);
-
   closeModal('noRepeatsModal');
-  toast('\ud83d\udce7 Mail app opened \u2014 formatted and ready. Just tap Send!', 'success', '\ud83d\udce7', 4000);
+  toast('\ud83d\udce7 Mail app opened \u2014 tap Send to deliver', 'success', '\ud83d\udce7', 4000);
 }
 
-// ── FALLBACK: Yahoo Mail web approach (2 steps) ──────────────
-// For users who prefer Yahoo Mail web over the mail app.
-// Step 1: body copied to clipboard + preview shown
-// Step 2: user opens Yahoo Mail web and pastes body (long-press → Paste)
-// Kept as fallback via the "🌐 Yahoo Web" button on the NMR modal.
+// ── FALLBACK: Yahoo Mail web + clipboard (2 steps) ────────────
 async function sendViaYahooWeb() {
   const { to, subject, body, pats } = _buildNMREmail();
   if (!pats.length) return;
-
-  // Use \n (not \r\n) for clipboard — paste into Yahoo web
   const clipBody = body.replace(/\r\n/g, '\n');
-
   window._nrYahooUrl = 'https://compose.mail.yahoo.com/?to=' + encodeURIComponent(to)
                      + '&subject=' + encodeURIComponent(subject);
   window._nrBodyText = clipBody;
   window._nrSubject  = subject;
-
   window._nrCopied = false;
   try { await navigator.clipboard.writeText(clipBody); window._nrCopied = true; }
   catch { try {
@@ -6369,8 +6360,6 @@ async function sendViaYahooWeb() {
     document.body.appendChild(ta); ta.focus(); ta.select();
     window._nrCopied = document.execCommand('copy'); document.body.removeChild(ta);
   } catch {} }
-
-  // Populate preview modal
   const subjEl  = document.getElementById('nrPreviewSubject');
   const bodyEl  = document.getElementById('nrPreviewBody');
   const stepsEl = document.getElementById('nrPasteSteps');
@@ -6390,8 +6379,7 @@ async function sendViaYahooWeb() {
   openModal('nrEmailPreviewModal');
 }
 
-// Kept for backward compat (was wired to modal Send button)
-async function sendConsolidatedEmail() { sendViaMailApp(); }
+async function sendConsolidatedEmail() { return sendViaMailApp(); }
 
 function nrOpenYahoo() {
   window.open(window._nrYahooUrl || 'https://compose.mail.yahoo.com/', '_blank');
@@ -7431,14 +7419,14 @@ function checkUnbilledToday() {
 }
 
 function getPatientsSeenOn(date) {
-  // Match patients whose most recent injection date matches,
-  // OR whose injection history contains this date
+  // Returns patients whose injection was administered on this date.
+  // injection_date now stores the ACTUAL VISIT DATE (appointment date),
+  // not the recording date — so patients recorded the next day still
+  // appear correctly under their actual visit date.
   return patients.filter(p => {
     if (!p['Injection Administered'] && !getAllDatesForPatient(p).includes(date)) return false;
     const allDates = getAllDatesForPatient(p);
-    // Include if this date appears anywhere in their injection history
     if (allDates.includes(date)) return true;
-    // Also check if injection_administered is true and most recent date matches
     return p['Injection Administered'] && getInjectionDate(p) === date;
   });
 }
@@ -7728,7 +7716,7 @@ function renderAddDayPatientList(date) {
   // ── Auto-detected section ──
   if (autoPats.length > 0) {
     html += `<div style="padding:5px 12px;background:var(--green-bg);border-bottom:1px solid #B6DFC8;font-size:10px;font-weight:800;color:var(--green);text-transform:uppercase;letter-spacing:.5px">
-      ✓ Auto-detected (${autoPats.length}) — injection recorded on this date
+      ✓ Auto-detected (${autoPats.length}) — visited on this date
     </div>`;
     autoPats.forEach(p => {
       const sel = _addDaySelected.has(p.id);
@@ -8822,9 +8810,18 @@ async function recordAllFromNote(fileNum) {
         setLoading(false); return;
       }
       if (left > 0) {
+        // ── Capture ACTUAL VISIT DATE before appointment fields are cleared ──
+        // Critical: appointment_date_time is set to null below, so we must
+        // read it now. If patient had a confirmed appointment on e.g. June 6
+        // but recording happens on June 7, visitDate = June 6 (correct).
+        const _apptRaw  = p['Appointment Date & Time'];
+        const _apptDate = _apptRaw ? _apptRaw.split('T')[0] : null;
+        const _apptConf = !!p['Appointment Confirmed'];
+        const visitDate = (_apptConf && _apptDate) ? _apptDate : today;
+
         let prevDates = (p['Previous Injection Dates'] || '')
           .split(',').map(s => s.trim()).filter(Boolean);
-        if (!prevDates.includes(today)) prevDates.push(today);
+        if (!prevDates.includes(visitDate)) prevDates.push(visitDate);
         p['Previous Injection Dates'] = prevDates.join(', ');
 
         const newLeft = left - 1;
@@ -8834,21 +8831,18 @@ async function recordAllFromNote(fileNum) {
         p['Appointment Date & Time']  = null;
         p['Pending']                  = (newLeft === 0);
 
-        // Reuse existing due-date formula exactly
-        const apptRaw  = p['Appointment Date & Time'];
-        const apptDate = apptRaw ? apptRaw.split('T')[0] : null;
-        const refDate  = (p['Appointment Confirmed'] && apptDate) ? apptDate : today;
-        p['Due Date']  = addWeeks(refDate, DOSE_TO_WEEKS[p['Dose Prescribed']] || 4);
+        // Due date based on actual visit date (not recording date)
+        p['Due Date']  = addWeeks(visitDate, DOSE_TO_WEEKS[p['Dose Prescribed']] || 4);
 
         actions.push(newLeft + ' dose' + (newLeft !== 1 ? 's' : '') + ' left');
         actions.push('Due: ' + formatDateFull(p['Due Date']));
 
-        // Dual-write to injections table (mirrors performInjection)
+        // Dual-write to injections table — use visitDate as injection_date
         try {
           const { data: authData } = await _sb.auth.getUser();
           await _sb.from('injections').upsert({
             file_number:     String(p['File Number']),
-            injection_date:  today,
+            injection_date:  visitDate,     // actual visit date, not recording date
             site,
             dose_mg:         parseFloat(p['Dose Prescribed']) || null,
             notes:           note,
@@ -8858,9 +8852,9 @@ async function recordAllFromNote(fileNum) {
 
           const fn = String(p['File Number']).trim();
           if (!_injectionHistory[fn]) _injectionHistory[fn] = [];
-          const existIdx = _injectionHistory[fn].findIndex(r => r.date === today);
+          const existIdx = _injectionHistory[fn].findIndex(r => r.date === visitDate);
           const rec = {
-            date: today, site,
+            date: visitDate, site,          // actual visit date
             dose_mg: parseFloat(p['Dose Prescribed']) || null,
             notes: note,
             adverse_effects: adverse.length ? adverse.join(', ') : '',
