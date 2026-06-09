@@ -4095,7 +4095,13 @@ function _handleCardClick(e) {
   const callBtn = e.target.closest('.js-call');
   if (callBtn) {
     e.stopPropagation();
-    window.location.href = 'tel:' + callBtn.dataset.phone;
+    // Use <a> click instead of window.location.href — prevents iOS Safari from
+    // adding tel: to navigation history (which causes the ">" forward chevron on right edge)
+    const a = document.createElement('a');
+    a.href = 'tel:' + callBtn.dataset.phone;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
     return;
   }
   const mapBtn = e.target.closest('.js-map');
@@ -5349,9 +5355,15 @@ async function lookupPostalCode() {
     const q = encodeURIComponent(raw + ', Canada');
     const url = `https://nominatim.openstreetmap.org/search?q=${q}&format=json&addressdetails=1&limit=5&countrycodes=ca`;
 
-    const res  = await fetch(url, {
-      headers: { 'Accept-Language': 'en', 'User-Agent': 'VaPiq-ClinicalSuite/1.0' }
+    // Note: User-Agent is a forbidden browser header — DO NOT set it in fetch()
+    // Nominatim accepts requests without it; browser sends its own User-Agent automatically
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000); // 8s timeout
+    const res = await fetch(url, {
+      headers: { 'Accept-Language': 'en,fr' },
+      signal: controller.signal
     });
+    clearTimeout(timeout);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
 
@@ -5407,7 +5419,10 @@ async function lookupPostalCode() {
     }, 100);
 
   } catch (e) {
-    _showPostalStatus(`Lookup failed: ${e.message}. Check your internet connection.`, 'warn');
+    const msg = e.name === 'AbortError'
+      ? 'Request timed out — check your connection and try again.'
+      : `Lookup failed: ${e.message}`;
+    _showPostalStatus(msg, 'warn');
   } finally {
     btn.disabled = false;
     btn.textContent = '🔍 Find postal code';
