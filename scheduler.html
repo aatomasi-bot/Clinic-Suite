@@ -1060,15 +1060,19 @@ function removeSlot(dayIdx,bkt,idx){
 function toggleEdit(dayIdx){
   const d=days[dayIdx];
   if(d.editMode){
-    // Locking — warn if there are unsaved changes (still in editMode means not yet saved)
+    // Locking — warn if there are patients that could have been modified
     if((d.conf.length+d.active.length)>0&&
-      !confirm('Lock this day without saving?\nUnsaved order changes will be lost.'))return;
+      !confirm('Lock this day without saving?\nAny unsaved changes (added or removed patients) will be discarded and the original schedule restored.'))return;
     d.editMode=false;
+    renderGrid();
+    // Reload from DB to restore the true confirmed state —
+    // prevents stale UI if the user added/removed patients without saving
+    reload().catch(()=>{});
   } else {
-    if(!confirm('Unlock this day for editing?\n\nYou can reorder, add or remove patients.\nPress "Save new order" when done to apply changes.'))return;
+    if(!confirm('Unlock this day for editing?\n\nYou can reorder, add or remove patients.\nDrop patients from the pool directly between existing ones.\nPress "Save new order" when done to confirm all changes.'))return;
     d.editMode=true;
+    renderGrid();
   }
-  renderGrid();
 }
 
 // ════════════════════════════════════════════════════════════
@@ -1181,8 +1185,21 @@ function doAssign(pid,dayIdx,insertAt){
   if(!p)return;
   pool=pool.filter(pp=>String(pp.id)!==String(pid));
   const pp={...p,_sugg:false};
-  insert(days[dayIdx].active,insertAt,pp);
-  renderPool();renderGrid();toast(`→ ${DAYS[dayIdx]}`);
+  const d=days[dayIdx];
+
+  if(d.editMode){
+    // ── editMode: insert into conf so the new patient appears at the
+    // correct position between existing confirmed patients.
+    // insertAt = the conf-array index of the card the user dropped onto.
+    // If dropped in empty space (insertAt=-1) → appended at end.
+    // confirmDay already saves [...d.conf,...d.active] so this is safe.
+    insert(d.conf,insertAt,pp);
+    toast(`Added to ${DAYS[(fromYMD(windowDates()[dayIdx]).getDay()+6)%7]} — press "Save order" to confirm`);
+  } else {
+    insert(d.active,insertAt,pp);
+    toast(`→ ${DAYS[(fromYMD(windowDates()[dayIdx]).getDay()+6)%7]}`);
+  }
+  renderPool();renderGrid();
 }
 
 function moveBetween(fd,fb,fi,td,ti){
@@ -1190,8 +1207,12 @@ function moveBetween(fd,fb,fi,td,ti){
   if(!arr||arr[fi]===undefined)return;
   const p={...arr[fi],_sugg:false};
   days[fd][fb]=arr.filter((_,i)=>i!==fi);
-  insert(days[td].active,ti,p);
-  renderPool();renderGrid();toast(`${DAYS[fd]} → ${DAYS[td]}`);
+  // If the target day is in editMode, insert into conf (same logic as doAssign)
+  const targetArr=days[td].editMode?days[td].conf:days[td].active;
+  insert(targetArr,ti,p);
+  const fdName=DAYS[(fromYMD(windowDates()[fd]).getDay()+6)%7];
+  const tdName=DAYS[(fromYMD(windowDates()[td]).getDay()+6)%7];
+  renderPool();renderGrid();toast(`${fdName} → ${tdName}`);
 }
 
 function reorder(di,bkt,fi,ti){
