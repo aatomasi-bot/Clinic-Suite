@@ -768,7 +768,16 @@ input, select, textarea { font: inherit; }
 .search-input-wrap input:focus { background: rgba(255,255,255,.2); }
 
 /* ── Reminders view ─────────────────────────────────────────── */
-#reminderView { padding: 12px; }
+#reminderView {
+  padding: 12px 12px calc(var(--nav-h) + 20px);  /* bottom padding clears nav bar */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  /* Mobile: sit below fixed header, scroll freely above nav */
+  position: fixed;
+  top: var(--header-h);
+  left: 0; right: 0;
+  bottom: var(--nav-h);
+}
 .reminder-header {
   display: flex; align-items: center; justify-content: space-between;
   margin-bottom: 14px;
@@ -1873,6 +1882,23 @@ stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
   body.view-patients #dashView,
   body.view-patients #reportView  { display: none !important; }
   body.view-patients #mainContent { display: block !important; }
+
+  /* Reminder view — desktop grid */
+  #reminderView {
+    grid-column: 2;
+    grid-row: 2 / 4;
+    overflow-y: auto;
+    height: calc(100vh - var(--header-h));
+    padding-bottom: 1.5rem;
+    position: static;   /* override mobile fixed */
+    top: auto; left: auto; right: auto; bottom: auto;
+  }
+  #reminderView.hidden { display: none !important; }
+  body.view-reminders #mainContent,
+  body.view-reminders #dashView,
+  body.view-reminders #invoiceView,
+  body.view-reminders #reportView  { display: none !important; }
+  body.view-reminders #reminderView { display: block !important; }
 
 } /* end @media 960px */
 
@@ -3942,6 +3968,16 @@ function _vsReset() {
   _vsSegments = [];
   _vsNextIdx  = 0;
 }
+
+// ── Pin helpers — must be defined BEFORE renderPatientList uses them ──
+// Full pin system is further below; these lightweight functions are
+// needed early so the patient card template can call isPinned().
+const _PIN_KEY = 'vapiq_pins';
+function loadPins() {
+  try { return JSON.parse(localStorage.getItem(_PIN_KEY) || '[]'); } catch { return []; }
+}
+function savePins(pins) { localStorage.setItem(_PIN_KEY, JSON.stringify(pins)); }
+function isPinned(fileNum) { return loadPins().includes(String(fileNum)); }
 
 function renderPatientList() {
   const el = document.getElementById('mainContent');
@@ -9823,21 +9859,12 @@ window.setTheme = setTheme;
 
 // ════════════════════════════════════════════════════════════
 // ── PIN SYSTEM ───────────────────────────────────────────────
-// Stores up to 10 patient file numbers in localStorage.
-// Chips rendered below search bar; click → navigate to patient.
+// loadPins / savePins / isPinned defined early (before renderPatientList).
+// PIN_KEY mirrors _PIN_KEY for consistency.
 // ════════════════════════════════════════════════════════════
-const PIN_KEY  = 'vapiq_pins';
+const PIN_KEY  = _PIN_KEY;
 const PIN_MAX  = 10;
 
-function loadPins() {
-  try { return JSON.parse(localStorage.getItem(PIN_KEY) || '[]'); } catch { return []; }
-}
-function savePins(pins) {
-  localStorage.setItem(PIN_KEY, JSON.stringify(pins));
-}
-function isPinned(fileNum) {
-  return loadPins().includes(String(fileNum));
-}
 function togglePin(fileNum) {
   const fn = String(fileNum);
   let pins = loadPins();
