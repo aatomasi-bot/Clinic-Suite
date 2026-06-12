@@ -359,3 +359,37 @@ Laval patients removed from that circuit entirely (moved to Friday Jun 26).
 | 8 | Jun 3, 2026 | Both | City-name fallback; Laval H7 sub-steps; Terrebonne NE apex | ✅ |
 
 *Last updated: Jun 3, 2026*
+
+---
+
+## Laval Horseshoe Arc (Circuit B Friday) — Confirmed Jun 11, 2026
+
+### The Problem
+Simple ascending step order (2→3→4) puts Port-au-Persil (NE apex, step 4) LAST 
+and Larivière (SW exit, step 2) SECOND — creating a zig-zag across Laval.
+
+### Correct Arc Order (enter west → sweep NE → return SW → exit to DDO)
+
+| Position | FSA(s) | Key | Example | Why |
+|----------|--------|-----|---------|-----|
+| 1st | H7N | 16 | 64 18e Rue | Entry bridge from H4N — always first in Laval |
+| 2nd | H7E, H7C, H7M, H7P, H7L | 17 | 3220 Port-au-Persil | Far NE apex — go there early, return west |
+| 3rd | H7A, H7T, H7S, H7K, H7V, H7W | 18 | Hennessy, Cageux | Central Laval — middle of arc |
+| 4th | H7G, H7R | 19 | 262 Larivière | SW exit — near southern bridge, last in Laval |
+| After | H9x (DDO, Pierrefonds) | 22 | 380 Isabelle Moyen, 185 Hilton | After all Laval patients |
+| Last | H9x West Island, J7W | 28 | Kirkland, Pincourt | Far West Island — always last |
+
+### Full Circuit B Key Range
+- B step 1 border (H4N, H3M, H4L) → key 10
+- B step 2 Ahuntsic (H2B, H1Z) → key 14
+- H7N Laval entry → key 16
+- H7 NE apex → key 17
+- H7 central → key 18
+- H7 SW exit → key 19
+- B step 4 Pierrefonds/DDO → key 22
+- B step 5 West Island → key 28
+
+### Route Comparison Log Entry — Jun 11, 2026
+Claude: H7N → H7G(Larivière) → Hennessy → Cageux → Port-au-Persil → DDO  ← WRONG
+Correct: H7N → Port-au-Persil → Hennessy → Cageux → Larivière → DDO  ← CORRECT
+Implemented: circBKey() function replaces simple step-ascending sort for all Friday days.
