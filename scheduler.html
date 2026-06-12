@@ -1636,6 +1636,37 @@ function satKey(cl){
   return 10+cl.s;                                     // A: ascending step
 }
 
+// ════════════════════════════════════════════════════════════
+// CIRCUIT B (Friday) SORT KEY — Laval horseshoe arc
+// Confirmed Jun 11, 2026:
+//   H7N (entry bridge, west Laval)   → 1st in Laval
+//   H7E/C/M/P/L (northeast apex)     → 2nd (go far first, then return)
+//   H7A/T/S/K/V/W (central Laval)   → 3rd
+//   H7G/H7R (SW exit, near Pont-Viau back to home) → last in Laval
+//   DDO/Pierrefonds step 4  → after Laval
+//   West Island step 5      → last
+//
+// Arc: enter at H7N (west) → sweep to NE apex → central → exit SW → DDO → West Island
+// ════════════════════════════════════════════════════════════
+const LAVAL_ARC_KEY={
+  'H7N':16,                                           // entry bridge (west) → first
+  'H7E':17,'H7C':17,'H7M':17,'H7P':17,'H7L':17,     // NE apex → second
+  'H7V':18,'H7W':18,'H7A':18,'H7T':18,'H7S':18,'H7K':18, // central → third
+  'H7G':19,'H7R':19,                                 // SW exit → last Laval
+};
+function circBKey(cl){
+  // H7 patients: use confirmed Laval horseshoe arc order
+  if(cl.f2==='H7'){
+    return LAVAL_ARC_KEY[cl.f3||'']||18; // unknown H7 → central position
+  }
+  // Non-Laval Circuit B: step-based (border first, West Island last)
+  const K={1:10,2:14,3:15,4:22,5:28};
+  return K[cl.s]||(10+cl.s);
+  // Result order: B-step-1 (10) → B-step-2 Ahuntsic (14) → Laval entry H7N (16) →
+  // Laval NE apex (17) → Laval central (18) → Laval SW exit (19) →
+  // Pierrefonds/Saint-Eustache step-4 (22) → West Island step-5 (28)
+}
+
 function buildSlots(fromDate){
   return Array.from({length:14},(_,i)=>{
     const d=addDays(fromYMD(fromDate),i);
@@ -1754,11 +1785,11 @@ function runPlanner(pats,fromDate){
     if(!scored.length)break; // nothing more to place
 
     const{sl,cands}=scored[0];
-    const isSat=sl.dow===6;
+    const isSat=sl.dow===6; const isFri=sl.dow===5;
     const room=sl.cap-sl.patients.length;
 
     // Sort candidates by confirmed route step order
-    cands.sort((a,b)=>isSat?(satKey(a._cl)-satKey(b._cl)):(a._cl.s-b._cl.s));
+    cands.sort((a,b)=>isSat?(satKey(a._cl)-satKey(b._cl)):isFri?(circBKey(a._cl)-circBKey(b._cl)):(a._cl.s-b._cl.s));
 
     // Place up to available room
     cands.slice(0,room).forEach(p=>{
@@ -1784,9 +1815,9 @@ function runPlanner(pats,fromDate){
 
   // ── Pass 3: Route sort + special trigger rules ────────────
   slots.forEach(sl=>{
-    const isSat=sl.dow===6;
-    // Step sort: ascending weekday / satKey Saturday
-    sl.patients.sort((a,b)=>isSat?(satKey(a._cl)-satKey(b._cl)):(a._cl.s-b._cl.s));
+    const isSat=sl.dow===6; const isFri=sl.dow===5;
+    // Step sort: ascending weekday / circBKey Friday / satKey Saturday
+    sl.patients.sort((a,b)=>isSat?(satKey(a._cl)-satKey(b._cl)):isFri?(circBKey(a._cl)-circBKey(b._cl)):(a._cl.s-b._cl.s));
     // Vermette trigger: 32 Rue Vermette always goes first regardless of step
     applyVermetteRule(sl.patients);
     applyDeguireLastRule(sl.patients);  // 325 Deguire always last
@@ -1968,10 +1999,10 @@ function resortDay(dayIdx){
   if(!active.length){toast('No unconfirmed patients to sort');return;}
   const dow=fromYMD(windowDates()[dayIdx]).getDay();
   const dayName=DAYS[(dow+6)%7];
-  const isSat=dow===6;
+  const isSat=dow===6; const isFri=dow===5;
   active.sort((a,b)=>{
     const ca=optClassify(a),cb=optClassify(b);
-    return isSat?(satKey(ca)-satKey(cb)):(ca.s-cb.s);
+    return isSat?(satKey(ca)-satKey(cb)):isFri?(circBKey(ca)-circBKey(cb)):(ca.s-cb.s);
   });
   applyVermetteRule(active);
   applyDeguireLastRule(active);  // 325 Deguire always last
@@ -2059,15 +2090,15 @@ function resortDay(dayIdx){
   if(!active.length){toast('No unconfirmed patients to re-sort');return;}
   const dow=fromYMD(windowDates()[dayIdx]).getDay();
   const dayName=DAYS[(dow+6)%7];
-  const isSat=dow===6;
+  const isSat=dow===6; const isFri=dow===5;
   active.sort((a,b)=>{
     const ca=optClassify(a),cb=optClassify(b);
-    return isSat?(satKey(ca)-satKey(cb)):(ca.s-cb.s);
+    return isSat?(satKey(ca)-satKey(cb)):isFri?(circBKey(ca)-circBKey(cb)):(ca.s-cb.s);
   });
   applyVermetteRule(active);
   applyDeguireLastRule(active);  // 325 Deguire always last
   renderGrid();
-  toast('↺ '+dayName+' re-sorted by route order'+(isSat?' (Sat: farthest first)':''));
+  toast('↺ '+dayName+' re-sorted by route order'+(isSat?' (Sat: farthest first)':isFri?' (Fri: Laval arc)':''));
 }
 
 // ════════════════════════════════════════════════════════════
