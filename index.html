@@ -709,6 +709,140 @@ input, select, textarea { font: inherit; }
   align-items: center;
   gap: 0.5rem;
 }
+
+/* ── Pin button on patient card ────────────────────────────── */
+.pin-btn {
+  width: 2rem; height: 2rem; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.85rem; border: 1.5px solid var(--border);
+  background: var(--card); cursor: pointer; flex-shrink: 0;
+  transition: all .18s; color: var(--text-3); padding: 0;
+}
+.pin-btn.pinned {
+  background: rgba(233,162,58,.15); border-color: var(--amber);
+  color: var(--amber); transform: rotate(-30deg);
+}
+.pin-btn:hover { border-color: var(--amber); color: var(--amber); }
+
+/* ── Pin chips strip (below search bar) ────────────────────── */
+#pinStrip {
+  display: flex; align-items: center; gap: 6px;
+  padding: 0 12px 8px; flex-wrap: nowrap; overflow-x: auto;
+  scrollbar-width: none;
+}
+#pinStrip:empty { display: none; }
+#pinStrip::-webkit-scrollbar { display: none; }
+.pin-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: rgba(233,162,58,.12); border: 1.5px solid var(--amber);
+  border-radius: 20px; padding: 4px 8px 4px 10px;
+  font-size: 11px; font-weight: 700; cursor: pointer;
+  white-space: nowrap; flex-shrink: 0; color: var(--text);
+  transition: background .15s;
+}
+.pin-chip:hover { background: rgba(233,162,58,.25); }
+.pin-chip-name { max-width: 90px; overflow: hidden; text-overflow: ellipsis; }
+.pin-chip-file { color: var(--teal-dark); font-size: 10px; }
+.pin-chip-x {
+  width: 14px; height: 14px; border-radius: 50%;
+  background: rgba(0,0,0,.1); border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px; color: var(--text-3); padding: 0; flex-shrink: 0;
+  transition: background .15s;
+}
+.pin-chip-x:hover { background: rgba(192,57,43,.25); color: var(--red); }
+
+/* ── Compact search bar ─────────────────────────────────────── */
+.search-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px 4px;
+}
+.search-input-wrap { flex: 1; position: relative; }
+.search-input-wrap input {
+  width: 100%; padding: 8px 32px 8px 14px;
+  border-radius: 22px; border: none;
+  background: rgba(255,255,255,.13); color: #fff;
+  font-size: 13px; outline: none;
+  transition: background .2s;
+}
+.search-input-wrap input:focus { background: rgba(255,255,255,.2); }
+
+/* ── Reminders view ─────────────────────────────────────────── */
+#reminderView { padding: 12px; }
+.reminder-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 14px;
+}
+.reminder-title {
+  font-size: 16px; font-weight: 800; color: var(--text);
+  display: flex; align-items: center; gap: 8px;
+}
+.rem-empty {
+  text-align: center; padding: 60px 20px;
+  color: var(--text-3); font-size: 14px;
+}
+.rem-empty-icon { font-size: 48px; margin-bottom: 12px; }
+.rem-card {
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: 14px; padding: 14px 16px; margin-bottom: 10px;
+  border-left: 4px solid var(--teal);
+  transition: box-shadow .2s;
+}
+.rem-card.status-no-answer { border-left-color: var(--amber); }
+.rem-card.status-snoozed   { opacity: .6; border-left-color: var(--text-3); }
+.rem-card-head {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
+}
+.rem-avatar {
+  width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 13px; color: #fff;
+  background: linear-gradient(135deg, var(--teal), var(--teal-dark));
+}
+.rem-name { font-weight: 700; font-size: 14px; }
+.rem-file { font-size: 11px; color: var(--teal-dark); font-weight: 600; }
+.rem-meta { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+.rem-phone-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.rem-phone-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: rgba(45,140,138,.1); border: 1px solid rgba(45,140,138,.3);
+  border-radius: 20px; padding: 5px 12px; font-size: 12px; font-weight: 600;
+  color: var(--teal-dark); cursor: pointer; text-decoration: none;
+  transition: background .15s;
+}
+.rem-phone-btn:hover { background: rgba(45,140,138,.2); }
+.rem-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.rem-btn {
+  flex: 1; min-width: 70px; padding: 7px 10px; border-radius: 8px;
+  border: 1.5px solid var(--border); background: var(--card);
+  font-size: 11px; font-weight: 700; cursor: pointer;
+  transition: all .15s; white-space: nowrap;
+}
+.rem-btn:active { transform: scale(.95); }
+.rem-btn--called { background: var(--teal); color: #fff; border-color: var(--teal); }
+.rem-btn--no-answer { border-color: var(--amber); color: var(--amber); }
+.rem-btn--snooze { border-color: var(--text-3); color: var(--text-3); }
+.rem-btn--view { border-color: var(--navy); color: var(--navy); }
+.rem-status-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  border-radius: 20px; padding: 2px 9px; font-size: 10px; font-weight: 700;
+  margin-left: auto;
+}
+.rem-status-badge.no-answer { background: rgba(233,162,58,.15); color: #7A5200; }
+.rem-status-badge.snoozed   { background: rgba(120,120,120,.12); color: var(--text-3); }
+.snooze-picker {
+  display: none; flex-wrap: wrap; gap: 6px; margin-top: 8px;
+  padding: 10px; background: var(--bg); border-radius: 10px;
+}
+.snooze-picker.open { display: flex; }
+.snooze-opt {
+  padding: 6px 12px; border-radius: 20px; border: 1.5px solid var(--border);
+  background: var(--card); font-size: 11px; font-weight: 700;
+  cursor: pointer; transition: all .15s;
+}
+.snooze-opt:hover { border-color: var(--teal); color: var(--teal); }
+[data-theme="dark"] .rem-card { background: var(--card); }
+[data-theme="dark"] .rem-btn--view { color: var(--teal2); border-color: var(--teal2); }
 .action-circle {
   width: 2.25rem;
   height: 2.25rem;
@@ -2451,6 +2585,8 @@ a:focus:not(:focus-visible) { outline: none; }
     </div>
     <button class="search-bar__refresh" id="refreshBtn" title="Refresh">⟳</button>
   </div>
+  <!-- Pin chips strip — shows pinned patients, hidden when empty -->
+  <div id="pinStrip"></div>
   <div class="tabs" id="tabBar">
     <button class="tab-btn active" data-tab="today">Today <span class="tab-count" id="cnt-today">0</span></button>
     <button class="tab-btn" data-tab="scheduled">Scheduled <span class="tab-count" id="cnt-scheduled">0</span></button>
@@ -2464,6 +2600,11 @@ a:focus:not(:focus-visible) { outline: none; }
 
 <!-- PATIENT LIST -->
 <div id="mainContent"></div>
+
+<!-- REMINDERS VIEW -->
+<div id="reminderView" class="hidden">
+  <div id="reminderContent"></div>
+</div>
 
 <!-- DASHBOARD -->
 <div id="dashView" class="hidden">
@@ -2848,11 +2989,10 @@ a:focus:not(:focus-visible) { outline: none; }
     <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
     <span>Patients</span>
   </button>
-  <button class="nav-btn nav-btn--new" id="nav-new">
-    <div class="nav-plus-wrap">
-      <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-    </div>
-    <span>New</span>
+  <button class="nav-btn" data-view="reminders" id="nav-reminders">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+    <span>Reminders</span>
+    <span class="nav-badge hidden" id="badge-reminders" style="background:var(--red)"></span>
   </button>
   <button class="nav-btn" data-view="invoice" id="nav-invoice">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="3"/></svg>
@@ -3686,6 +3826,9 @@ function updateTabCounts() {
     if (c.overdue > 0) { badge.textContent = c.overdue; badge.classList.remove('hidden'); }
     else badge.classList.add('hidden');
   }
+  // Update reminder badge and pin chips after every load
+  if (typeof updateReminderBadge === 'function') updateReminderBadge();
+  if (typeof renderPins === 'function') renderPins();
 }
 
 function getFilteredPatients() {
@@ -3989,6 +4132,7 @@ function renderCard(p, idx) {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 2l4 4-10 10-6 2 2-6L18 2z"/><line x1="14" y1="6" x2="18" y2="10"/></svg>
       Record
     </button>
+    <button class="pin-btn js-pin ${isPinned(p['File Number'])?'pinned':''}" data-fnum="${p['File Number']}" title="${isPinned(p['File Number'])?'Unpin patient':'Pin patient'}">📌</button>
     <button class="note-icon-btn ${hasQuickNote(p['File Number'])?'has-note':''}" data-fnum="${p['File Number']}"
       title="Quick note" onclick="event.stopPropagation();toggleNoteArea('${esc(p['File Number']||'')}')">📝</button>
     <button class="expand-btn js-expand">&#9660;</button>
@@ -4108,6 +4252,12 @@ function _handleCardClick(e) {
   if (mapBtn) {
     e.stopPropagation();
     window.open('https://maps.google.com/?q=' + encodeURIComponent(mapBtn.dataset.addr));
+    return;
+  }
+  const pinBtn = e.target.closest('.js-pin');
+  if (pinBtn) {
+    e.stopPropagation();
+    togglePin(pinBtn.dataset.fnum);
     return;
   }
   const injectBtn = e.target.closest('.js-inject');
@@ -4610,20 +4760,21 @@ const _debouncedMirSearch     = _debounce(() => mirApplySearch(), 150);
 
 function switchView(view) {
   currentView = view;
-  const patientArea = document.getElementById('mainContent');
-  const dashView    = document.getElementById('dashView');
-  const reportView  = document.getElementById('reportView');
-  const invoiceView = document.getElementById('invoiceView');
-  const searchArea  = document.getElementById('searchArea');
+  const patientArea  = document.getElementById('mainContent');
+  const dashView     = document.getElementById('dashView');
+  const reportView   = document.getElementById('reportView');
+  const invoiceView  = document.getElementById('invoiceView');
+  const reminderView = document.getElementById('reminderView');
+  const searchArea   = document.getElementById('searchArea');
 
-  // Set body class for reliable desktop grid switching
-  document.body.classList.remove('view-patients','view-dash','view-report','view-invoice');
-  document.body.classList.add('view-' + (view === 'patients' ? 'patients' : view === 'dash' ? 'dash' : view === 'report' ? 'report' : view === 'invoice' ? 'invoice' : 'patients'));
+  document.body.classList.remove('view-patients','view-dash','view-report','view-invoice','view-reminders');
+  document.body.classList.add('view-' + (['dash','report','invoice','reminders'].includes(view) ? view : 'patients'));
 
   patientArea.classList.add('hidden');
   dashView.classList.add('hidden');
   reportView.classList.add('hidden');
   invoiceView.classList.add('hidden');
+  reminderView.classList.add('hidden');
 
   document.querySelectorAll('.nav-btn[data-view]').forEach(b => b.classList.remove('active'));
   document.getElementById('nav-'+view)?.classList.add('active');
@@ -4639,6 +4790,10 @@ function switchView(view) {
     invoiceView.classList.remove('hidden');
     searchArea.classList.add('hidden');
     renderInvoiceView();
+  } else if (view === 'reminders') {
+    reminderView.classList.remove('hidden');
+    searchArea.classList.add('hidden');
+    renderReminders();
   } else {
     patientArea.classList.remove('hidden');
     searchArea.classList.remove('hidden');
@@ -9290,7 +9445,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.querySelectorAll('.nav-btn[data-view]').forEach(btn => {
     btn.addEventListener('click', () => switchView(btn.dataset.view));
   });
-  document.getElementById('nav-new').addEventListener('click', openAddModal);
+  // nav-new removed — patients added via PDF / Apple Notes in drawer
 
   // Tabs
   document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -9665,6 +9820,288 @@ window.setTheme = setTheme;
   window.notesUpdateField = notesUpdateField;
   window.setPatNote = setPatNote;
   window.switchView = switchView;
+
+// ════════════════════════════════════════════════════════════
+// ── PIN SYSTEM ───────────────────────────────────────────────
+// Stores up to 10 patient file numbers in localStorage.
+// Chips rendered below search bar; click → navigate to patient.
+// ════════════════════════════════════════════════════════════
+const PIN_KEY  = 'vapiq_pins';
+const PIN_MAX  = 10;
+
+function loadPins() {
+  try { return JSON.parse(localStorage.getItem(PIN_KEY) || '[]'); } catch { return []; }
+}
+function savePins(pins) {
+  localStorage.setItem(PIN_KEY, JSON.stringify(pins));
+}
+function isPinned(fileNum) {
+  return loadPins().includes(String(fileNum));
+}
+function togglePin(fileNum) {
+  const fn = String(fileNum);
+  let pins = loadPins();
+  if (pins.includes(fn)) {
+    if (!confirm('Unpin this patient?')) return;
+    pins = pins.filter(p => p !== fn);
+    savePins(pins);
+    renderPins();
+    // Update button state
+    document.querySelectorAll(`.js-pin[data-fnum="${fn}"]`).forEach(b => {
+      b.classList.remove('pinned');
+      b.title = 'Pin patient';
+    });
+    return;
+  }
+  if (pins.length >= PIN_MAX) {
+    showToast(`Maximum ${PIN_MAX} pins reached. Unpin one first.`, 'warn');
+    return;
+  }
+  pins.push(fn);
+  savePins(pins);
+  renderPins();
+  document.querySelectorAll(`.js-pin[data-fnum="${fn}"]`).forEach(b => {
+    b.classList.add('pinned');
+    b.title = 'Unpin patient';
+  });
+  showToast('📌 Patient pinned', 'success');
+}
+function renderPins() {
+  const strip = document.getElementById('pinStrip');
+  if (!strip) return;
+  const pins = loadPins();
+  if (!pins.length) { strip.innerHTML = ''; return; }
+  strip.innerHTML = pins.map(fn => {
+    const p = patients.find(pt => String(pt['File Number']) === fn);
+    const name = p ? (p['Patient Name'] || '').split(' ').slice(0,2).join(' ') : `#${fn}`;
+    return `<div class="pin-chip" onclick="navigateToPin('${fn}')" title="Go to patient ${name}">
+      <span class="pin-chip-name">${esc(name)}</span>
+      <span class="pin-chip-file">#${fn}</span>
+      <button class="pin-chip-x" onclick="event.stopPropagation();unpinChip('${fn}')" title="Unpin">✕</button>
+    </div>`;
+  }).join('');
+}
+function unpinChip(fn) {
+  if (!confirm('Unpin this patient?')) return;
+  const pins = loadPins().filter(p => p !== String(fn));
+  savePins(pins);
+  renderPins();
+  document.querySelectorAll(`.js-pin[data-fnum="${fn}"]`).forEach(b => {
+    b.classList.remove('pinned'); b.title = 'Pin patient';
+  });
+}
+function navigateToPin(fn) {
+  // Find the patient and figure out which tab they belong to
+  const p = patients.find(pt => String(pt['File Number']) === String(fn));
+  if (!p) { showToast('Patient not found in current data', 'warn'); return; }
+  // Determine best tab
+  let tab = 'all';
+  const today = todayStr();
+  const apptDate = p['Appointment Date & Time'] ? p['Appointment Date & Time'].split('T')[0] : null;
+  if (p['Injection Administered']) tab = 'all';
+  else if (p['Pending']) tab = 'pending';
+  else if (apptDate === today && p['Appointment Confirmed']) tab = 'today';
+  else if (p['Appointment Confirmed']) tab = 'scheduled';
+  else if (p['Due Date'] && p['Due Date'] < today) tab = 'overdue';
+  else tab = 'pending';
+
+  switchToTab(tab);
+  // Highlight the card after render
+  setTimeout(() => {
+    const card = document.querySelector(`.patient-card[data-id="${p.id}"]`);
+    if (card) {
+      card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      card.style.outline = '3px solid var(--amber)';
+      card.style.outlineOffset = '2px';
+      setTimeout(() => { card.style.outline = ''; card.style.outlineOffset = ''; }, 2500);
+    }
+  }, 200);
+}
+
+// ════════════════════════════════════════════════════════════
+// ── REMINDER SYSTEM ──────────────────────────────────────────
+// Patients with no confirmed appointment appear here.
+// Status: pending | called | no_answer | snoozed
+// Stored in localStorage. Auto-removed when appointment confirmed.
+// ════════════════════════════════════════════════════════════
+const REM_KEY = 'vapiq_reminders';
+
+function loadRem() {
+  try { return JSON.parse(localStorage.getItem(REM_KEY) || '{}'); } catch { return {}; }
+}
+function saveRem(data) {
+  localStorage.setItem(REM_KEY, JSON.stringify(data));
+}
+
+// Returns patients who should appear in reminders right now
+function getReminderPatients() {
+  const rem  = loadRem();
+  const now  = Date.now();
+  return patients.filter(p => {
+    // Auto-clear: patient now has a confirmed appointment → skip
+    if (p['Appointment Confirmed'] || p['Appointment Date & Time']) return false;
+    // Must be active / not yet injected
+    if (p['Injection Administered']) return false;
+    const fn = String(p['File Number']);
+    const r  = rem[fn];
+    if (!r) return true; // never seen → show
+    if (r.status === 'called') return false; // dismissed
+    if (r.status === 'snoozed' && r.snoozeUntil > now) return false; // still snoozed
+    return true; // pending or no-answer or snooze expired
+  });
+}
+
+function updateReminderBadge() {
+  const badge = document.getElementById('badge-reminders');
+  if (!badge) return;
+  const count = getReminderPatients().length;
+  if (count > 0) {
+    badge.textContent = count > 9 ? '9+' : count;
+    badge.classList.remove('hidden');
+  } else {
+    badge.classList.add('hidden');
+  }
+}
+
+function markCalled(fn) {
+  const rem = loadRem();
+  rem[String(fn)] = { status:'called', calledAt: Date.now() };
+  saveRem(rem);
+  renderReminders();
+  updateReminderBadge();
+  showToast('✓ Marked as called', 'success');
+}
+
+function markNoAnswer(fn) {
+  const rem = loadRem();
+  const existing = rem[String(fn)] || {};
+  rem[String(fn)] = {
+    status: 'no_answer',
+    noAnswerCount: (existing.noAnswerCount || 0) + 1,
+    lastAttempt: Date.now()
+  };
+  saveRem(rem);
+  renderReminders();
+  updateReminderBadge();
+  showToast('📵 No answer recorded', 'warn');
+}
+
+function snoozeReminder(fn, hours) {
+  const rem = loadRem();
+  rem[String(fn)] = {
+    status: 'snoozed',
+    snoozeUntil: Date.now() + hours * 60 * 60 * 1000,
+    prevStatus: (rem[String(fn)] || {}).status || 'pending'
+  };
+  saveRem(rem);
+  // Hide snooze picker
+  const picker = document.getElementById('snooze-' + fn);
+  if (picker) picker.classList.remove('open');
+  renderReminders();
+  updateReminderBadge();
+  const label = hours < 1 ? '30 min' : hours === 1 ? '1 hour' : hours < 24 ? `${hours}h` : `${hours/24} day(s)`;
+  showToast(`⏰ Snoozed for ${label}`, 'info');
+}
+
+function toggleSnooze(fn) {
+  const picker = document.getElementById('snooze-' + fn);
+  if (picker) picker.classList.toggle('open');
+}
+
+function renderReminders() {
+  const container = document.getElementById('reminderContent');
+  if (!container) return;
+  const rem      = loadRem();
+  const remPats  = getReminderPatients();
+  const total    = remPats.length;
+
+  if (!total) {
+    container.innerHTML = `
+      <div class="rem-empty">
+        <div class="rem-empty-icon">🎉</div>
+        <div style="font-weight:700;font-size:15px;margin-bottom:6px">All caught up!</div>
+        <div style="color:var(--text-3)">No patients waiting to be scheduled.<br>New patients will appear here automatically.</div>
+      </div>`;
+    return;
+  }
+
+  const today = todayStr();
+  container.innerHTML = `
+    <div class="reminder-header">
+      <div class="reminder-title">
+        🔔 Call List
+        <span style="font-size:12px;font-weight:600;background:var(--red);color:#fff;border-radius:20px;padding:2px 9px">${total}</span>
+      </div>
+      <button onclick="clearCalledReminders()" style="font-size:11px;color:var(--text-3);background:none;border:none;cursor:pointer">Clear called</button>
+    </div>
+    ${remPats.map(p => {
+      const fn  = String(p['File Number']);
+      const r   = rem[fn] || { status:'pending' };
+      const name = p['Patient Name'] || '';
+      const ph1  = p['Phone 1'] || '';
+      const ph2  = p['Phone 2'] || '';
+      const due  = p['Due Date'] || '';
+      const init = (name.split(' ').map(w=>w[0]).join('').toUpperCase() || '?').slice(0,2);
+      const dueLabel = due ? (due < today ? `⚠️ Overdue since ${due}` : `Due ${due}`) : 'No due date';
+      const noAnsCount = r.noAnswerCount ? ` (${r.noAnswerCount}× no answer)` : '';
+      const statusBadge = r.status === 'no_answer'
+        ? `<span class="rem-status-badge no-answer">📵 No answer${noAnsCount}</span>` : '';
+
+      return `<div class="rem-card ${r.status === 'no_answer' ? 'status-no-answer' : ''}" id="rem-${fn}">
+        <div class="rem-card-head">
+          <div class="rem-avatar">${esc(init)}</div>
+          <div style="flex:1;min-width:0">
+            <div class="rem-name">${esc(name)}</div>
+            <div class="rem-file">#${fn}</div>
+            <div class="rem-meta">${dueLabel}</div>
+          </div>
+          ${statusBadge}
+        </div>
+        ${ph1 || ph2 ? `<div class="rem-phone-row">
+          ${ph1 ? `<a class="rem-phone-btn" href="tel:${ph1.replace(/\D/g,'')}">📞 ${esc(ph1)}</a>` : ''}
+          ${ph2 ? `<a class="rem-phone-btn" href="tel:${ph2.replace(/\D/g,'')}">📞 ${esc(ph2)}</a>` : ''}
+        </div>` : ''}
+        <div class="rem-actions">
+          <button class="rem-btn rem-btn--called" onclick="markCalled('${fn}')">✓ Called</button>
+          <button class="rem-btn rem-btn--no-answer" onclick="markNoAnswer('${fn}')">📵 No answer</button>
+          <button class="rem-btn rem-btn--snooze" onclick="toggleSnooze('${fn}')">⏰ Snooze</button>
+          <button class="rem-btn rem-btn--view" onclick="navigateToPin('${fn}')">👁 View</button>
+        </div>
+        <div class="snooze-picker" id="snooze-${fn}">
+          <span style="font-size:11px;color:var(--text-3);width:100%;margin-bottom:2px">Remind me again in:</span>
+          <button class="snooze-opt" onclick="snoozeReminder('${fn}', 0.5)">30 min</button>
+          <button class="snooze-opt" onclick="snoozeReminder('${fn}', 1)">1 hour</button>
+          <button class="snooze-opt" onclick="snoozeReminder('${fn}', 4)">4 hours</button>
+          <button class="snooze-opt" onclick="snoozeReminder('${fn}', 24)">Tomorrow</button>
+          <button class="snooze-opt" onclick="snoozeReminder('${fn}', 72)">3 days</button>
+          <button class="snooze-opt" onclick="snoozeReminder('${fn}', 168)">1 week</button>
+        </div>
+      </div>`;
+    }).join('')}`;
+}
+
+function clearCalledReminders() {
+  const rem = loadRem();
+  for (const fn of Object.keys(rem)) {
+    if (rem[fn].status === 'called') delete rem[fn];
+  }
+  saveRem(rem);
+  renderReminders();
+  updateReminderBadge();
+}
+
+// Expose globally
+window.togglePin         = togglePin;
+window.unpinChip         = unpinChip;
+window.navigateToPin     = navigateToPin;
+window.markCalled        = markCalled;
+window.markNoAnswer      = markNoAnswer;
+window.snoozeReminder    = snoozeReminder;
+window.toggleSnooze      = toggleSnooze;
+window.clearCalledReminders = clearCalledReminders;
+window.renderReminders   = renderReminders;
+window.renderPins        = renderPins;
+window.updateReminderBadge = updateReminderBadge;
   window.toggleDark = toggleDark;
   window.ignoreDate = ignoreDate;
   window.openNoRepeatsModal = openNoRepeatsModal;
