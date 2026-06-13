@@ -710,6 +710,60 @@ input, select, textarea { font: inherit; }
   gap: 0.5rem;
 }
 
+/* ── Pin toggle button in search bar ───────────────────────── */
+.pin-toggle-btn {
+  position: relative; flex-shrink: 0;
+  background: rgba(233,162,58,.12); border: 1.5px solid rgba(233,162,58,.4);
+  border-radius: 20px; padding: 6px 10px; cursor: pointer; font-size: 14px;
+  transition: background .15s; color: var(--text);
+}
+.pin-toggle-btn:hover { background: rgba(233,162,58,.25); }
+.pin-toggle-count {
+  position: absolute; top: -4px; right: -4px;
+  background: var(--red); color: #fff; border-radius: 10px;
+  font-size: 9px; font-weight: 800; padding: 1px 5px; min-width: 16px;
+  text-align: center; line-height: 14px;
+}
+
+/* ── Pin floating panel ─────────────────────────────────────── */
+.pin-panel {
+  position: absolute; top: 100%; right: 8px; z-index: 500;
+  width: min(320px, calc(100vw - 24px));
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: 14px; box-shadow: 0 12px 36px rgba(0,0,0,.2);
+  overflow: hidden; animation: slideDown .15s ease;
+}
+@keyframes slideDown { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
+.pin-panel-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 14px; border-bottom: 1px solid var(--border);
+  font-size: 12px; font-weight: 700; color: var(--text);
+}
+.pin-panel-empty { padding: 20px 14px; text-align: center; color: var(--text-3); font-size: 12px; }
+.pin-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 14px; border-bottom: 1px solid var(--border);
+  cursor: pointer; transition: background .12s;
+}
+.pin-row:last-child { border-bottom: none; }
+.pin-row:hover { background: var(--bg); }
+.pin-row-avatar {
+  width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+  background: linear-gradient(135deg,var(--teal),var(--teal-dark));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 800; color: #fff;
+}
+.pin-row-name { font-size: 13px; font-weight: 600; flex: 1; min-width: 0; }
+.pin-row-file { font-size: 11px; color: var(--teal-dark); }
+.pin-row-declined { font-size: 10px; color: var(--amber); font-weight: 700; }
+.pin-row-x {
+  width: 22px; height: 22px; border-radius: 50%; border: none;
+  background: rgba(0,0,0,.07); cursor: pointer; font-size: 10px;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  transition: background .12s; color: var(--text-3);
+}
+.pin-row-x:hover { background: rgba(192,57,43,.2); color: var(--red); }
+
 /* ── Pin button on patient card ────────────────────────────── */
 .pin-btn {
   width: 2rem; height: 2rem; border-radius: 50%;
@@ -718,39 +772,134 @@ input, select, textarea { font: inherit; }
   background: var(--card); cursor: pointer; flex-shrink: 0;
   transition: all .18s; color: var(--text-3); padding: 0;
 }
-.pin-btn.pinned {
-  background: rgba(233,162,58,.15); border-color: var(--amber);
-  color: var(--amber); transform: rotate(-30deg);
-}
+.pin-btn.pinned { background: rgba(233,162,58,.15); border-color: var(--amber); color: var(--amber); transform: rotate(-30deg); }
 .pin-btn:hover { border-color: var(--amber); color: var(--amber); }
 
-/* ── Pin chips strip (below search bar) ────────────────────── */
-#pinStrip {
+/* ── Reminders — two group layout ──────────────────────────── */
+.rem-group-title {
+  font-size: 11px; font-weight: 800; text-transform: uppercase;
+  letter-spacing: .7px; color: var(--text-3); padding: 12px 4px 8px;
   display: flex; align-items: center; gap: 6px;
-  padding: 0 12px 8px; flex-wrap: nowrap; overflow-x: auto;
-  scrollbar-width: none;
 }
-#pinStrip:empty { display: none; }
-#pinStrip::-webkit-scrollbar { display: none; }
-.pin-chip {
-  display: inline-flex; align-items: center; gap: 5px;
-  background: rgba(233,162,58,.12); border: 1.5px solid var(--amber);
-  border-radius: 20px; padding: 4px 8px 4px 10px;
-  font-size: 11px; font-weight: 700; cursor: pointer;
-  white-space: nowrap; flex-shrink: 0; color: var(--text);
-  transition: background .15s;
+.rem-group-badge {
+  background: var(--red); color: #fff; border-radius: 10px;
+  padding: 1px 7px; font-size: 10px; font-weight: 800;
 }
-.pin-chip:hover { background: rgba(233,162,58,.25); }
-.pin-chip-name { max-width: 90px; overflow: hidden; text-overflow: ellipsis; }
-.pin-chip-file { color: var(--teal-dark); font-size: 10px; }
-.pin-chip-x {
-  width: 14px; height: 14px; border-radius: 50%;
-  background: rgba(0,0,0,.1); border: none; cursor: pointer;
+.rem-group-badge.confirm { background: var(--amber); color: var(--navy); }
+
+/* ── Reminder cards ─────────────────────────────────────────── */
+.rem-card {
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: 14px; padding: 14px 16px; margin-bottom: 10px;
+  border-left: 4px solid var(--teal); transition: box-shadow .2s;
+}
+.rem-card.status-no-answer  { border-left-color: var(--amber); }
+.rem-card.status-snoozed    { opacity: .6; border-left-color: var(--text-3); }
+.rem-card.status-declined   { border-left-color: var(--red); background: rgba(192,57,43,.04); }
+.rem-card.needs-confirm     { border-left-color: var(--amber); }
+.rem-card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.rem-avatar {
+  width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
-  font-size: 9px; color: var(--text-3); padding: 0; flex-shrink: 0;
-  transition: background .15s;
+  font-weight: 800; font-size: 13px; color: #fff;
+  background: linear-gradient(135deg,var(--teal),var(--teal-dark));
 }
-.pin-chip-x:hover { background: rgba(192,57,43,.25); color: var(--red); }
+.rem-avatar.amber { background: linear-gradient(135deg,var(--amber),#B37A20); }
+.rem-name { font-weight: 700; font-size: 14px; }
+.rem-file { font-size: 11px; color: var(--teal-dark); font-weight: 600; }
+.rem-meta { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+.rem-appt-time {
+  font-size: 12px; font-weight: 700; color: var(--amber);
+  background: rgba(233,162,58,.12); border-radius: 6px; padding: 2px 8px;
+  margin-top: 4px; display: inline-block;
+}
+.rem-phone-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.rem-phone-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: rgba(45,140,138,.1); border: 1px solid rgba(45,140,138,.3);
+  border-radius: 20px; padding: 5px 12px; font-size: 12px; font-weight: 600;
+  color: var(--teal-dark); cursor: pointer; text-decoration: none; transition: background .15s;
+}
+.rem-phone-btn:hover { background: rgba(45,140,138,.2); }
+.rem-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.rem-btn {
+  flex: 1; min-width: 70px; padding: 7px 10px; border-radius: 8px;
+  border: 1.5px solid var(--border); background: var(--card);
+  font-size: 11px; font-weight: 700; cursor: pointer;
+  transition: all .15s; white-space: nowrap;
+}
+.rem-btn:active { transform: scale(.95); }
+.rem-btn--called   { background: var(--teal);  color: #fff; border-color: var(--teal); }
+.rem-btn--accepted { background: var(--green); color: #fff; border-color: var(--green); }
+.rem-btn--declined { background: var(--red);   color: #fff; border-color: var(--red); }
+.rem-btn--no-answer { border-color: var(--amber); color: var(--amber); }
+.rem-btn--snooze   { border-color: var(--text-3); color: var(--text-3); }
+.rem-btn--view     { border-color: var(--navy); color: var(--navy); }
+.rem-status-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  border-radius: 20px; padding: 2px 9px; font-size: 10px; font-weight: 700; margin-left: auto;
+}
+.rem-status-badge.no-answer { background: rgba(233,162,58,.15); color: #7A5200; }
+.rem-status-badge.snoozed   { background: rgba(120,120,120,.12); color: var(--text-3); }
+.rem-status-badge.declined  { background: rgba(192,57,43,.12); color: var(--red); }
+
+/* ── Acceptance inline form ─────────────────────────────────── */
+.accept-form {
+  display: none; background: rgba(46,125,94,.06); border-radius: 10px;
+  padding: 12px; margin-top: 10px; border: 1px solid rgba(46,125,94,.25);
+}
+.accept-form.open { display: block; }
+.accept-form-label { font-size: 11px; font-weight: 700; color: var(--green); margin-bottom: 8px; }
+.accept-form-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.accept-time-input {
+  border: 1.5px solid var(--border); border-radius: 8px;
+  padding: 7px 10px; font-size: 13px; font-weight: 600;
+  background: var(--card); color: var(--text); width: 90px; outline: none;
+  font-family: var(--mono);
+}
+.accept-time-input:focus { border-color: var(--green); }
+.accept-preview {
+  font-size: 12px; font-weight: 700; color: var(--green);
+  background: rgba(46,125,94,.1); border-radius: 6px; padding: 4px 10px; flex: 1;
+}
+.accept-confirm-btn {
+  background: var(--green); color: #fff; border: none; border-radius: 8px;
+  padding: 7px 14px; font-size: 12px; font-weight: 700; cursor: pointer;
+  transition: opacity .15s;
+}
+.accept-confirm-btn:hover { opacity: .85; }
+
+/* ── Snooze picker ──────────────────────────────────────────── */
+.snooze-picker {
+  display: none; flex-wrap: wrap; gap: 6px; margin-top: 8px;
+  padding: 10px; background: var(--bg); border-radius: 10px;
+}
+.snooze-picker.open { display: flex; }
+.snooze-opt {
+  padding: 6px 12px; border-radius: 20px; border: 1.5px solid var(--border);
+  background: var(--card); font-size: 11px; font-weight: 700;
+  cursor: pointer; transition: all .15s;
+}
+.snooze-opt:hover { border-color: var(--teal); color: var(--teal); }
+
+/* ── Reminder view scroll ───────────────────────────────────── */
+#reminderView {
+  padding: 0 12px calc(var(--nav-h) + 20px);
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+  position: fixed; top: var(--header-h); left: 0; right: 0; bottom: var(--nav-h);
+}
+.reminder-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 4px 4px; position: sticky; top: 0;
+  background: var(--bg); z-index: 2;
+}
+.reminder-title { font-size: 16px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+.rem-empty { text-align: center; padding: 60px 20px; color: var(--text-3); font-size: 14px; }
+.rem-empty-icon { font-size: 48px; margin-bottom: 12px; }
+[data-theme="dark"] .rem-card { background: var(--card); }
+[data-theme="dark"] .rem-btn--view { color: var(--teal2); border-color: var(--teal2); }
+
+/* pinStrip removed — replaced by pin panel button */
 
 /* ── Compact search bar ─────────────────────────────────────── */
 .search-bar {
@@ -1885,13 +2034,10 @@ stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
 
   /* Reminder view — desktop grid */
   #reminderView {
-    grid-column: 2;
-    grid-row: 2 / 4;
-    overflow-y: auto;
-    height: calc(100vh - var(--header-h));
+    grid-column: 2; grid-row: 2 / 4;
+    overflow-y: auto; height: calc(100vh - var(--header-h));
     padding-bottom: 1.5rem;
-    position: static;   /* override mobile fixed */
-    top: auto; left: auto; right: auto; bottom: auto;
+    position: static; top: auto; left: auto; right: auto; bottom: auto;
   }
   #reminderView.hidden { display: none !important; }
   body.view-reminders #mainContent,
@@ -1899,6 +2045,9 @@ stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
   body.view-reminders #invoiceView,
   body.view-reminders #reportView  { display: none !important; }
   body.view-reminders #reminderView { display: block !important; }
+  /* Pin panel: on desktop anchor to search bar */
+  .pin-panel { position: absolute; right: 12px; top: calc(100% + 2px); }
+  #searchArea { position: relative; }
 
 } /* end @media 960px */
 
@@ -2606,13 +2755,23 @@ a:focus:not(:focus-visible) { outline: none; }
 <div id="searchArea">
   <div class="search-bar">
     <div class="search-input-wrap">
-      <input type="search" id="searchInput" placeholder="Search name or file number…" autocomplete="off">
+      <input type="search" id="searchInput" placeholder="Search…" autocomplete="off">
       <button class="search-clear" id="clearSearch">✕</button>
     </div>
     <button class="search-bar__refresh" id="refreshBtn" title="Refresh">⟳</button>
+    <!-- Pin panel toggle button -->
+    <button class="pin-toggle-btn" id="pinToggleBtn" onclick="togglePinPanel()" title="Pinned patients">
+      📌<span class="pin-toggle-count hidden" id="pinBadgeCount">0</span>
+    </button>
   </div>
-  <!-- Pin chips strip — shows pinned patients, hidden when empty -->
-  <div id="pinStrip"></div>
+  <!-- Pin floating panel — opens on tap of 📌 -->
+  <div class="pin-panel hidden" id="pinPanel">
+    <div class="pin-panel-head">
+      <span>📌 Pinned Patients</span>
+      <button onclick="togglePinPanel()" style="background:none;border:none;cursor:pointer;color:var(--text-3);font-size:16px">✕</button>
+    </div>
+    <div id="pinPanelList"><div class="pin-panel-empty">No patients pinned yet.</div></div>
+  </div>
   <div class="tabs" id="tabBar">
     <button class="tab-btn active" data-tab="today">Today <span class="tab-count" id="cnt-today">0</span></button>
     <button class="tab-btn" data-tab="scheduled">Scheduled <span class="tab-count" id="cnt-scheduled">0</span></button>
@@ -3852,9 +4011,11 @@ function updateTabCounts() {
     if (c.overdue > 0) { badge.textContent = c.overdue; badge.classList.remove('hidden'); }
     else badge.classList.add('hidden');
   }
-  // Update reminder badge and pin chips after every load
+  // Update reminder badge and pin UI after every load
   if (typeof updateReminderBadge === 'function') updateReminderBadge();
   if (typeof renderPins === 'function') renderPins();
+  // Sync pins from Supabase in background (cross-device)
+  if (typeof syncPinsFromSupabase === 'function') syncPinsFromSupabase();
 }
 
 function getFilteredPatients() {
@@ -8975,7 +9136,9 @@ async function recordAllFromNote(fileNum) {
   // Authoritative source: cache (populated on save). Only use live textarea if panel is open.
   const ta     = document.querySelector('#narea-' + fileNum + ' textarea');
   const isOpen = document.getElementById('narea-' + fileNum)?.classList.contains('open');
-  const note   = (ta && isOpen ? ta.value : getQuickNote(fileNum)).trim();
+  // Auto-strip any lingering time-window comment (e.g. "8:00-10:00, OK") from the note
+  const rawNote = (ta && isOpen ? ta.value : getQuickNote(fileNum)).trim();
+  const note    = typeof stripTimeWindow === 'function' ? stripTimeWindow(rawNote) : rawNote;
 
   if (!note) { toast('Quick note is empty — nothing to process', 'warning'); return; }
 
@@ -9858,12 +10021,484 @@ window.setTheme = setTheme;
   window.switchView = switchView;
 
 // ════════════════════════════════════════════════════════════
-// ── PIN SYSTEM ───────────────────────────────────────────────
+// ── PIN SYSTEM (Supabase-synced, cross-device) ───────────────
 // loadPins / savePins / isPinned defined early (before renderPatientList).
-// PIN_KEY mirrors _PIN_KEY for consistency.
+// Full panel + sync logic here.
 // ════════════════════════════════════════════════════════════
 const PIN_KEY  = _PIN_KEY;
 const PIN_MAX  = 10;
+const PIN_TABLE = 'vapiq_pins';
+
+let _pinPanelOpen = false;
+
+// ── Supabase sync (background, non-blocking) ─────────────────
+async function syncPinsFromSupabase() {
+  try {
+    const { data: u } = await _sb.auth.getUser();
+    if (!u?.user?.id) return;
+    const { data, error } = await _sb.from(PIN_TABLE)
+      .select('pins').eq('user_id', u.user.id).maybeSingle();
+    if (error || !data) return;
+    const remote = data.pins || [];
+    // Only update if different from local
+    const local = JSON.parse(localStorage.getItem(PIN_KEY) || '[]');
+    if (JSON.stringify(remote) !== JSON.stringify(local)) {
+      localStorage.setItem(PIN_KEY, JSON.stringify(remote));
+      renderPins();
+    }
+  } catch(e) { console.warn('Pin sync read:', e.message); }
+}
+
+async function savePinsToSupabase(pins) {
+  localStorage.setItem(PIN_KEY, JSON.stringify(pins)); // immediate local
+  try {
+    const { data: u } = await _sb.auth.getUser();
+    if (!u?.user?.id) return;
+    await _sb.from(PIN_TABLE).upsert({
+      user_id: u.user.id,
+      pins: pins,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'user_id' });
+  } catch(e) { console.warn('Pin sync write:', e.message); }
+}
+
+// ── Pin panel UI ─────────────────────────────────────────────
+function togglePinPanel() {
+  _pinPanelOpen = !_pinPanelOpen;
+  const panel = document.getElementById('pinPanel');
+  if (!panel) return;
+  if (_pinPanelOpen) { panel.classList.remove('hidden'); renderPinPanel(); }
+  else panel.classList.add('hidden');
+}
+
+function renderPinPanel() {
+  const list = document.getElementById('pinPanelList');
+  if (!list) return;
+  const pins = loadPins();
+  if (!pins.length) {
+    list.innerHTML = '<div class="pin-panel-empty">No patients pinned yet.<br><small>Tap 📌 on any patient card.</small></div>';
+    return;
+  }
+  list.innerHTML = pins.map(fn => {
+    const p = patients.find(pt => String(pt['File Number']) === String(fn));
+    const name = p ? (p['Patient Name'] || '').trim() : `#${fn}`;
+    const init = (name.split(' ').map(w=>w[0]).join('').toUpperCase()||'?').slice(0,2);
+    const rem  = loadRem();
+    const decl = rem[String(fn)]?.status === 'declined';
+    return `<div class="pin-row" onclick="navigateToPin('${fn}')">
+      <div class="pin-row-avatar">${esc(init)}</div>
+      <div style="flex:1;min-width:0">
+        <div class="pin-row-name">${esc(name)}</div>
+        <div class="pin-row-file">#${fn}${decl ? ' <span class="pin-row-declined">⚠ Needs reschedule</span>' : ''}</div>
+      </div>
+      <button class="pin-row-x" onclick="event.stopPropagation();unpinFromPanel('${fn}')" title="Unpin">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function renderPins() {
+  const badge = document.getElementById('pinBadgeCount');
+  const btn   = document.getElementById('pinToggleBtn');
+  const count = loadPins().length;
+  if (badge) {
+    badge.textContent = count;
+    if (count > 0) badge.classList.remove('hidden');
+    else badge.classList.add('hidden');
+  }
+  if (_pinPanelOpen) renderPinPanel();
+}
+
+async function togglePin(fileNum) {
+  const fn = String(fileNum);
+  let pins = loadPins();
+  if (pins.includes(fn)) {
+    if (!confirm('Unpin this patient?')) return;
+    pins = pins.filter(p => p !== fn);
+    await savePinsToSupabase(pins);
+    renderPins();
+    document.querySelectorAll(`.js-pin[data-fnum="${fn}"]`).forEach(b => {
+      b.classList.remove('pinned'); b.title = 'Pin patient';
+    });
+    return;
+  }
+  if (pins.length >= PIN_MAX) { showToast(`Max ${PIN_MAX} pins reached`, 'warn'); return; }
+  pins.push(fn);
+  await savePinsToSupabase(pins);
+  renderPins();
+  document.querySelectorAll(`.js-pin[data-fnum="${fn}"]`).forEach(b => {
+    b.classList.add('pinned'); b.title = 'Unpin patient';
+  });
+  showToast('📌 Patient pinned', 'success');
+}
+
+async function unpinFromPanel(fn) {
+  if (!confirm('Unpin this patient?')) return;
+  const pins = loadPins().filter(p => p !== String(fn));
+  await savePinsToSupabase(pins);
+  renderPins();
+  document.querySelectorAll(`.js-pin[data-fnum="${fn}"]`).forEach(b => {
+    b.classList.remove('pinned'); b.title = 'Pin patient';
+  });
+}
+
+function navigateToPin(fn) {
+  const p = patients.find(pt => String(pt['File Number']) === String(fn));
+  if (!p) { showToast('Patient not found in current data', 'warn'); return; }
+  // Close pin panel
+  _pinPanelOpen = false;
+  document.getElementById('pinPanel')?.classList.add('hidden');
+  // Determine best tab
+  const today  = todayStr();
+  const apptDate = p['Appointment Date & Time'] ? p['Appointment Date & Time'].split('T')[0] : null;
+  let tab = 'all';
+  if (p['Injection Administered'])   tab = 'all';
+  else if (p['Pending'])             tab = 'pending';
+  else if (apptDate === today && p['Appointment Confirmed']) tab = 'today';
+  else if (p['Appointment Confirmed']) tab = 'scheduled';
+  else if (p['Due Date'] && p['Due Date'] < today) tab = 'overdue';
+  else tab = 'pending';
+  switchView('patients');
+  switchToTab(tab);
+  setTimeout(() => {
+    const card = document.querySelector(`.patient-card[data-id="${p.id}"]`);
+    if (card) {
+      card.scrollIntoView({ behavior:'smooth', block:'center' });
+      card.style.outline = '3px solid var(--amber)';
+      card.style.outlineOffset = '2px';
+      setTimeout(() => { card.style.outline=''; card.style.outlineOffset=''; }, 2500);
+    }
+  }, 250);
+}
+
+// Close pin panel when clicking outside
+document.addEventListener('click', e => {
+  if (!_pinPanelOpen) return;
+  const btn   = document.getElementById('pinToggleBtn');
+  const panel = document.getElementById('pinPanel');
+  if (btn?.contains(e.target) || panel?.contains(e.target)) return;
+  _pinPanelOpen = false;
+  panel?.classList.add('hidden');
+});
+
+// ════════════════════════════════════════════════════════════
+// ── REMINDER SYSTEM ──────────────────────────────────────────
+// Group 1: Patients with NO appointment → needs scheduling call
+// Group 2: Scheduler-confirmed patients → needs confirmation call
+// ════════════════════════════════════════════════════════════
+const REM_KEY = 'vapiq_reminders';
+const TIME_WINDOW_RE = /\d{1,2}:\d{2}\s*[-–]\s*\d{1,2}:\d{2}\s*,?\s*(?:OK|ok)\s*\n?/g;
+
+function loadRem() {
+  try { return JSON.parse(localStorage.getItem(REM_KEY) || '{}'); } catch { return {}; }
+}
+function saveRem(data) { localStorage.setItem(REM_KEY, JSON.stringify(data)); }
+
+// Auto-strip time window comment from a note string (safety net on Record)
+function stripTimeWindow(note) {
+  if (!note) return note;
+  return note.replace(TIME_WINDOW_RE, '').trim();
+}
+
+// Calculate "HH:MM-HH:MM, OK" from a start time string like "08:00"
+function calcTimeWindow(startStr) {
+  if (!startStr) return '';
+  const [h, m] = startStr.split(':').map(Number);
+  if (isNaN(h) || isNaN(m)) return '';
+  const endH = (h + 2) % 24;
+  const fmt  = (n, pad) => pad ? String(n).padStart(2,'0') : String(n);
+  return `${fmt(h,false)}:${fmt(m,true)}-${fmt(endH,false)}:${fmt(m,true)}, OK`;
+}
+
+function extractApptTime(p) {
+  const dt = p['Appointment Date & Time'];
+  if (!dt) return '';
+  const t = dt.split('T')[1] || '';
+  return t.slice(0, 5); // "08:00"
+}
+
+function getReminderGroups() {
+  const rem    = loadRem();
+  const now    = Date.now();
+  const today  = todayStr();
+  const cutoff = new Date(Date.now() + 21 * 86400000).toISOString().split('T')[0]; // 3 weeks out
+  const g1 = [], g2 = [];
+
+  patients.forEach(p => {
+    if (p['Injection Administered']) return; // already done
+    const fn = String(p['File Number']);
+    const r  = rem[fn] || {};
+    if (r.status === 'called' || r.status === 'confirmation_called') return; // done
+    if (r.status === 'snoozed' && r.snoozeUntil > now) return; // still snoozed
+
+    const hasAppt  = !!p['Appointment Date & Time'];
+    const isConf   = !!p['Appointment Confirmed'];
+    const apptDate = hasAppt ? p['Appointment Date & Time'].split('T')[0] : null;
+
+    if (!hasAppt || !isConf) {
+      // Group 1: needs an appointment
+      g1.push({ ...p, _remStatus: r.status || 'pending', _rem: r });
+    } else if (hasAppt && isConf && apptDate && apptDate >= today && apptDate <= cutoff) {
+      // Group 2: scheduled within 3 weeks, needs patient call to confirm
+      g2.push({ ...p, _remStatus: r.status || 'pending', _rem: r });
+    }
+  });
+  return { g1, g2 };
+}
+
+function updateReminderBadge() {
+  const badge = document.getElementById('badge-reminders');
+  if (!badge) return;
+  const { g1, g2 } = getReminderGroups();
+  const count = g1.length + g2.length;
+  if (count > 0) { badge.textContent = count > 99 ? '99+' : count; badge.classList.remove('hidden'); }
+  else badge.classList.add('hidden');
+}
+
+function renderReminders() {
+  const container = document.getElementById('reminderContent');
+  if (!container) return;
+  const { g1, g2 } = getReminderGroups();
+  const total = g1.length + g2.length;
+
+  if (!total) {
+    container.innerHTML = `
+      <div class="rem-empty">
+        <div class="rem-empty-icon">🎉</div>
+        <div style="font-weight:700;font-size:15px;margin-bottom:6px">All caught up!</div>
+        <div>No patients waiting. New patients and optimized appointments appear here automatically.</div>
+      </div>`; return;
+  }
+
+  const today = todayStr();
+
+  const renderCard = (p, isGroup2) => {
+    const fn   = String(p['File Number']);
+    const r    = p._rem || {};
+    const name = p['Patient Name'] || '';
+    const ph1  = p['Phone 1'] || '';
+    const ph2  = p['Phone 2'] || '';
+    const due  = p['Due Date'] || '';
+    const apptTime = extractApptTime(p);
+    const init = (name.split(' ').map(w=>w[0]).join('').toUpperCase()||'?').slice(0,2);
+    const noAnsCount = r.noAnswerCount ? ` (${r.noAnswerCount}×)` : '';
+
+    const statusBadge =
+      r.status === 'no_answer' ? `<span class="rem-status-badge no-answer">📵 No answer${noAnsCount}</span>` :
+      r.status === 'declined'  ? `<span class="rem-status-badge declined">❌ Declined</span>` : '';
+
+    const dueLabel = isGroup2
+      ? `📅 Appt: ${p['Appointment Date & Time'] ? new Date(p['Appointment Date & Time']).toLocaleDateString('en-CA',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '—'}`
+      : (due ? (due < today ? `⚠️ Overdue since ${due}` : `Due ${due}`) : 'No due date');
+
+    const apptBlock = isGroup2 && apptTime
+      ? `<div class="rem-appt-time">🕐 ${apptTime} → ${calcTimeWindow(apptTime)}</div>` : '';
+
+    const actionBtns = isGroup2 ? `
+      <button class="rem-btn rem-btn--accepted" onclick="openAcceptForm('${fn}')">✓ Accepted</button>
+      <button class="rem-btn rem-btn--declined" onclick="markDeclined('${fn}')">✗ Declined</button>
+      <button class="rem-btn rem-btn--snooze"   onclick="toggleSnooze('${fn}')">⏰ Snooze</button>
+      <button class="rem-btn rem-btn--view"     onclick="navigateToPin('${fn}')">👁 View</button>
+    ` : `
+      <button class="rem-btn rem-btn--called"    onclick="markCalled('${fn}')">✓ Called</button>
+      <button class="rem-btn rem-btn--no-answer" onclick="markNoAnswer('${fn}')">📵 No answer</button>
+      <button class="rem-btn rem-btn--snooze"    onclick="toggleSnooze('${fn}')">⏰ Snooze</button>
+      <button class="rem-btn rem-btn--view"      onclick="navigateToPin('${fn}')">👁 View</button>
+    `;
+
+    const cardClass = [
+      'rem-card',
+      r.status === 'no_answer' ? 'status-no-answer' : '',
+      r.status === 'snoozed'   ? 'status-snoozed'   : '',
+      r.status === 'declined'  ? 'status-declined'   : '',
+      isGroup2                 ? 'needs-confirm'     : ''
+    ].filter(Boolean).join(' ');
+
+    return `<div class="${cardClass}" id="rem-${fn}">
+      <div class="rem-card-head">
+        <div class="rem-avatar${isGroup2?' amber':''}">${esc(init)}</div>
+        <div style="flex:1;min-width:0">
+          <div class="rem-name">${esc(name)}</div>
+          <div class="rem-file">#${fn}</div>
+          <div class="rem-meta">${dueLabel}</div>
+          ${apptBlock}
+        </div>
+        ${statusBadge}
+      </div>
+      ${ph1||ph2 ? `<div class="rem-phone-row">
+        ${ph1 ? `<a class="rem-phone-btn" href="tel:${ph1.replace(/\D/g,'')}">📞 ${esc(ph1)}</a>` : ''}
+        ${ph2 ? `<a class="rem-phone-btn" href="tel:${ph2.replace(/\D/g,'')}">📞 ${esc(ph2)}</a>` : ''}
+      </div>` : ''}
+      <div class="rem-actions">${actionBtns}</div>
+      <!-- Accept form (Group 2 only) -->
+      <div class="accept-form" id="accept-${fn}">
+        <div class="accept-form-label">✓ Patient accepted — enter appointment start time:</div>
+        <div class="accept-form-row">
+          <input type="text" class="accept-time-input" id="atime-${fn}"
+            value="${apptTime}" placeholder="8:00"
+            oninput="updateAcceptPreview('${fn}')"
+            onkeydown="if(event.key==='Enter')confirmAccepted('${fn}')">
+          <div class="accept-preview" id="aprev-${fn}">${calcTimeWindow(apptTime)||'enter time above'}</div>
+          <button class="accept-confirm-btn" onclick="confirmAccepted('${fn}')">✓ Confirm</button>
+        </div>
+      </div>
+      <!-- Snooze picker -->
+      <div class="snooze-picker" id="snooze-${fn}">
+        <span style="font-size:11px;color:var(--text-3);width:100%;margin-bottom:2px">Remind again in:</span>
+        <button class="snooze-opt" onclick="snoozeReminder('${fn}', 0.5)">30 min</button>
+        <button class="snooze-opt" onclick="snoozeReminder('${fn}', 1)">1 hour</button>
+        <button class="snooze-opt" onclick="snoozeReminder('${fn}', 4)">4 hours</button>
+        <button class="snooze-opt" onclick="snoozeReminder('${fn}', 24)">Tomorrow</button>
+        <button class="snooze-opt" onclick="snoozeReminder('${fn}', 72)">3 days</button>
+        <button class="snooze-opt" onclick="snoozeReminder('${fn}', 168)">1 week</button>
+      </div>
+    </div>`;
+  };
+
+  let html = `
+    <div class="reminder-header">
+      <div class="reminder-title">🔔 Call List <span style="font-size:12px;background:var(--red);color:#fff;border-radius:10px;padding:2px 8px;font-weight:700">${total}</span></div>
+      <button onclick="clearCalledReminders()" style="font-size:11px;color:var(--text-3);background:none;border:none;cursor:pointer;padding:4px 8px">Clear called</button>
+    </div>`;
+
+  if (g2.length) {
+    html += `<div class="rem-group-title"><span>📅 Needs Confirmation Call</span><span class="rem-group-badge confirm">${g2.length}</span></div>`;
+    html += g2.map(p => renderCard(p, true)).join('');
+  }
+  if (g1.length) {
+    html += `<div class="rem-group-title"><span>📞 Needs Appointment</span><span class="rem-group-badge">${g1.length}</span></div>`;
+    html += g1.map(p => renderCard(p, false)).join('');
+  }
+  container.innerHTML = html;
+}
+
+// ── Reminder actions ──────────────────────────────────────────
+function markCalled(fn) {
+  const rem = loadRem();
+  rem[String(fn)] = { status:'called', calledAt: Date.now() };
+  saveRem(rem); renderReminders(); updateReminderBadge();
+  showToast('✓ Marked as called', 'success');
+}
+
+function markNoAnswer(fn) {
+  const rem = loadRem();
+  const ex  = rem[String(fn)] || {};
+  rem[String(fn)] = { status:'no_answer', noAnswerCount:(ex.noAnswerCount||0)+1, lastAttempt:Date.now() };
+  saveRem(rem); renderReminders(); updateReminderBadge();
+  showToast('📵 No answer recorded', 'warn');
+}
+
+async function markDeclined(fn) {
+  const rem = loadRem();
+  rem[String(fn)] = { status:'declined', declinedAt: Date.now() };
+  saveRem(rem);
+  // Auto-pin the patient so they show in pins for reschedule tracking
+  let pins = loadPins();
+  if (!pins.includes(String(fn))) {
+    if (pins.length < PIN_MAX) {
+      pins.push(String(fn));
+      await savePinsToSupabase(pins);
+      renderPins();
+      document.querySelectorAll(`.js-pin[data-fnum="${fn}"]`).forEach(b => {
+        b.classList.add('pinned'); b.title = 'Unpin patient';
+      });
+    }
+  }
+  renderReminders(); updateReminderBadge();
+  showToast('❌ Declined — patient pinned for reschedule', 'warn');
+}
+
+function snoozeReminder(fn, hours) {
+  const rem = loadRem();
+  rem[String(fn)] = { status:'snoozed', snoozeUntil: Date.now() + hours*3600000 };
+  saveRem(rem);
+  document.getElementById('snooze-'+fn)?.classList.remove('open');
+  renderReminders(); updateReminderBadge();
+  const label = hours < 1 ? '30 min' : hours===1 ? '1 hour' : hours<24 ? `${hours}h` : `${hours/24} day(s)`;
+  showToast(`⏰ Snoozed ${label}`, 'info');
+}
+
+function toggleSnooze(fn) {
+  document.getElementById('snooze-'+fn)?.classList.toggle('open');
+}
+
+// ── Accept flow ───────────────────────────────────────────────
+function openAcceptForm(fn) {
+  const form = document.getElementById('accept-'+fn);
+  if (!form) return;
+  form.classList.toggle('open');
+  if (form.classList.contains('open')) {
+    const inp = document.getElementById('atime-'+fn);
+    inp?.focus(); inp?.select();
+    updateAcceptPreview(fn);
+  }
+}
+
+function updateAcceptPreview(fn) {
+  const inp  = document.getElementById('atime-'+fn);
+  const prev = document.getElementById('aprev-'+fn);
+  if (!inp || !prev) return;
+  const win = calcTimeWindow(inp.value.trim());
+  prev.textContent = win || 'e.g. 8:00';
+}
+
+async function confirmAccepted(fn) {
+  const inp  = document.getElementById('atime-'+fn);
+  const time = (inp?.value || '').trim();
+  if (!time) { showToast('Enter appointment start time', 'warn'); inp?.focus(); return; }
+  const window = calcTimeWindow(time);
+  if (!window) { showToast('Invalid time — use format 8:00 or 14:30', 'warn'); inp?.focus(); return; }
+
+  // Prepend time window to quick note
+  const current = getQuickNote(fn) || '';
+  const newNote = window + (current ? '\n' + current : '');
+  await saveQuickNote(fn, newNote);
+
+  // Set appointment_confirmed = true in Supabase
+  try {
+    await _sb.from('patients').update({ appointment_confirmed: true }).eq('file_number', String(fn));
+    // Update in-memory patient record
+    const p = patients.find(pt => String(pt['File Number']) === String(fn));
+    if (p) p['Appointment Confirmed'] = true;
+  } catch(e) { console.warn('Confirm appointment update:', e.message); }
+
+  // Mark reminder as confirmation-called
+  const rem = loadRem();
+  rem[String(fn)] = { status:'confirmation_called', calledAt: Date.now(), timeWindow: window };
+  saveRem(rem);
+
+  renderReminders(); updateReminderBadge();
+  const p = patients.find(pt => String(pt['File Number']) === String(fn));
+  showToast(`✅ ${p?.['Patient Name'] || '#'+fn} confirmed — "${window}" added to notes`, 'success');
+}
+
+function clearCalledReminders() {
+  const rem = loadRem();
+  for (const fn of Object.keys(rem)) {
+    if (rem[fn].status === 'called' || rem[fn].status === 'confirmation_called') delete rem[fn];
+  }
+  saveRem(rem); renderReminders(); updateReminderBadge();
+}
+
+// ── Expose globally ───────────────────────────────────────────
+window.togglePin           = togglePin;
+window.unpinFromPanel      = unpinFromPanel;
+window.navigateToPin       = navigateToPin;
+window.togglePinPanel      = togglePinPanel;
+window.renderPins          = renderPins;
+window.markCalled          = markCalled;
+window.markNoAnswer        = markNoAnswer;
+window.markDeclined        = markDeclined;
+window.snoozeReminder      = snoozeReminder;
+window.toggleSnooze        = toggleSnooze;
+window.openAcceptForm      = openAcceptForm;
+window.updateAcceptPreview = updateAcceptPreview;
+window.confirmAccepted     = confirmAccepted;
+window.clearCalledReminders = clearCalledReminders;
+window.renderReminders     = renderReminders;
+window.updateReminderBadge = updateReminderBadge;
+window.calcTimeWindow      = calcTimeWindow;
+window.stripTimeWindow     = stripTimeWindow;
+window.syncPinsFromSupabase = syncPinsFromSupabase;
 
 function togglePin(fileNum) {
   const fn = String(fileNum);
