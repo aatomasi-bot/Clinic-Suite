@@ -10475,30 +10475,45 @@ async function confirmAccepted(fn) {
   const inp  = document.getElementById('atime-'+fn);
   const time = (inp?.value || '').trim();
   if (!time) { showToast('Enter appointment start time', 'warn'); inp?.focus(); return; }
-  const window = calcTimeWindow(time);
-  if (!window) { showToast('Invalid time — use format 8:00 or 14:30', 'warn'); inp?.focus(); return; }
+
+  // 'timeWin' — NOT named 'window' (that shadows the global browser object)
+  const timeWin = calcTimeWindow(time);
+  if (!timeWin) { showToast('Invalid time — use format 8:00 or 14:30', 'warn'); inp?.focus(); return; }
+
+  // Find patient record first so we have their id for Supabase
+  const pat = patients.find(pt => String(pt['File Number']) === String(fn));
 
   // Prepend time window to quick note
   const current = getQuickNote(fn) || '';
-  const newNote = window + (current ? '\n' + current : '');
+  const newNote = timeWin + (current ? '\n' + current : '');
   await saveQuickNote(fn, newNote);
 
-  // Set appointment_confirmed = true in Supabase
-  try {
-    await _sb.from('patients').update({ appointment_confirmed: true }).eq('file_number', String(fn));
-    // Update in-memory patient record
-    const p = patients.find(pt => String(pt['File Number']) === String(fn));
-    if (p) p['Appointment Confirmed'] = true;
-  } catch(e) { console.warn('Confirm appointment update:', e.message); }
-
-  // Mark reminder as confirmation-called
+  // Mark reminder status FIRST — before any async calls that might re-render
   const rem = loadRem();
-  rem[String(fn)] = { status:'confirmation_called', calledAt: Date.now(), timeWindow: window };
+  rem[String(fn)] = { status:'confirmation_called', calledAt: Date.now(), timeWindow: timeWin };
   saveRem(rem);
 
-  renderReminders(); updateReminderBadge();
-  const p = patients.find(pt => String(pt['File Number']) === String(fn));
-  showToast(`✅ ${p?.['Patient Name'] || '#'+fn} confirmed — "${window}" added to notes`, 'success');
+  // Update in-memory patient record immediately
+  if (pat) pat['Appointment Confirmed'] = true;
+
+  // Re-render immediately so patient disappears from list
+  renderReminders();
+  updateReminderBadge();
+
+  // Close the accept form
+  const form = document.getElementById('accept-'+fn);
+  if (form) form.classList.remove('open');
+
+  showToast(`✅ ${pat?.['Patient Name'] || '#'+fn} confirmed — "${timeWin}" added to notes`, 'success');
+
+  // Persist to Supabase in background (non-blocking)
+  try {
+    // Use patient id for reliable matching regardless of column type
+    const updateTarget = pat?.id
+      ? _sb.from('patients').update({ appointment_confirmed: true }).eq('id', pat.id)
+      : _sb.from('patients').update({ appointment_confirmed: true }).eq('file_number', String(fn));
+    await updateTarget;
+  } catch(e) { console.warn('Confirm appointment Supabase update (non-fatal):', e.message); }
 }
 
 function clearCalledReminders() {
