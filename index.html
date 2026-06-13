@@ -897,7 +897,6 @@ input, select, textarea { font: inherit; }
 .rem-empty { text-align: center; padding: 60px 20px; color: var(--text-3); font-size: 14px; }
 .rem-empty-icon { font-size: 48px; margin-bottom: 12px; }
 [data-theme="dark"] .rem-card { background: var(--card); }
-[data-theme="dark"] .rem-btn--view { color: var(--teal2); border-color: var(--teal2); }
 
 /* pinStrip removed — replaced by pin panel button */
 
@@ -974,13 +973,17 @@ input, select, textarea { font: inherit; }
   flex: 1; min-width: 70px; padding: 7px 10px; border-radius: 8px;
   border: 1.5px solid var(--border); background: var(--card);
   font-size: 11px; font-weight: 700; cursor: pointer;
-  transition: all .15s; white-space: nowrap;
+  transition: all .15s; white-space: nowrap; color: var(--text);
 }
 .rem-btn:active { transform: scale(.95); }
-.rem-btn--called { background: var(--teal); color: #fff; border-color: var(--teal); }
+/* ALL variants MUST come after .rem-btn to win the cascade */
+.rem-btn--called    { background: var(--teal);  color: #fff !important; border-color: var(--teal); }
+.rem-btn--accepted  { background: var(--green); color: #fff !important; border-color: var(--green); }
+.rem-btn--declined  { background: var(--red);   color: #fff !important; border-color: var(--red); }
+.rem-btn--cancel    { border-color: var(--text-3); color: var(--text-3); }
 .rem-btn--no-answer { border-color: var(--amber); color: var(--amber); }
-.rem-btn--snooze { border-color: var(--text-3); color: var(--text-3); }
-.rem-btn--view { border-color: var(--navy); color: var(--navy); }
+.rem-btn--snooze    { border-color: var(--text-3); color: var(--text-3); }
+.rem-btn--view      { border-color: var(--navy);   color: var(--navy); }
 .rem-status-badge {
   display: inline-flex; align-items: center; gap: 4px;
   border-radius: 20px; padding: 2px 9px; font-size: 10px; font-weight: 700;
@@ -988,6 +991,15 @@ input, select, textarea { font: inherit; }
 }
 .rem-status-badge.no-answer { background: rgba(233,162,58,.15); color: #7A5200; }
 .rem-status-badge.snoozed   { background: rgba(120,120,120,.12); color: var(--text-3); }
+.rem-status-badge.declined  { background: rgba(224,90,90,.12); color: var(--red); }
+/* Dark mode text contrast for reminder cards */
+[data-theme="dark"] .rem-name        { color: #FFFFFF; }
+[data-theme="dark"] .rem-file        { color: var(--teal-2); }
+[data-theme="dark"] .rem-meta        { color: var(--text-2); }
+[data-theme="dark"] .rem-appt-time   { background: rgba(217,119,6,.2); color: #FBBF24; }
+[data-theme="dark"] .rem-btn--view   { color: var(--teal-2); border-color: var(--teal-2); }
+[data-theme="dark"] .rem-btn--cancel { color: var(--text-2); border-color: var(--text-3); }
+[data-theme="dark"] .accept-form     { background: rgba(61,154,107,.1); border-color: rgba(61,154,107,.3); }
 .snooze-picker {
   display: none; flex-wrap: wrap; gap: 6px; margin-top: 8px;
   padding: 10px; background: var(--bg); border-radius: 10px;
@@ -10229,6 +10241,13 @@ function getReminderGroups() {
     const r  = rem[fn] || {};
     if (r.status === 'called' || r.status === 'confirmation_called') return; // done
     if (r.status === 'snoozed' && r.snoozeUntil > now) return; // still snoozed
+    if (r.status === 'cancelled') {
+      // Re-appear only if the appointment was changed (patient re-optimized)
+      const currentApptDT = p['Appointment Date & Time'] || '';
+      if (currentApptDT === r.apptDT) return; // same appointment → still cancelled
+      // Different/new appointment → reset and show
+      delete rem[fn]; saveRem(rem);
+    }
 
     const hasAppt  = !!p['Appointment Date & Time'];
     const isConf   = !!p['Appointment Confirmed'];
@@ -10298,11 +10317,13 @@ function renderReminders() {
       <button class="rem-btn rem-btn--declined" onclick="markDeclined('${fn}')">✗ Declined</button>
       <button class="rem-btn rem-btn--snooze"   onclick="toggleSnooze('${fn}')">⏰ Snooze</button>
       <button class="rem-btn rem-btn--view"     onclick="navigateToPin('${fn}')">👁 View</button>
+      <button class="rem-btn rem-btn--cancel"   onclick="markCancelled('${fn}','${(p['Appointment Date & Time']||'').replace(/'/g,'')}')" title="Remove from list until next optimization">✕ Cancel</button>
     ` : `
       <button class="rem-btn rem-btn--called"    onclick="markCalled('${fn}')">✓ Called</button>
       <button class="rem-btn rem-btn--no-answer" onclick="markNoAnswer('${fn}')">📵 No answer</button>
       <button class="rem-btn rem-btn--snooze"    onclick="toggleSnooze('${fn}')">⏰ Snooze</button>
       <button class="rem-btn rem-btn--view"      onclick="navigateToPin('${fn}')">👁 View</button>
+      <button class="rem-btn rem-btn--cancel"    onclick="markCancelled('${fn}','')" title="Remove from list — reappears on next optimization">✕ Cancel</button>
     `;
 
     const cardClass = [
@@ -10377,6 +10398,15 @@ function markCalled(fn) {
   rem[String(fn)] = { status:'called', calledAt: Date.now() };
   saveRem(rem); renderReminders(); updateReminderBadge();
   showToast('✓ Marked as called', 'success');
+}
+
+function markCancelled(fn, apptDT) {
+  // Stores the current appointment time alongside status.
+  // If the patient is re-optimized (new apptDT), they reappear automatically.
+  const rem = loadRem();
+  rem[String(fn)] = { status:'cancelled', cancelledAt: Date.now(), apptDT: apptDT || '' };
+  saveRem(rem); renderReminders(); updateReminderBadge();
+  showToast('Removed from call list — reappears when re-optimized', 'info');
 }
 
 function markNoAnswer(fn) {
@@ -10486,6 +10516,7 @@ window.navigateToPin       = navigateToPin;
 window.togglePinPanel      = togglePinPanel;
 window.renderPins          = renderPins;
 window.markCalled          = markCalled;
+window.markCancelled       = markCancelled;
 window.markNoAnswer        = markNoAnswer;
 window.markDeclined        = markDeclined;
 window.snoozeReminder      = snoozeReminder;
