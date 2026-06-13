@@ -900,7 +900,16 @@ input, select, textarea { font: inherit; }
 
 /* pinStrip removed — replaced by pin panel button */
 
-/* ── Compact search bar ─────────────────────────────────────── */
+/* ── Reminder action buttons ─────────────────────────────────── */
+/* Mobile: 2-row grid — primary actions on row 1, secondary on row 2 */
+@media (max-width: 520px) {
+  .rem-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+  .rem-btn { font-size: 11px; padding: 8px 5px; min-width: 0; flex: none; }
+  /* Accepted/Called take full-width row 1 */
+  .rem-btn--accepted, .rem-btn--called { grid-column: 1 / 3; }
+  /* Declined/No-answer full-width row 2 */
+  .rem-btn--declined, .rem-btn--no-answer { grid-column: 1 / 3; }
+}
 .search-bar {
   display: flex; align-items: center; gap: 8px;
   padding: 10px 12px 4px;
@@ -4026,8 +4035,9 @@ function updateTabCounts() {
   // Update reminder badge and pin UI after every load
   if (typeof updateReminderBadge === 'function') updateReminderBadge();
   if (typeof renderPins === 'function') renderPins();
-  // Sync pins from Supabase in background (cross-device)
+  // Sync pins and reminders from Supabase in background (cross-device)
   if (typeof syncPinsFromSupabase === 'function') syncPinsFromSupabase();
+  if (typeof syncRemindersFromSupabase === 'function') syncRemindersFromSupabase();
 }
 
 function getFilteredPatients() {
@@ -7464,14 +7474,17 @@ function getAllInjectionRecords(p) {
 let _quickNotesCache = {};  // fileNumber(string) → noteText
 
 async function loadQuickNotesFromDB() {
+  // Step 1: Load localStorage immediately (instant, no network)
+  try { _quickNotesCache = JSON.parse(localStorage.getItem('_qn') || '{}'); } catch(e) { _quickNotesCache = {}; }
+  // Step 2: Fetch from Supabase and MERGE (Supabase wins for same key, keeps local-only entries)
   try {
     const { data, error } = await _sb.from('quick_notes').select('*');
     if (error) throw error;
-    _quickNotesCache = {};
-    (data||[]).forEach(r => { if(r.note_text) _quickNotesCache[String(r.file_number)] = r.note_text; });
+    (data||[]).forEach(r => { if (r.note_text) _quickNotesCache[String(r.file_number)] = r.note_text; });
+    // Persist merged result back to localStorage
+    try { localStorage.setItem('_qn', JSON.stringify(_quickNotesCache)); } catch(e) {}
   } catch(e) {
-    // Fallback: localStorage
-    try { _quickNotesCache = JSON.parse(localStorage.getItem('_qn')||'{}'); } catch(e2) {}
+    // Supabase unavailable — already loaded from localStorage above, nothing to do
   }
 }
 
@@ -10198,12 +10211,47 @@ document.addEventListener('click', e => {
 // Group 2: Scheduler-confirmed patients → needs confirmation call
 // ════════════════════════════════════════════════════════════
 const REM_KEY = 'vapiq_reminders';
+const REM_TABLE = 'vapiq_reminders'; // Supabase table for cross-device sync
 const TIME_WINDOW_RE = /\d{1,2}:\d{2}\s*[-–]\s*\d{1,2}:\d{2}\s*,?\s*(?:OK|ok)\s*\n?/g;
 
 function loadRem() {
   try { return JSON.parse(localStorage.getItem(REM_KEY) || '{}'); } catch { return {}; }
 }
-function saveRem(data) { localStorage.setItem(REM_KEY, JSON.stringify(data)); }
+function saveRem(data) {
+  localStorage.setItem(REM_KEY, JSON.stringify(data));
+  // Sync to Supabase in background for cross-device access
+  _syncRemToSupabase(data).catch(() => {});
+}
+async function _syncRemToSupabase(data) {
+  try {
+    const { data: u } = await _sb.auth.getUser();
+    if (!u?.user?.id) return;
+    await _sb.from(REM_TABLE).upsert({
+      user_id: u.user.id, reminders: data,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'user_id' });
+  } catch(e) { /* non-fatal, localStorage is source of truth */ }
+}
+async function syncRemindersFromSupabase() {
+  try {
+    const { data: u } = await _sb.auth.getUser();
+    if (!u?.user?.id) return;
+    const { data, error } = await _sb.from(REM_TABLE)
+      .select('reminders').eq('user_id', u.user.id).maybeSingle();
+    if (error || !data?.reminders) return;
+    const remote = data.reminders;
+    const local  = loadRem();
+    // Merge: prefer remote status for each file number (it's always the latest action)
+    const merged = { ...local, ...remote };
+    localStorage.setItem(REM_KEY, JSON.stringify(merged));
+    // Refresh UI if data changed
+    if (JSON.stringify(merged) !== JSON.stringify(local)) {
+      updateReminderBadge();
+      if (typeof currentView !== 'undefined' && currentView === 'reminders') renderReminders();
+    }
+  } catch(e) { console.warn('Reminder sync:', e.message); }
+}
+window.syncRemindersFromSupabase = syncRemindersFromSupabase;
 
 // Auto-strip time window comment from a note string (safety net on Record)
 function stripTimeWindow(note) {
