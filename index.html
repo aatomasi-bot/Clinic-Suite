@@ -821,7 +821,6 @@ input, select, textarea { font: inherit; }
   color: var(--teal-dark); cursor: pointer; text-decoration: none; transition: background .15s;
 }
 .rem-phone-btn:hover { background: rgba(45,140,138,.2); }
-.rem-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .rem-btn {
   flex: 1; min-width: 70px; padding: 7px 10px; border-radius: 8px;
   border: 1.5px solid var(--border); background: var(--card);
@@ -900,15 +899,24 @@ input, select, textarea { font: inherit; }
 
 /* pinStrip removed — replaced by pin panel button */
 
-/* ── Reminder action buttons ─────────────────────────────────── */
-/* Mobile: 2-row grid — primary actions on row 1, secondary on row 2 */
-@media (max-width: 520px) {
-  .rem-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
-  .rem-btn { font-size: 11px; padding: 8px 5px; min-width: 0; flex: none; }
-  /* Accepted/Called take full-width row 1 */
-  .rem-btn--accepted, .rem-btn--called { grid-column: 1 / 3; }
-  /* Declined/No-answer full-width row 2 */
-  .rem-btn--declined, .rem-btn--no-answer { grid-column: 1 / 3; }
+/* ── Reminder action buttons — mobile layout ────────────────── */
+/* On phones: primary actions (Accepted/Declined) full-width rows,
+   secondary (Snooze, View, Cancel) in 3-column row below */
+@media (max-width: 540px) {
+  .rem-actions {
+    display: grid !important;          /* override duplicate flex declaration */
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 5px;
+  }
+  .rem-btn {
+    font-size: 10.5px; padding: 8px 4px; min-width: 0 !important;
+    white-space: nowrap; text-overflow: ellipsis; overflow: hidden;
+  }
+  /* Green button — full width row 1 */
+  .rem-btn--accepted, .rem-btn--called   { grid-column: 1 / 4; font-size: 12px; }
+  /* Red button — full width row 2 */
+  .rem-btn--declined, .rem-btn--no-answer { grid-column: 1 / 4; font-size: 12px; }
+  /* Snooze, View, Cancel — each take 1 of 3 columns in row 3 */
 }
 .search-bar {
   display: flex; align-items: center; gap: 8px;
