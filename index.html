@@ -777,50 +777,18 @@ input, select, textarea { font: inherit; }
 
 /* ── Reminders — two group layout ──────────────────────────── */
 .rem-group-title {
-  font-size: 11px; font-weight: 800; text-transform: uppercase;
-  letter-spacing: .7px; color: var(--text-3); padding: 12px 4px 8px;
-  display: flex; align-items: center; gap: 6px;
+  font-size: 10px; font-weight: 800; text-transform: uppercase;
+  letter-spacing: .7px; color: var(--text-3); padding: 8px 2px 5px;
+  display: flex; align-items: center; gap: 5px;
 }
 .rem-group-badge {
   background: var(--red); color: #fff; border-radius: 10px;
-  padding: 1px 7px; font-size: 10px; font-weight: 800;
+  padding: 1px 6px; font-size: 9px; font-weight: 800;
 }
 .rem-group-badge.confirm { background: var(--amber); color: var(--navy); }
 
 /* ── Reminder cards ─────────────────────────────────────────── */
-.rem-card {
-  background: var(--card); border: 1.5px solid var(--border);
-  border-radius: 14px; padding: 14px 16px; margin-bottom: 10px;
-  border-left: 4px solid var(--teal); transition: box-shadow .2s;
-}
-.rem-card.status-no-answer  { border-left-color: var(--amber); }
-.rem-card.status-snoozed    { opacity: .6; border-left-color: var(--text-3); }
-.rem-card.status-declined   { border-left-color: var(--red); background: rgba(192,57,43,.04); }
-.rem-card.needs-confirm     { border-left-color: var(--amber); }
-.rem-card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-.rem-avatar {
-  width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0;
-  display: flex; align-items: center; justify-content: center;
-  font-weight: 800; font-size: 13px; color: #fff;
-  background: linear-gradient(135deg,var(--teal),var(--teal-dark));
-}
-.rem-avatar.amber { background: linear-gradient(135deg,var(--amber),#B37A20); }
-.rem-name { font-weight: 700; font-size: 14px; }
-.rem-file { font-size: 11px; color: var(--teal-dark); font-weight: 600; }
-.rem-meta { font-size: 11px; color: var(--text-3); margin-top: 2px; }
-.rem-appt-time {
-  font-size: 12px; font-weight: 700; color: var(--amber);
-  background: rgba(233,162,58,.12); border-radius: 6px; padding: 2px 8px;
-  margin-top: 4px; display: inline-block;
-}
-.rem-phone-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
-.rem-phone-btn {
-  display: inline-flex; align-items: center; gap: 4px;
-  background: rgba(45,140,138,.1); border: 1px solid rgba(45,140,138,.3);
-  border-radius: 20px; padding: 5px 12px; font-size: 12px; font-weight: 600;
-  color: var(--teal-dark); cursor: pointer; text-decoration: none; transition: background .15s;
-}
-.rem-phone-btn:hover { background: rgba(45,140,138,.2); }
+
 .rem-btn {
   flex: 1; min-width: 70px; padding: 7px 10px; border-radius: 8px;
   border: 1.5px solid var(--border); background: var(--card);
@@ -844,39 +812,39 @@ input, select, textarea { font: inherit; }
 
 /* ── Acceptance inline form ─────────────────────────────────── */
 .accept-form {
-  display: none; background: rgba(46,125,94,.06); border-radius: 10px;
-  padding: 12px; margin-top: 10px; border: 1px solid rgba(46,125,94,.25);
+  display: none; background: rgba(46,125,94,.06); border-radius: 8px;
+  padding: 9px 10px; margin-top: 7px; border: 1px solid rgba(46,125,94,.25);
 }
 .accept-form.open { display: block; }
-.accept-form-label { font-size: 11px; font-weight: 700; color: var(--green); margin-bottom: 8px; }
-.accept-form-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.accept-form-label { font-size: 10px; font-weight: 700; color: var(--green); margin-bottom: 6px; }
+.accept-form-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .accept-time-input {
-  border: 1.5px solid var(--border); border-radius: 8px;
-  padding: 7px 10px; font-size: 13px; font-weight: 600;
-  background: var(--card); color: var(--text); width: 90px; outline: none;
+  border: 1.5px solid var(--border); border-radius: 7px;
+  padding: 6px 8px; font-size: 13px; font-weight: 600;
+  background: var(--card); color: var(--text); width: 80px; outline: none;
   font-family: var(--mono);
 }
 .accept-time-input:focus { border-color: var(--green); }
 .accept-preview {
   font-size: 12px; font-weight: 700; color: var(--green);
-  background: rgba(46,125,94,.1); border-radius: 6px; padding: 4px 10px; flex: 1;
+  background: rgba(46,125,94,.1); border-radius: 5px; padding: 3px 8px; flex: 1;
 }
 .accept-confirm-btn {
-  background: var(--green); color: #fff; border: none; border-radius: 8px;
-  padding: 7px 14px; font-size: 12px; font-weight: 700; cursor: pointer;
-  transition: opacity .15s;
+  background: var(--green); color: #fff; border: none; border-radius: 7px;
+  padding: 6px 12px; font-size: 11px; font-weight: 700; cursor: pointer;
+  transition: opacity .15s; white-space: nowrap;
 }
 .accept-confirm-btn:hover { opacity: .85; }
 
 /* ── Snooze picker ──────────────────────────────────────────── */
 .snooze-picker {
-  display: none; flex-wrap: wrap; gap: 6px; margin-top: 8px;
-  padding: 10px; background: var(--bg); border-radius: 10px;
+  display: none; flex-wrap: wrap; gap: 4px; margin-top: 6px;
+  padding: 7px; background: var(--bg); border-radius: 8px;
 }
 .snooze-picker.open { display: flex; }
 .snooze-opt {
-  padding: 6px 12px; border-radius: 20px; border: 1.5px solid var(--border);
-  background: var(--card); font-size: 11px; font-weight: 700;
+  padding: 4px 10px; border-radius: 20px; border: 1.5px solid var(--border);
+  background: var(--card); font-size: 10px; font-weight: 700;
   cursor: pointer; transition: all .15s;
 }
 .snooze-opt:hover { border-color: var(--teal); color: var(--teal); }
@@ -903,16 +871,15 @@ input, select, textarea { font: inherit; }
 /* Row 1: primary (Accepted/Called + Declined/NoAnswer) side by side   */
 /* Row 2: secondary (Snooze, View, Cancel) in thirds                   */
 .rem-actions-row {
-  display: flex; gap: 5px; margin-bottom: 5px;
+  display: flex; gap: 4px; margin-bottom: 4px;
 }
 .rem-actions-row:last-child { margin-bottom: 0; }
 .rem-actions-row .rem-btn {
-  flex: 1; min-width: 0;           /* allow shrinking on any screen */
-  font-size: 11.5px; padding: 9px 6px;
+  flex: 1; min-width: 0;
+  font-size: 11px; padding: 7px 4px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-/* Primary buttons slightly larger text */
-.rem-actions-row--primary .rem-btn { font-size: 12px; font-weight: 800; }
+.rem-actions-row--primary .rem-btn { font-size: 11.5px; font-weight: 800; padding: 8px 4px; }
 .search-bar {
   display: flex; align-items: center; gap: 8px;
   padding: 10px 12px 4px;
@@ -951,35 +918,44 @@ input, select, textarea { font: inherit; }
   color: var(--text-3); font-size: 14px;
 }
 .rem-empty-icon { font-size: 48px; margin-bottom: 12px; }
+/* ── Reminder card — compact design ─────────────────────────── */
 .rem-card {
   background: var(--card); border: 1.5px solid var(--border);
-  border-radius: 14px; padding: 14px 16px; margin-bottom: 10px;
-  border-left: 4px solid var(--teal);
-  transition: box-shadow .2s;
+  border-radius: 12px; padding: 10px 12px; margin-bottom: 8px;
+  border-left: 3px solid var(--teal); transition: box-shadow .15s;
 }
 .rem-card.status-no-answer { border-left-color: var(--amber); }
 .rem-card.status-snoozed   { opacity: .6; border-left-color: var(--text-3); }
+.rem-card.status-declined  { border-left-color: var(--red); background: rgba(192,57,43,.03); }
+.rem-card.needs-confirm    { border-left-color: var(--amber); }
 .rem-card-head {
-  display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
+  display: flex; align-items: center; gap: 8px; margin-bottom: 7px;
 }
 .rem-avatar {
-  width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0;
+  width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
-  font-weight: 800; font-size: 13px; color: #fff;
-  background: linear-gradient(135deg, var(--teal), var(--teal-dark));
+  font-weight: 800; font-size: 11px; color: #fff;
+  background: linear-gradient(135deg,var(--teal),var(--teal-dark));
 }
-.rem-name { font-weight: 700; font-size: 14px; }
-.rem-file { font-size: 11px; color: var(--teal-dark); font-weight: 600; }
-.rem-meta { font-size: 11px; color: var(--text-3); margin-top: 2px; }
-.rem-phone-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.rem-avatar.amber { background: linear-gradient(135deg,var(--amber),#B37A20); }
+.rem-name  { font-weight: 700; font-size: 13px; line-height: 1.2; }
+.rem-file  { font-size: 10px; color: var(--teal-dark); font-weight: 600; }
+.rem-meta  { font-size: 10px; color: var(--text-3); margin-top: 1px; }
+.rem-appt-time {
+  font-size: 11px; font-weight: 700; color: var(--amber);
+  background: rgba(233,162,58,.12); border-radius: 5px;
+  padding: 1px 7px; margin-top: 3px; display: inline-block;
+}
+.rem-phone-row { display: flex; gap: 6px; flex-wrap: nowrap; margin-bottom: 7px; overflow: hidden; }
 .rem-phone-btn {
-  display: inline-flex; align-items: center; gap: 4px;
-  background: rgba(45,140,138,.1); border: 1px solid rgba(45,140,138,.3);
-  border-radius: 20px; padding: 5px 12px; font-size: 12px; font-weight: 600;
+  display: inline-flex; align-items: center; gap: 3px; flex: 1;
+  background: rgba(45,140,138,.08); border: 1px solid rgba(45,140,138,.25);
+  border-radius: 20px; padding: 4px 8px; font-size: 11px; font-weight: 600;
   color: var(--teal-dark); cursor: pointer; text-decoration: none;
-  transition: background .15s;
+  transition: background .15s; min-width: 0; overflow: hidden;
+  white-space: nowrap; text-overflow: ellipsis;
 }
-.rem-phone-btn:hover { background: rgba(45,140,138,.2); }
+.rem-phone-btn:hover { background: rgba(45,140,138,.18); }
 .rem-actions { display: block; }   /* rows stack vertically inside */
 .rem-btn {
   flex: 1; min-width: 70px; padding: 7px 10px; border-radius: 8px;
@@ -1013,13 +989,13 @@ input, select, textarea { font: inherit; }
 [data-theme="dark"] .rem-btn--cancel { color: var(--text-2); border-color: var(--text-3); }
 [data-theme="dark"] .accept-form     { background: rgba(61,154,107,.1); border-color: rgba(61,154,107,.3); }
 .snooze-picker {
-  display: none; flex-wrap: wrap; gap: 6px; margin-top: 8px;
-  padding: 10px; background: var(--bg); border-radius: 10px;
+  display: none; flex-wrap: wrap; gap: 4px; margin-top: 6px;
+  padding: 7px; background: var(--bg); border-radius: 8px;
 }
 .snooze-picker.open { display: flex; }
 .snooze-opt {
-  padding: 6px 12px; border-radius: 20px; border: 1.5px solid var(--border);
-  background: var(--card); font-size: 11px; font-weight: 700;
+  padding: 4px 10px; border-radius: 20px; border: 1.5px solid var(--border);
+  background: var(--card); font-size: 10px; font-weight: 700;
   cursor: pointer; transition: all .15s;
 }
 .snooze-opt:hover { border-color: var(--teal); color: var(--teal); }
