@@ -10476,44 +10476,47 @@ async function confirmAccepted(fn) {
   const time = (inp?.value || '').trim();
   if (!time) { showToast('Enter appointment start time', 'warn'); inp?.focus(); return; }
 
-  // 'timeWin' — NOT named 'window' (that shadows the global browser object)
+  // NOTE: variable is 'timeWin' not 'window' — never shadow the global window object
   const timeWin = calcTimeWindow(time);
   if (!timeWin) { showToast('Invalid time — use format 8:00 or 14:30', 'warn'); inp?.focus(); return; }
 
-  // Find patient record first so we have their id for Supabase
   const pat = patients.find(pt => String(pt['File Number']) === String(fn));
 
-  // Prepend time window to quick note
-  const current = getQuickNote(fn) || '';
-  const newNote = timeWin + (current ? '\n' + current : '');
-  await saveQuickNote(fn, newNote);
-
-  // Mark reminder status FIRST — before any async calls that might re-render
+  // ── STEP 1: Mark as confirmed in reminder system IMMEDIATELY (sync) ──
+  // This must happen before any await so the UI updates correctly even
+  // if async calls fail.
   const rem = loadRem();
   rem[String(fn)] = { status:'confirmation_called', calledAt: Date.now(), timeWindow: timeWin };
   saveRem(rem);
 
-  // Update in-memory patient record immediately
+  // ── STEP 2: Update in-memory patient record (sync) ──
   if (pat) pat['Appointment Confirmed'] = true;
 
-  // Re-render immediately so patient disappears from list
+  // ── STEP 3: Re-render immediately — patient disappears from list ──
   renderReminders();
   updateReminderBadge();
 
   // Close the accept form
-  const form = document.getElementById('accept-'+fn);
-  if (form) form.classList.remove('open');
+  document.getElementById('accept-'+fn)?.classList.remove('open');
 
   showToast(`✅ ${pat?.['Patient Name'] || '#'+fn} confirmed — "${timeWin}" added to notes`, 'success');
 
-  // Persist to Supabase in background (non-blocking)
+  // ── STEP 4: Async background tasks (non-blocking) ──
+  // Save time window to quick note
   try {
-    // Use patient id for reliable matching regardless of column type
-    const updateTarget = pat?.id
+    const current = getQuickNote(fn) || '';
+    const newNote = timeWin + (current ? '\n' + current : '');
+    _quickNotesCache[String(fn)] = newNote;           // update cache immediately
+    await _saveNoteDB(fn, newNote);                   // persist to Supabase
+  } catch(e) { console.warn('Time window note save (non-fatal):', e.message); }
+
+  // Update appointment_confirmed in Supabase
+  try {
+    const updateQ = pat?.id
       ? _sb.from('patients').update({ appointment_confirmed: true }).eq('id', pat.id)
       : _sb.from('patients').update({ appointment_confirmed: true }).eq('file_number', String(fn));
-    await updateTarget;
-  } catch(e) { console.warn('Confirm appointment Supabase update (non-fatal):', e.message); }
+    await updateQ;
+  } catch(e) { console.warn('Confirm Supabase update (non-fatal):', e.message); }
 }
 
 function clearCalledReminders() {
