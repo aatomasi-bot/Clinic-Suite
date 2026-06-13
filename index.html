@@ -870,16 +870,7 @@ input, select, textarea { font: inherit; }
 /* ── Reminder action buttons — always 2 rows, no media query needed ── */
 /* Row 1: primary (Accepted/Called + Declined/NoAnswer) side by side   */
 /* Row 2: secondary (Snooze, View, Cancel) in thirds                   */
-.rem-actions-row {
-  display: flex; gap: 4px; margin-bottom: 4px;
-}
-.rem-actions-row:last-child { margin-bottom: 0; }
-.rem-actions-row .rem-btn {
-  flex: 1; min-width: 0;
-  font-size: 11px; padding: 7px 4px;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.rem-actions-row--primary .rem-btn { font-size: 11.5px; font-weight: 800; padding: 8px 4px; }
+/* rem-actions-row CSS removed — using single-row layout */
 .search-bar {
   display: flex; align-items: center; gap: 8px;
   padding: 10px 12px 4px;
@@ -956,14 +947,15 @@ input, select, textarea { font: inherit; }
   white-space: nowrap; text-overflow: ellipsis;
 }
 .rem-phone-btn:hover { background: rgba(45,140,138,.18); }
-.rem-actions { display: block; }   /* rows stack vertically inside */
+.rem-actions { display: flex; gap: 4px; }   /* all buttons in one row */
 .rem-btn {
-  flex: 1; min-width: 70px; padding: 7px 10px; border-radius: 8px;
+  flex: 1; min-width: 0; padding: 7px 2px; border-radius: 7px;
   border: 1.5px solid var(--border); background: var(--card);
   font-size: 11px; font-weight: 700; cursor: pointer;
-  transition: all .15s; white-space: nowrap; color: var(--text);
+  transition: all .15s; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; color: var(--text);
 }
-.rem-btn:active { transform: scale(.95); }
+.rem-btn:active { transform: scale(.97); }
 /* ALL variants MUST come after .rem-btn to win the cascade */
 .rem-btn--called    { background: var(--teal);  color: #fff !important; border-color: var(--teal); }
 .rem-btn--accepted  { background: var(--green); color: #fff !important; border-color: var(--green); }
@@ -10340,25 +10332,17 @@ function renderReminders() {
       ? `<div class="rem-appt-time">🕐 ${apptTime} → ${calcTimeWindow(apptTime)}</div>` : '';
 
     const actionBtns = isGroup2 ? `
-      <div class="rem-actions-row rem-actions-row--primary">
-        <button class="rem-btn rem-btn--accepted" onclick="openAcceptForm('${fn}')">✓ Accepted</button>
-        <button class="rem-btn rem-btn--declined" onclick="markDeclined('${fn}')">✗ Declined</button>
-      </div>
-      <div class="rem-actions-row">
-        <button class="rem-btn rem-btn--snooze"  onclick="toggleSnooze('${fn}')">⏰ Snooze</button>
-        <button class="rem-btn rem-btn--view"    onclick="navigateToPin('${fn}')">👁 View</button>
-        <button class="rem-btn rem-btn--cancel"  onclick="markCancelled('${fn}','${(p['Appointment Date & Time']||'').replace(/'/g,'')}')">✕ Cancel</button>
-      </div>
+      <button class="rem-btn rem-btn--accepted" onclick="openAcceptForm('${fn}')">✓ OK</button>
+      <button class="rem-btn rem-btn--declined" onclick="markDeclined('${fn}')">✗ No</button>
+      <button class="rem-btn rem-btn--snooze"   onclick="toggleSnooze('${fn}')">⏰</button>
+      <button class="rem-btn rem-btn--view"     onclick="navigateToPin('${fn}')">👁</button>
+      <button class="rem-btn rem-btn--cancel"   onclick="markCancelled('${fn}','${(p['Appointment Date & Time']||'').replace(/'/g,'')}')">✕</button>
     ` : `
-      <div class="rem-actions-row rem-actions-row--primary">
-        <button class="rem-btn rem-btn--called"     onclick="markCalled('${fn}')">✓ Called</button>
-        <button class="rem-btn rem-btn--no-answer"  onclick="markNoAnswer('${fn}')">📵 No answer</button>
-      </div>
-      <div class="rem-actions-row">
-        <button class="rem-btn rem-btn--snooze"     onclick="toggleSnooze('${fn}')">⏰ Snooze</button>
-        <button class="rem-btn rem-btn--view"       onclick="navigateToPin('${fn}')">👁 View</button>
-        <button class="rem-btn rem-btn--cancel"     onclick="markCancelled('${fn}','')">✕ Cancel</button>
-      </div>
+      <button class="rem-btn rem-btn--called"    onclick="markCalled('${fn}')">✓ Called</button>
+      <button class="rem-btn rem-btn--no-answer" onclick="markNoAnswer('${fn}')">📵 No</button>
+      <button class="rem-btn rem-btn--snooze"    onclick="toggleSnooze('${fn}')">⏰</button>
+      <button class="rem-btn rem-btn--view"      onclick="navigateToPin('${fn}')">👁</button>
+      <button class="rem-btn rem-btn--cancel"    onclick="markCancelled('${fn}','')">✕</button>
     `;
 
     const cardClass = [
