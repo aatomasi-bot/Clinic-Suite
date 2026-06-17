@@ -3227,6 +3227,9 @@ a:focus:not(:focus-visible) { outline: none; }
       <button class="drawer-btn" onclick="closeMenuDrawer();openModal('fixDateModal');renderFixDatePatList()" style="border-color:var(--teal)">
         <span class="drawer-btn-icon">📅</span>Fix Injection Date
       </button>
+      <button class="drawer-btn" onclick="closeMenuDrawer();openModal('rawFinderModal');document.getElementById('rawFinderInput')?.focus()" style="border-color:var(--purple,#6B4FBB)">
+        <span class="drawer-btn-icon">🔍</span>Find Patient (Raw Search)
+      </button>
       <button class="drawer-btn" onclick="closeMenuDrawer();openDedupeModal()" style="border-color:var(--orange)">
         <span class="drawer-btn-icon">🧹</span>Remove Duplicates
         <span style="margin-left:auto;font-size:10px;font-weight:700;background:var(--orange-bg);color:var(--orange);padding:2px 7px;border-radius:20px" id="dedupeBadge"></span>
@@ -10100,6 +10103,75 @@ window.setTheme = setTheme;
   window.switchView = switchView;
 
 // ════════════════════════════════════════════════════════════
+// ── RAW PATIENT FINDER — diagnostic tool ─────────────────────
+// Searches the ENTIRE in-memory patients[] array directly with
+// no tab, Archived, or Pending filtering whatsoever. If a patient
+// exists anywhere in the loaded data, this WILL find them and
+// show every field exactly as stored — useful for tracking down
+// "ghost" records that don't appear in any normal tab.
+// ════════════════════════════════════════════════════════════
+function rawFinderSearch() {
+  const raw = (document.getElementById('rawFinderInput')?.value || '').trim();
+  const results = document.getElementById('rawFinderResults');
+  if (!raw) { results.innerHTML = 'Type a name or file number above and press Search.'; return; }
+
+  const q = raw.toLowerCase();
+  // Normalize accents for name matching (Lavoie vs LAVOIE vs Lavoié etc.)
+  const norm = s => String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const qNorm = norm(raw);
+
+  const matches = patients.filter(p => {
+    const nameMatch = norm(p['Patient Name']).includes(qNorm);
+    const fileMatch  = String(p['File Number']||'').toLowerCase().includes(q);
+    return nameMatch || fileMatch;
+  });
+
+  if (!matches.length) {
+    results.innerHTML = `
+      <div style="text-align:center;padding:24px 12px;color:var(--text-3)">
+        <div style="font-size:32px;margin-bottom:8px">❌</div>
+        <b>No record found anywhere in the loaded data</b><br>
+        <span style="font-size:11px">Total patients currently loaded: ${patients.length}</span><br>
+        <span style="font-size:11px;color:var(--red);margin-top:6px;display:block">
+          If you're certain this patient exists in Supabase, the record may not have loaded —
+          try 🔄 Refresh Patient Data first, then search again.
+        </span>
+      </div>`;
+    return;
+  }
+
+  results.innerHTML = `<div style="font-size:11px;font-weight:700;color:var(--green);margin-bottom:10px">
+    ✓ Found ${matches.length} matching record${matches.length!==1?'s':''}
+  </div>` + matches.map(p => {
+    const rows = Object.entries(p).map(([k,v]) => `
+      <tr>
+        <td style="padding:3px 8px;font-weight:700;color:var(--text-2);white-space:nowrap;vertical-align:top">${esc(k)}</td>
+        <td style="padding:3px 8px;color:var(--text);word-break:break-word">${
+          v === null ? '<i style="color:var(--text-3)">null</i>' :
+          v === '' ? '<i style="color:var(--text-3)">(empty string)</i>' :
+          v === true ? '<b style="color:var(--green)">true</b>' :
+          v === false ? '<b style="color:var(--red)">false</b>' :
+          esc(String(v))
+        }</td>
+      </tr>`).join('');
+    return `
+      <div style="border:1.5px solid var(--teal);border-radius:10px;overflow:hidden;margin-bottom:14px">
+        <div style="background:var(--teal);color:#fff;padding:8px 12px;font-weight:700;font-size:13px;
+          display:flex;align-items:center;justify-content:space-between">
+          <span>${esc(p['Patient Name']||'(no name)')}  ·  #${esc(p['File Number']||'?')}</span>
+          <button onclick="closeModal('rawFinderModal');navigateToPin('${esc(String(p['File Number']||''))}')"
+            style="background:#fff;color:var(--teal);border:none;border-radius:6px;
+              padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer">👁 Go to record</button>
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:11px">
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  }).join('');
+}
+window.rawFinderSearch = rawFinderSearch;
+
+// ════════════════════════════════════════════════════════════
 // ── PIN SYSTEM (Supabase-synced, cross-device) ───────────────
 // loadPins / savePins / isPinned defined early (before renderPatientList).
 // Full panel + sync logic here.
@@ -10916,8 +10988,34 @@ function navigateToPin(fn) {
   </div>
 </div>
 
-
-<!-- APPLE NOTES IMPORT MODAL -->
+<!-- RAW PATIENT FINDER — diagnostic tool, bypasses ALL tab/status filtering -->
+<div class="modal-overlay" id="rawFinderModal">
+  <div class="modal" style="max-height:85vh;display:flex;flex-direction:column">
+    <div class="modal-handle"></div>
+    <div class="modal-header" style="flex-shrink:0">
+      <div class="modal-title">🔍 Find Patient (Raw Search)</div>
+      <button class="modal-close" onclick="closeModal('rawFinderModal')">✕</button>
+    </div>
+    <div class="modal-body" style="overflow-y:auto">
+      <div style="font-size:11px;color:var(--text-2);margin-bottom:10px;line-height:1.5">
+        Searches the <b>entire</b> patient list directly — ignores Archived, Pending, and tab status.
+        If a patient exists anywhere in the database, this will find them.
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:12px">
+        <input type="text" id="rawFinderInput" placeholder="Name or file number…"
+          style="flex:1;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;
+            background:var(--card);color:var(--text);font-size:13px;outline:none"
+          onkeydown="if(event.key==='Enter')rawFinderSearch()">
+        <button onclick="rawFinderSearch()"
+          style="padding:9px 16px;border-radius:8px;border:none;background:var(--teal);
+            color:#fff;font-weight:700;font-size:13px;cursor:pointer">Search</button>
+      </div>
+      <div id="rawFinderResults" style="font-size:12px;color:var(--text-3)">
+        Type a name or file number above and press Search.
+      </div>
+    </div>
+  </div>
+</div>
 <div class="modal-overlay" id="notesImportModal">
   <div class="modal" style="max-height:92vh;display:flex;flex-direction:column">
     <div class="modal-handle"></div>
