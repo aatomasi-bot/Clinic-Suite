@@ -10298,11 +10298,14 @@ function navigateToPin(fn) {
   // Close pin panel
   _pinPanelOpen = false;
   document.getElementById('pinPanel')?.classList.add('hidden');
-  // Determine best tab
+  // Determine best tab — Archived MUST be checked first; an archived patient
+  // can also have Pending=true or old appointment data, which would otherwise
+  // incorrectly route to those tabs instead of Archived where they actually live.
   const today  = todayStr();
   const apptDate = p['Appointment Date & Time'] ? p['Appointment Date & Time'].split('T')[0] : null;
   let tab = 'all';
-  if (p['Injection Administered'])   tab = 'all';
+  if (p['Archived'])                 tab = 'archived';
+  else if (p['Injection Administered']) tab = 'all';
   else if (p['Pending'])             tab = 'pending';
   else if (apptDate === today && p['Appointment Confirmed']) tab = 'today';
   else if (p['Appointment Confirmed']) tab = 'scheduled';
@@ -10775,33 +10778,7 @@ function unpinChip(fn) {
     b.classList.remove('pinned'); b.title = 'Pin patient';
   });
 }
-function navigateToPin(fn) {
-  // Find the patient and figure out which tab they belong to
-  const p = patients.find(pt => String(pt['File Number']) === String(fn));
-  if (!p) { showToast('Patient not found in current data', 'warn'); return; }
-  // Determine best tab
-  let tab = 'all';
-  const today = todayStr();
-  const apptDate = p['Appointment Date & Time'] ? p['Appointment Date & Time'].split('T')[0] : null;
-  if (p['Injection Administered']) tab = 'all';
-  else if (p['Pending']) tab = 'pending';
-  else if (apptDate === today && p['Appointment Confirmed']) tab = 'today';
-  else if (p['Appointment Confirmed']) tab = 'scheduled';
-  else if (p['Due Date'] && p['Due Date'] < today) tab = 'overdue';
-  else tab = 'pending';
-
-  switchToTab(tab);
-  // Highlight the card after render
-  setTimeout(() => {
-    const card = document.querySelector(`.patient-card[data-id="${p.id}"]`);
-    if (card) {
-      card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      card.style.outline = '3px solid var(--amber)';
-      card.style.outlineOffset = '2px';
-      setTimeout(() => { card.style.outline = ''; card.style.outlineOffset = ''; }, 2500);
-    }
-  }, 200);
-}
+// navigateToPin defined earlier (with Archived-first tab routing) — duplicate removed
 
   window.toggleDark = toggleDark;
   window.ignoreDate = ignoreDate;
