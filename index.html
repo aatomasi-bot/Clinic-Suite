@@ -7102,6 +7102,7 @@ async function importNotesPatients() {
   }
 
   let added = 0, skipped = 0, failed = 0;
+  const skippedDetails = []; // track WHICH existing record blocked each skip
   const total = _notesExtracted.length;
 
   for (let i = 0; i < _notesExtracted.length; i++) {
@@ -7113,8 +7114,16 @@ async function importNotesPatients() {
 
     if (!p.patient_name) { skipped++; continue; }
     const fileNum = String(p.file_number || '').trim();
-    if (fileNum && patients.find(e => String(e['File Number']||'').trim() === fileNum)) {
-      skipped++; continue;
+    const existing = fileNum ? patients.find(e => String(e['File Number']||'').trim() === fileNum) : null;
+    if (existing) {
+      skipped++;
+      skippedDetails.push({
+        fileNum,
+        triedName:     p.patient_name,
+        existingName:  existing['Patient Name'] || '(blank name)',
+        existingStatus: existing['Archived'] ? 'Archived' : existing['Pending'] ? 'Pending' : 'Active'
+      });
+      continue;
     }
 
     try {
@@ -7168,7 +7177,35 @@ async function importNotesPatients() {
     if (skipped) parts.push(skipped + ' duplicates skipped');
     if (failed)  parts.push(failed + ' errors');
     toast(parts.join(' · '), 'success');
-    if (added > 0) setTimeout(() => { closeModal('notesImportModal'); notesImportReset(); }, 1800);
+
+    // If anything was skipped, show exactly which existing record caused it
+    if (skippedDetails.length) {
+      const detailHtml = skippedDetails.map(d => `
+        <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;
+          background:var(--bg);border-radius:8px;margin-bottom:6px;font-size:12px">
+          <div style="flex:1;min-width:0">
+            <b>#${esc(d.fileNum)}</b> already exists as
+            <b>"${esc(d.existingName)}"</b>
+            <span style="color:var(--amber);font-weight:700">(${esc(d.existingStatus)})</span>
+            ${d.existingName !== d.triedName ? `<br><span style="color:var(--text-3)">You tried to import: "${esc(d.triedName)}"</span>` : ''}
+          </div>
+          <button onclick="closeModal('notesImportModal');navigateToPin('${esc(d.fileNum)}')"
+            style="flex-shrink:0;padding:5px 10px;border-radius:6px;border:1.5px solid var(--teal);
+            background:var(--card);color:var(--teal);font-size:11px;font-weight:700;cursor:pointer">
+            👁 Find it
+          </button>
+        </div>`).join('');
+      const footerEl2 = document.getElementById('notesFooterBtns');
+      if (footerEl2) {
+        footerEl2.insertAdjacentHTML('beforebegin', `
+          <div style="padding:10px 4px 4px;font-size:11px;font-weight:700;color:var(--text-2)">
+            ⚠️ Skipped — already in database:
+          </div>
+          ${detailHtml}`);
+      }
+    }
+
+    if (added > 0 && !skippedDetails.length) setTimeout(() => { closeModal('notesImportModal'); notesImportReset(); }, 1800);
   } else {
     toast('Import cancelled — ' + added + ' saved before cancelling', 'warning');
     if (added > 0) await loadPatients();
