@@ -3872,9 +3872,26 @@ async function loadPatients() {
   if (!_sb) return;
   setLoading(true, 'Loading patients…');
   try {
-    const { data, error } = await _sb.from('patients').select('*').order('created_at', { ascending: false });
-    if (error) throw error;
-    patients = data.map(row => {
+    // ── Paginate through ALL rows ──────────────────────────────
+    // Supabase/PostgREST caps a single request at 1000 rows by default.
+    // If the clinic has more than 1000 patients, the oldest ones would
+    // silently never load without this loop (newest-first ordering
+    // means anyone beyond row 1000 simply disappears from the app).
+    let allRows = [];
+    let from = 0;
+    const PAGE = 1000;
+    while (true) {
+      const { data, error } = await _sb.from('patients')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .range(from, from + PAGE - 1);
+      if (error) throw error;
+      if (!data || !data.length) break;
+      allRows = allRows.concat(data);
+      if (data.length < PAGE) break; // last page reached
+      from += PAGE;
+    }
+    patients = allRows.map(row => {
       const p = { id: row.id };
       for (const [k, v] of Object.entries(COL)) p[k] = row[v] ?? null;
       return p;
@@ -7386,13 +7403,24 @@ let _injectionHistory = {};
 async function loadInjectionHistoryFromDB() {
   if (!_sb) return;
   try {
-    const { data, error } = await _sb
-      .from('injections')
-      .select('file_number, injection_date, site, dose_mg, notes, adverse_effects, id')
-      .order('injection_date', { ascending: true });
-    if (error) throw error;
+    // Paginate — injection history can easily exceed Supabase's 1000-row default cap
+    let allRows = [];
+    let from = 0;
+    const PAGE = 1000;
+    while (true) {
+      const { data, error } = await _sb
+        .from('injections')
+        .select('file_number, injection_date, site, dose_mg, notes, adverse_effects, id')
+        .order('injection_date', { ascending: true })
+        .range(from, from + PAGE - 1);
+      if (error) throw error;
+      if (!data || !data.length) break;
+      allRows = allRows.concat(data);
+      if (data.length < PAGE) break;
+      from += PAGE;
+    }
     _injectionHistory = {};
-    (data || []).forEach(row => {
+    allRows.forEach(row => {
       const fn = String(row.file_number).trim();
       if (!_injectionHistory[fn]) _injectionHistory[fn] = [];
       _injectionHistory[fn].push({
@@ -7449,9 +7477,18 @@ async function loadQuickNotesFromDB() {
   try { _quickNotesCache = JSON.parse(localStorage.getItem('_qn') || '{}'); } catch(e) { _quickNotesCache = {}; }
   // Step 2: Fetch from Supabase and MERGE (Supabase wins for same key, keeps local-only entries)
   try {
-    const { data, error } = await _sb.from('quick_notes').select('*');
-    if (error) throw error;
-    (data||[]).forEach(r => { if (r.note_text) _quickNotesCache[String(r.file_number)] = r.note_text; });
+    let allRows = [];
+    let from = 0;
+    const PAGE = 1000;
+    while (true) {
+      const { data, error } = await _sb.from('quick_notes').select('*').range(from, from + PAGE - 1);
+      if (error) throw error;
+      if (!data || !data.length) break;
+      allRows = allRows.concat(data);
+      if (data.length < PAGE) break;
+      from += PAGE;
+    }
+    allRows.forEach(r => { if (r.note_text) _quickNotesCache[String(r.file_number)] = r.note_text; });
     // Persist merged result back to localStorage
     try { localStorage.setItem('_qn', JSON.stringify(_quickNotesCache)); } catch(e) {}
   } catch(e) {
@@ -7592,10 +7629,19 @@ function loadInvoiceData(key) {
 async function loadInvoicesFromDB() {
   if (!_sb) return;
   try {
-    const { data, error } = await _sb.from('invoices').select('*');
-    if (error) throw error;
+    let allRows = [];
+    let from = 0;
+    const PAGE = 1000;
+    while (true) {
+      const { data, error } = await _sb.from('invoices').select('*').range(from, from + PAGE - 1);
+      if (error) throw error;
+      if (!data || !data.length) break;
+      allRows = allRows.concat(data);
+      if (data.length < PAGE) break;
+      from += PAGE;
+    }
     _invoiceCache = {};
-    (data||[]).forEach(row => {
+    allRows.forEach(row => {
       _invoiceCache[row.month_key] = {
         days:           row.days           || [],
         invoice_number: row.invoice_number || autoInvoiceNumber(),
