@@ -4034,12 +4034,19 @@ function updateTabCounts() {
 function getFilteredPatients() {
   const today = todayStr();
   return patients.filter(p => {
-    if (p['Archived'] && currentTab !== 'archived') return false;
-    if (!p['Archived'] && currentTab === 'archived') return false;
-    if (currentTab === 'cpp') return !!p['CPP Patient'] && !p['Archived'];
-    if (p['Pending'] && currentTab !== 'pending') return false;
-    if (!p['Pending'] && currentTab === 'pending') return false;
-    if (currentTab === 'pending' || currentTab === 'archived') return true;
+    // ── Archived takes ABSOLUTE precedence ──────────────────────
+    // A patient can sometimes have both Archived AND Pending set true
+    // (e.g. data entry error, or marked pending before being archived).
+    // Once Archived, the patient belongs ONLY in the Archived tab —
+    // Pending status must never override this, or the patient becomes
+    // invisible in every tab (excluded from Archived because Pending
+    // is true, AND excluded from Pending because Archived is true).
+    if (p['Archived']) return currentTab === 'archived';
+    if (currentTab === 'archived') return false; // not archived, doesn't belong here
+
+    if (currentTab === 'cpp') return !!p['CPP Patient'];
+    if (p['Pending']) return currentTab === 'pending';
+    if (currentTab === 'pending') return false;
 
     const apptDate = p['Appointment Date & Time'] ? p['Appointment Date & Time'].split('T')[0] : null;
     const confirmed = !!p['Appointment Confirmed'];
