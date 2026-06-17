@@ -4036,7 +4036,7 @@ function getFilteredPatients() {
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     return (p['Patient Name']||'').toLowerCase().includes(q) ||
-           (p['File Number']||'').toLowerCase().includes(q) ||
+           String(p['File Number']||'').toLowerCase().includes(q) ||
            (p['Address']||'').toLowerCase().includes(q);
   }).sort((a, b) => {
     const aConf = !!a['Appointment Confirmed'];
