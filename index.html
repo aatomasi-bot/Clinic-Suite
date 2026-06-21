@@ -1186,11 +1186,17 @@ input, select, textarea { font: inherit; }
      fixed when scrolling fast, or after the keyboard dismisses.
      transform: translateZ(0) forces the element onto its own
      GPU layer so the browser never scrolls it with the page. */
-  -webkit-transform: translateZ(0);
-  transform: translateZ(0);
+  -webkit-transform: translateY(0) translateZ(0);
+  transform: translateY(0) translateZ(0);
   will-change: transform;
+  transition: transform 0.28s cubic-bezier(0.4, 0, 0.6, 1);
   /* ── iPhone notch / home indicator safe area ─────────────── */
   padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+/* Nav hidden state — slides down off screen when scrolling into content */
+.bottom-nav.nav-hidden {
+  -webkit-transform: translateY(100%) translateZ(0);
+  transform: translateY(100%) translateZ(0);
 }
 .nav-btn {
   flex: 1;
@@ -4229,15 +4235,21 @@ function renderPatientList() {
   }
 
   // Confirmed date groups
+  const threeDaysAgoDate = (() => {
+    const dt = new Date(); dt.setDate(dt.getDate() - 3);
+    return `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}`;
+  })();
   for (const date of Object.keys(confGroups).sort()) {
     const isToday  = date === today;
     const isPast   = date < today && date !== 'Unknown';
+    const isRecent = isPast && date >= threeDaysAgoDate; // within last 3 days
     const sepClass = isToday ? 'date-sep--today' : (isPast ? 'date-sep--overdue' : '');
+    const showActions = isToday || isRecent;
     let segHtml = `<div class="date-sep ${sepClass}">
-        <span class="date-sep__label">${isToday ? 'TODAY' : formatDateFull(date).toUpperCase()}</span>
+        <span class="date-sep__label">${isToday ? 'TODAY' : formatDateFull(date).toUpperCase()}${isRecent ? ' ⚠' : ''}</span>
         <span style="font-size:9px;font-weight:700;letter-spacing:0.5px;color:var(--teal);margin-left:2px">✓ APPT</span>
         <span class="date-sep__badge">${confGroups[date].length}</span>
-        ${isToday ? `<button class="eod-link" onclick="openEndOfDayModal('${date}')">📧 End of Day</button><button class="record-all-link" onclick="recordAllForDate('${date}')">⚡ Record All</button>` : ''}
+        ${showActions ? `<button class="eod-link" onclick="openEndOfDayModal('${date}')">📧 End of Day</button><button class="record-all-link" onclick="recordAllForDate('${date}')" style="${isRecent?'background:rgba(233,162,58,.15);border-color:var(--amber);color:#7A5200':''}">⚡ Record All${isRecent?' ('+formatDateFull(date).split(',')[0]+')':''}</button>` : ''}
       </div>`;
     confGroups[date].forEach(p => { segHtml += renderCard(p, cardIdx++); });
     _vsSegments.push({ html: segHtml });
@@ -4259,11 +4271,13 @@ function renderPatientList() {
   for (const date of Object.keys(dueGroups).sort()) {
     const isToday  = date === today;
     const isPast   = date < today && date !== 'Unknown';
+    const isRecent = isPast && date >= threeDaysAgoDate;
     const sepClass = isToday ? 'date-sep--today' : (isPast ? 'date-sep--overdue' : '');
+    const showActions = isToday || isRecent;
     let segHtml = `<div class="date-sep ${sepClass}">
-        <span class="date-sep__label">${isToday ? 'TODAY' : formatDateFull(date).toUpperCase()}</span>
+        <span class="date-sep__label">${isToday ? 'TODAY' : formatDateFull(date).toUpperCase()}${isRecent ? ' ⚠' : ''}</span>
         <span class="date-sep__badge">${dueGroups[date].length}</span>
-        ${isToday ? `<button class="eod-link" onclick="openEndOfDayModal('${date}')">📧 End of Day</button><button class="record-all-link" onclick="recordAllForDate('${date}')">⚡ Record All</button>` : ''}
+        ${showActions ? `<button class="eod-link" onclick="openEndOfDayModal('${date}')">📧 End of Day</button><button class="record-all-link" onclick="recordAllForDate('${date}')" style="${isRecent?'background:rgba(233,162,58,.15);border-color:var(--amber);color:#7A5200':''}">⚡ Record All${isRecent?' ('+formatDateFull(date).split(',')[0]+')':''}</button>` : ''}
       </div>`;
     dueGroups[date].forEach(p => { segHtml += renderCard(p, cardIdx++); });
     _vsSegments.push({ html: segHtml });
@@ -4339,6 +4353,11 @@ function renderCard(p, idx) {
           <span style="font-size:9px;background:rgba(45,140,138,.12);color:var(--teal-dark);
             border:1px solid rgba(45,140,138,.3);border-radius:4px;padding:1px 6px;font-weight:700">
             ✓ ${apptTime}</span>
+        </div>` : ''}
+        ${(apptDate && confirmed && !p['Injection Administered'] && weeks !== '?') ? `<div style="margin-top:3px;display:flex;align-items:center;gap:3px">
+          <span style="font-size:9px;color:var(--text-3);font-style:italic">
+            📅 Next due: <b style="color:var(--text-2)">${formatDateFull(addWeeks(apptDate, parseInt(DOSE_TO_WEEKS[dose]||4)))}</b>
+          </span>
         </div>` : ''}
         ${addr ? `<div class="card-addr">${mapSVG}<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(formatAddrDisplay(addr))}</span></div>` : ''}
         ${special ? `<div class="card-flag-strip">
@@ -10118,6 +10137,55 @@ window.setTheme = setTheme;
   window.notesUpdateField = notesUpdateField;
   window.setPatNote = setPatNote;
   window.switchView = switchView;
+
+// ════════════════════════════════════════════════════════════
+// ── SCROLL-AWARE NAV (Twitter/X style) ───────────────────────
+// Swipe UP (thumb up, content scrolls down) → nav hides
+// Swipe DOWN (thumb down, content scrolls up) → nav reappears
+// At the very top → always visible
+// ════════════════════════════════════════════════════════════
+(function () {
+  let _lastST = 0;
+  const THRESHOLD = 12; // px of scroll before triggering hide/show
+
+  function _navScroll(e) {
+    const el  = e.target;
+    const st  = el.scrollTop;
+    const nav = document.querySelector('.bottom-nav');
+    if (!nav) return;
+
+    if (st < 60) {
+      // At the top — always show
+      nav.classList.remove('nav-hidden');
+    } else if (st > _lastST + THRESHOLD) {
+      // Scrolling DOWN (thumb moved UP) — hide nav
+      nav.classList.add('nav-hidden');
+    } else if (st < _lastST - THRESHOLD) {
+      // Scrolling UP (thumb moved DOWN) — show nav
+      nav.classList.remove('nav-hidden');
+    }
+    _lastST = st;
+  }
+
+  // Attach to ALL scrollable views using capture so we catch scroll
+  // events from any fixed-positioned child container on mobile
+  document.addEventListener('scroll', _navScroll, { capture: true, passive: true });
+
+  // Also reset when switching views (don't start a new tab with hidden nav)
+  const _origSwitchView = window.switchView;
+  if (typeof _origSwitchView === 'function') {
+    window.switchView = function(view) {
+      _origSwitchView(view);
+      _lastST = 0;
+      const nav = document.querySelector('.bottom-nav');
+      if (nav) nav.classList.remove('nav-hidden');
+    };
+  }
+})();
+
+window.addEventListener('switchView', () => {
+  document.querySelector('.bottom-nav')?.classList.remove('nav-hidden');
+});
 
 // ════════════════════════════════════════════════════════════
 // ── RAW PATIENT FINDER — diagnostic tool ─────────────────────
