@@ -4358,15 +4358,10 @@ function renderCard(p, idx) {
         <div class="card-due ${dueClass}">
           <span>📅</span> ${dueDisplay}
         </div>
-        ${confirmed && apptTime ? `<div style="display:flex;align-items:center;gap:4px;margin-top:2px">
-          <span style="font-size:9px;background:rgba(45,140,138,.12);color:var(--teal-dark);
-            border:1px solid rgba(45,140,138,.3);border-radius:4px;padding:1px 6px;font-weight:700">
-            ✓ ${apptTime}</span>
-        </div>` : ''}
-        ${(apptDate && confirmed && !p['Injection Administered'] && weeks !== '?') ? `<div style="margin-top:3px;display:flex;align-items:center;gap:3px">
-          <span style="font-size:9px;color:var(--text-3);font-style:italic">
-            📅 Next due: <b style="color:var(--text-2)">${formatDateLong(addWeeks(apptDate, parseInt(DOSE_TO_WEEKS[dose]||4)))}</b>
-          </span>
+        ${(confirmed && apptTime) || (apptDate && confirmed && !p['Injection Administered'] && weeks !== '?') ? `
+        <div style="display:flex;align-items:center;gap:5px;margin-top:2px;flex-wrap:wrap">
+          ${confirmed && apptTime ? `<span style="font-size:9px;background:rgba(45,140,138,.12);color:var(--teal-dark);border:1px solid rgba(45,140,138,.3);border-radius:4px;padding:1px 6px;font-weight:700">✓ ${apptTime}</span>` : ''}
+          ${(apptDate && confirmed && !p['Injection Administered'] && weeks !== '?') ? `<span style="font-size:9px;color:var(--text-3);font-style:italic">📅 Next due: <b style="color:var(--text-2)">${formatDateLong(addWeeks(apptDate, parseInt(DOSE_TO_WEEKS[dose]||4)))}</b></span>` : ''}
         </div>` : ''}
         ${addr ? `<div class="card-addr">${mapSVG}<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(formatAddrDisplay(addr))}</span></div>` : ''}
         ${special ? `<div class="card-flag-strip">
@@ -10158,10 +10153,11 @@ window.setTheme = setTheme;
 // Swipe DOWN (thumb down, content scrolls up) → nav reappears
 // At the very top → always visible
 //
-// IMPORTANT — two scroll sources:
-// • Patient / All Active tabs → body scrolls → fires on WINDOW
-// • Reminder / Invoice views  → fixed divs with overflow-y:auto
-//                               → fires as element scroll, caught via capture
+// Two scroll sources on mobile:
+// • Patient / All Active / Scheduled tabs → body scrolls → WINDOW scroll event
+// • Reminder / Invoice / Dashboard views  → fixed divs with overflow-y:auto
+//   iOS Safari does NOT reliably propagate scroll from these via document capture,
+//   so we attach DIRECTLY to each element after the DOM is ready.
 // ════════════════════════════════════════════════════════════
 (function () {
   let _lastST  = 0;
@@ -10171,13 +10167,18 @@ window.setTheme = setTheme;
     const nav = document.querySelector('.bottom-nav');
     if (!nav) return;
     if (st < 60) {
-      nav.classList.remove('nav-hidden');          // at top — always show
+      nav.classList.remove('nav-hidden');
     } else if (st > _lastST + THRESH) {
-      nav.classList.add('nav-hidden');             // scrolling down — hide
+      nav.classList.add('nav-hidden');
     } else if (st < _lastST - THRESH) {
-      nav.classList.remove('nav-hidden');          // scrolling up — show
+      nav.classList.remove('nav-hidden');
     }
     _lastST = st;
+  }
+
+  function resetNav() {
+    _lastST = 0;
+    document.querySelector('.bottom-nav')?.classList.remove('nav-hidden');
   }
 
   // ① Body/window scroll — patient list, All Active, Scheduled, Overdue, Pending, Archived
@@ -10185,25 +10186,39 @@ window.setTheme = setTheme;
     applyNavScroll(window.scrollY || window.pageYOffset || 0);
   }, { passive: true });
 
-  // ② Element scroll — reminder view, invoice view, dashboard (fixed divs with own overflow)
-  document.addEventListener('scroll', function(e) {
-    const t = e.target;
-    // Skip if target is document/body/html — already handled by window listener above
-    if (!t || t === document || t === document.body || t === document.documentElement) return;
-    applyNavScroll(t.scrollTop || 0);
-  }, { capture: true, passive: true });
+  // ② Direct attachment to fixed scrollable views — works reliably on iOS Safari
+  //   (document capture doesn't reliably catch scroll from fixed overflow containers)
+  function attachDirectScroll(el) {
+    if (!el || el._vapiqScrollAttached) return;
+    el.addEventListener('scroll', function() {
+      applyNavScroll(this.scrollTop || 0);
+    }, { passive: true });
+    el._vapiqScrollAttached = true;
+  }
 
-  // Reset nav to visible whenever the user switches tabs/views
+  // Attach after DOM is ready — these elements exist in the HTML from page load
+  const SCROLLABLE_VIEWS = ['reminderView','dashView','invoiceView','reportView'];
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
+      SCROLLABLE_VIEWS.forEach(id => attachDirectScroll(document.getElementById(id)));
+    });
+  } else {
+    SCROLLABLE_VIEWS.forEach(id => attachDirectScroll(document.getElementById(id)));
+  }
+
+  // Reset nav to visible when switching tabs/views
   const _orig = window.switchView;
   if (typeof _orig === 'function') {
     window.switchView = function(view) {
       _orig(view);
       _lastST = 0;
-      // Reset body scroll position too — new view starts at top
       window.scrollTo(0, 0);
-      document.querySelector('.bottom-nav')?.classList.remove('nav-hidden');
+      resetNav();
     };
   }
+
+  // Expose so external code can reset if needed
+  window._resetNavScroll = resetNav;
 })();
 
 // ════════════════════════════════════════════════════════════
