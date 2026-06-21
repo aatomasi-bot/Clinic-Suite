@@ -3765,6 +3765,15 @@ function formatDateFull(dateStr) {
   return `${months[m-1]} ${d}, ${y}`;
 }
 
+// Long format: "7 December, 2026" — used for projected next due date on cards
+function formatDateLong(dateStr) {
+  if (!dateStr) return '';
+  const [y,m,d] = dateStr.split('-').map(Number);
+  const months = ['January','February','March','April','May','June',
+                  'July','August','September','October','November','December'];
+  return `${d} ${months[m-1]}, ${y}`;
+}
+
 function formatDateTime(dtStr) {
   if (!dtStr) return 'Not set';
   try {
@@ -4356,7 +4365,7 @@ function renderCard(p, idx) {
         </div>` : ''}
         ${(apptDate && confirmed && !p['Injection Administered'] && weeks !== '?') ? `<div style="margin-top:3px;display:flex;align-items:center;gap:3px">
           <span style="font-size:9px;color:var(--text-3);font-style:italic">
-            📅 Next due: <b style="color:var(--text-2)">${formatDateFull(addWeeks(apptDate, parseInt(DOSE_TO_WEEKS[dose]||4)))}</b>
+            📅 Next due: <b style="color:var(--text-2)">${formatDateLong(addWeeks(apptDate, parseInt(DOSE_TO_WEEKS[dose]||4)))}</b>
           </span>
         </div>` : ''}
         ${addr ? `<div class="card-addr">${mapSVG}<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(formatAddrDisplay(addr))}</span></div>` : ''}
@@ -10144,48 +10153,58 @@ window.setTheme = setTheme;
 // Swipe DOWN (thumb down, content scrolls up) → nav reappears
 // At the very top → always visible
 // ════════════════════════════════════════════════════════════
+// ── SCROLL-AWARE NAV (Twitter/X style) ───────────────────────
+// Swipe UP (thumb up, content scrolls down) → nav hides
+// Swipe DOWN (thumb down, content scrolls up) → nav reappears
+// At the very top → always visible
+//
+// IMPORTANT — two scroll sources:
+// • Patient / All Active tabs → body scrolls → fires on WINDOW
+// • Reminder / Invoice views  → fixed divs with overflow-y:auto
+//                               → fires as element scroll, caught via capture
+// ════════════════════════════════════════════════════════════
 (function () {
-  let _lastST = 0;
-  const THRESHOLD = 12; // px of scroll before triggering hide/show
+  let _lastST  = 0;
+  const THRESH = 10;
 
-  function _navScroll(e) {
-    const el  = e.target;
-    const st  = el.scrollTop;
+  function applyNavScroll(st) {
     const nav = document.querySelector('.bottom-nav');
     if (!nav) return;
-
     if (st < 60) {
-      // At the top — always show
-      nav.classList.remove('nav-hidden');
-    } else if (st > _lastST + THRESHOLD) {
-      // Scrolling DOWN (thumb moved UP) — hide nav
-      nav.classList.add('nav-hidden');
-    } else if (st < _lastST - THRESHOLD) {
-      // Scrolling UP (thumb moved DOWN) — show nav
-      nav.classList.remove('nav-hidden');
+      nav.classList.remove('nav-hidden');          // at top — always show
+    } else if (st > _lastST + THRESH) {
+      nav.classList.add('nav-hidden');             // scrolling down — hide
+    } else if (st < _lastST - THRESH) {
+      nav.classList.remove('nav-hidden');          // scrolling up — show
     }
     _lastST = st;
   }
 
-  // Attach to ALL scrollable views using capture so we catch scroll
-  // events from any fixed-positioned child container on mobile
-  document.addEventListener('scroll', _navScroll, { capture: true, passive: true });
+  // ① Body/window scroll — patient list, All Active, Scheduled, Overdue, Pending, Archived
+  window.addEventListener('scroll', function() {
+    applyNavScroll(window.scrollY || window.pageYOffset || 0);
+  }, { passive: true });
 
-  // Also reset when switching views (don't start a new tab with hidden nav)
-  const _origSwitchView = window.switchView;
-  if (typeof _origSwitchView === 'function') {
+  // ② Element scroll — reminder view, invoice view, dashboard (fixed divs with own overflow)
+  document.addEventListener('scroll', function(e) {
+    const t = e.target;
+    // Skip if target is document/body/html — already handled by window listener above
+    if (!t || t === document || t === document.body || t === document.documentElement) return;
+    applyNavScroll(t.scrollTop || 0);
+  }, { capture: true, passive: true });
+
+  // Reset nav to visible whenever the user switches tabs/views
+  const _orig = window.switchView;
+  if (typeof _orig === 'function') {
     window.switchView = function(view) {
-      _origSwitchView(view);
+      _orig(view);
       _lastST = 0;
-      const nav = document.querySelector('.bottom-nav');
-      if (nav) nav.classList.remove('nav-hidden');
+      // Reset body scroll position too — new view starts at top
+      window.scrollTo(0, 0);
+      document.querySelector('.bottom-nav')?.classList.remove('nav-hidden');
     };
   }
 })();
-
-window.addEventListener('switchView', () => {
-  document.querySelector('.bottom-nav')?.classList.remove('nav-hidden');
-});
 
 // ════════════════════════════════════════════════════════════
 // ── RAW PATIENT FINDER — diagnostic tool ─────────────────────
