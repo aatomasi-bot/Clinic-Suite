@@ -8,91 +8,128 @@
 **H4N 1N4 — Cartierville / Saint-Laurent, Montréal**
 Home is ALWAYS the departure point. It is never counted as a stop.
 
-> ⚠️ Previous session errors: Claude had assumed H4J 1T2, then H8S (Lachine) — both WRONG. Confirmed home is H4N 1N4.
+---
+
+## BROWSER
+**User uses Chrome on iOS (iPhone) + Chrome on iMac — NOT Safari.**
 
 ---
 
-## SPECIAL TRIGGER RULE — 32 Rue Vermette
+## SPECIAL TRIGGER RULES
 
-> **When 32 Rue Vermette, Saint-Eustache is on the plan → it is always STOP #1.**
-> Home still departs first, but Vermette is visited before any other patient stop.
-> The rest of the route then continues in the normal NW → NE horseshoe arc.
+### 32 Rue Vermette — Always FIRST
+> When 32 Rue Vermette, Saint-Eustache is on the plan → **always STOP #1.**
 
-**Confirmed order with Vermette present (May 25, 2026):**
-`Home → Vermette → Guindon → Rang du Domaine (NW apex) → Damien-Cyr → Mascouche (NE apex) → Thomas Lapointe → Lévesque Est → 15e Rue → Coughtry`
-
----
-
-## LAVAL / NORTH CIRCUIT — Step Order (from H4N)
-
-Shape: **clockwise horseshoe** — start local, sweep NW to far apex, arc NE to far apex, return local.
-
-| Step | Zone | Example addresses | Notes |
-|------|------|-------------------|-------|
-| Special | Saint-Eustache | 32 Rue Vermette | **Always first if present** |
-| 1 | Local / St-Laurent | Coughtry H4L | Closest to home — visited LAST when no Vermette; first after Vermette trigger |
-| 2 | West Laval entry | 15e Rue H7N | Enter Laval close to H4N |
-| 3 | East Laval | Lévesque Est H7G | Sweep east in Laval |
-| 4 | NW Laval | Damien-Cyr H7L | Swing northwest through Laval |
-| 5 | Saint-Eustache | Vermette J7P, Guindon J7R | NW cluster |
-| 6 | Far NW apex | Rang du Domaine J0N / Deux-Montagnes | **Furthest NW point** |
-| 7 | NE arc | Terrebonne J6W | Swing northeast |
-| 8 | Far NE apex | Mascouche J7K | **Furthest NE point** |
-
-**Without Vermette:** Home → local (Coughtry) → W Laval → E Laval → Terrebonne → Mascouche (NE apex) → NW Laval → Saint-Eustache → far NW apex (end)
-
-**With Vermette:** Home → Vermette (first!) → Saint-Eustache cluster → far NW apex → NW Laval → Mascouche (NE apex) → Terrebonne → E Laval → W Laval → Coughtry (end)
+### 325 Boulevard Deguire — Always LAST (confirmed Jun 1, 2026)
+> **325 Boul Deguire is a patient address. When present → it goes LAST.**
 
 ---
 
-## MONTREAL CIRCUIT — Step Order (from H4N)
+## SAME-ADDRESS GROUPING (confirmed Jun 22, 2026)
 
-Shape: **SW-to-NE arc** ending in north Montreal.
+When multiple patients share the same building (same street number + street, different apt):
+- Grouped **consecutively** in route — **one MapQuest stop**
+- First patient: normal scheduled time
+- Each subsequent patient at same address: **+15 minutes** (not full 30-min slot)
+- `copyDayAddresses()` deduplicates the MapQuest list automatically
+- Toast confirms: "2 same-building duplicates removed"
+
+---
+
+## WEEKDAY SORT — Circuit B Goes LAST (confirmed Jun 22, 2026)
+
+**Problem fixed:** Circuit B patients (H4J, H4K border zone, s=1) were being placed FIRST on weekdays due to raw step sort. They should come LAST after sweeping SW→NE Montreal.
+
+**`weekdayKey()` function:**
+- Circuit A → step value directly (1–11)
+- Circuit B → step + 20 (always after all Circuit A)
+
+| Effective Key | Zone |
+|---------------|------|
+| 1–11 | Circuit A: NDG → Lachine → Downtown → Rosemont → Ahuntsic → Mtl-Nord → Mtl-Est |
+| 21 | Circuit B: Border zone (H4J, H4K, H4L, H3M) |
+| 22–25 | Circuit B: Ahuntsic N → Laval → Pierrefonds → West Island |
+
+---
+
+## MONTREAL CIRCUIT A — Step Order
 
 | Step | FSA(s) | Neighbourhood |
 |------|--------|---------------|
-| 1 | H8S, H8R | Lachine |
-| 2 | H8N, H8P | LaSalle |
-| 3 | H3E | Nun's Island / Île-des-Sœurs |
-| 4 | H4C, H4E | St-Henri / LaSalle east |
-| 5 | H3W | NDG / Queen Mary |
-| 6 | H3T | Côte-Ste-Catherine |
-| 7 | H3S, H3X | Appleton / CDN upper |
-| 8 | H2X, H3H | Sherbrooke O / Downtown |
-| 9 | J5Y, J5Z, J6A | Repentigny — **NE apex** |
-| 10 | H2M | Chabanel / Ahuntsic |
-| 11 | H3N, H2V | Park-Extension / Outremont — **last** |
+| 1 | H3W, H4A | NDG / Côte-St-Luc |
+| 2 | H4B | NDG south / Cavendish |
+| 3 | H8S, H8R, H8P, H8N, H8T, H8Y, H3E, H4E | Lachine / LaSalle / Nun's Island |
+| 4 | H4G, H4C, H3J, J5R, J4W, J4G | Verdun / St-Henri / South Shore |
+| 5 | H3H, H3Y, H3T, H3S, H3X | Downtown W / Westmount / CDN |
+| 6 | H2X, H4P | Downtown / Snowdon |
+| 7 | H2V, H2T, H2K | Outremont / Plateau / HoMa |
+| 8 | H1Y, H1X | Rosemont |
+| 9 | H2M, H2N, H2C, H3N, H3L, H4M, H4S | Ahuntsic / Chabanel / Park-Ex |
+| 10 | H1H, H1G, H1J | Montreal-Nord / Anjou |
+| 11 | H1B | Montréal-Est — **absolute last** |
 
 ---
 
-## CRITICAL RULES (all circuits)
+## FRIDAY CIRCUIT B — Laval Horseshoe Arc
 
-1. **Home (H4N) always departs first** — never skip this.
-2. **32 Rue Vermette = always stop #1** when present.
-3. **North Montreal (H2M, H3N, H2V) is LAST** on Montreal circuit — Claude's biggest recurring error is putting these first.
-4. **Far apexes are visited near the end**, not the beginning (except Vermette trigger).
-5. **Local stops are last** on normal days (end near home). With Vermette trigger, local stops shift to the end.
+| Position | FSA(s) | circBKey | Notes |
+|----------|--------|----------|-------|
+| Border | H4N, H4L, H3M | 10 | Near home — first |
+| Ahuntsic N | H2B, H1Z | 14 | |
+| Laval entry | H7N | 16 | Entry bridge — first in Laval |
+| Laval NE apex | H7E, H7C, H7M, H7P, H7L | 17 | Go far first |
+| Laval central | H7A, H7T, H7S, H7K, H7V, H7W | 18 | |
+| Laval SW exit | H7G, H7R | 19 | Last in Laval |
+| Pierrefonds/SE | H8Z, J7P, J7R | 22 | After Laval |
+| West Island | H9x, J7W | 28 | **Absolute last** |
+
+---
+
+## SATURDAY RULES
+
+- **Start at FARTHEST patient** from home
+- Sweep progressively back toward home (H4N)
+- Last patient = closest to home
+- First appointment: **8:00 AM**
+
+---
+
+## CRITICAL RULES
+
+1. **Home (H4N) always departs first**
+2. **32 Rue Vermette = always stop #1**
+3. **325 Boul Deguire = always LAST**
+4. **Circuit B comes AFTER Circuit A on weekdays** (weekdayKey)
+5. **Same-address patients = 1 MapQuest stop, 15-min apart**
+6. **North Montreal (H2M, H3N) is LATE** — not first
+
+---
+
+## KEY FSA OVERRIDES
+
+| FSA | Circuit | Step | Notes |
+|-----|---------|------|-------|
+| H3M | B | 1 | Cartierville border → Friday |
+| H8Z | B | 4 | Pierrefonds |
+| H1H, H1G | A | 10 | Montreal-Nord |
+| J5Y, J5Z, J6A | A | 9 | Repentigny — NE apex |
 
 ---
 
 ## ROUTE COMPARISONS LOG
 
-| # | Date | Route | Key learning | In scheduler? |
-|---|------|-------|--------------|---------------|
-| 1 | May 24, 2026 | Jun 10 Montreal | South Shore middle; far east last; home base error corrected | ❌ Pending |
-| 2 | May 24, 2026 | Same 12 Montreal addresses | North last confirmed; J5Y apex confirmed; home = H4N confirmed | ❌ Pending |
-| 3 | May 25, 2026 | 9-stop Laval/NE circuit | Horseshoe shape confirmed; Vermette = stop #1 rule established | ❌ Pending |
-
----
-
-## SCHEDULER LOGIC (current state)
-
-- Classifies patients by FSA → circuit + step
-- Plans 14 days respecting caps and ±3-day windows
-- Sorts each day by circuit step order
-- Stores plan in sessionStorage
-
-**FSA table**: needs update — apply corrected step orders above once 3 confirmations per rule.
+| # | Date | Circuit | Key learning | Applied? |
+|---|------|---------|--------------|----------|
+| 1 | May 24 | Montreal | South Shore middle; north last | ✅ |
+| 2 | May 24 | Montreal | H4N home confirmed | ✅ |
+| 3 | May 25 | Laval/NE | Horseshoe; Vermette stop #1 | ✅ |
+| 4 | May 25 | Saturday | Start farthest; end near home | ✅ |
+| 5 | May 25 | Montreal | H1B far east last; H2V step 7 | ✅ |
+| 6 | May 25 | Friday | Border→Laval→West Island | ✅ |
+| 7 | Jun 1 | Both | H3M→B; Deguire last; H1H step 10 | ✅ |
+| 8 | Jun 3 | Both | City-name fallback; H7 sub-steps | ✅ |
+| 9 | Jun 11 | Friday | Laval horseshoe arc confirmed | ✅ |
+| 10 | Jun 22 | Tuesday | weekdayKey + same-address 15-min grouping | ✅ |
 
 ---
 
@@ -101,295 +138,5 @@ Shape: **SW-to-NE arc** ending in north Montreal.
 - **App**: VaPiq Clinical Suite
 - **GitHub**: aatomasi-bot.github.io/Clinic-Suite/
 - **Supabase**: wqlbmtjbjloxpvsbeqyb.supabase.co
-- **Files**: index.html (437KB), scheduler.html (84KB), ROUTE_PREFERENCES.md
 
----
-
-## HOW TO USE THIS FILE
-
-At the start of a new Claude session:
-1. Open this file from GitHub
-2. Paste its full contents into Claude
-3. Claude restores full context instantly
-
-When sharing a new route comparison:
-- Share both maps (your preferred + Claude's output)
-- Claude updates the log and extracts rules
-- 3 confirmations → rule applied to scheduler.html
-
----
-
-*Maintained by Claude. Part of VaPiq Clinical Suite.*
-*Last updated: May 25, 2026 — Vermette trigger rule added. Laval horseshoe circuit documented.*
-
----
-
-## SATURDAY SPECIAL RULES
-
-> **Saturday is the INVERSE of weekday routing.**
-
-### Core Saturday Rule
-- **Start at the FARTHEST patient from home** — not the closest
-- First appointment = **8:00 AM** → leave home early enough to reach the far patient on time
-- Route sweeps progressively BACK toward home throughout the day
-- Last patients of the day are the ones closest to home (H4N area)
-- This way fatigue at end of day = short drive home
-
-### Saturday Arc Pattern (confirmed May 25, 2026 — 14-stop route)
-`Far west apex → West Island → LaSalle south → LaSalle → NDG → Verdun → Nun's Island → St-Henri → Westmount → Far east (Old Port) → Plateau → Villeray → Snowdon (end near home)`
-
-**Confirmed stop order:**
-1. 490 Av du Parc, Vaudreuil (J7V) ← **START — absolute farthest**
-2. 145 Av Cartier, Pointe-Claire (H9S)
-3. 8318 Av des Rapides, LaSalle (H8P)
-4. 6261 Rue Jogues, LaSalle (H4E)
-5. 2219 Av Prud'Homme, NDG (H4A)
-6. 779 Rue Hickson, Verdun (H4G)
-7. 325 Ch. Pointe-Sud, Nun's Island (H3E) ← after Verdun on Saturdays
-8. 2700 Rue Rufus-Rockhead, St-Henri (H3J)
-9. 464 Av Elm, Westmount (H3Y)
-10. 1000 Rue Commune Est, Old Port (H2L) ← far east visited mid-route
-11. 2547 Rue Chapleau, Plateau (H2K)
-12. 524 Rue Castelnau E, Villeray (H2R)
-13. 8511 Av Chateaubriand, Villeray (H2P)
-14. 4080 Av Kindersley, Snowdon (H4P) ← **END — closest to home**
-
-### How to Identify the "Farthest" Patient
-- Compare straight-line distance from H4N to each patient
-- Vaudreuil (J7V), Repentigny (J5Y), Mascouche (J7K), Brossard (J4W) = candidates for far starts
-- If two patients are equally far in opposite directions → pick the westernmost first (west→east sweep)
-
-### Saturday vs Weekday Comparison
-| Rule | Weekday | Saturday |
-|------|---------|----------|
-| Start | Near home (local first) | Farthest patient |
-| End | Far apex or north cluster | Near home (Snowdon/local) |
-| First appt | Morning, any time | 8:00 AM |
-| Direction | Home → outward | Outward → home |
-
----
-
-## ROUTE COMPARISONS LOG (updated)
-
-| # | Date | Route | Key learning | In scheduler? |
-|---|------|-------|--------------|---------------|
-| 1 | May 24, 2026 | Jun 10 Montreal | South Shore middle; far east last; home base error corrected | ❌ Pending |
-| 2 | May 24, 2026 | Same 12 Montreal addresses | North last confirmed; J5Y apex confirmed; home = H4N confirmed | ❌ Pending |
-| 3 | May 25, 2026 | 9-stop Laval/NE circuit | Horseshoe shape; Vermette = stop #1 rule | ❌ Pending |
-| 4 | May 25, 2026 | 14-stop Saturday Jun 6 | **Saturday rule: start farthest, end near home; 8 AM first patient** | ❌ Pending |
-
-*Last updated: May 25, 2026 — Saturday routing rules added.*
-
----
-
-## CIRCUIT SEPARATION RULES (new — May 25, 2026)
-
-When a day has too many patients, split by circuit. Each circuit runs on a specific day type.
-
----
-
-### CIRCUIT A — Montreal Inner
-**Day**: Mon/Tue/Wed/Thu (non-Friday weekday)
-**FSAs covered**: H3W, H4B, H8S, H8R, H3E, H4C, H4G, H3J, H3H, H2X, H2V, H2T, H1Y, H1X, H1J, H1B, J5R (south shore)
-**Does NOT include**: near-home (H4N, H4R), Ahuntsic (H2B, H1Z), Laval (H7V), Pierrefonds (H8Z), West Island (J7W)
-
-**Confirmed step order (Image 1 — May 25, 2026):**
-| Step | FSA | Neighbourhood |
-|------|-----|---------------|
-| 1 | H3W | NDG / Côte-St-Luc |
-| 2 | H4B | NDG south / Cavendish |
-| 3 | H8S | Lachine |
-| 4 | H8R | LaSalle |
-| 5 | J5R | South Shore (La Prairie) — middle |
-| 6 | H3H | Downtown W / Westmount |
-| 7 | H2X | Downtown Sherbrooke O |
-| 8 | H2V | Outremont |
-| 9 | H2T | Plateau |
-| 10 | H1Y, H1X | Rosemont |
-| 11 | H1J | Anjou |
-| 12 | H1B | Montréal-Est ← **FAR EAST apex, absolute last** |
-
-> ⚠️ CORRECTION: Previous rule said "H2V (Outremont) is last" — THIS WAS WRONG.
-> H2V is late (step 8) but FAR EAST (H1B Montréal-Est, H1J Anjou) is the true last cluster.
-> H2V only appears "last" on days where there are no H1B/H1J patients.
-
----
-
-### CIRCUIT B — Friday / Laval + Montreal Border + West Island
-**Day**: Friday (and overflow days when needed)
-**User's rule**: *"I start in Montreal, enter Laval, finish in West Island"*
-**FSAs covered**: H4N, H4R (near home / Montreal border) + H1Z, H2B (Ahuntsic) + H7V (west Laval) + H8Z (Pierrefonds) + J7W (Pincourt / West Island)
-
-**Confirmed step order (Image 2 — May 25, 2026):**
-| Step | FSA | Neighbourhood |
-|------|-----|---------------|
-| 1 | H4R, H4N | Near home / Montreal border — START |
-| 2 | H1Z | Villeray / Ahuntsic north |
-| 3 | H2B | Ahuntsic / Gouin Est |
-| 4 | H7V | West Laval (Belle-Rive) ← cross to Laval |
-| 5 | H8Z | Pierrefonds / Gouin Ouest ← back on island west |
-| 6 | J7W | Pincourt / West Island ← **FAR WEST, absolute last** |
-
-**Shape**: Montreal border (home area) → north Ahuntsic → cross to Laval → swing west Pierrefonds → far West Island
-
----
-
-### CIRCUIT C — Laval + Northeast (previously documented)
-**Day**: Varies (often paired with Friday or a separate day)
-**FSAs covered**: Laval (H7L, H7N, H7G, H7K etc.) + Saint-Eustache (J7P, J7R) + Deux-Montagnes (J0N) + Terrebonne (J6W) + Mascouche (J7K)
-**Special rule**: 32 Rue Vermette = always stop #1 when present
-
----
-
-## UPDATED ROUTE COMPARISONS LOG
-
-| # | Date | Circuit | Key learning | Applied? |
-|---|------|---------|--------------|----------|
-| 1 | May 24 | Montreal | South Shore middle; north last | ❌ |
-| 2 | May 24 | Montreal | H4N home confirmed; north last confirmed | ❌ |
-| 3 | May 25 | Laval/NE | Horseshoe; Vermette = stop #1 | ❌ |
-| 4 | May 25 | Saturday | Start farthest; end near home; 8 AM | ❌ |
-| 5 | May 25 | Montreal Inner | H1B/H1J = true last; H2V is step 8 not last | ❌ |
-| 6 | May 25 | Friday | Start Montreal border → Laval → West Island end | ❌ |
-
-*Last updated: May 25, 2026 — Circuit A/B/C separation rules added. H2V "last" error corrected.*
-
----
-
-## 325 BOULEVARD DEGUIRE RULE  (confirmed Jun 1, 2026)
-
-> **325 Boul Deguire is a PATIENT address. When it appears on any day's schedule → it goes LAST.**
-> This is the reverse of the Vermette rule (Vermette = always first, Deguire = always last).
-> Note: 42 Boul Deguire = home departure point (different address, not a patient).
-
----
-
-## H3M FSA CORRECTION  (confirmed Jun 1, 2026)
-
-**H3M (Cartierville / Salaberry-de-Valleyfield border area) → Circuit B (Friday)**
-
-Previously misclassified as Circuit A step 9. The user explicitly moved:
-- 2320 Rue de Salaberry (H3M) → Friday route
-- 12140 Rue Joseph-Casavant (H3M) → Friday route
-
-These are in the Cartierville borough, adjacent to H4L and H4N (both Circuit B step 1).
-They border Laval and naturally belong to the Friday circuit.
-
-**FSA table updated:** `H3M → Circuit B step 1` (same zone as H4L, H4N, H4R)
-
----
-
-## H1H CORRECTION  (confirmed Jun 1, 2026)
-
-**H1H (Montreal-Nord / Blvd St-Michel area) → Circuit A step 10**
-
-Previously fell to FSA2 H1 → step 8 (far east fallback). But Montreal-Nord is NORTH, not east.
-It should come AFTER Ahuntsic (H2M step 9) but BEFORE Anjou (H1J step 10) / Montreal-Est (H1B step 11).
-Confirmed: 10901 Boul St-Michel was the last Montreal Inner stop in the Jun 18 route.
-
----
-
-## ROUTE COMPARISONS LOG (updated)
-
-| # | Date | Circuit | Key learning | Applied? |
-|---|------|---------|--------------|----------|
-| 1 | May 24 | Montreal | South Shore middle; north last | ❌ |
-| 2 | May 24 | Montreal | H4N home confirmed; north last confirmed | ❌ |
-| 3 | May 25 | Laval/NE | Horseshoe; Vermette = stop #1 | ✅ |
-| 4 | May 25 | Saturday | Start farthest; end near home; 8 AM | ✅ |
-| 5 | May 25 | Montreal Inner | H1B/H1J true last; H2V is step 7 | ✅ |
-| 6 | May 25 | Friday | Start border→Laval→West Island end | ✅ |
-| 7 | Jun 1 | Montreal/Friday | H3M→Circuit B; 325 Deguire last; H1H step 10 | ✅ |
-
-*Last updated: Jun 1, 2026 — H3M reclassified; 325 Deguire last rule added; H1H corrected.*
-
----
-
-## ROUTE COMPARISON LOG #8 — Jun 3, 2026 (4 screenshots)
-
-### Key Learning: City-Name Fallback (critical fix)
-
-**Root cause of wrong routes:** When patient addresses lack full postal codes,
-`optClassify` fell back to `{c:'A', s:3}` — putting Laval and Terrebonne patients
-on the Montreal circuit, causing back-and-forth crossing lines.
-
-**Fix applied:** City-name detection added to `optClassify`:
-- If address contains **"Laval"** → Circuit B step 3 (regardless of postal code)
-- If address contains **"Terrebonne"** → Circuit B step 3
-- If address contains **"Mascouche"** → Circuit B step 3
-- If address contains **"Saint-Eustache"** → Circuit B step 4
-- If address contains **"Pincourt"/"Kirkland"/"Vaudreuil"** → Circuit B step 5
-- If address contains **"Pointe-Claire"** → Circuit B step 5
-- If address contains **"La Prairie"/"Brossard"** → Circuit A step 4 (South Shore)
-
-**Safety override:** Even when postal code IS found, if address says "Laval" but
-FSA resolves to Circuit A → force Circuit B.
-
----
-
-### Laval Circuit Arc Order (confirmed Jun 26 route)
-
-User's preferred Laval/Friday order:
-1. McNamara (central Laval, H7G area) — entry from home H4N
-2. 18e Rue (H7N — west Laval near bridge)
-3. Port-au-Persil (northeast Laval — far apex)
-4. Hennessy (central Laval)
-5. Cageux (south-central Laval)
-6. Larivière (southwest border area — near home return)
-
-**Laval sub-steps added to FSA3:**
-- H7N, H7G, H7R → step 2 (west/south Laval, closest to H4N)
-- H7A, H7T, H7S, H7K → step 3 (central Laval)
-- H7E, H7C, H7M, H7P, H7L → step 4 (northeast Laval, far apex)
-
----
-
-### Montreal Circuit — Terrebonne as NE Apex (confirmed)
-
-**Wrong:** Claude put 265 Pierre-Laporte, Terrebonne at position B (second stop)
-on the Montreal circuit — massive back-and-forth to northeast then back south.
-
-**Correct:** When Terrebonne appears on a Montreal-circuit day, it goes
-NEAR LAST as the NE apex (confirmed position K of 13 stops in Jun 24 route).
-
-Laval patients removed from that circuit entirely (moved to Friday Jun 26).
-
-| # | Date | Circuit | Learning | Applied? |
-|---|------|---------|----------|----------|
-| 8 | Jun 3, 2026 | Both | City-name fallback; Laval H7 sub-steps; Terrebonne NE apex | ✅ |
-
-*Last updated: Jun 3, 2026*
-
----
-
-## Laval Horseshoe Arc (Circuit B Friday) — Confirmed Jun 11, 2026
-
-### The Problem
-Simple ascending step order (2→3→4) puts Port-au-Persil (NE apex, step 4) LAST 
-and Larivière (SW exit, step 2) SECOND — creating a zig-zag across Laval.
-
-### Correct Arc Order (enter west → sweep NE → return SW → exit to DDO)
-
-| Position | FSA(s) | Key | Example | Why |
-|----------|--------|-----|---------|-----|
-| 1st | H7N | 16 | 64 18e Rue | Entry bridge from H4N — always first in Laval |
-| 2nd | H7E, H7C, H7M, H7P, H7L | 17 | 3220 Port-au-Persil | Far NE apex — go there early, return west |
-| 3rd | H7A, H7T, H7S, H7K, H7V, H7W | 18 | Hennessy, Cageux | Central Laval — middle of arc |
-| 4th | H7G, H7R | 19 | 262 Larivière | SW exit — near southern bridge, last in Laval |
-| After | H9x (DDO, Pierrefonds) | 22 | 380 Isabelle Moyen, 185 Hilton | After all Laval patients |
-| Last | H9x West Island, J7W | 28 | Kirkland, Pincourt | Far West Island — always last |
-
-### Full Circuit B Key Range
-- B step 1 border (H4N, H3M, H4L) → key 10
-- B step 2 Ahuntsic (H2B, H1Z) → key 14
-- H7N Laval entry → key 16
-- H7 NE apex → key 17
-- H7 central → key 18
-- H7 SW exit → key 19
-- B step 4 Pierrefonds/DDO → key 22
-- B step 5 West Island → key 28
-
-### Route Comparison Log Entry — Jun 11, 2026
-Claude: H7N → H7G(Larivière) → Hennessy → Cageux → Port-au-Persil → DDO  ← WRONG
-Correct: H7N → Port-au-Persil → Hennessy → Cageux → Larivière → DDO  ← CORRECT
-Implemented: circBKey() function replaces simple step-ascending sort for all Friday days.
+*Last updated: Jun 22, 2026*
