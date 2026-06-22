@@ -111,7 +111,7 @@
   --shadow-xl:  0 20px 60px rgba(27,38,56,.22);
 
   /* ── Layout ── */
-  --nav-h:      calc(70px + env(safe-area-inset-bottom, 0px));
+  --nav-h:      54px;   /* visible button area — safe area padding added separately in .bottom-nav */
   --header-h:   60px;
   --search-area-h: 106px;
 
@@ -169,7 +169,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   padding-top: var(--header-h);
-  padding-bottom: calc(var(--nav-h) + 1rem);
+  padding-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px) + 1rem);
 }
 button {
   cursor: pointer;
@@ -865,12 +865,12 @@ input, select, textarea { font: inherit; }
    Chrome supports :has() fully. When .bottom-nav has .nav-hidden,
    the fixed reminderView expands to bottom:0 (no blank gap),
    in sync with the nav's 0.28s slide-out animation.           ── */
-body:has(.bottom-nav.nav-hidden) #reminderView {
-  bottom: 0 !important;
-  padding-bottom: 20px;
-}
 body:has(.bottom-nav.nav-hidden) {
   padding-bottom: 0.5rem !important;
+}
+body:has(.bottom-nav.nav-hidden) #reminderView {
+  bottom: 0 !important;
+  padding-bottom: 16px;
 }
 
 /* ── Reminder action buttons — always 2 rows, no media query needed ── */
@@ -893,13 +893,13 @@ body:has(.bottom-nav.nav-hidden) {
 
 /* ── Reminders view ─────────────────────────────────────────── */
 #reminderView {
-  padding: 12px 12px calc(var(--nav-h) + 20px);  /* bottom padding clears nav bar */
+  padding: 12px 12px calc(var(--nav-h) + env(safe-area-inset-bottom, 0px) + 12px);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   position: fixed;
   top: var(--header-h);
   left: 0; right: 0;
-  bottom: var(--nav-h);
+  bottom: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px));
   transition: bottom 0.28s cubic-bezier(0.4, 0, 0.6, 1),
               padding-bottom 0.28s cubic-bezier(0.4, 0, 0.6, 1);
 }
@@ -1180,30 +1180,33 @@ body:has(.bottom-nav.nav-hidden) {
   position: fixed;
   bottom: 0; left: 0; right: 0;
   z-index: 100;
-  height: var(--nav-h);
-  background: rgba(255,255,255,0.88);
+  /* Height = button area + home indicator safe zone */
+  height: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px));
+  background: rgba(255,255,255,0.92);
   border-top: 1px solid var(--border);
   display: flex;
-  align-items: center;
-  box-shadow: 0 -4px 24px rgba(27,38,56,0.10);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  /* ── iOS Safari fix: force GPU compositing layer ──────────────
-     Without this, iOS Safari sometimes refuses to keep the nav
-     fixed when scrolling fast, or after the keyboard dismisses.
-     transform: translateZ(0) forces the element onto its own
-     GPU layer so the browser never scrolls it with the page. */
+  align-items: flex-start;      /* buttons sit at top; safe area is below them */
+  padding-top: 6px;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  box-shadow: 0 -2px 12px rgba(27,38,56,0.08);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
   -webkit-transform: translateY(0) translateZ(0);
   transform: translateY(0) translateZ(0);
   will-change: transform;
-  transition: transform 0.28s cubic-bezier(0.4, 0, 0.6, 1);
-  /* ── iPhone notch / home indicator safe area ─────────────── */
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  transition: transform 0.28s cubic-bezier(0.4, 0, 0.6, 1),
+              box-shadow 0.15s ease,
+              backdrop-filter 0.15s ease;
 }
-/* Nav hidden state — slides down off screen when scrolling into content */
+/* Nav hidden — overshoot by 40px extra so the box-shadow (which extends
+   upward from nav top) also clears the viewport. Without this the shadow
+   leaves a visible gradient band at the bottom of the screen. */
 .bottom-nav.nav-hidden {
-  -webkit-transform: translateY(100%) translateZ(0);
-  transform: translateY(100%) translateZ(0);
+  -webkit-transform: translateY(calc(100% + 40px)) translateZ(0);
+  transform: translateY(calc(100% + 40px)) translateZ(0);
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 .nav-btn {
   flex: 1;
@@ -1211,23 +1214,23 @@ body:has(.bottom-nav.nav-hidden) {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  height: 100%;
+  gap: 2px;
+  height: var(--nav-h);    /* fixed to button area only, not full nav height */
   color: var(--text-3);
   transition: color var(--transition);
   position: relative;
-  padding-bottom: 6px;
+  padding-bottom: 0;
 }
 .nav-btn svg {
-  width: 1.375rem;
-  height: 1.375rem;
+  width: 1.25rem;
+  height: 1.25rem;
   stroke: currentColor;
   fill: none;
   stroke-width: 1.8;
   transition: transform var(--transition);
 }
-.nav-btn:hover svg { transform: translateY(-2px); }
-.nav-btn span { font-size: 0.625rem; font-weight: 600; }
+.nav-btn:hover svg { transform: translateY(-1px); }
+.nav-btn span { font-size: 0.5625rem; font-weight: 600; }
 .nav-btn.active { color: var(--teal); }
 .nav-btn--new { color: #fff !important; }
 .nav-btn--new .nav-plus-wrap {
@@ -2079,13 +2082,7 @@ stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
   }
 }
 
-/* Safe area insets (iPhone notch / Dynamic Island) */
-@supports (padding-bottom: env(safe-area-inset-bottom)) {
-  .bottom-nav {
-    padding-bottom: env(safe-area-inset-bottom);
-    height: calc(var(--nav-h) + env(safe-area-inset-bottom));
-  }
-}
+/* Safe area already built into .bottom-nav height and padding-bottom above */
 
   
 /* ══════ DARK MODE ══════ */
