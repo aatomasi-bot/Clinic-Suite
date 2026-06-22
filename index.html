@@ -850,11 +850,7 @@ input, select, textarea { font: inherit; }
 .snooze-opt:hover { border-color: var(--teal); color: var(--teal); }
 
 /* ── Reminder view scroll ───────────────────────────────────── */
-#reminderView {
-  padding: 0 12px calc(var(--nav-h) + 20px);
-  overflow-y: auto; -webkit-overflow-scrolling: touch;
-  position: fixed; top: var(--header-h); left: 0; right: 0; bottom: var(--nav-h);
-}
+/* first #reminderView definition removed — authoritative one below */
 .reminder-header {
   display: flex; align-items: center; justify-content: space-between;
   padding: 12px 4px 4px; position: sticky; top: 0;
@@ -865,7 +861,17 @@ input, select, textarea { font: inherit; }
 .rem-empty-icon { font-size: 48px; margin-bottom: 12px; }
 [data-theme="dark"] .rem-card { background: var(--card); }
 
-/* pinStrip removed — replaced by pin panel button */
+/* ── When nav is hidden: expand fixed views + remove blank strip ────
+   Chrome supports :has() fully. When .bottom-nav has .nav-hidden,
+   the fixed reminderView expands to bottom:0 (no blank gap),
+   in sync with the nav's 0.28s slide-out animation.           ── */
+body:has(.bottom-nav.nav-hidden) #reminderView {
+  bottom: 0 !important;
+  padding-bottom: 20px;
+}
+body:has(.bottom-nav.nav-hidden) {
+  padding-bottom: 0.5rem !important;
+}
 
 /* ── Reminder action buttons — always 2 rows, no media query needed ── */
 /* Row 1: primary (Accepted/Called + Declined/NoAnswer) side by side   */
@@ -890,11 +896,12 @@ input, select, textarea { font: inherit; }
   padding: 12px 12px calc(var(--nav-h) + 20px);  /* bottom padding clears nav bar */
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  /* Mobile: sit below fixed header, scroll freely above nav */
   position: fixed;
   top: var(--header-h);
   left: 0; right: 0;
   bottom: var(--nav-h);
+  transition: bottom 0.28s cubic-bezier(0.4, 0, 0.6, 1),
+              padding-bottom 0.28s cubic-bezier(0.4, 0, 0.6, 1);
 }
 .reminder-header {
   display: flex; align-items: center; justify-content: space-between;
