@@ -1262,15 +1262,22 @@ async function confirmDay(dayIdx){
           appointment_date_time:null,appointment_confirmed:false}).eq('id',p.id);
       }
     }
-    // Confirm all patients in toSave with recalculated times
+    // Assign times — same-address patients (different apt, same building)
+    // get 15-min gap instead of full SLOT to avoid revisiting the address.
+    const SAME_ADDR_GAP=15;
+    let runningMin=startMin+confOffset*SLOT;
     for(let j=0;j<toSave.length;j++){
       const p=toSave[j];
-      const slotPos=confOffset+j;
-      const tm=startMin+slotPos*SLOT;
+      const tm=runningMin;
       const dt=`${ds}T${p2(Math.floor(tm/60))}:${p2(tm%60)}`;
       await _sb.from('patients').update({
         appointment_date_time:dt,appointment_confirmed:true}).eq('id',p.id);
       saved++;
+      // Advance: 15 min if next patient shares same base address, else full SLOT
+      const nextP=toSave[j+1];
+      const sameAddr=nextP&&baseAddress(p.address||'')&&
+        baseAddress(nextP.address||'')===baseAddress(p.address||'');
+      runningMin+=sameAddr?SAME_ADDR_GAP:SLOT;
     }
     // Exit editMode on success so day is locked again with new order
     d.editMode=false;
@@ -1303,13 +1310,19 @@ async function confirmAll(){
       if(!d.active.length)continue;
       const ds=winD[i];
       const confOff=d.conf.length;
+      const SAME_ADDR_GAP=15;
+      let runMin=startMin+confOff*SLOT;
       for(let j=0;j<d.active.length;j++){
         const p=d.active[j];
-        const tm=startMin+(confOff+j)*SLOT;
+        const tm=runMin;
         const dt=`${ds}T${p2(Math.floor(tm/60))}:${p2(tm%60)}`;
         await _sb.from('patients').update({
           appointment_date_time:dt,appointment_confirmed:true}).eq('id',p.id);
         allBatchIds.push(p.id);saved++;
+        const nxt=d.active[j+1];
+        const same=nxt&&baseAddress(p.address||'')&&
+          baseAddress(nxt.address||'')===baseAddress(p.address||'');
+        runMin+=same?SAME_ADDR_GAP:SLOT;
       }
     }
     localStorage.setItem('vapiq_appts_updated',Date.now());
@@ -1667,7 +1680,51 @@ function circBKey(cl){
   // Pierrefonds/Saint-Eustache step-4 (22) → West Island step-5 (28)
 }
 
-function buildSlots(fromDate){
+// ════════════════════════════════════════════════════════════
+// WEEKDAY SORT KEY (Tue/Wed/Thu)
+// On weekdays the route sweeps SW Montreal → Central → NE, then
+// the Circuit B border zone (Cartierville/H4J etc.) LAST.
+// Raw (s - s) sort puts Circuit B step-1 patients FIRST because
+// s=1 is the lowest value — but H4J/H4K (north border) should
+// come at the END of a Tuesday route, not the beginning.
+// Fix: push all Circuit B patients to key 20+, after all Circ A.
+// ════════════════════════════════════════════════════════════
+function weekdayKey(cl){
+  if(cl.c==='A') return cl.s;   // Circuit A 1-11 → SW to NE Montreal
+  return 20 + cl.s;              // Circuit B → after all Circuit A stops
+}
+
+// ════════════════════════════════════════════════════════════
+// SAME-ADDRESS HELPERS
+// baseAddress: strips apt/unit suffix so two patients in the
+// same building are recognised as "same address".
+// groupByAddress: keeps same-address patients consecutive in
+// the route list (position of first occurrence preserved).
+// ════════════════════════════════════════════════════════════
+function baseAddress(addr){
+  if(!addr) return '';
+  return addr
+    .replace(/,?\s*(apt\.?|app\.?|suite|unit|#|bur\.?|porte)\s*[a-z0-9\-]+/gi,'')
+    .replace(/,?\s+#[a-z0-9\-]+\s*$/i,'')
+    .split(',')[0]          // keep street only, drop city/prov/postal
+    .toLowerCase().replace(/\s+/g,' ').trim();
+}
+
+function groupByAddress(list){
+  if(!list||!list.length) return list;
+  const out=[];
+  list.forEach(p=>{
+    const ba=baseAddress(p.address||p['Address']||'');
+    if(!ba){ out.push(p); return; }
+    // Find last existing entry with same base address
+    let ins=-1;
+    for(let i=out.length-1;i>=0;i--){
+      if(baseAddress(out[i].address||out[i]['Address']||'')===ba){ins=i+1;break;}
+    }
+    if(ins===-1) out.push(p); else out.splice(ins,0,p);
+  });
+  return out;
+}
   return Array.from({length:14},(_,i)=>{
     const d=addDays(fromYMD(fromDate),i);
     const dow=d.getDay();
@@ -1789,7 +1846,7 @@ function runPlanner(pats,fromDate){
     const room=sl.cap-sl.patients.length;
 
     // Sort candidates by confirmed route step order
-    cands.sort((a,b)=>isSat?(satKey(a._cl)-satKey(b._cl)):isFri?(circBKey(a._cl)-circBKey(b._cl)):(a._cl.s-b._cl.s));
+    cands.sort((a,b)=>isSat?(satKey(a._cl)-satKey(b._cl)):isFri?(circBKey(a._cl)-circBKey(b._cl)):weekdayKey(a._cl)-weekdayKey(b._cl));
 
     // Place up to available room
     cands.slice(0,room).forEach(p=>{
@@ -1817,7 +1874,9 @@ function runPlanner(pats,fromDate){
   slots.forEach(sl=>{
     const isSat=sl.dow===6; const isFri=sl.dow===5;
     // Step sort: ascending weekday / circBKey Friday / satKey Saturday
-    sl.patients.sort((a,b)=>isSat?(satKey(a._cl)-satKey(b._cl)):isFri?(circBKey(a._cl)-circBKey(b._cl)):(a._cl.s-b._cl.s));
+    sl.patients.sort((a,b)=>isSat?(satKey(a._cl)-satKey(b._cl)):isFri?(circBKey(a._cl)-circBKey(b._cl)):weekdayKey(a._cl)-weekdayKey(b._cl));
+    // Group same-address patients consecutively (different apts = 15-min apart)
+    sl.patients=groupByAddress(sl.patients);
     // Vermette trigger: 32 Rue Vermette always goes first regardless of step
     applyVermetteRule(sl.patients);
     applyDeguireLastRule(sl.patients);  // 325 Deguire always last
@@ -1972,15 +2031,29 @@ async function mergeDay(fromIdx,toIdx){
 
 // ════════════════════════════════════════════════════════════
 // COPY DAY ADDRESSES  (📋 button on each day header)
-// Copies all patient addresses for that day as plain text,
-// one per line, in route order — ready to paste into MapQuest.
+// Copies patient addresses in route order for MapQuest.
+// Same-address patients (different apt, same building) are
+// DEDUPLICATED — only the address appears once in the list
+// since MapQuest only needs one stop per building.
 // ════════════════════════════════════════════════════════════
 async function copyDayAddresses(dayIdx){
   const day=days[dayIdx];if(!day)return;
   const all=[...(day.conf||[]),...(day.active||[])];
-  const addrs=all.map(p=>p.address||p['Address']||'').filter(Boolean);
-  if(!addrs.length){toast('No addresses on this day');return;}
-  const text=addrs.join('\n');
+  if(!all.length){toast('No addresses on this day');return;}
+
+  // Deduplicate consecutive same-base-address entries for MapQuest
+  const uniqueAddrs=[];
+  let lastBase='';
+  all.forEach(p=>{
+    const addr=(p.address||p['Address']||'').trim();
+    if(!addr) return;
+    const ba=baseAddress(addr);
+    if(ba&&ba===lastBase) return; // same building — skip
+    uniqueAddrs.push(addr);
+    lastBase=ba;
+  });
+
+  const text=uniqueAddrs.join('\n');
   let ok=false;
   try{await navigator.clipboard.writeText(text);ok=true;}
   catch{try{
@@ -1990,25 +2063,13 @@ async function copyDayAddresses(dayIdx){
     document.body.appendChild(ta);ta.focus();ta.select();ok=document.execCommand('copy');document.body.removeChild(ta);
   }catch{}}
   const dow=DAYS[(fromYMD(windowDates()[dayIdx]).getDay()+6)%7];
-  toast(ok?`📋 ${addrs.length} addresses copied for ${dow}`:'\u26a0 Copy failed',ok?2500:3500);
+  const skipped=all.length-uniqueAddrs.length;
+  const note=skipped?` (${skipped} same-building duplicate${skipped>1?'s':''} removed)`:'';
+  toast(ok?`📋 ${uniqueAddrs.length} addresses copied for ${dow}${note}`:'\u26a0 Copy failed',ok?2500:3500);
 }
 
 // ── Re-sort day by circuit step order ────────────────────────
-function resortDay(dayIdx){
-  const active=days[dayIdx].active;
-  if(!active.length){toast('No unconfirmed patients to sort');return;}
-  const dow=fromYMD(windowDates()[dayIdx]).getDay();
-  const dayName=DAYS[(dow+6)%7];
-  const isSat=dow===6; const isFri=dow===5;
-  active.sort((a,b)=>{
-    const ca=optClassify(a),cb=optClassify(b);
-    return isSat?(satKey(ca)-satKey(cb)):isFri?(circBKey(ca)-circBKey(cb)):(ca.s-cb.s);
-  });
-  applyVermetteRule(active);
-  applyDeguireLastRule(active);  // 325 Deguire always last
-  renderGrid();
-  toast(`↺ ${dayName} re-sorted by route order${isSat?' (Sat: farthest first)':''}`);
-}
+// resortDay defined below (canonical version with groupByAddress)
 
 // ── Cluster mode toggle ───────────────────────────────────────
 function toggleCluster(dayIdx){
@@ -2083,7 +2144,9 @@ async function undoLastBatch(){
 
 
 // ════════════════════════════════════════════════════════════
-// RE-SORT DAY — re-apply circuit step order to active patients
+// RE-SORT DAY — canonical version
+// Applies: weekdayKey / circBKey / satKey sort → groupByAddress
+// → Vermette first → Deguire last
 // ════════════════════════════════════════════════════════════
 function resortDay(dayIdx){
   const active=days[dayIdx].active;
@@ -2093,12 +2156,13 @@ function resortDay(dayIdx){
   const isSat=dow===6; const isFri=dow===5;
   active.sort((a,b)=>{
     const ca=optClassify(a),cb=optClassify(b);
-    return isSat?(satKey(ca)-satKey(cb)):isFri?(circBKey(ca)-circBKey(cb)):(ca.s-cb.s);
+    return isSat?(satKey(ca)-satKey(cb)):isFri?(circBKey(ca)-circBKey(cb)):weekdayKey(ca)-weekdayKey(cb);
   });
-  applyVermetteRule(active);
-  applyDeguireLastRule(active);  // 325 Deguire always last
+  days[dayIdx].active=groupByAddress(active);
+  applyVermetteRule(days[dayIdx].active);
+  applyDeguireLastRule(days[dayIdx].active);
   renderGrid();
-  toast('↺ '+dayName+' re-sorted by route order'+(isSat?' (Sat: farthest first)':isFri?' (Fri: Laval arc)':''));
+  toast('↺ '+dayName+' re-sorted — same-address patients grouped'+(isSat?' (Sat: far→near)':isFri?' (Fri: Laval arc)':''));
 }
 
 // ════════════════════════════════════════════════════════════
