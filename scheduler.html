@@ -1725,6 +1725,8 @@ function groupByAddress(list){
   });
   return out;
 }
+
+function buildSlots(fromDate){
   return Array.from({length:14},(_,i)=>{
     const d=addDays(fromYMD(fromDate),i);
     const dow=d.getDay();
