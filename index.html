@@ -112,7 +112,7 @@
 
   /* ── Layout ── */
   --nav-h:      54px;   /* visible button area — safe area padding added separately in .bottom-nav */
-  --header-h:   60px;
+  --header-h:   calc(60px + env(safe-area-inset-top, 0px));  /* 60px content + iOS status bar */
   --search-area-h: 106px;
 
   /* ── Motion ── */
@@ -191,6 +191,8 @@ input, select, textarea { font: inherit; }
   align-items: center;
   justify-content: space-between;
   padding: 0 1rem;
+  /* Push content below iOS status bar (notch / Dynamic Island) */
+  padding-top: env(safe-area-inset-top, 0px);
   box-shadow: 0 2px 16px rgba(27,38,56,0.25);
   backdrop-filter: blur(8px);
 }
@@ -4055,6 +4057,10 @@ function updateTabCounts() {
   // Update reminder badge and pin UI after every load
   if (typeof updateReminderBadge === 'function') updateReminderBadge();
   if (typeof renderPins === 'function') renderPins();
+  // If already on the Reminders tab, refresh its content too
+  if (typeof renderReminders === 'function' && typeof currentView !== 'undefined' && currentView === 'reminders') {
+    renderReminders();
+  }
   // Sync pins and reminders from Supabase in background (cross-device)
   if (typeof syncPinsFromSupabase === 'function') syncPinsFromSupabase();
   if (typeof syncRemindersFromSupabase === 'function') syncRemindersFromSupabase();
@@ -10539,7 +10545,21 @@ function getReminderGroups() {
     if (p['Injection Administered']) return; // already done
     const fn = String(p['File Number']);
     const r  = rem[fn] || {};
-    if (r.status === 'called' || r.status === 'confirmation_called') return; // done
+    if (r.status === 'called' || r.status === 'confirmation_called') {
+      // For confirmation_called: reset if appointment was re-optimized to a different date/time.
+      // This ensures a patient re-scheduled by the optimizer reappears for a new confirmation call.
+      if (r.status === 'confirmation_called') {
+        const currentApptDT = p['Appointment Date & Time'] || '';
+        if (currentApptDT && r.apptDT && currentApptDT !== r.apptDT) {
+          // New appointment detected — clear stale status so patient reappears
+          delete rem[fn]; saveRem(rem);
+        } else {
+          return; // same appointment, already confirmed-called
+        }
+      } else {
+        return; // called (Group 1) — done
+      }
+    }
     if (r.status === 'snoozed' && r.snoozeUntil > now) return; // still snoozed
     if (r.status === 'cancelled') {
       // Re-appear only if the appointment was changed (patient re-optimized)
@@ -10786,7 +10806,8 @@ async function confirmAccepted(fn) {
   // This must happen before any await so the UI updates correctly even
   // if async calls fail.
   const rem = loadRem();
-  rem[String(fn)] = { status:'confirmation_called', calledAt: Date.now(), timeWindow: timeWin };
+  rem[String(fn)] = { status:'confirmation_called', calledAt: Date.now(), timeWindow: timeWin,
+                       apptDT: pat?.['Appointment Date & Time'] || '' };
   saveRem(rem);
 
   // ── STEP 2: Update in-memory patient record (sync) ──
