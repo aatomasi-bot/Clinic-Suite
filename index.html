@@ -4767,8 +4767,8 @@ async function performInjection() {
     toast(`Injection recorded! ${newLeft} doses left. Next due: ${formatDateFull(p['Due Date'])}`, 'success', '💉');
     await loadPatients();
     await loadInjectionHistoryFromDB();
-    // Scan all 0-dose patients for consolidated email
-    if (newLeft === 0) checkAllNoRepeats();
+    // Scan all 0-dose patients for consolidated email — pass visitDate not today
+    if (newLeft === 0) checkAllNoRepeats(visitDate);
   } catch(e) {
     toast('Error: ' + e.message, 'error');
   } finally {
@@ -6691,23 +6691,31 @@ function toggleDark() {
 
 // ══ CONSOLIDATED NO-REPEATS EMAIL ══
 
-function checkAllNoRepeats(forDate) {
-  // Only include patients injected ON THIS SPECIFIC DATE with 0 doses left
-  // forDate defaults to today — not previous days
-  const date     = forDate || todayStr();
+function checkAllNoRepeats(forDate, forceFileNum) {
+  // forDate    — the actual injection/visit date (NOT necessarily today)
+  // forceFileNum — when NMR keyword was in note, include this patient
+  //               even if doses > 0 (e.g. "nmr" on the last of 5 doses)
+  const date = forDate || todayStr();
+
   const zeroDose = patients.filter(p => {
-    if ((parseInt(p['Doses Remaining'])||0) !== 0) return false;
     if (p['Archived'] || !p['File Number']) return false;
-    // Must have been injected on THIS date specifically
+    // Always include if explicitly forced via NMR keyword in note
+    if (forceFileNum && String(p['File Number']) === String(forceFileNum)) return true;
+    // Otherwise require doses === 0 AND injected on the specified date
+    if ((parseInt(p['Doses Remaining'])||0) !== 0) return false;
     const allDates = getAllDatesForPatient(p);
     return allDates.includes(date);
   });
+
   if (!zeroDose.length) return;
-  openNoRepeatsModal(zeroDose);
+  openNoRepeatsModal(zeroDose, date);
 }
 
-function openNoRepeatsModal(pats) {
-  const today = new Date().toLocaleDateString('en-CA',{month:'long',day:'numeric',year:'numeric'});
+function openNoRepeatsModal(pats, visitDate) {
+  // Show the actual injection date (not necessarily today — could be a past overdue date)
+  const displayDate = visitDate
+    ? new Date(visitDate + 'T12:00:00').toLocaleDateString('en-CA',{month:'long',day:'numeric',year:'numeric'})
+    : new Date().toLocaleDateString('en-CA',{month:'long',day:'numeric',year:'numeric'});
   // Build list HTML for modal
   const listHtml = pats.map(p => {
     const note = getQuickNote(p['File Number']);
@@ -6721,10 +6729,11 @@ function openNoRepeatsModal(pats) {
 
   document.getElementById('nrPatientList').innerHTML = listHtml;
   document.getElementById('nrCount').textContent = pats.length + ' patient' + (pats.length!==1?'s':'');
-  document.getElementById('nrDate').textContent  = today;
+  document.getElementById('nrDate').textContent  = displayDate;
 
   // Store for send function
-  window._nrPatients = pats;
+  window._nrPatients  = pats;
+  window._nrVisitDate = visitDate || todayStr();
   openModal('noRepeatsModal');
 }
 
@@ -6735,9 +6744,13 @@ function openNoRepeatsModal(pats) {
 // Shared: build email subject + body from current NMR patients
 function _buildNMREmail() {
   const pats   = window._nrPatients || [];
-  const today  = new Date().toLocaleDateString('en-CA',{month:'long',day:'numeric',year:'numeric'});
+  // Use the date stored when the modal was opened (actual visit date, not today)
+  // This ensures overdue-patient emails show the correct injection date.
+  const dateStr = window._nrVisitDate || todayStr();
+  const displayDate = new Date(dateStr + 'T12:00:00')
+    .toLocaleDateString('en-CA',{month:'long',day:'numeric',year:'numeric'});
   const to     = 'reports@medicum.ca';
-  const subject = 'No More Repeats \u2014 ' + pats.length + ' Patient' + (pats.length>1?'s':'') + ' \u2014 ' + today;
+  const subject = 'No More Repeats \u2014 ' + pats.length + ' Patient' + (pats.length>1?'s':'') + ' \u2014 ' + displayDate;
   const lines   = pats.map(p =>
     (p['Patient Name']||'') + '  |  File #' + (p['File Number']||'') +
     (p['Dose Prescribed'] ? '  |  ' + p['Dose Prescribed'] + 'mg' : '')
@@ -9105,7 +9118,6 @@ function syncDaySearch(val) {
 // finds those with a Quick Note, and runs recordAllFromNote for each.
 async function recordAllForDate(date) {
   try {
-  // Collect patients who were injected on this date OR are due/confirmed on this date
   const group = patients.filter(p => {
     if (p['Archived'] || !p['File Number']) return false;
     const apptDate = p['Appointment Date & Time']
@@ -9115,7 +9127,6 @@ async function recordAllForDate(date) {
     return allDates.includes(date) || apptDate === date || dueDate === date;
   });
 
-  // Only patients who have a Quick Note
   const withNotes = group.filter(p => {
     const note = getQuickNote(p['File Number']);
     return note && note.trim().length > 0;
@@ -9130,13 +9141,14 @@ async function recordAllForDate(date) {
     ? withNotes[0]['Patient Name'] + ' has a note — process it?'
     : withNotes.length + ' patients have Quick Notes for ' + formatDateFull(date) + '. Process all?';
 
-  // Simple confirm — no modal intrusion
   if (!window.confirm(confirm)) return;
 
   setLoading(true, '⚡ Processing ' + withNotes.length + ' note' + (withNotes.length > 1 ? 's' : '') + '…');
 
   let processed = 0, skipped = 0;
   const summaryLines = [];
+  // Collect NMR patients from this batch — show ONE consolidated modal at end
+  const nmrFileNums = new Set();
 
   for (const p of withNotes) {
     const fn   = String(p['File Number']);
@@ -9150,12 +9162,14 @@ async function recordAllForDate(date) {
     if (!site && !adverse.length && !isNMR) { skipped++; continue; }
 
     try {
+      // Suppress the individual NMR modal by temporarily disabling checkAllNoRepeats
+      // We'll fire a consolidated one after the whole batch
       await recordAllFromNote(fn);
       processed++;
       const actions = [p['Patient Name'] || ('#' + fn)];
       if (site)          actions.push(site);
       if (adverse.length) actions.push(adverse.join(', '));
-      if (isNMR)         actions.push('NMR');
+      if (isNMR) { actions.push('NMR'); nmrFileNums.add(fn); }
       summaryLines.push(actions.join(' · '));
     } catch(e) {
       console.warn('[Record All for Date] Failed for', fn, ':', e.message);
@@ -9168,12 +9182,26 @@ async function recordAllForDate(date) {
   if (processed > 0) {
     toast('⚡ Processed ' + processed + ' patient' + (processed > 1 ? 's' : '') +
       (skipped > 0 ? ' (' + skipped + ' skipped)' : ''), 'success', '📋');
-    console.info('[Record All for Date] Processed: ' + summaryLines.join(' | ')); } else {
+
+    // ── Consolidated NMR modal for the whole batch ─────────────
+    // Reload patients first so doses_remaining is fresh after all records saved
+    await loadPatients();
+    // Collect: patients explicitly NMR-flagged + any with 0 doses left on this date
+    const nmrPats = patients.filter(p => {
+      if (p['Archived'] || !p['File Number']) return false;
+      const fn = String(p['File Number']);
+      if (nmrFileNums.has(fn)) return true; // keyword NMR
+      if ((parseInt(p['Doses Remaining'])||0) !== 0) return false;
+      return getAllDatesForPatient(p).includes(date); // 0 doses + injected on this date
+    });
+    if (nmrPats.length) {
+      setTimeout(() => openNoRepeatsModal(nmrPats, date), 600);
+    }
+  } else {
     toast('No recognizable keywords found in any notes', 'warning');
   }
   } catch(e) {
     console.error('[recordAllForDate]', e);
-    
     throw e;
   }
 }
@@ -9403,10 +9431,16 @@ async function recordAllFromNote(fileNum) {
     if (noteBtn) noteBtn.classList.remove('has-note');
 
     // ── F. No More Repeats workflow ────────────────────────────
+    // CRITICAL: use visitDate (actual appointment date) NOT today (recording date).
+    // When recording overdue patients from previous days, today !== visitDate.
+    // checkAllNoRepeats filters by injection date — if we pass 'today' it won't
+    // find a patient injected on June 26 when we record them on June 28.
     const dozesGone = site && parseInt(p['Doses Remaining']) === 0;
     if (isNMR || dozesGone) {
       actions.push('📧 NMR email queued');
-      setTimeout(() => checkAllNoRepeats(today), 400);
+      // Pass visitDate so the date filter matches the actual injection date.
+      // Also pass isNMR so keyword-triggered NMR works even if doses > 0.
+      setTimeout(() => checkAllNoRepeats(visitDate, isNMR ? String(p['File Number']) : null), 400);
     }
 
     await loadPatients();
