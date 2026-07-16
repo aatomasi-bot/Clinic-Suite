@@ -4028,11 +4028,11 @@ function getDueCounts() {
     if (p['Pending']) { counts.pending++; }
     if (p['CPP Patient']) counts.cpp++;
     if (p['Pending']) return;
-    const apptDate = p['Appointment Date & Time'] ? p['Appointment Date & Time'].split('T')[0] : null;
-    const confirmed = p['Appointment Confirmed'];
-    const isToday = apptDate === today;
-    const isFuture = apptDate && apptDate > today;
-    const overdue = apptDate && apptDate < today && confirmed && !p['Injection Administered'];
+    const apptDate  = p['Appointment Date & Time'] ? p['Appointment Date & Time'].split('T')[0] : null;
+    const confirmed = !!(p['Appointment Confirmed'] && apptDate); // requires BOTH flag AND date
+    const isToday   = apptDate === today;
+    const isFuture  = apptDate && apptDate > today;
+    const overdue   = apptDate && apptDate < today && confirmed && !p['Injection Administered'];
     if (isToday && confirmed && p['Injection Administered']) counts.administered++;
     else if (isToday && confirmed) counts.today++;
     else if (isFuture && confirmed) counts.scheduled++;
@@ -4084,16 +4084,24 @@ function getFilteredPatients() {
     if (currentTab === 'pending') return false;
 
     const apptDate = p['Appointment Date & Time'] ? p['Appointment Date & Time'].split('T')[0] : null;
-    const confirmed = !!p['Appointment Confirmed'];
-    const isToday = apptDate === today;
-    const isFuture = apptDate && apptDate > today;
-    const overdue = apptDate && apptDate < today && confirmed && !p['Injection Administered'];
+    // confirmed is only meaningful when BOTH the flag AND a date are set.
+    // If confirmed=true but apptDate=null (data inconsistency — e.g. scheduler set
+    // confirmed but date was cleared, or injection recorded but flag wasn't reset),
+    // treat the patient as unconfirmed so they appear in "All Active" instead of
+    // vanishing from every tab.
+    const confirmed = !!(p['Appointment Confirmed'] && apptDate);
+    const isToday   = apptDate === today;
+    const isFuture  = apptDate && apptDate > today;
+    const overdue   = apptDate && apptDate < today && confirmed && !p['Injection Administered'];
 
-    if (currentTab === 'today') return isToday && confirmed && !p['Injection Administered'];
+    if (currentTab === 'today')     return isToday  && confirmed && !p['Injection Administered'];
     if (currentTab === 'scheduled') return isFuture && confirmed;
-    if (currentTab === 'overdue') return !!overdue;
+    if (currentTab === 'overdue')   return !!overdue;
+    // All Active: patients with no upcoming/confirmed appointment
+    // Safety net: if none of the specific tabs match, always show here so no
+    // active patient can become invisible due to data inconsistency.
     if (currentTab === 'all') return !isToday && !isFuture && !overdue && !confirmed;
-    return true;
+    return true; // catch-all — should not reach here normally
   }).filter(p => {
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
@@ -9147,10 +9155,12 @@ async function recordAllForDate(date) {
 
   let processed = 0, skipped = 0;
   const summaryLines = [];
-  // Collect NMR patients from this batch — show ONE consolidated modal at end
   const nmrFileNums = new Set();
 
-  for (const p of withNotes) {
+  // Prevent N × full Supabase reload on mobile (each recordAllFromNote would call loadPatients)
+  _batchRecording = true;
+  try {
+    for (const p of withNotes) {
     const fn   = String(p['File Number']);
     const note = getQuickNote(fn).trim();
     if (!note) { skipped++; continue; }
@@ -9176,16 +9186,20 @@ async function recordAllForDate(date) {
       skipped++;
     }
   }
+  } finally {
+    _batchRecording = false; // always restore even on error
+  }
 
   setLoading(false);
 
   if (processed > 0) {
+    // ONE final reload for the whole batch — prevents N × Supabase round-trips on mobile
+    await loadPatients();
     toast('⚡ Processed ' + processed + ' patient' + (processed > 1 ? 's' : '') +
       (skipped > 0 ? ' (' + skipped + ' skipped)' : ''), 'success', '📋');
 
-    // ── Consolidated NMR modal for the whole batch ─────────────
-    // Reload patients first so doses_remaining is fresh after all records saved
-    await loadPatients();
+    // ── Consolidated NMR modal ─────────────────────────────────
+    // patients[] is now fresh after loadPatients() above
     // Collect: patients explicitly NMR-flagged + any with 0 doses left on this date
     const nmrPats = patients.filter(p => {
       if (p['Archived'] || !p['File Number']) return false;
@@ -9443,7 +9457,10 @@ async function recordAllFromNote(fileNum) {
       setTimeout(() => checkAllNoRepeats(visitDate, isNMR ? String(p['File Number']) : null), 400);
     }
 
-    await loadPatients();
+    // ── G. Reload — skip during batch to prevent N × full-reload on mobile ──
+    if (!_batchRecording) {
+      await loadPatients();
+    }
     toast('✓ ' + actions.join(' · '), 'success', '⚡');
 
   } catch(e) {
@@ -10264,6 +10281,11 @@ window.setTheme = setTheme;
   // Expose so external code can reset if needed
   window._resetNavScroll = resetNav;
 })();
+
+// Flag set during batch recording to skip redundant loadPatients() calls.
+// recordAllForDate sets this before the loop and clears it after, then
+// does ONE final loadPatients(). Prevents N × full-reload on mobile.
+let _batchRecording = false;
 
 // ════════════════════════════════════════════════════════════
 // ── RAW PATIENT FINDER — diagnostic tool ─────────────────────
