@@ -1271,7 +1271,7 @@ async function confirmDay(dayIdx){
       const tm=runningMin;
       const dt=`${ds}T${p2(Math.floor(tm/60))}:${p2(tm%60)}`;
       await _sb.from('patients').update({
-        appointment_date_time:dt,appointment_confirmed:true}).eq('id',p.id);
+        appointment_date_time:dt,appointment_confirmed:true,injection_administered:false}).eq('id',p.id);
       saved++;
       // Advance: 15 min if next patient shares same base address, else full SLOT
       const nextP=toSave[j+1];
@@ -1317,7 +1317,7 @@ async function confirmAll(){
         const tm=runMin;
         const dt=`${ds}T${p2(Math.floor(tm/60))}:${p2(tm%60)}`;
         await _sb.from('patients').update({
-          appointment_date_time:dt,appointment_confirmed:true}).eq('id',p.id);
+          appointment_date_time:dt,appointment_confirmed:true,injection_administered:false}).eq('id',p.id);
         allBatchIds.push(p.id);saved++;
         const nxt=d.active[j+1];
         const same=nxt&&baseAddress(p.address||'')&&
