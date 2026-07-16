@@ -4226,9 +4226,14 @@ function renderPatientList() {
 
   const today = todayStr();
 
-  // ── Split and group (logic completely unchanged) ──
-  const confirmed   = filtered.filter(p => !!p['Appointment Confirmed']);
-  const unconfirmed = filtered.filter(p => !p['Appointment Confirmed']);
+  // ── Split and group ──
+  // Must use same "confirmed" definition as getFilteredPatients:
+  // BOTH appointment_confirmed flag AND an appointment date must exist.
+  // If confirmed=true but date=null, patient belongs with unconfirmed.
+  const confirmed   = filtered.filter(p =>
+    !!(p['Appointment Confirmed'] && p['Appointment Date & Time']));
+  const unconfirmed = filtered.filter(p =>
+    !(p['Appointment Confirmed'] && p['Appointment Date & Time']));
 
   const confGroups = {};
   confirmed.forEach(p => {
