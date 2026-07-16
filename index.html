@@ -4068,27 +4068,37 @@ function updateTabCounts() {
 
 function getFilteredPatients() {
   const today = todayStr();
+
+  // ── SEARCH OVERRIDE ─────────────────────────────────────────────
+  // When the user is actively searching by name or file number, bypass ALL
+  // tab filtering and return every matching patient from the full list.
+  // This prevents a patient from being "invisible" due to data inconsistency
+  // (wrong appointment_confirmed flag, missing date, etc.).
+  // Archived patients ARE included when searching — search is a global lookup.
+  if (searchQuery && searchQuery.trim().length > 0) {
+    const q    = searchQuery.trim().toLowerCase();
+    const qNum = q.replace(/\D/g, ''); // digits only — for file number search
+    return patients.filter(p => {
+      const nameMatch = (p['Patient Name']||'').toLowerCase().normalize('NFD')
+        .replace(/[\u0300-\u036f]/g,'').includes(q);
+      const fileMatch = String(p['File Number']||'').trim() === q ||
+                        String(p['File Number']||'').includes(q) ||
+                        (qNum && String(p['File Number']||'').includes(qNum));
+      const addrMatch = (p['Address']||'').toLowerCase().includes(q);
+      return nameMatch || fileMatch || addrMatch;
+    });
+  }
+
   return patients.filter(p => {
     // ── Archived takes ABSOLUTE precedence ──────────────────────
-    // A patient can sometimes have both Archived AND Pending set true
-    // (e.g. data entry error, or marked pending before being archived).
-    // Once Archived, the patient belongs ONLY in the Archived tab —
-    // Pending status must never override this, or the patient becomes
-    // invisible in every tab (excluded from Archived because Pending
-    // is true, AND excluded from Pending because Archived is true).
     if (p['Archived']) return currentTab === 'archived';
-    if (currentTab === 'archived') return false; // not archived, doesn't belong here
+    if (currentTab === 'archived') return false;
 
     if (currentTab === 'cpp') return !!p['CPP Patient'];
     if (p['Pending']) return currentTab === 'pending';
     if (currentTab === 'pending') return false;
 
-    const apptDate = p['Appointment Date & Time'] ? p['Appointment Date & Time'].split('T')[0] : null;
-    // confirmed is only meaningful when BOTH the flag AND a date are set.
-    // If confirmed=true but apptDate=null (data inconsistency — e.g. scheduler set
-    // confirmed but date was cleared, or injection recorded but flag wasn't reset),
-    // treat the patient as unconfirmed so they appear in "All Active" instead of
-    // vanishing from every tab.
+    const apptDate  = p['Appointment Date & Time'] ? p['Appointment Date & Time'].split('T')[0] : null;
     const confirmed = !!(p['Appointment Confirmed'] && apptDate);
     const isToday   = apptDate === today;
     const isFuture  = apptDate && apptDate > today;
@@ -4097,17 +4107,8 @@ function getFilteredPatients() {
     if (currentTab === 'today')     return isToday  && confirmed && !p['Injection Administered'];
     if (currentTab === 'scheduled') return isFuture && confirmed;
     if (currentTab === 'overdue')   return !!overdue;
-    // All Active: patients with no upcoming/confirmed appointment
-    // Safety net: if none of the specific tabs match, always show here so no
-    // active patient can become invisible due to data inconsistency.
-    if (currentTab === 'all') return !isToday && !isFuture && !overdue && !confirmed;
-    return true; // catch-all — should not reach here normally
-  }).filter(p => {
-    if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
-    return (p['Patient Name']||'').toLowerCase().includes(q) ||
-           String(p['File Number']||'').toLowerCase().includes(q) ||
-           (p['Address']||'').toLowerCase().includes(q);
+    if (currentTab === 'all')       return !isToday && !isFuture && !overdue && !confirmed;
+    return true;
   }).sort((a, b) => {
     const aConf = !!a['Appointment Confirmed'];
     const bConf = !!b['Appointment Confirmed'];
