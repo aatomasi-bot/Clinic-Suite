@@ -10873,7 +10873,10 @@ async function confirmAccepted(fn) {
   saveRem(rem);
 
   // ── STEP 2: Update in-memory patient record (sync) ──
-  if (pat) pat['Appointment Confirmed'] = true;
+  if (pat) {
+    pat['Appointment Confirmed']  = true;
+    pat['Injection Administered'] = false; // reset so patient shows in Today/Scheduled
+  }
 
   // ── STEP 3: Re-render immediately — patient disappears from list ──
   renderReminders();
@@ -10893,12 +10896,24 @@ async function confirmAccepted(fn) {
     await _saveNoteDB(fn, newNote);                   // persist to Supabase
   } catch(e) { console.warn('Time window note save (non-fatal):', e.message); }
 
-  // Update appointment_confirmed in Supabase
+  // Update appointment_confirmed + reset injection_administered in Supabase.
+  // injection_administered must be reset to false so the patient appears in
+  // Today/Scheduled tabs correctly — without this, a returning patient whose
+  // last injection was recorded (injection_administered=true) stays invisible
+  // even after a new appointment is confirmed for them.
   try {
     const updateQ = pat?.id
-      ? _sb.from('patients').update({ appointment_confirmed: true }).eq('id', pat.id)
-      : _sb.from('patients').update({ appointment_confirmed: true }).eq('file_number', String(fn));
+      ? _sb.from('patients').update({
+          appointment_confirmed: true,
+          injection_administered: false
+        }).eq('id', pat.id)
+      : _sb.from('patients').update({
+          appointment_confirmed: true,
+          injection_administered: false
+        }).eq('file_number', String(fn));
     await updateQ;
+    // Also update in-memory so filter picks it up immediately
+    if (pat) pat['Injection Administered'] = false;
   } catch(e) { console.warn('Confirm Supabase update (non-fatal):', e.message); }
 }
 
