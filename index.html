@@ -3716,6 +3716,9 @@ let pendingInjectId = null;
 let pendingApptId = null;
 let confirmCallback = null;
 let apptConfirmedStatus = true;
+// Real-time listener state — declared early so dbUpdate can access without TDZ issues
+let _lastLocalUpdateTs = 0;
+let _realtimeDebounce  = null;
 
 // ========== DATE UTILS ==========
 function todayStr() {
@@ -3980,7 +3983,7 @@ async function dbInsert(p) {
 
 async function dbUpdate(id, p) {
   try {
-  _markLocalUpdate(); // suppress real-time reload for our own changes
+  _lastLocalUpdateTs = Date.now(); // suppress real-time reload for our own changes
   const row = {};
   for (const [k,v] of Object.entries(COL)) row[v] = p[k] ?? null;
   const { error } = await _sb.from('patients').update(row).eq('id', id);
@@ -10314,8 +10317,8 @@ let _batchRecording = false;
 // automatically without a manual refresh.
 // Debounced to avoid rapid consecutive reloads during bulk operations.
 // ════════════════════════════════════════════════════════════
-let _realtimeDebounce = null;
-let _lastLocalUpdateTs = 0; // timestamp of last update WE made
+let _realtimeDebounce = null; // declared early — kept for reference
+// _lastLocalUpdateTs declared early above
 
 function _initRealtime() {
   if (!_sb || !_sb.channel) return;
