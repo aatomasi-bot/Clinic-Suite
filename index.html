@@ -3980,6 +3980,7 @@ async function dbInsert(p) {
 
 async function dbUpdate(id, p) {
   try {
+  _markLocalUpdate(); // suppress real-time reload for our own changes
   const row = {};
   for (const [k,v] of Object.entries(COL)) row[v] = p[k] ?? null;
   const { error } = await _sb.from('patients').update(row).eq('id', id);
@@ -4935,6 +4936,18 @@ async function savePatient() {
   // Preserve existing patient fields that are NOT in the edit form
   const _existPat = editingId ? patients.find(p => p.id === editingId) : null;
 
+  const newApptValue = document.getElementById('f-appt').value || null;
+  const oldApptValue = _existPat ? (_existPat['Appointment Date & Time'] || null) : null;
+  // When a new or changed appointment date is saved, reset injection_administered.
+  // This is the ROOT CAUSE of the "patient invisible after reschedule" bug:
+  // a previously-recorded patient (injection_administered=true) who is given a new
+  // appointment stays invisible in Today/Scheduled because the flag was never cleared.
+  // Rule: if there's an appointment date being set, the patient hasn't been seen yet
+  // for THAT appointment — injection_administered must be false.
+  const newInjAdministered = newApptValue
+    ? false  // new appointment → not yet administered
+    : (_existPat ? (_existPat['Injection Administered'] || false) : false);
+
   const data = {
     'Patient Name': _name,
     'File Number':  fn,
@@ -4947,17 +4960,17 @@ async function savePatient() {
     'Previous Injection Site':  document.getElementById('f-lastsite').value,
     'Injection Site':           document.getElementById('f-lastsite').value,
     'Due Date':                 document.getElementById('f-due').value,
-    'Appointment Date & Time':  document.getElementById('f-appt').value || null,
+    'Appointment Date & Time':  newApptValue,
     'Previous Injection Dates': document.getElementById('f-prevdates').value,
     'Assignment Type':          document.getElementById('f-type').value,
     'Special Instructions':     document.getElementById('f-special').value,
     'Adverse Effects Comments': document.getElementById('f-adverse').value,
     'CPP Patient':              document.getElementById('f-cpp').checked,
-    'Appointment Confirmed':    !!document.getElementById('f-appt').value,
-    'File Status':            _existPat ? (_existPat['File Status']            || 'Active') : 'Active',
-    'Injection Administered': _existPat ? (_existPat['Injection Administered'] || false)   : false,
-    'Pending':                _existPat ? (_existPat['Pending']                || false)   : false,
-    'Archived':               _existPat ? (_existPat['Archived']               || false)   : false,
+    'Appointment Confirmed':    !!newApptValue,
+    'File Status':              _existPat ? (_existPat['File Status']  || 'Active') : 'Active',
+    'Injection Administered':   newInjAdministered,
+    'Pending':                  _existPat ? (_existPat['Pending']      || false)   : false,
+    'Archived':                 _existPat ? (_existPat['Archived']     || false)   : false,
   };
   setLoading(true, editingId ? 'Updating patient…' : 'Adding patient…');
   try {
@@ -9634,6 +9647,7 @@ async function doLogin() {
     ]);
     toast('Welcome back!', 'success', '👋');
     _verifyRLS(); // background RLS health check
+    _initRealtime(); // start real-time patient sync
   } catch(e) {
     _loginAttempts++;
     console.warn('[doLogin] Auth error (attempt', _loginAttempts, ')');
@@ -10294,6 +10308,41 @@ window.setTheme = setTheme;
 let _batchRecording = false;
 
 // ════════════════════════════════════════════════════════════
+// SUPABASE REAL-TIME LISTENER
+// Subscribes to changes on the patients table so that updates
+// from the scheduler, another device, or another session appear
+// automatically without a manual refresh.
+// Debounced to avoid rapid consecutive reloads during bulk operations.
+// ════════════════════════════════════════════════════════════
+let _realtimeDebounce = null;
+let _lastLocalUpdateTs = 0; // timestamp of last update WE made
+
+function _initRealtime() {
+  if (!_sb || !_sb.channel) return;
+  try {
+    _sb.channel('vapiq-patients-realtime')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'patients' },
+        (payload) => {
+          // Skip if we just made this update ourselves (within 3s)
+          if (Date.now() - _lastLocalUpdateTs < 3000) return;
+          // Debounce: wait 800ms for rapid bulk changes before reloading
+          clearTimeout(_realtimeDebounce);
+          _realtimeDebounce = setTimeout(() => {
+            if (!_batchRecording) loadPatients();
+          }, 800);
+        }
+      )
+      .subscribe();
+    console.info('[VaPiq] Real-time patient sync active');
+  } catch(e) {
+    console.warn('[VaPiq] Real-time unavailable:', e.message);
+  }
+}
+// Called after any local update so we don't double-reload
+function _markLocalUpdate() { _lastLocalUpdateTs = Date.now(); }
+
+// ════════════════════════════════════════════════════════════
 // ── RAW PATIENT FINDER — diagnostic tool ─────────────────────
 // Searches the ENTIRE in-memory patients[] array directly with
 // no tab, Archived, or Pending filtering whatsoever. If a patient
@@ -10492,16 +10541,20 @@ function navigateToPin(fn) {
   // Determine best tab — Archived MUST be checked first; an archived patient
   // can also have Pending=true or old appointment data, which would otherwise
   // incorrectly route to those tabs instead of Archived where they actually live.
-  const today  = todayStr();
+  const today    = todayStr();
   const apptDate = p['Appointment Date & Time'] ? p['Appointment Date & Time'].split('T')[0] : null;
+  const conf     = !!(p['Appointment Confirmed'] && apptDate);
   let tab = 'all';
-  if (p['Archived'])                 tab = 'archived';
-  else if (p['Injection Administered']) tab = 'all';
-  else if (p['Pending'])             tab = 'pending';
-  else if (apptDate === today && p['Appointment Confirmed']) tab = 'today';
-  else if (p['Appointment Confirmed']) tab = 'scheduled';
-  else if (p['Due Date'] && p['Due Date'] < today) tab = 'overdue';
-  else tab = 'pending';
+  if      (p['Archived'])                                 tab = 'archived';
+  else if (p['Pending'])                                  tab = 'pending';
+  // Appointment-based routing takes priority over injection_administered.
+  // A patient with a new confirmed appointment must go to today/scheduled
+  // even if injection_administered=true from a previous cycle.
+  else if (apptDate === today && conf)                    tab = 'today';
+  else if (apptDate && apptDate > today && conf)          tab = 'scheduled';
+  else if (apptDate && apptDate < today && conf && !p['Injection Administered']) tab = 'overdue';
+  else if (p['Due Date'] && p['Due Date'] < today && !p['Injection Administered']) tab = 'overdue';
+  else                                                    tab = 'all';
   switchView('patients');
   switchToTab(tab);
   setTimeout(() => {
