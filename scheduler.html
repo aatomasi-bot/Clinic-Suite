@@ -960,7 +960,7 @@ function renderGrid(){
           </div>
           <div class="sc-bottom">
             <span class="sc-zone" style="background:${z.c}">${z.n}</span>
-            ${loadPlan()?`<span class="step-badge">S${p._cl?p._cl.s:"?"}</span>`:"" }
+            ${loadPlan()?`<span class="step-badge">S${p._cl?p._cl.s:"?"}</span><span class="step-badge" style="background:rgba(45,140,138,.12);border-color:rgba(45,140,138,.4);color:var(--teal-dark);font-size:9px;margin-left:2px" title="FSA postal code used for routing">${p._cl&&p._cl.f3?p._cl.f3:(p._cl&&p._cl.f2?p._cl.f2+'?':'?')}</span>`:"" }
             <span class="sc-time">🕐 ${dispTime}</span>
             ${!editMode?`<button class="sc-undo" data-undo1="${i}|${ci}" title="Undo this single appointment">↩</button>`:''}
             ${canDrag?'<span class="rh" style="position:static;margin-left:auto">⠿</span>':''}
@@ -1528,11 +1528,23 @@ const FSA3={
   // Step 7: Outremont + Plateau/HoMa — NOT last (H1B/H1J are later)
   'H2V':{c:'A',s:7},                                     // Outremont (fixed: was "last")
   'H2T':{c:'A',s:7},'H2K':{c:'A',s:7},                  // Plateau / HoMa
-  // Step 8: Rosemont
+  // Step 8: Rosemont + Plateau-Est border
   'H1Y':{c:'A',s:8},'H1X':{c:'A',s:8},
-  // Step 9: Ahuntsic / Chabanel / Park-Ex (late north cluster)
+  // H2H/H2J = Plateau-Mont-Royal Est (fell to FSA2 H2→s:7, placed too early)
+  'H2H':{c:'A',s:8},                                     // Plateau-Est / Rosemont-border
+  'H2J':{c:'A',s:8},                                     // Plateau-Est (Rachel→Mont-Royal)
+  // Step 9: Ahuntsic / Chabanel / Park-Ex / Villeray (late north cluster)
   'H2M':{c:'A',s:9},'H2N':{c:'A',s:9},'H2C':{c:'A',s:9},
   'H3N':{c:'A',s:9},'H3L':{c:'A',s:9},
+  // H2P/H2S = Villeray north (fell to FSA2 H2→s:7, placed too early)
+  'H2P':{c:'A',s:9},                                     // Villeray (Crémazie/Jarry area)
+  'H2S':{c:'A',s:9},                                     // Villeray-Saint-Michel
+  // H1L/H1K/H1N = Hochelaga-Maisonneuve (fell to FSA2 H1→s:8, placed too early)
+  // HM is east of Rosemont and east of Villeray → step 9 (before Anjou at step 10)
+  // Confirmed Jul 2026: H1L 4A9 = 2525 Bilaudeau (Hochelaga area)
+  'H1L':{c:'A',s:9},                                     // Hochelaga-Maisonneuve
+  'H1N':{c:'A',s:9},                                     // Hochelaga-Maisonneuve north
+  'H1K':{c:'A',s:9},                                     // Mercier-Hochelaga-Maisonneuve E
   'H3M':{c:'B',s:1},                                     // Cartierville/Salaberry border → Friday circuit (confirmed May 2026)
   // Step 10: Montreal-Nord / Anjou
   'H1H':{c:'A',s:10},'H1G':{c:'A',s:10},                // Montreal-Nord (after Ahuntsic step 9)
