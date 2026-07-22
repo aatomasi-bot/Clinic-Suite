@@ -112,7 +112,11 @@ When multiple patients share the same building (same street number + street, dif
 | H3M | B | 1 | Cartierville border → Friday |
 | H8Z | B | 4 | Pierrefonds |
 | H1H, H1G | A | 10 | Montreal-Nord |
+| H1J | A | 10 | Anjou |
 | J5Y, J5Z, J6A | A | 9 | Repentigny — NE apex |
+| H2H, H2J | A | 8 | Plateau-Est (was FSA2 H2→s:7, too early) |
+| H2P, H2S | A | 9 | Villeray north (was FSA2 H2→s:7, too early) |
+| H1L, H1N, H1K | A | 9 | Hochelaga-Maisonneuve (was FSA2 H1→s:8, too early — confirmed Jul 2026: H1L 4A9 = 2525 Bilaudeau) |
 
 ---
 
