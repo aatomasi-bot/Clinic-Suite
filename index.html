@@ -4709,30 +4709,32 @@ async function performInjection() {
   const adverse  = document.getElementById('injAdverse').value.trim();
   const special  = document.getElementById('injSpecial').value.trim();
 
-  // Update injection history
+  // ── VISIT DATE — must be determined FIRST, used throughout ──────────
+  // Priority: appointment date (past/today) → due date (past/today) → today.
+  // This is the actual date the injection was administered, which may be
+  // earlier than today if the nurse is recording the next day.
+  const apptDate = p['Appointment Date & Time'] ? p['Appointment Date & Time'].split('T')[0] : null;
+  const dueDate  = p['Due Date'] || null;
+  const visitDate = (apptDate && apptDate <= today) ? apptDate :
+                    (dueDate  && dueDate  <= today) ? dueDate  :
+                    today;
+
+  // Update injection history — use visitDate, NOT today
   let prevDates = p['Previous Injection Dates'] ? p['Previous Injection Dates'].split(',').map(s=>s.trim()).filter(Boolean) : [];
-  prevDates.push(today);
+  if (!prevDates.includes(visitDate)) prevDates.push(visitDate);
   p['Previous Injection Dates'] = prevDates.join(', ');
 
   // Rotate sites
   if (p['Injection Site']) p['Previous Injection Site'] = p['Injection Site'];
   p['Injection Site'] = site;
 
-  // Append notes
-  const tag = `[${today}]`;
+  // Append notes — tag with visitDate (actual injection date), not today (recording date)
+  const tag = `[${visitDate}]`;
   if (adverse) p['Adverse Effects Comments'] = [(p['Adverse Effects Comments']||''), `${tag} ${adverse}`].filter(Boolean).join(' | ');
   if (special || comments) p['Special Instructions'] = [(p['Special Instructions']||''), `${tag} ${[special, comments].filter(Boolean).join(' — ')}`].filter(Boolean).join(' | ');
 
   const newLeft = left - 1;
   p['Doses Remaining'] = newLeft;
-
-  // Calculate next due date
-  // ── Capture ACTUAL VISIT DATE before clearing appointment fields ──
-  // When an injection is recorded the next day, we still want the
-  // injection_date = the appointment date (when the nurse visited),
-  // NOT today (when the record button was pressed).
-  const apptDate = p['Appointment Date & Time'] ? p['Appointment Date & Time'].split('T')[0] : null;
-  const visitDate = (p['Appointment Confirmed'] && apptDate) ? apptDate : today;
   p['Due Date'] = addWeeks(visitDate, DOSE_TO_WEEKS[p['Dose Prescribed']] || 4);
   p['Injection Administered'] = true;
   p['Appointment Confirmed'] = false;
@@ -6332,7 +6334,7 @@ Extraction Rules:
 - patient_name: Full name from fields labeled "PATIENT NAME", "NOM DU PATIENT", or similar. Title-case the result.
 - file_number: From "FILE NUMBER", "PATIENT ID", "MEDICUM #", or any visible file reference. Prefer actual patient file number over pharmacy/clinic numbers.
 - dose: Must be exactly one of: "7.5", "22.5", "30", or "45" (numbers only, no units). Look for selected/checked checkboxes or circled values next to "mg", "1 month", "3 month", "4 month", "6 month".
-- address: Combine street + city + province/state + postal code into one clean string.
+- address: Combine street + city + province/state + postal code into one clean string. Include the postal code ONCE only — do not repeat it if it already appears as part of the city/province line.
 - phone_1: Primary patient phone (labeled TELEPHONE, PHONE, TEL, HOME). Preserve original formatting (dashes, spaces, brackets).
 - phone_2: Secondary/alternate contact number if available. If none, use "".
 - date_of_injection: From "LAST INJECTION", "DATE OF INJECTION", or "INJECTION DUE DATE". Format as YYYY-MM-DD.
@@ -6462,11 +6464,27 @@ function extractWithRegex(textData, filename) {
   // Also try to capture postal code / province if on a separate row
   const postalM = text.match(/(?:POSTAL\s*CODE|CODE\s*POSTAL)[\s:]+([A-Z]\d[A-Z]\s*\d[A-Z]\d)/i) ||
                   text.match(/([A-Z]\d[A-Z]\s*\d[A-Z]\d)(?:\s|$)/m);
-  const addrParts = [streetM?.[1]?.trim(), cityM?.[1]?.trim(), postalM?.[1]?.trim()].filter(Boolean);
+
+  const streetText = streetM?.[1]?.trim() || '';
+  const cityText   = cityM?.[1]?.trim()   || '';
+  const postalCode = postalM?.[1]?.trim() || '';
+  // Only append postalCode if it's NOT already embedded in the street or city capture.
+  // cityM typically captures the full city line including province + postal code,
+  // so adding postalCode separately would duplicate it (e.g. "H9A 1B2, H9A 1B2").
+  const postalNorm = postalCode.replace(/\s/g,'').toUpperCase();
+  const alreadyHasPostal = postalNorm && (
+    (streetText + cityText).replace(/\s/g,'').toUpperCase().includes(postalNorm)
+  );
+  const addrParts = [streetText, cityText, alreadyHasPostal ? '' : postalCode].filter(Boolean);
+
   if (addrParts.length) {
-    // Combine street + city then move any Apt/Suite/Room to end
+    // Combine street + city, move apt/suite to end, then de-duplicate any postal code
     const rawAddr = addrParts.join(', ').replace(/\s+/g,' ').trim();
-    result.address = formatAddrDisplay(rawAddr); // moves apt to end
+    const formatted = formatAddrDisplay(rawAddr); // moves apt to end
+    // Final safety: remove any duplicate Canadian postal code (e.g. "H9A 1B2, H9A 1B2")
+    result.address = formatted.replace(
+      /\b([A-Z]\d[A-Z]\s*\d[A-Z]\d)\b([\s,]+\1\b)+/gi, '$1'
+    ).replace(/,\s*,/g, ',').trim();
   }
   if (!result.address) result.missing_fields.push('address');
 
@@ -6573,6 +6591,16 @@ function showPDFReview(extracted, filename, textData) {
   const missing = extracted.missing_fields || [];
   const flag = f => missing.includes(f) ? ' style="border-color:#E05A5A;background:#FDEDED"' : '';
   const flagLabel = f => missing.includes(f) ? ' <span style="color:#E05A5A;font-size:10px;font-weight:700">⚠ Not found</span>' : '';
+
+  // Safety: de-duplicate any repeated postal code in address (e.g. "H9A 1B2, H9A 1B2")
+  // Handles both regex-path and Claude AI-path address outputs.
+  if (extracted.address) {
+    extracted.address = extracted.address
+      .replace(/\b([A-Z]\d[A-Z]\s*\d[A-Z]\d)\b([\s,]+\1\b)+/gi, '$1')
+      .replace(/,\s*,/g, ',')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
 
   document.getElementById('pdfReviewFilename').textContent = filename;
   // Store raw text for debugging
@@ -9376,13 +9404,15 @@ async function recordAllFromNote(fileNum) {
       }
       if (left > 0) {
         // ── Capture ACTUAL VISIT DATE before appointment fields are cleared ──
-        // Critical: appointment_date_time is set to null below, so we must
-        // read it now. If patient had a confirmed appointment on e.g. June 6
-        // but recording happens on June 7, visitDate = June 6 (correct).
+        // Priority: appointment date (past/today) > due date (past/today) > today.
+        // This ensures late recording (nurse records next day) always uses the
+        // actual visit date, regardless of whether appointment_confirmed is set.
         const _apptRaw  = p['Appointment Date & Time'];
         const _apptDate = _apptRaw ? _apptRaw.split('T')[0] : null;
-        const _apptConf = !!p['Appointment Confirmed'];
-        const visitDate = (_apptConf && _apptDate) ? _apptDate : today;
+        const _dueDate  = p['Due Date'] || null;
+        const visitDate = (_apptDate && _apptDate <= today) ? _apptDate :
+                          (_dueDate  && _dueDate  <= today) ? _dueDate  :
+                          today;
 
         let prevDates = (p['Previous Injection Dates'] || '')
           .split(',').map(s => s.trim()).filter(Boolean);
