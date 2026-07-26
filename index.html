@@ -418,6 +418,86 @@ input, select, textarea { font: inherit; }
 .date-sep--today .date-sep__badge { background: var(--orange-bg); color: var(--orange); }
 .date-sep--overdue .date-sep__label { color: var(--red); }
 
+/* ══════════════════════════════════════════════════════════════
+   THEME 2 ADDITIONS
+   Only visual changes — no layout dimensions changed.
+   All logic, events, and data attributes are untouched.
+   ══════════════════════════════════════════════════════════════ */
+
+/* Date separator — SAME height (padding unchanged).
+   Only background + border added for prominence.
+   Works on both today (teal) and future (navy) dates.         */
+.date-sep {
+  background: rgba(45,140,138,.07);
+  border: 1px solid rgba(45,140,138,.15);
+  border-radius: 8px;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+.date-sep--today {
+  background: rgba(45,140,138,.13);
+  border-color: rgba(45,140,138,.28);
+}
+.date-sep--overdue {
+  background: rgba(224,90,90,.07);
+  border-color: rgba(224,90,90,.2);
+}
+[data-theme="dark"] .date-sep {
+  background: rgba(45,140,138,.09);
+  border-color: rgba(45,140,138,.22);
+}
+[data-theme="dark"] .date-sep--today {
+  background: rgba(45,140,138,.15);
+  border-color: rgba(45,140,138,.35);
+}
+
+/* Patient card base needs position:relative so watermark is contained.
+   Note: status-variant cards (.patient-card--today etc.) already have
+   position:relative — this just ensures plain cards do too.          */
+.patient-card { position: relative; }
+
+/* Watermark initial — ghost behind ALL card content.
+   z-index: 0 places it in the same layer as the ::before corner gradient,
+   which is BELOW card content at z-index:1 (existing system, untouched).
+   pointer-events:none guarantees zero interference with taps/clicks.
+   overflow:hidden on .patient-card clips any overflow — no div leaking. */
+.card-watermark {
+  position: absolute;
+  right: -0.25rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 6.5rem;
+  font-weight: 900;
+  line-height: 1;
+  opacity: 0.055;
+  user-select: none;
+  pointer-events: none;
+  letter-spacing: -0.25rem;
+  max-width: 55%;
+  overflow: hidden;
+  white-space: nowrap;
+  z-index: 0;
+}
+
+/* Avatar hidden — watermark provides the visual patient identity */
+.card-avatar { display: none; }
+
+/* Progress bar hidden — doses shown inline as "2/6" badge */
+.card-progress { display: none; }
+
+/* Compact doses badge — replaces the progress bar */
+.card-doses-compact {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--text-2);
+  background: rgba(0,0,0,.05);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 2px 7px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 /* ========== PATIENT CARD ========== */
 .patient-card {
   background: linear-gradient(160deg, #fff 0%, #FAFCFF 100%);
@@ -4370,17 +4450,26 @@ function renderCard(p, idx) {
     </svg>
   </button>` : '';
 
+  // Watermark colour matches the card's avatar gradient tint
+  const wmColors = {
+    teal:'var(--teal)', orange:'var(--orange)', navy:'var(--navy)',
+    purple:'#7B68B6', green:'var(--green)',
+  };
+  const wmColor = wmColors[color] || 'var(--teal)';
+
   return `
 <div class="patient-card ${cardClass} ${cppClass}" data-id="${p.id}">
+  <!--  Watermark: z-index:0, pointer-events:none — sits behind all content  -->
+  <div class="card-watermark" style="color:${wmColor}">${initials(_name)}</div>
   <div class="card-status-strip"></div>
   <div class="card-head">
-    <div class="card-avatar card-avatar--${color}">${initials(_name)}</div>
     <div class="card-info">
       <div class="card-name-row">
         <span class="card-name">${esc(_name)}</span>
         <span class="card-file">#${esc(p['File Number']||'')}</span>
         ${dose ? `<span class="card-dose-badge">${dose} mg · ${weeks}w</span>` : ''}
         ${p['CPP Patient'] ? `<span style="background:#F0EEF9;color:#5B48A0;border:1px solid #C4B8E8;border-radius:20px;padding:2px 8px;font-size:10px;font-weight:700">🩺 CPP</span>` : ''}
+        <span class="card-doses-compact">${given}/${total}</span>
       </div>
       <div class="card-meta">
         <div class="card-due ${dueClass}">
