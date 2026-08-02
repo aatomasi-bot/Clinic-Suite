@@ -2887,56 +2887,99 @@ a:focus:not(:focus-visible) { outline: none; }
 
 <!-- DASHBOARD -->
 <div id="dashView" class="hidden">
-  <div id="dash-greeting" style="background:var(--navy);padding:12px 16px 16px;margin-bottom:0;border-bottom:1px solid rgba(255,255,255,.06)"></div>
-  <div class="stats-grid">
-    <div class="stat-card stat-card--teal stat-card--link" onclick="switchToTab('all')" title="View all active patients">
-      <div class="stat-card__icon">💊</div>
-      <div class="stat-card__label">Active Patients</div>
-      <div class="stat-card__value" id="ds-active">0</div>
-      <div class="stat-card__sub">Total in system</div>
+  <!-- Greeting strip -->
+  <div id="dash-greeting" style="background:linear-gradient(135deg,var(--navy) 0%,var(--navy-mid) 100%);padding:14px 16px 18px;border-bottom:1px solid rgba(255,255,255,.06)"></div>
+
+  <div style="padding:12px 12px 100px">
+
+    <!-- ── KPI Row ── -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+      <!-- Today -->
+      <div onclick="switchView('patients');switchToTab('today')" style="background:var(--card);border-radius:14px;padding:14px;border:1.5px solid var(--border);cursor:pointer;box-shadow:var(--shadow);position:relative;overflow:hidden">
+        <div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--teal),var(--teal-dark))"></div>
+        <div style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px">Today</div>
+        <div style="font-size:28px;font-weight:900;color:var(--teal);letter-spacing:-1px;line-height:1" id="ds-today">0</div>
+        <div style="font-size:10px;color:var(--text-3);margin-top:3px">appointments</div>
+      </div>
+      <!-- Overdue -->
+      <div onclick="switchView('patients');switchToTab('overdue')" style="background:var(--card);border-radius:14px;padding:14px;border:1.5px solid var(--border);cursor:pointer;box-shadow:var(--shadow);position:relative;overflow:hidden">
+        <div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--red),#c94040)"></div>
+        <div style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px">Overdue</div>
+        <div style="font-size:28px;font-weight:900;color:var(--red);letter-spacing:-1px;line-height:1" id="ds-overdue">0</div>
+        <div style="font-size:10px;color:var(--text-3);margin-top:3px">need attention</div>
+      </div>
+      <!-- Scheduled -->
+      <div onclick="switchView('patients');switchToTab('scheduled')" style="background:var(--card);border-radius:14px;padding:14px;border:1.5px solid var(--border);cursor:pointer;box-shadow:var(--shadow);position:relative;overflow:hidden">
+        <div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#4F7FA8,#3A6080)"></div>
+        <div style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px">Scheduled</div>
+        <div style="font-size:28px;font-weight:900;color:#4F7FA8;letter-spacing:-1px;line-height:1" id="ds-scheduled">0</div>
+        <div style="font-size:10px;color:var(--text-3);margin-top:3px">upcoming</div>
+      </div>
+      <!-- Pending -->
+      <div onclick="switchView('patients');switchToTab('pending')" style="background:var(--card);border-radius:14px;padding:14px;border:1.5px solid var(--border);cursor:pointer;box-shadow:var(--shadow);position:relative;overflow:hidden">
+        <div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--orange),#c07818)"></div>
+        <div style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px">Pending</div>
+        <div style="font-size:28px;font-weight:900;color:var(--orange);letter-spacing:-1px;line-height:1" id="ds-pending">0</div>
+        <div style="font-size:10px;color:var(--text-3);margin-top:3px">renewal needed</div>
+      </div>
     </div>
-    <div class="stat-card stat-card--orange stat-card--link" onclick="switchToTab('today')" title="View today's appointments">
-      <div class="stat-card__icon">📅</div>
-      <div class="stat-card__label">Due Today</div>
-      <div class="stat-card__value" id="ds-today">0</div>
-      <div class="stat-card__sub">Tap to view</div>
+
+    <!-- ── Patient Distribution Donut + Legend ── -->
+    <div style="background:var(--card);border-radius:16px;padding:16px;border:1.5px solid var(--border);box-shadow:var(--shadow);margin-bottom:12px">
+      <div style="font-size:12px;font-weight:800;color:var(--text);letter-spacing:-.2px;margin-bottom:14px">Patient Distribution</div>
+      <div style="display:flex;align-items:center;gap:20px">
+        <!-- SVG Donut Chart -->
+        <div style="flex-shrink:0;position:relative;width:120px;height:120px">
+          <svg id="dash-donut" viewBox="0 0 120 120" width="120" height="120" style="transform:rotate(-90deg)">
+            <circle cx="60" cy="60" r="45" fill="none" stroke="var(--border)" stroke-width="18"/>
+            <!-- Segments filled by JS -->
+          </svg>
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center">
+            <div style="font-size:20px;font-weight:900;color:var(--text);line-height:1" id="ds-active">0</div>
+            <div style="font-size:9px;color:var(--text-3);font-weight:600;margin-top:2px">active</div>
+          </div>
+        </div>
+        <!-- Legend -->
+        <div style="flex:1;display:flex;flex-direction:column;gap:8px" id="dash-legend">
+          <!-- filled by JS -->
+        </div>
+      </div>
     </div>
-    <div class="stat-card stat-card--red stat-card--link" onclick="switchToTab('overdue')" title="View overdue patients">
-      <div class="stat-card__icon">⚠️</div>
-      <div class="stat-card__label">Overdue</div>
-      <div class="stat-card__value" id="ds-overdue">0</div>
-      <div class="stat-card__sub">Tap to view</div>
+
+    <!-- ── Invoice Summary + Dose Breakdown ── -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+      <!-- Invoice card -->
+      <div onclick="switchView('invoice')" style="background:linear-gradient(135deg,var(--navy) 0%,var(--navy-mid) 100%);border-radius:14px;padding:14px;cursor:pointer;box-shadow:0 4px 16px rgba(27,38,56,.3);position:relative;overflow:hidden">
+        <div style="position:absolute;top:0;right:0;bottom:0;left:0;background:linear-gradient(135deg,rgba(45,140,138,.15) 0%,transparent 60%);pointer-events:none"></div>
+        <div style="font-size:10px;font-weight:700;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px">This Month</div>
+        <div style="font-size:20px;font-weight:900;color:#fff;letter-spacing:-1px;line-height:1" id="ds-invoice-total">$0.00</div>
+        <div style="font-size:10px;color:rgba(255,255,255,.5);margin-top:4px" id="ds-invoice-sub">Invoice</div>
+        <div style="margin-top:8px;font-size:11px;color:rgba(255,255,255,.6)">📋 Tap to open →</div>
+      </div>
+      <!-- CPP card -->
+      <div onclick="switchView('patients');switchToTab('cpp')" style="background:linear-gradient(135deg,#4A2D7A 0%,#6B3FA0 100%);border-radius:14px;padding:14px;cursor:pointer;box-shadow:0 4px 16px rgba(74,45,122,.3);position:relative;overflow:hidden">
+        <div style="font-size:10px;font-weight:700;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px">CPP Patients</div>
+        <div style="font-size:28px;font-weight:900;color:#fff;letter-spacing:-1px;line-height:1" id="ds-cpp">0</div>
+        <div style="font-size:10px;color:rgba(255,255,255,.5);margin-top:3px">complex care plan</div>
+        <div style="margin-top:8px;font-size:11px;color:rgba(255,255,255,.6)">🩺 Tap to view →</div>
+      </div>
     </div>
-    <div class="stat-card stat-card--navy stat-card--link" onclick="switchToTab('pending')" title="View pending patients">
-      <div class="stat-card__icon">⏳</div>
-      <div class="stat-card__label">Pending Renewal</div>
-      <div class="stat-card__value" id="ds-pending">0</div>
-      <div class="stat-card__sub">Tap to view</div>
+
+    <!-- ── Dose Bar Chart ── -->
+    <div style="background:var(--card);border-radius:16px;padding:16px;border:1.5px solid var(--border);box-shadow:var(--shadow);margin-bottom:12px">
+      <div style="font-size:12px;font-weight:800;color:var(--text);letter-spacing:-.2px;margin-bottom:12px">Patients by Dose</div>
+      <div id="doseChart"></div>
     </div>
-    <div class="stat-card stat-card--purple stat-card--link" onclick="switchToTab('cpp')" title="View CPP patients">
-      <div class="stat-card__icon">🩺</div>
-      <div class="stat-card__label">CPP Patients</div>
-      <div class="stat-card__value" id="ds-cpp">0</div>
-      <div class="stat-card__sub">Tap to view</div>
-    </div>
-    <div class="stat-card stat-card--invoice stat-card--link" onclick="switchView('invoice')" title="Open invoice">
-      <div class="stat-card__icon">📋</div>
-      <div class="stat-card__label">Invoice</div>
-      <div class="stat-card__value" id="ds-invoice-total">$0</div>
-      <div class="stat-card__sub" id="ds-invoice-sub">This month</div>
-    </div>
-  </div>
-  <div class="dose-chart" id="doseChartWrap">
-    <h3>Patients by Dose</h3>
-    <div id="doseChart"></div>
-  </div>
-  <div class="quick-actions">
-    <h3>Quick Actions</h3>
-    <div class="quick-action-btns">
-      <button class="quick-action-btn" onclick="switchToTab('today')">📅 Due Today</button>
-      <button class="quick-action-btn" onclick="switchToTab('overdue')">⚠️ Overdue</button>
-      <button class="quick-action-btn" onclick="openMenuDrawer()">📥 Import Data</button>
-      <button class="quick-action-btn" onclick="openMenuDrawer()">📤 Export Data</button>
+
+    <!-- ── Quick Actions ── -->
+    <div style="background:var(--card);border-radius:16px;padding:16px;border:1.5px solid var(--border);box-shadow:var(--shadow)">
+      <div style="font-size:12px;font-weight:800;color:var(--text);letter-spacing:-.2px;margin-bottom:12px">Quick Actions</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <button onclick="switchView('patients');switchToTab('today')" style="padding:10px;border-radius:10px;border:1.5px solid var(--border);background:var(--bg);font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer;text-align:left">📅 Today's List</button>
+        <button onclick="switchView('patients');switchToTab('overdue')" style="padding:10px;border-radius:10px;border:1.5px solid rgba(224,90,90,.3);background:rgba(224,90,90,.06);font-size:12px;font-weight:600;color:var(--red);cursor:pointer;text-align:left">⚠️ Overdue</button>
+        <button onclick="switchView('reminders')" style="padding:10px;border-radius:10px;border:1.5px solid var(--border);background:var(--bg);font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer;text-align:left">🔔 Reminders</button>
+        <button onclick="switchView('invoice')" style="padding:10px;border-radius:10px;border:1.5px solid var(--border);background:var(--bg);font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer;text-align:left">🧾 Invoice</button>
+      </div>
     </div>
   </div>
 </div>
@@ -4671,7 +4714,136 @@ function attachCardEvents() { /* intentional no-op — listener lives on mainCon
 // ========== DASHBOARD ==========
 function renderDashboard() {
   const today = todayStr();
-  const active = patients.filter(p => !p['Archived']).length;
+  const active    = patients.filter(p => !p['Archived'] && !p['Pending']).length;
+  const dueToday  = patients.filter(p => !p['Archived'] && p['Appointment Date & Time'] && p['Appointment Date & Time'].split('T')[0] === today && !!(p['Appointment Confirmed'] && p['Appointment Date & Time']) && !p['Injection Administered']).length;
+  const overdue   = patients.filter(p => { if (p['Archived']||p['Pending']) return false; const d=p['Appointment Date & Time']?p['Appointment Date & Time'].split('T')[0]:null; return d&&d<today&&p['Appointment Confirmed']&&!p['Injection Administered']; }).length;
+  const scheduled = patients.filter(p => { const d=p['Appointment Date & Time']?p['Appointment Date & Time'].split('T')[0]:null; return d&&d>today&&!!(p['Appointment Confirmed']&&d)&&!p['Archived']; }).length;
+  const pending   = patients.filter(p => p['Pending'] && !p['Archived']).length;
+  const cpp       = patients.filter(p => !p['Archived'] && p['CPP Patient']).length;
+  const archived  = patients.filter(p => p['Archived']).length;
+  const allActive = patients.filter(p => !p['Archived'] && !p['Pending'] && !(p['Appointment Date & Time'] && !!(p['Appointment Confirmed'] && p['Appointment Date & Time']))).length;
+
+  // Greeting
+  const greetEl = document.getElementById('dash-greeting');
+  if (greetEl) {
+    const hr = new Date().getHours();
+    const greet = hr < 12 ? 'Good morning' : hr < 17 ? 'Good afternoon' : 'Good evening';
+    const dt = new Date().toLocaleDateString('en-CA', {weekday:'long', month:'long', day:'numeric'});
+    greetEl.innerHTML = `<div style="font-size:10px;color:rgba(255,255,255,.45);font-weight:600;letter-spacing:.5px;text-transform:uppercase;margin-bottom:2px">${dt}</div>
+      <div style="font-size:18px;font-weight:800;color:#fff;letter-spacing:-.3px">${greet}, Abdul 👋</div>
+      <div style="font-size:11px;color:rgba(255,255,255,.45);margin-top:3px">${active} active patients · ${dueToday > 0 ? dueToday + ' due today' : 'No appointments today'}</div>`;
+  }
+
+  // Animated count-up
+  function countUp(id, target) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const start = parseInt(el.textContent) || 0;
+    if (start === target) { el.textContent = target; return; }
+    const dur = 600, steps = 20, interval = dur / steps;
+    let step = 0;
+    const timer = setInterval(() => {
+      step++;
+      el.textContent = Math.round(start + (target - start) * (step / steps));
+      if (step >= steps) clearInterval(timer);
+    }, interval);
+  }
+  countUp('ds-active', active);
+  countUp('ds-today', dueToday);
+  countUp('ds-overdue', overdue);
+  countUp('ds-scheduled', scheduled);
+  countUp('ds-pending', pending);
+  countUp('ds-cpp', cpp);
+
+  // ── Donut chart ────────────────────────────────────────────
+  const segments = [
+    { label:'Today',     value:dueToday,  color:'#2D8C8A', tab:'today' },
+    { label:'Scheduled', value:scheduled, color:'#4F7FA8', tab:'scheduled' },
+    { label:'All Active',value:allActive,  color:'#3D9A6B', tab:'all' },
+    { label:'Overdue',   value:overdue,   color:'#E9A23A', tab:'overdue' },
+    { label:'Pending',   value:pending,   color:'#6B5EA8', tab:'pending' },
+    { label:'Archived',  value:archived,  color:'#8FA5B5', tab:'archived' },
+  ].filter(s => s.value > 0);
+
+  const total = segments.reduce((s, seg) => s + seg.value, 0) || 1;
+  const R = 45, CX = 60, CY = 60, strokeW = 18;
+  const circ = 2 * Math.PI * R;
+
+  let svgSegments = '';
+  let offset = 0;
+  segments.forEach(seg => {
+    const dash = (seg.value / total) * circ;
+    const gap  = circ - dash;
+    svgSegments += `<circle cx="${CX}" cy="${CY}" r="${R}" fill="none"
+      stroke="${seg.color}" stroke-width="${strokeW}"
+      stroke-dasharray="${dash.toFixed(2)} ${gap.toFixed(2)}"
+      stroke-dashoffset="${(-offset).toFixed(2)}"
+      style="cursor:pointer;transition:opacity .2s"
+      onclick="switchView('patients');switchToTab('${seg.tab}')"
+      onmouseenter="this.style.opacity='.7'" onmouseleave="this.style.opacity='1'"
+    />`;
+    offset += dash;
+  });
+
+  const donutSvg = document.getElementById('dash-donut');
+  if (donutSvg) donutSvg.innerHTML = `
+    <circle cx="${CX}" cy="${CY}" r="${R}" fill="none" stroke="var(--border)" stroke-width="${strokeW}"/>
+    ${svgSegments}`;
+
+  // Legend
+  const legendEl = document.getElementById('dash-legend');
+  if (legendEl) {
+    legendEl.innerHTML = segments.map(s => `
+      <div onclick="switchView('patients');switchToTab('${s.tab}')" style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:3px 0">
+        <div style="width:10px;height:10px;border-radius:3px;background:${s.color};flex-shrink:0"></div>
+        <div style="font-size:11px;color:var(--text-2);flex:1">${s.label}</div>
+        <div style="font-size:12px;font-weight:800;color:var(--text)">${s.value}</div>
+      </div>`).join('');
+  }
+
+  // ── Invoice summary ────────────────────────────────────────
+  const invKey  = invoiceStorageKey();
+  const invData = loadInvoiceData(invKey);
+  const fmt     = n => '$' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  let invVisits=0, invKm=0, invMins=0, invCpp=0;
+  invData.days.forEach(d => { invVisits+=d.patients.length; invKm+=d.net_km||0; invMins+=d.net_time||0; invCpp+=d.patients.filter(p=>p.cpp).length; });
+  const invSub   = invVisits*INVOICE_RATES.visit + invKm*INVOICE_RATES.km + invMins/60*INVOICE_RATES.hrRate + invCpp*INVOICE_RATES.cpp;
+  const invTotal = invSub * (1 + GST_RATE + QST_RATE);
+  const _dashMonthLabel = new Date().toLocaleDateString('en-CA', { month: 'long' });
+  const totalEl = document.getElementById('ds-invoice-total');
+  const subEl   = document.getElementById('ds-invoice-sub');
+  if (totalEl) totalEl.textContent = invData.days.length ? fmt(invTotal) : '$0.00';
+  if (subEl) {
+    const unbilled = getUnbilledDates().length;
+    subEl.textContent = invData.days.length
+      ? _dashMonthLabel + ' · ' + invData.days.length + ' day' + (invData.days.length!==1?'s':'')
+        + (invData.finalized?' · 🔒':'') + (unbilled?' · ⚠️ '+unbilled+' unbilled':'')
+      : _dashMonthLabel + (unbilled?' · ⚠️ '+unbilled+' unbilled':' · No days added');
+  }
+
+  // ── Dose bar chart ─────────────────────────────────────────
+  const doseCounts = {};
+  patients.filter(p=>!p['Archived']).forEach(p => { const d=p['Dose Prescribed']||'Unknown'; doseCounts[d]=(doseCounts[d]||0)+1; });
+  const maxCount = Math.max(...Object.values(doseCounts), 1);
+  let chartHtml = '';
+  ['7.5','22.5','30','45'].forEach(d => {
+    const c = doseCounts[d] || 0;
+    if (!c) return;
+    const pct = Math.round((c/maxCount)*100);
+    const barColor = d==='7.5'?'#4F7FA8':d==='22.5'?'#2D8C8A':d==='30'?'#E9A23A':'#6B5EA8';
+    chartHtml += `<div style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <span style="font-size:11px;font-weight:700;color:var(--text)">${d} mg</span>
+        <span style="font-size:11px;font-weight:800;color:var(--text)">${c}</span>
+      </div>
+      <div style="background:var(--border);border-radius:6px;height:8px;overflow:hidden">
+        <div style="width:${pct}%;height:100%;background:${barColor};border-radius:6px;transition:width .6s cubic-bezier(.4,0,.2,1)"></div>
+      </div>
+    </div>`;
+  });
+  const chartEl = document.getElementById('doseChart');
+  if (chartEl) chartEl.innerHTML = chartHtml || '<div style="color:var(--text-3);font-size:12px">No dose data yet</div>';
+}
   // Add greeting to dashboard header
   const greetEl = document.getElementById('dash-greeting');
   if (greetEl) {
@@ -4704,67 +4876,6 @@ function renderDashboard() {
       if (step >= steps) clearInterval(timer);
     }, interval);
   }
-  countUp('ds-active', active);
-  countUp('ds-today', dueToday);
-  countUp('ds-overdue', overdue);
-  countUp('ds-pending', pending);
-  countUp('ds-cpp', cpp);
-
-  // ── Invoice summary on dashboard ──
-  const invKey  = invoiceStorageKey();
-  const invData = loadInvoiceData(invKey);
-  const fmt     = n => '$' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-
-  let invVisits = 0, invKm = 0, invMinutes = 0, invCpp = 0;
-  invData.days.forEach(d => {
-    invVisits   += d.patients.length;
-    invKm       += d.net_km   || 0;
-    invMinutes  += d.net_time || 0;
-    invCpp      += d.patients.filter(p => p.cpp).length;
-  });
-  const invSubtotal = (invVisits * INVOICE_RATES.visit)
-                    + (invKm    * INVOICE_RATES.km)
-                    + (invMinutes / 60 * INVOICE_RATES.hrRate)
-                    + (invCpp   * INVOICE_RATES.cpp);
-  const invTotal = invSubtotal * (1 + GST_RATE + QST_RATE);
-
-  const now = new Date();
-  const monthLabel = now.toLocaleDateString('en-CA', { month: 'long' });
-
-  const totalEl = document.getElementById('ds-invoice-total');
-  const subEl   = document.getElementById('ds-invoice-sub');
-  if (totalEl) totalEl.textContent = invData.days.length ? fmt(invTotal) : '$0.00';
-  if (subEl) {
-    const unbilled = getUnbilledDates().length;
-    subEl.textContent = invData.days.length
-      ? monthLabel + ' · ' + invData.days.length + ' day' + (invData.days.length !== 1 ? 's' : '')
-        + (invData.finalized ? ' · 🔒' : '')
-        + (unbilled ? ' · ⚠️ ' + unbilled + ' unbilled' : '')
-      : monthLabel + (unbilled ? ' · ⚠️ ' + unbilled + ' unbilled' : ' · No days added');
-  }
-
-  // Dose chart
-  const doseCounts = {};
-  patients.filter(p=>!p['Archived']).forEach(p => {
-    const d = p['Dose Prescribed'] || 'Unknown';
-    doseCounts[d] = (doseCounts[d]||0) + 1;
-  });
-  const maxCount = Math.max(...Object.values(doseCounts), 1);
-  let chartHtml = '';
-  const doseOrder = ['7.5','22.5','30','45'];
-  doseOrder.forEach(d => {
-    const c = doseCounts[d] || 0;
-    if (c === 0) return;
-    const pct = Math.round((c/maxCount)*100);
-    chartHtml += `<div class="dose-bar-row">
-      <div class="dose-bar-label">${d}mg</div>
-      <div class="dose-bar-track"><div class="dose-bar-fill" style="width:${pct}%"></div></div>
-      <div class="dose-bar-count">${c}</div>
-    </div>`;
-  });
-  document.getElementById('doseChart').innerHTML = chartHtml || '<p style="color:var(--text-2);font-size:13px">No data</p>';
-}
-
 // ========== INJECTION ==========
 function openInjectionModal(id) {
   pendingInjectId = id;
@@ -7856,9 +7967,29 @@ const INVOICE_DEDUCT_MIN = 40;
 const GST_RATE  = 0.05;
 const QST_RATE  = 0.09975;
 
-function invoiceStorageKey() {
+function invoiceStorageKey(yr, mo) {
+  // If yr/mo supplied, use them. Otherwise use the navigation vars or current month.
+  const y = yr || _invoiceViewYear  || new Date().getFullYear();
+  const m = mo || _invoiceViewMonth || (new Date().getMonth() + 1);
+  return `invoice_${y}_${String(m).padStart(2,'0')}`;
+}
+
+function navigateInvoiceMonth(delta) {
+  // Initialise from current view if first navigation
+  if (!_invoiceViewYear) {
+    _invoiceViewYear  = new Date().getFullYear();
+    _invoiceViewMonth = new Date().getMonth() + 1;
+  }
+  _invoiceViewMonth += delta;
+  if (_invoiceViewMonth > 12) { _invoiceViewMonth = 1;  _invoiceViewYear++; }
+  if (_invoiceViewMonth < 1)  { _invoiceViewMonth = 12; _invoiceViewYear--; }
+  renderInvoiceView();
+}
+
+function isViewingCurrentInvoiceMonth() {
+  if (!_invoiceViewYear && !_invoiceViewMonth) return true;
   const now = new Date();
-  return `invoice_${now.getFullYear()}_${String(now.getMonth()+1).padStart(2,'0')}`;
+  return _invoiceViewYear === now.getFullYear() && _invoiceViewMonth === (now.getMonth() + 1);
 }
 
 function loadInvoiceData(key) {
@@ -7983,27 +8114,21 @@ async function _saveInvoiceToDB(key, data) {
 }
 
 function autoInvoiceNumber() {
-  const now = new Date();
-  const monthNum = now.getMonth() + 1;
-  const year = now.getFullYear();
-  // Check if there was a previous month invoice to determine next number
-  const prevKey = monthNum === 1
-    ? `invoice_${year-1}_12`
-    : `invoice_${year}_${String(monthNum-1).padStart(2,'0')}`;
-  const prevRaw = localStorage.getItem(prevKey);
-  if (prevRaw) {
-    try {
-      const prev = JSON.parse(prevRaw);
-      if (prev.invoice_number) {
-        // Increment: "003-2026" → "004-2026", or "012-2025" → "001-2026" if year changed
-        const parts = prev.invoice_number.split('-');
-        if (parts.length === 2) {
-          const prevNum = parseInt(parts[0]) || 0;
-          return `${String(prevNum + 1).padStart(3,'0')}-${year}`;
-        }
-      }
-    } catch(e) {}
+  const year     = _invoiceViewYear  || new Date().getFullYear();
+  const monthNum = _invoiceViewMonth || (new Date().getMonth() + 1);
+  // Check previous month invoice to determine next number
+  const prevMo  = monthNum === 1 ? 12 : monthNum - 1;
+  const prevYr  = monthNum === 1 ? year - 1 : year;
+  const prevKey = `invoice_${prevYr}_${String(prevMo).padStart(2,'0')}`;
+  const prevRaw = _invoiceCache[prevKey];
+  if (prevRaw && prevRaw.invoice_number) {
+    const parts = prevRaw.invoice_number.split('-');
+    if (parts.length === 2) {
+      const prevNum = parseInt(parts[0]) || 0;
+      return `${String(prevNum + 1).padStart(3,'0')}-${year}`;
+    }
   }
+  // Fall back to month-number as sequential guess
   return `${String(monthNum).padStart(3,'0')}-${year}`;
 }
 
@@ -8109,8 +8234,12 @@ function getRecentPatientsForManualAdd() {
 function renderInvoiceView() {
   const key  = invoiceStorageKey();
   const data = loadInvoiceData(key);
-  const now  = new Date();
-  const monthLabel = now.toLocaleDateString('en-CA', {month:'long', year:'numeric'});
+  // Use the viewed month/year for the label (not always current month)
+  const viewYear  = _invoiceViewYear  || new Date().getFullYear();
+  const viewMonth = _invoiceViewMonth || (new Date().getMonth() + 1);
+  const viewDate  = new Date(viewYear, viewMonth - 1, 1);
+  const monthLabel = viewDate.toLocaleDateString('en-CA', {month:'long', year:'numeric'});
+  const isCurrent  = isViewingCurrentInvoiceMonth();
   const unbilled = checkUnbilledToday();
 
   // Calculate totals
@@ -8132,6 +8261,16 @@ function renderInvoiceView() {
   const fmt = n => '$' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',');
 
   let html = `
+  <!-- Month navigation -->
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;background:var(--bg);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:8px 12px">
+    <button onclick="navigateInvoiceMonth(-1)" style="width:32px;height:32px;border-radius:50%;border:1.5px solid var(--border);background:var(--card);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;color:var(--text-2)">‹</button>
+    <div style="flex:1;text-align:center">
+      <div style="font-size:14px;font-weight:800;color:var(--text)">${monthLabel}</div>
+      ${!isCurrent ? `<div style="font-size:10px;color:var(--orange);font-weight:700;margin-top:1px">📅 Viewing past month</div>` : ''}
+    </div>
+    <button onclick="navigateInvoiceMonth(1)" ${isCurrent ? 'disabled style="width:32px;height:32px;border-radius:50%;border:1.5px solid var(--border);background:var(--bg);cursor:not-allowed;font-size:16px;display:flex;align-items:center;justify-content:center;color:var(--text-3);opacity:.4"' : 'style="width:32px;height:32px;border-radius:50%;border:1.5px solid var(--border);background:var(--card);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;color:var(--text-2)"'}>›</button>
+    ${!isCurrent ? `<button onclick="_invoiceViewYear=null;_invoiceViewMonth=null;renderInvoiceView()" style="padding:4px 10px;border-radius:12px;border:none;background:var(--teal);color:#fff;font-size:10px;font-weight:700;cursor:pointer">↩ Current</button>` : ''}
+  </div>
   <!-- Header -->
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
     <div>
@@ -10295,6 +10434,8 @@ window.setTheme = setTheme;
   window.sendConsolidatedEmail = sendConsolidatedEmail;
   window.openMenuDrawer = openMenuDrawer;
   window.renderInvoiceView = renderInvoiceView;
+  window.navigateInvoiceMonth = navigateInvoiceMonth;
+  window.isViewingCurrentInvoiceMonth = isViewingCurrentInvoiceMonth;
   window.exportInvoiceXLSX = exportInvoiceXLSX;
   window.openAddDayModal = openAddDayModal;
   window.toggleAddDayPat = toggleAddDayPat;
@@ -10428,6 +10569,9 @@ window.setTheme = setTheme;
 // recordAllForDate sets this before the loop and clears it after, then
 // does ONE final loadPatients(). Prevents N × full-reload on mobile.
 let _batchRecording = false;
+// Invoice month navigation — null means current month, set to navigate to past months
+let _invoiceViewYear  = null;
+let _invoiceViewMonth = null;
 
 // ════════════════════════════════════════════════════════════
 // SUPABASE REAL-TIME LISTENER
