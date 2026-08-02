@@ -7969,27 +7969,27 @@ const QST_RATE  = 0.09975;
 
 function invoiceStorageKey(yr, mo) {
   // If yr/mo supplied, use them. Otherwise use the navigation vars or current month.
-  const y = yr || _invoiceViewYear  || new Date().getFullYear();
-  const m = mo || _invoiceViewMonth || (new Date().getMonth() + 1);
+  const y = yr || window._invoiceViewYear  || new Date().getFullYear();
+  const m = mo || window._invoiceViewMonth || (new Date().getMonth() + 1);
   return `invoice_${y}_${String(m).padStart(2,'0')}`;
 }
 
 function navigateInvoiceMonth(delta) {
   // Initialise from current view if first navigation
-  if (!_invoiceViewYear) {
-    _invoiceViewYear  = new Date().getFullYear();
-    _invoiceViewMonth = new Date().getMonth() + 1;
+  if (!window._invoiceViewYear) {
+    window._invoiceViewYear  = new Date().getFullYear();
+    window._invoiceViewMonth = new Date().getMonth() + 1;
   }
-  _invoiceViewMonth += delta;
-  if (_invoiceViewMonth > 12) { _invoiceViewMonth = 1;  _invoiceViewYear++; }
-  if (_invoiceViewMonth < 1)  { _invoiceViewMonth = 12; _invoiceViewYear--; }
+  window._invoiceViewMonth += delta;
+  if (window._invoiceViewMonth > 12) { window._invoiceViewMonth = 1;  window._invoiceViewYear++; }
+  if (window._invoiceViewMonth < 1)  { window._invoiceViewMonth = 12; window._invoiceViewYear--; }
   renderInvoiceView();
 }
 
 function isViewingCurrentInvoiceMonth() {
-  if (!_invoiceViewYear && !_invoiceViewMonth) return true;
+  if (!window._invoiceViewYear && !window._invoiceViewMonth) return true;
   const now = new Date();
-  return _invoiceViewYear === now.getFullYear() && _invoiceViewMonth === (now.getMonth() + 1);
+  return window._invoiceViewYear === now.getFullYear() && window._invoiceViewMonth === (now.getMonth() + 1);
 }
 
 function loadInvoiceData(key) {
@@ -8114,8 +8114,8 @@ async function _saveInvoiceToDB(key, data) {
 }
 
 function autoInvoiceNumber() {
-  const year     = _invoiceViewYear  || new Date().getFullYear();
-  const monthNum = _invoiceViewMonth || (new Date().getMonth() + 1);
+  const year     = window._invoiceViewYear  || new Date().getFullYear();
+  const monthNum = window._invoiceViewMonth || (new Date().getMonth() + 1);
   // Check previous month invoice to determine next number
   const prevMo  = monthNum === 1 ? 12 : monthNum - 1;
   const prevYr  = monthNum === 1 ? year - 1 : year;
@@ -8232,11 +8232,20 @@ function getRecentPatientsForManualAdd() {
 
 // ── INVOICE VIEW ──
 function renderInvoiceView() {
+  try { _renderInvoiceViewInner(); }
+  catch(e) {
+    console.error('[renderInvoiceView]', e);
+    const c = document.getElementById('invoiceContent');
+    if (c) c.innerHTML = `<div style="padding:20px;color:var(--red);background:var(--red-bg);border-radius:10px;margin:10px">
+      <b>⚠ Invoice error:</b> ${e.message}<br><small>Check browser console. Refresh to retry.</small></div>`;
+  }
+}
+function _renderInvoiceViewInner() {
   const key  = invoiceStorageKey();
   const data = loadInvoiceData(key);
   // Use the viewed month/year for the label (not always current month)
-  const viewYear  = _invoiceViewYear  || new Date().getFullYear();
-  const viewMonth = _invoiceViewMonth || (new Date().getMonth() + 1);
+  const viewYear  = window._invoiceViewYear  || new Date().getFullYear();
+  const viewMonth = window._invoiceViewMonth || (new Date().getMonth() + 1);
   const viewDate  = new Date(viewYear, viewMonth - 1, 1);
   const monthLabel = viewDate.toLocaleDateString('en-CA', {month:'long', year:'numeric'});
   const isCurrent  = isViewingCurrentInvoiceMonth();
@@ -8269,7 +8278,7 @@ function renderInvoiceView() {
       ${!isCurrent ? `<div style="font-size:10px;color:var(--orange);font-weight:700;margin-top:1px">📅 Viewing past month</div>` : ''}
     </div>
     <button onclick="navigateInvoiceMonth(1)" ${isCurrent ? 'disabled style="width:32px;height:32px;border-radius:50%;border:1.5px solid var(--border);background:var(--bg);cursor:not-allowed;font-size:16px;display:flex;align-items:center;justify-content:center;color:var(--text-3);opacity:.4"' : 'style="width:32px;height:32px;border-radius:50%;border:1.5px solid var(--border);background:var(--card);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;color:var(--text-2)"'}>›</button>
-    ${!isCurrent ? `<button onclick="_invoiceViewYear=null;_invoiceViewMonth=null;renderInvoiceView()" style="padding:4px 10px;border-radius:12px;border:none;background:var(--teal);color:#fff;font-size:10px;font-weight:700;cursor:pointer">↩ Current</button>` : ''}
+    ${!isCurrent ? `<button onclick="window._invoiceViewYear=null;window._invoiceViewMonth=null;renderInvoiceView()" style="padding:4px 10px;border-radius:12px;border:none;background:var(--teal);color:#fff;font-size:10px;font-weight:700;cursor:pointer">↩ Current</button>` : ''}
   </div>
   <!-- Header -->
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
@@ -10569,9 +10578,10 @@ window.setTheme = setTheme;
 // recordAllForDate sets this before the loop and clears it after, then
 // does ONE final loadPatients(). Prevents N × full-reload on mobile.
 let _batchRecording = false;
-// Invoice month navigation — null means current month, set to navigate to past months
-let _invoiceViewYear  = null;
-let _invoiceViewMonth = null;
+// Invoice month navigation — stored on window so inline onclick handlers can access them
+// (let variables are NOT accessible from inline onclick attributes)
+window.window._invoiceViewYear  = null;
+window.window._invoiceViewMonth = null;
 
 // ════════════════════════════════════════════════════════════
 // SUPABASE REAL-TIME LISTENER
