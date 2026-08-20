@@ -8411,7 +8411,14 @@ function _renderInvoiceViewInner() {
           ${dayCpp ? `<span>🩺 ${dayCpp} CPP survey${dayCpp>1?'s':''}</span>` : ''}
         </div>
         <div style="padding:4px 14px 8px;display:flex;flex-wrap:wrap;gap:4px">
-          ${day.patients.map(p=>`<span style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:2px 7px;font-size:10px;font-weight:600">${esc(p.initials)} #${esc(String(p.file))}</span>`).join('')}
+          ${day.patients.map((p,pi)=>`
+            <span onclick="toggleInvoiceCpp(${realIdx},${pi})"
+              title="${p.cpp?'CPP ✓ — tap to remove $25':'No CPP — tap to add $25'}"
+              style="display:inline-flex;align-items:center;gap:4px;border:1.5px solid ${p.cpp?'rgba(91,72,160,.45)':'var(--border)'};border-radius:7px;padding:3px 8px;font-size:10px;font-weight:600;cursor:pointer;transition:all .15s;
+                     background:${p.cpp?'rgba(91,72,160,.1)':'var(--bg)'};
+                     color:${p.cpp?'#5B48A0':'var(--text-2)'}">
+              ${p.cpp?'🩺 ':''}${esc(p.initials)} #${esc(String(p.file))}${p.cpp?' <span style=\"font-size:9px;font-weight:800;color:#5B48A0\">+$25</span>':''}
+            </span>`).join('')}
         </div>
       </div>`;
     });
@@ -8652,6 +8659,23 @@ function removeDayFromInvoice(idx) {
   const data = loadInvoiceData(key);
   data.days.splice(idx, 1);
   saveInvoiceData(key, data);
+  renderInvoiceView();
+}
+
+// Toggle CPP charge for one patient in an already-saved invoice day.
+// dayIdx = index into data.days[], patIdx = index into day.patients[].
+// Flips p.cpp true↔false, saves, and re-renders so totals update instantly.
+function toggleInvoiceCpp(dayIdx, patIdx) {
+  const key  = invoiceStorageKey();
+  const data = loadInvoiceData(key);
+  const day  = data.days[dayIdx];
+  if (!day || !day.patients[patIdx]) return;
+  const p    = day.patients[patIdx];
+  const was  = !!p.cpp;
+  p.cpp = !was;
+  saveInvoiceData(key, data);
+  const change = was ? '-$25.00 CPP removed' : '+$25.00 CPP added';
+  toast(`🩺 ${p.initials} #${p.file} — ${change}`, was ? 'warning' : 'success');
   renderInvoiceView();
 }
 
@@ -10445,6 +10469,8 @@ window.setTheme = setTheme;
   window.renderInvoiceView = renderInvoiceView;
   window.navigateInvoiceMonth = navigateInvoiceMonth;
   window.isViewingCurrentInvoiceMonth = isViewingCurrentInvoiceMonth;
+  window.toggleInvoiceCpp = toggleInvoiceCpp;
+  window.removeDayFromInvoice = removeDayFromInvoice;
   window.exportInvoiceXLSX = exportInvoiceXLSX;
   window.openAddDayModal = openAddDayModal;
   window.toggleAddDayPat = toggleAddDayPat;
