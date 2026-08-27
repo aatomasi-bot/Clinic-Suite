@@ -1003,6 +1003,7 @@ body:has(.bottom-nav.nav-hidden) #reminderView {
   background: var(--card); border: 1.5px solid var(--border);
   border-radius: 12px; padding: 10px 12px; margin-bottom: 8px;
   border-left: 3px solid var(--teal); transition: box-shadow .15s;
+  position: relative; /* needed for route-order badge absolute positioning */
 }
 .rem-card.status-no-answer { border-left-color: var(--amber); }
 .rem-card.status-snoozed   { opacity: .6; border-left-color: var(--text-3); }
@@ -10916,11 +10917,30 @@ async function syncRemindersFromSupabase() {
     if (error || !data?.reminders) return;
     const remote = data.reminders;
     const local  = loadRem();
-    // Merge: prefer remote status for each file number (it's always the latest action)
-    const merged = { ...local, ...remote };
-    localStorage.setItem(REM_KEY, JSON.stringify(merged));
-    // Refresh UI if data changed
-    if (JSON.stringify(merged) !== JSON.stringify(local)) {
+
+    // ── Timestamp-based merge ──────────────────────────────────────
+    // NEVER blindly let remote overwrite local (`{ ...local, ...remote }`).
+    // If the nurse just confirmed a patient (local = confirmation_called) but
+    // Supabase hasn't received the background sync yet, the stale remote value
+    // would reset the status back to pending → patient reappears → double confirm.
+    // Fix: keep whichever entry has the newer calledAt/snoozeUntil timestamp.
+    const merged = {};
+    const allKeys = new Set([...Object.keys(local), ...Object.keys(remote)]);
+    for (const key of allKeys) {
+      const loc = local[key];
+      const rem = remote[key];
+      if (!loc) { merged[key] = rem; continue; }
+      if (!rem) { merged[key] = loc; continue; }
+      // Both exist — keep the newer one (higher timestamp = more recent action)
+      const locTs = loc.calledAt || loc.snoozeUntil || 0;
+      const remTs = rem.calledAt || rem.snoozeUntil || 0;
+      merged[key] = locTs >= remTs ? loc : rem;
+    }
+
+    const prevStr = JSON.stringify(local);
+    const newStr  = JSON.stringify(merged);
+    if (newStr !== prevStr) {
+      localStorage.setItem(REM_KEY, newStr);
       updateReminderBadge();
       if (typeof currentView !== 'undefined' && currentView === 'reminders') renderReminders();
     }
@@ -10937,11 +10957,14 @@ function stripTimeWindow(note) {
 // Calculate "HH:MM-HH:MM, OK" from a start time string like "08:00"
 function calcTimeWindow(startStr) {
   if (!startStr) return '';
-  const [h, m] = startStr.split(':').map(Number);
-  if (isNaN(h) || isNaN(m)) return '';
+  // Accept both "8:00" and "8.00" or "800" formats
+  const cleaned = startStr.trim().replace('.', ':').replace(/^(\d{3,4})$/, m =>
+    m.length === 3 ? m[0]+':'+m.slice(1) : m.slice(0,2)+':'+m.slice(2));
+  const [h, m] = cleaned.split(':').map(Number);
+  if (isNaN(h) || isNaN(m) || h < 0 || h > 23 || m < 0 || m > 59) return '';
   const endH = (h + 2) % 24;
-  const fmt  = (n, pad) => pad ? String(n).padStart(2,'0') : String(n);
-  return `${fmt(h,false)}:${fmt(m,true)}-${fmt(endH,false)}:${fmt(m,true)}, OK`;
+  const pad  = n => String(n).padStart(2, '0');
+  return `${pad(h)}:${pad(m)}-${pad(endH)}:${pad(m)}, OK`;
 }
 
 function extractApptTime(p) {
@@ -10998,6 +11021,27 @@ function getReminderGroups() {
       g2.push({ ...p, _remStatus: r.status || 'pending', _rem: r });
     }
   });
+  // ── Sort groups to match optimized route order ───────────────
+  // Group 2: sort by appointment_date_time ascending.
+  // The scheduler assigns times sequentially in route order (8:30 → 9:00 → 9:30…),
+  // so sorting by datetime gives the exact optimized route order.
+  // When a patient gets "OK" and is removed, the remaining patients stay in order.
+  // Cross-day: earlier dates appear first (Aug 28 before Sep 3).
+  g2.sort((a, b) => {
+    const dtA = a['Appointment Date & Time'] || '';
+    const dtB = b['Appointment Date & Time'] || '';
+    return dtA.localeCompare(dtB);
+  });
+
+  // Group 1: sort by due_date ascending (most overdue / most urgent first),
+  // then alphabetically within the same date.
+  g1.sort((a, b) => {
+    const dA = a['Due Date'] || '9999';
+    const dB = b['Due Date'] || '9999';
+    if (dA !== dB) return dA.localeCompare(dB);
+    return (a['Patient Name'] || '').localeCompare(b['Patient Name'] || '');
+  });
+
   return { g1, g2 };
 }
 
@@ -11120,7 +11164,50 @@ function renderReminders() {
 
   if (g2.length) {
     html += `<div class="rem-group-title"><span>📅 Needs Confirmation Call</span><span class="rem-group-badge confirm">${g2.length}</span></div>`;
-    html += g2.map(p => renderCard(p, true)).join('');
+
+    // Group by appointment date so each day's patients are clustered with a date label.
+    // Within each day, patients are already sorted by time = route order.
+    let currentDay = null;
+    let routePos   = 0; // position counter across the whole list (for route # badge)
+    g2.forEach(p => {
+      routePos++;
+      const apptDT  = p['Appointment Date & Time'] || '';
+      const dayKey  = apptDT ? apptDT.split('T')[0] : 'unscheduled';
+      const today   = todayStr();
+
+      // Insert a date separator whenever the day changes
+      if (dayKey !== currentDay) {
+        currentDay = dayKey;
+        if (dayKey !== 'unscheduled') {
+          const dayDate  = new Date(dayKey + 'T12:00:00');
+          const isToday  = dayKey === today;
+          const dayLabel = isToday
+            ? 'Today — ' + dayDate.toLocaleDateString('en-CA', { weekday:'long', month:'long', day:'numeric' })
+            : dayDate.toLocaleDateString('en-CA', { weekday:'long', month:'long', day:'numeric' });
+          const dayPatients = g2.filter(q => (q['Appointment Date & Time'] || '').startsWith(dayKey));
+          html += `<div style="
+            display:flex;align-items:center;gap:8px;
+            padding:6px 10px;margin:6px 0 4px;
+            background:${isToday ? 'rgba(45,140,138,.12)' : 'rgba(0,0,0,.04)'};
+            border-left:3px solid ${isToday ? 'var(--teal)' : 'var(--text-3)'};
+            border-radius:6px">
+            <span style="font-size:10px;font-weight:800;color:${isToday ? 'var(--teal-dark)' : 'var(--text-2)'};text-transform:uppercase;letter-spacing:.5px">${dayLabel}</span>
+            <span style="font-size:9px;color:var(--text-3);margin-left:auto">${dayPatients.length} patient${dayPatients.length!==1?'s':''}</span>
+          </div>`;
+        }
+      }
+
+      // Add route-position badge to each card
+      const cardHtml = renderCard(p, true);
+      // Inject a small route-order badge into the card
+      html += cardHtml.replace(
+        'class="rem-card',
+        `data-route-pos="${routePos}" class="rem-card`
+      ).replace(
+        '<div class="rem-card-head">',
+        `<div class="rem-card-head"><span style="position:absolute;top:8px;right:8px;background:var(--navy);color:rgba(255,255,255,.7);font-size:9px;font-weight:800;border-radius:10px;padding:2px 6px;letter-spacing:.3px">#${routePos}</span>`
+      );
+    });
   }
   if (g1.length) {
     html += `<div class="rem-group-title"><span>📞 Needs Appointment</span><span class="rem-group-badge">${g1.length}</span></div>`;
@@ -11217,11 +11304,14 @@ async function confirmAccepted(fn) {
   const timeWin = calcTimeWindow(time);
   if (!timeWin) { showToast('Invalid time — use format 8:00 or 14:30', 'warn'); inp?.focus(); return; }
 
+  // Guard: prevent double-calls (debounce at 2s)
+  const guardKey = '_confirmGuard_' + fn;
+  if (window[guardKey] && Date.now() - window[guardKey] < 2000) return;
+  window[guardKey] = Date.now();
+
   const pat = patients.find(pt => String(pt['File Number']) === String(fn));
 
   // ── STEP 1: Mark as confirmed in reminder system IMMEDIATELY (sync) ──
-  // This must happen before any await so the UI updates correctly even
-  // if async calls fail.
   const rem = loadRem();
   rem[String(fn)] = { status:'confirmation_called', calledAt: Date.now(), timeWindow: timeWin,
                        apptDT: pat?.['Appointment Date & Time'] || '' };
@@ -11230,32 +11320,34 @@ async function confirmAccepted(fn) {
   // ── STEP 2: Update in-memory patient record (sync) ──
   if (pat) {
     pat['Appointment Confirmed']  = true;
-    pat['Injection Administered'] = false; // reset so patient shows in Today/Scheduled
+    pat['Injection Administered'] = false;
   }
 
-  // ── STEP 3: Re-render immediately — patient disappears from list ──
+  // ── STEP 3: Re-render reminders immediately ──
   renderReminders();
   updateReminderBadge();
-
-  // Close the accept form
   document.getElementById('accept-'+fn)?.classList.remove('open');
-
   showToast(`✅ ${pat?.['Patient Name'] || '#'+fn} confirmed — "${timeWin}" added to notes`, 'success');
 
   // ── STEP 4: Async background tasks (non-blocking) ──
-  // Save time window to quick note
+  // Save time window to quick note — prepend so it's always at the top
   try {
     const current = getQuickNote(fn) || '';
+    // Build the note: "08:30-10:30, OK" at the start, preserve existing note below
     const newNote = timeWin + (current ? '\n' + current : '');
-    _quickNotesCache[String(fn)] = newNote;           // update cache immediately
-    await _saveNoteDB(fn, newNote);                   // persist to Supabase
+    _quickNotesCache[String(fn)] = newNote;
+    await _saveNoteDB(fn, newNote);
+    // Update note badge on patient card if visible
+    const noteBtn = document.querySelector('.note-icon-btn[data-fnum="' + fn + '"]');
+    if (noteBtn) noteBtn.classList.add('has-note');
   } catch(e) { console.warn('Time window note save (non-fatal):', e.message); }
 
-  // Update appointment_confirmed + reset injection_administered in Supabase.
-  // injection_administered must be reset to false so the patient appears in
-  // Today/Scheduled tabs correctly — without this, a returning patient whose
-  // last injection was recorded (injection_administered=true) stays invisible
-  // even after a new appointment is confirmed for them.
+  // Suppress real-time listener for 3s so the Supabase update below does NOT
+  // trigger loadPatients() → syncRemindersFromSupabase() with stale data.
+  // Without this, the listener fires and can reset the reminder status back to
+  // pending (race condition → "double confirmation" bug).
+  _lastLocalUpdateTs = Date.now();
+
   try {
     const updateQ = pat?.id
       ? _sb.from('patients').update({
@@ -11267,9 +11359,13 @@ async function confirmAccepted(fn) {
           injection_administered: false
         }).eq('file_number', String(fn));
     await updateQ;
-    // Also update in-memory so filter picks it up immediately
     if (pat) pat['Injection Administered'] = false;
   } catch(e) { console.warn('Confirm Supabase update (non-fatal):', e.message); }
+
+  // ── STEP 5: Refresh patient list so patient appears in correct tab ──
+  // Without this, the patient stays in whatever tab they were in until
+  // the next manual refresh or real-time trigger.
+  if (typeof renderPatientList === 'function') renderPatientList();
 }
 
 function clearCalledReminders() {
