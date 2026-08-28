@@ -11094,7 +11094,9 @@ function renderReminders() {
       ? `<div class="rem-appt-time">🕐 ${apptTime} → ${calcTimeWindow(apptTime)}</div>` : '';
 
     const actionBtns = isGroup2 ? `
-      <button class="rem-btn rem-btn--accepted" onclick="openAcceptForm('${fn}')">✓ OK</button>
+      <button class="rem-btn rem-btn--accepted" onclick="openAcceptForm('${fn}')" title="${apptTime ? 'Confirm — will save '+calcTimeWindow(apptTime)+' to quick note' : 'Enter appointment time'}">
+        ${apptTime ? `✓ OK ${apptTime}` : '✓ OK'}
+      </button>
       <button class="rem-btn rem-btn--declined" onclick="markDeclined('${fn}')">✗ No</button>
       <button class="rem-btn rem-btn--snooze"   onclick="toggleSnooze('${fn}')">⏰</button>
       <button class="rem-btn rem-btn--view"     onclick="navigateToPin('${fn}')">👁</button>
@@ -11277,11 +11279,24 @@ function toggleSnooze(fn) {
 
 // ── Accept flow ───────────────────────────────────────────────
 function openAcceptForm(fn) {
+  // If the appointment time is already pre-filled by the scheduler,
+  // confirm directly — no second click needed.
+  // Only show the manual form if the time is missing or invalid.
+  const inp = document.getElementById('atime-'+fn);
+  const preFilledTime = (inp?.value || '').trim();
+  const preFilledWin  = preFilledTime ? calcTimeWindow(preFilledTime) : '';
+
+  if (preFilledWin) {
+    // Pre-filled time is valid → confirm directly, skip the form
+    confirmAccepted(fn);
+    return;
+  }
+
+  // No valid pre-filled time → open the manual entry form
   const form = document.getElementById('accept-'+fn);
   if (!form) return;
   form.classList.toggle('open');
   if (form.classList.contains('open')) {
-    const inp = document.getElementById('atime-'+fn);
     inp?.focus(); inp?.select();
     updateAcceptPreview(fn);
   }
