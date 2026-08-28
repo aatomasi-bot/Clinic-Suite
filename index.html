@@ -7874,7 +7874,17 @@ async function _saveNoteDB(fileNum, text) {
 }
 
 function getQuickNote(fileNum) {
-  return _quickNotesCache[String(fileNum)] || '';
+  const key = String(fileNum);
+  // Check in-memory cache first (fastest)
+  if (_quickNotesCache[key]) return _quickNotesCache[key];
+  // Fallback: read from localStorage in case the cache was not yet populated
+  // (e.g., note was just saved by confirmAccepted but cache was somehow reset)
+  try {
+    const ls = JSON.parse(localStorage.getItem('_qn') || '{}');
+    const lsNote = ls[key] || '';
+    if (lsNote) _quickNotesCache[key] = lsNote; // repopulate cache
+    return lsNote;
+  } catch(e) { return ''; }
 }
 function hasQuickNote(fileNum) {
   const n = _quickNotesCache[String(fileNum)]; return !!(n && n.trim());
@@ -7899,7 +7909,14 @@ function toggleNoteArea(fileNum) {
   if (!isOpen) {
     area.classList.add('open');
     const ta = area.querySelector('textarea');
-    if (ta) { ta.value = getQuickNote(fileNum); ta.focus(); }
+    if (ta) {
+      // Get from cache (with localStorage fallback). If textarea already has
+      // content (directly injected by confirmAccepted), prefer that over an
+      // empty cache read — but always prefer a non-empty cache/localStorage value.
+      const cached = getQuickNote(fileNum);
+      if (cached) ta.value = cached; // cache wins (most accurate)
+      ta.focus();
+    }
   }
 }
 
@@ -11378,9 +11395,18 @@ async function confirmAccepted(fn) {
   } catch(e) { console.warn('Confirm Supabase update (non-fatal):', e.message); }
 
   // ── STEP 5: Refresh patient list so patient appears in correct tab ──
-  // Without this, the patient stays in whatever tab they were in until
-  // the next manual refresh or real-time trigger.
   if (typeof renderPatientList === 'function') renderPatientList();
+
+  // ── STEP 6: Directly inject the note into the rendered textarea ──
+  // This is a belt-and-suspenders approach: even if getQuickNote() misses,
+  // the textarea will already contain the note from this direct DOM write.
+  // We do this AFTER renderPatientList so the fresh DOM element exists.
+  try {
+    const noteTA = document.querySelector(`#narea-${fn} textarea`);
+    if (noteTA) noteTA.value = timeWin;
+    const noteBtn2 = document.querySelector(`.note-icon-btn[data-fnum="${fn}"]`);
+    if (noteBtn2) noteBtn2.classList.add('has-note');
+  } catch(e) { /* non-fatal */ }
 }
 
 function clearCalledReminders() {
