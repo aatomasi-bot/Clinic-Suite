@@ -4553,7 +4553,7 @@ function renderCard(p, idx) {
     <textarea placeholder="Quick note for ${esc(_name)}…"
       oninput="onNoteInput('${esc(p['File Number']||'')}',this.value)"
       onblur="onNoteInput('${esc(p['File Number']||'')}',this.value)"
-    ></textarea>
+    >${esc(getQuickNote(p['File Number']))}</textarea>
     <div class="note-actions-row">
       <span class="note-char-count" id="note-cc-${esc(p['File Number']||'')}"></span>
       <button class="note-clear-btn" onclick="clearQuickNote('${esc(p['File Number']||'')}')">🗑 Clear</button>
@@ -7830,8 +7830,32 @@ function getAllInjectionRecords(p) {
 }
 
 // ══════════════════════════════════════════════
-//  QUICK NOTES
-// ══════════════════════════════════════════════
+// ── Pending notes: dedicated store for time windows saved by confirmAccepted ──
+// Stored on window (immune to any cache reset) AND localStorage.
+// getQuickNote checks this FIRST so the note is always found even if
+// _quickNotesCache or localStorage._qn is stale or empty.
+window._vapiqPendingNotes = window._vapiqPendingNotes || {};
+
+function _savePendingNote(fileNum, text) {
+  const key = String(fileNum);
+  window._vapiqPendingNotes[key] = text;
+  try {
+    const stored = JSON.parse(localStorage.getItem('_vapiq_pending') || '{}');
+    stored[key] = text;
+    localStorage.setItem('_vapiq_pending', JSON.stringify(stored));
+  } catch(e) {}
+}
+
+function _getPendingNote(fileNum) {
+  const key = String(fileNum);
+  if (window._vapiqPendingNotes[key]) return window._vapiqPendingNotes[key];
+  try {
+    const stored = JSON.parse(localStorage.getItem('_vapiq_pending') || '{}');
+    if (stored[key]) { window._vapiqPendingNotes[key] = stored[key]; return stored[key]; }
+  } catch(e) {}
+  return '';
+}
+
 let _quickNotesCache = {};  // fileNumber(string) → noteText
 
 async function loadQuickNotesFromDB() {
@@ -7875,16 +7899,20 @@ async function _saveNoteDB(fileNum, text) {
 
 function getQuickNote(fileNum) {
   const key = String(fileNum);
-  // Check in-memory cache first (fastest)
+  // Layer 1: Dedicated pending notes (set by confirmAccepted, immune to cache resets)
+  const pending = _getPendingNote(key);
+  if (pending) {
+    _quickNotesCache[key] = pending; // promote to main cache
+    return pending;
+  }
+  // Layer 2: In-memory cache
   if (_quickNotesCache[key]) return _quickNotesCache[key];
-  // Fallback: read from localStorage in case the cache was not yet populated
-  // (e.g., note was just saved by confirmAccepted but cache was somehow reset)
+  // Layer 3: localStorage main notes store
   try {
     const ls = JSON.parse(localStorage.getItem('_qn') || '{}');
-    const lsNote = ls[key] || '';
-    if (lsNote) _quickNotesCache[key] = lsNote; // repopulate cache
-    return lsNote;
-  } catch(e) { return ''; }
+    if (ls[key]) { _quickNotesCache[key] = ls[key]; return ls[key]; }
+  } catch(e) {}
+  return '';
 }
 function hasQuickNote(fileNum) {
   const n = _quickNotesCache[String(fileNum)]; return !!(n && n.trim());
@@ -11362,14 +11390,18 @@ async function confirmAccepted(fn) {
   showToast(`✅ ${pat?.['Patient Name'] || '#'+fn} confirmed — "${timeWin}" added to notes`, 'success');
 
   // ── STEP 4: Async background tasks (non-blocking) ──
-  // Save time window to quick note — prepend so it's always at the top
+  // Save time window to quick note — prepend so it's always at the top.
+  // Uses THREE storage layers to guarantee the note is never lost:
+  //   1. window._vapiqPendingNotes (immune to any cache reset)
+  //   2. _quickNotesCache (in-memory, read by renderCard at render time)
+  //   3. localStorage._qn (persists across tab switches)
+  //   4. Supabase quick_notes (persists across page reloads/devices)
   try {
     const current = getQuickNote(fn) || '';
-    // Build the note: "08:30-10:30, OK" at the start, preserve existing note below
-    const newNote = timeWin + (current ? '\n' + current : '');
-    _quickNotesCache[String(fn)] = newNote;
-    await _saveNoteDB(fn, newNote);
-    // Update note badge on patient card if visible
+    const newNote = timeWin + (current && !current.startsWith(timeWin) ? '\n' + current : '');
+    _savePendingNote(fn, newNote);          // Layer 1: dedicated pending store
+    _quickNotesCache[String(fn)] = newNote; // Layer 2: in-memory cache
+    await _saveNoteDB(fn, newNote);         // Layer 3+4: localStorage + Supabase
     const noteBtn = document.querySelector('.note-icon-btn[data-fnum="' + fn + '"]');
     if (noteBtn) noteBtn.classList.add('has-note');
   } catch(e) { console.warn('Time window note save (non-fatal):', e.message); }
