@@ -4553,7 +4553,7 @@ function renderCard(p, idx) {
     <textarea placeholder="Quick note for ${esc(_name)}…"
       oninput="onNoteInput('${esc(p['File Number']||'')}',this.value)"
       onblur="onNoteInput('${esc(p['File Number']||'')}',this.value)"
-    >${esc(p._confirmedNote || getQuickNote(p['File Number']))}</textarea>
+    >${esc(getQuickNote(p['File Number']) || p._confirmedNote || '')}</textarea>
     <div class="note-actions-row">
       <span class="note-char-count" id="note-cc-${esc(p['File Number']||'')}"></span>
       <button class="note-clear-btn" onclick="clearQuickNote('${esc(p['File Number']||'')}')">🗑 Clear</button>
@@ -7925,6 +7925,14 @@ function hasQuickNote(fileNum) {
 let _noteTimer = null;
 function onNoteInput(fileNum, val) {
   _quickNotesCache[String(fileNum)] = val;
+  // ── Critical: clear _confirmedNote when user edits the note ──────────
+  // Without this, every re-render (tab switch, refresh) reads _confirmedNote
+  // back onto the textarea, overriding whatever the user typed for their
+  // injection visit notes (site, NMR, adverse effects, etc.).
+  const _cpat = patients.find(pt => String(pt['File Number']) === String(fileNum));
+  if (_cpat?._confirmedNote) delete _cpat._confirmedNote;
+  // Also clear from pending notes so getQuickNote returns the user's edit
+  if (window._vapiqPendingNotes) delete window._vapiqPendingNotes[String(fileNum)];
   clearTimeout(_noteTimer);
   _noteTimer = setTimeout(() => _saveNoteDB(fileNum, val.trim()), 900);
   const btn = document.querySelector('.note-icon-btn[data-fnum="'+fileNum+'"]');
@@ -7944,7 +7952,7 @@ function toggleNoteArea(fileNum) {
     if (ta) {
       // Check patient object's _confirmedNote first (most reliable)
       const pat = patients.find(pt => String(pt['File Number']) === String(fileNum));
-      const note = pat?._confirmedNote || getQuickNote(fileNum);
+      const note = getQuickNote(fileNum) || pat?._confirmedNote || '';
       if (note) ta.value = note;
       ta.focus();
     }
@@ -7954,6 +7962,9 @@ function toggleNoteArea(fileNum) {
 async function clearQuickNote(fileNum) {
   try {
   _quickNotesCache[String(fileNum)] = '';
+  const _clpat = patients.find(pt => String(pt['File Number']) === String(fileNum));
+  if (_clpat) delete _clpat._confirmedNote;
+  if (window._vapiqPendingNotes) delete window._vapiqPendingNotes[String(fileNum)];
   await _saveNoteDB(fileNum, '');
   const ta = document.querySelector('#narea-'+fileNum+' textarea');
   if (ta) ta.value = '';
@@ -7974,6 +7985,9 @@ async function saveNoteAndClose(fileNum) {
   const ta = document.querySelector('#narea-'+fileNum+' textarea');
   const val = ta ? ta.value.trim() : '';
   _quickNotesCache[String(fileNum)] = val;
+  const _svpat = patients.find(pt => String(pt['File Number']) === String(fileNum));
+  if (_svpat) delete _svpat._confirmedNote;
+  if (window._vapiqPendingNotes) delete window._vapiqPendingNotes[String(fileNum)];
   await _saveNoteDB(fileNum, val);
   const area = document.getElementById('narea-'+fileNum);
   if (area) area.classList.remove('open');
