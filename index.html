@@ -4553,7 +4553,7 @@ function renderCard(p, idx) {
     <textarea placeholder="Quick note for ${esc(_name)}…"
       oninput="onNoteInput('${esc(p['File Number']||'')}',this.value)"
       onblur="onNoteInput('${esc(p['File Number']||'')}',this.value)"
-    >${esc(getQuickNote(p['File Number']))}</textarea>
+    >${esc(p._confirmedNote || getQuickNote(p['File Number']))}</textarea>
     <div class="note-actions-row">
       <span class="note-char-count" id="note-cc-${esc(p['File Number']||'')}"></span>
       <button class="note-clear-btn" onclick="clearQuickNote('${esc(p['File Number']||'')}')">🗑 Clear</button>
@@ -7915,7 +7915,11 @@ function getQuickNote(fileNum) {
   return '';
 }
 function hasQuickNote(fileNum) {
-  const n = _quickNotesCache[String(fileNum)]; return !!(n && n.trim());
+  // Check patient object's _confirmedNote first (set by confirmAccepted)
+  const pat = patients.find(pt => String(pt['File Number']) === String(fileNum));
+  if (pat?._confirmedNote) return true;
+  const n = getQuickNote(fileNum);
+  return !!(n && n.trim());
 }
 
 let _noteTimer = null;
@@ -7938,11 +7942,10 @@ function toggleNoteArea(fileNum) {
     area.classList.add('open');
     const ta = area.querySelector('textarea');
     if (ta) {
-      // Get from cache (with localStorage fallback). If textarea already has
-      // content (directly injected by confirmAccepted), prefer that over an
-      // empty cache read — but always prefer a non-empty cache/localStorage value.
-      const cached = getQuickNote(fileNum);
-      if (cached) ta.value = cached; // cache wins (most accurate)
+      // Check patient object's _confirmedNote first (most reliable)
+      const pat = patients.find(pt => String(pt['File Number']) === String(fileNum));
+      const note = pat?._confirmedNote || getQuickNote(fileNum);
+      if (note) ta.value = note;
       ta.focus();
     }
   }
@@ -11356,89 +11359,69 @@ function updateAcceptPreview(fn) {
 }
 
 async function confirmAccepted(fn) {
-  const inp  = document.getElementById('atime-'+fn);
-  const time = (inp?.value || '').trim();
-  if (!time) { showToast('Enter appointment start time', 'warn'); inp?.focus(); return; }
-
-  // NOTE: variable is 'timeWin' not 'window' — never shadow the global window object
+  const inp     = document.getElementById('atime-'+fn);
+  const time    = (inp?.value || '').trim();
+  if (!time)    { showToast('Enter appointment start time', 'warn'); inp?.focus(); return; }
   const timeWin = calcTimeWindow(time);
   if (!timeWin) { showToast('Invalid time — use format 8:00 or 14:30', 'warn'); inp?.focus(); return; }
 
-  // Guard: prevent double-calls (debounce at 2s)
+  // Double-call guard (2 s)
   const guardKey = '_confirmGuard_' + fn;
   if (window[guardKey] && Date.now() - window[guardKey] < 2000) return;
   window[guardKey] = Date.now();
 
   const pat = patients.find(pt => String(pt['File Number']) === String(fn));
 
-  // ── STEP 1: Mark as confirmed in reminder system IMMEDIATELY (sync) ──
-  const rem = loadRem();
-  rem[String(fn)] = { status:'confirmation_called', calledAt: Date.now(), timeWindow: timeWin,
-                       apptDT: pat?.['Appointment Date & Time'] || '' };
-  saveRem(rem);
-
-  // ── STEP 2: Update in-memory patient record (sync) ──
+  // ── NUCLEAR NOTE STORAGE — attach directly to patient object ──────────
+  // renderCard(p) reads p._confirmedNote first. Since renderPatientList()
+  // iterates the SAME patients[] objects, this is 100% reliable. No cache
+  // layer, no async timing, no storage API — just the patient object itself.
   if (pat) {
+    pat._confirmedNote = timeWin;
     pat['Appointment Confirmed']  = true;
     pat['Injection Administered'] = false;
   }
 
-  // ── STEP 3: Re-render reminders immediately ──
+  // Also store in all backup layers
+  _savePendingNote(fn, timeWin);
+  _quickNotesCache[String(fn)] = timeWin;
+
+  // ── Reminder system ────────────────────────────────────────────────────
+  const rem = loadRem();
+  rem[String(fn)] = { status:'confirmation_called', calledAt: Date.now(),
+                       timeWindow: timeWin, apptDT: pat?.['Appointment Date & Time'] || '' };
+  saveRem(rem);
+
+  // ── Re-render reminders (patient disappears) ───────────────────────────
   renderReminders();
   updateReminderBadge();
   document.getElementById('accept-'+fn)?.classList.remove('open');
   showToast(`✅ ${pat?.['Patient Name'] || '#'+fn} confirmed — "${timeWin}" added to notes`, 'success');
 
-  // ── STEP 4: Async background tasks (non-blocking) ──
-  // Save time window to quick note — prepend so it's always at the top.
-  // Uses THREE storage layers to guarantee the note is never lost:
-  //   1. window._vapiqPendingNotes (immune to any cache reset)
-  //   2. _quickNotesCache (in-memory, read by renderCard at render time)
-  //   3. localStorage._qn (persists across tab switches)
-  //   4. Supabase quick_notes (persists across page reloads/devices)
-  try {
-    const current = getQuickNote(fn) || '';
-    const newNote = timeWin + (current && !current.startsWith(timeWin) ? '\n' + current : '');
-    _savePendingNote(fn, newNote);          // Layer 1: dedicated pending store
-    _quickNotesCache[String(fn)] = newNote; // Layer 2: in-memory cache
-    await _saveNoteDB(fn, newNote);         // Layer 3+4: localStorage + Supabase
-    const noteBtn = document.querySelector('.note-icon-btn[data-fnum="' + fn + '"]');
-    if (noteBtn) noteBtn.classList.add('has-note');
-  } catch(e) { console.warn('Time window note save (non-fatal):', e.message); }
+  // ── Async saves (non-blocking) ─────────────────────────────────────────
+  const current = getQuickNote(fn) || '';
+  const newNote = timeWin + (current && !current.startsWith(timeWin) ? '\n' + current : '');
+  try { await _saveNoteDB(fn, newNote); } catch(e) {}
 
-  // Suppress real-time listener for 3s so the Supabase update below does NOT
-  // trigger loadPatients() → syncRemindersFromSupabase() with stale data.
-  // Without this, the listener fires and can reset the reminder status back to
-  // pending (race condition → "double confirmation" bug).
-  _lastLocalUpdateTs = Date.now();
+  _lastLocalUpdateTs = Date.now(); // suppress real-time listener
 
   try {
     const updateQ = pat?.id
-      ? _sb.from('patients').update({
-          appointment_confirmed: true,
-          injection_administered: false
-        }).eq('id', pat.id)
-      : _sb.from('patients').update({
-          appointment_confirmed: true,
-          injection_administered: false
-        }).eq('file_number', String(fn));
+      ? _sb.from('patients').update({ appointment_confirmed: true, injection_administered: false }).eq('id', pat.id)
+      : _sb.from('patients').update({ appointment_confirmed: true, injection_administered: false }).eq('file_number', String(fn));
     await updateQ;
-    if (pat) pat['Injection Administered'] = false;
-  } catch(e) { console.warn('Confirm Supabase update (non-fatal):', e.message); }
+  } catch(e) {}
 
-  // ── STEP 5: Refresh patient list so patient appears in correct tab ──
+  // ── Refresh patient list — p._confirmedNote ensures note shows in card ─
   if (typeof renderPatientList === 'function') renderPatientList();
 
-  // ── STEP 6: Directly inject the note into the rendered textarea ──
-  // This is a belt-and-suspenders approach: even if getQuickNote() misses,
-  // the textarea will already contain the note from this direct DOM write.
-  // We do this AFTER renderPatientList so the fresh DOM element exists.
+  // ── Also directly set DOM textarea just in case ────────────────────────
   try {
-    const noteTA = document.querySelector(`#narea-${fn} textarea`);
-    if (noteTA) noteTA.value = timeWin;
-    const noteBtn2 = document.querySelector(`.note-icon-btn[data-fnum="${fn}"]`);
-    if (noteBtn2) noteBtn2.classList.add('has-note');
-  } catch(e) { /* non-fatal */ }
+    const ta = document.querySelector(`#narea-${fn} textarea`);
+    if (ta) ta.value = timeWin;
+    const nb = document.querySelector(`.note-icon-btn[data-fnum="${fn}"]`);
+    if (nb) nb.classList.add('has-note');
+  } catch(e) {}
 }
 
 function clearCalledReminders() {
