@@ -4334,6 +4334,29 @@ function isPinned(fileNum) { return loadPins().includes(String(fileNum)); }
 
 function renderPatientList() {
   const el = document.getElementById('mainContent');
+
+  // ── Preserve open note areas before re-render ─────────────────────
+  // When the real-time listener fires (e.g. another device updates the
+  // patients table), renderPatientList rebuilds the entire DOM. Any open
+  // note textarea — including one the user is actively typing in — gets
+  // destroyed. This causes the cross-device "note gets stuck" bug: the
+  // user's typing is wiped and the old cached value reappears.
+  // Fix: snapshot all open note areas before the rebuild, restore after.
+  const openNoteState = {};
+  document.querySelectorAll('.quick-note-area.open').forEach(area => {
+    const fn = area.id.replace('narea-', '');
+    const ta = area.querySelector('textarea');
+    if (fn && ta) {
+      openNoteState[fn] = ta.value;
+      // Also update cache immediately so the restored value is correct
+      if (ta.value !== getQuickNote(fn)) {
+        _quickNotesCache[fn] = ta.value;
+        // Save to localStorage right now (don't wait for the 900ms debounce)
+        try { localStorage.setItem('_qn', JSON.stringify(_quickNotesCache)); } catch(e) {}
+      }
+    }
+  });
+
   const filtered = getFilteredPatients();
 
   // ── Empty state (unchanged) ──
@@ -4447,6 +4470,32 @@ function renderPatientList() {
   // ── Render first batch into DOM ──
   el.innerHTML = '';
   _vsRenderBatch(el); // _handleCardClick listener stays on el permanently
+
+  // ── Restore open note areas ────────────────────────────────────────
+  // After re-render, reopen any note areas that were open before and
+  // restore the user's current content (including unsaved typing).
+  // This is the fix for the cross-device "note gets stuck" bug:
+  // when another device updates the patients table, the real-time
+  // listener re-renders all cards — without this restore, the user's
+  // typing is wiped and the old Supabase value reappears.
+  if (Object.keys(openNoteState).length > 0) {
+    // Use a small rAF to let the virtual scroll first batch render
+    requestAnimationFrame(() => {
+      Object.entries(openNoteState).forEach(([fn, savedValue]) => {
+        const area = document.getElementById('narea-' + fn);
+        if (area) {
+          area.classList.add('open');
+          const ta = area.querySelector('textarea');
+          if (ta) {
+            ta.value = savedValue;
+            // Update char count display
+            const cc = document.getElementById('note-cc-' + fn);
+            if (cc) cc.textContent = savedValue.length + ' chars';
+          }
+        }
+      });
+    });
+  }
 }
 
 function renderCard(p, idx) {
@@ -7925,14 +7974,16 @@ function hasQuickNote(fileNum) {
 let _noteTimer = null;
 function onNoteInput(fileNum, val) {
   _quickNotesCache[String(fileNum)] = val;
-  // ── Critical: clear _confirmedNote when user edits the note ──────────
-  // Without this, every re-render (tab switch, refresh) reads _confirmedNote
-  // back onto the textarea, overriding whatever the user typed for their
-  // injection visit notes (site, NMR, adverse effects, etc.).
+  // ── Save to localStorage IMMEDIATELY (not just after 900ms debounce) ──
+  // If a re-render fires during typing (e.g. real-time listener from another
+  // device), renderCard reads from getQuickNote() which checks localStorage.
+  // Without this immediate save, the old value would be restored on re-render.
+  try { localStorage.setItem('_qn', JSON.stringify(_quickNotesCache)); } catch(e) {}
+  // ── Clear _confirmedNote when user edits the note ────────────────────
   const _cpat = patients.find(pt => String(pt['File Number']) === String(fileNum));
   if (_cpat?._confirmedNote) delete _cpat._confirmedNote;
-  // Also clear from pending notes so getQuickNote returns the user's edit
   if (window._vapiqPendingNotes) delete window._vapiqPendingNotes[String(fileNum)];
+  // Debounce the Supabase save (expensive, network call)
   clearTimeout(_noteTimer);
   _noteTimer = setTimeout(() => _saveNoteDB(fileNum, val.trim()), 900);
   const btn = document.querySelector('.note-icon-btn[data-fnum="'+fileNum+'"]');
