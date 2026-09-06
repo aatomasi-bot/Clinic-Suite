@@ -7895,6 +7895,23 @@ function _savePendingNote(fileNum, text) {
   } catch(e) {}
 }
 
+// ── Clear ALL pending note storage for a patient ────────────────────
+// Must clear BOTH window object AND localStorage._vapiq_pending.
+// Clearing only the window object is not enough — _getPendingNote would
+// re-read localStorage and restore the stale confirmed time, causing the
+// "note gets stuck" bug on the next getQuickNote() call.
+function _clearPendingNote(fileNum) {
+  const key = String(fileNum);
+  if (window._vapiqPendingNotes) delete window._vapiqPendingNotes[key];
+  try {
+    const stored = JSON.parse(localStorage.getItem('_vapiq_pending') || '{}');
+    if (stored[key] !== undefined) {
+      delete stored[key];
+      localStorage.setItem('_vapiq_pending', JSON.stringify(stored));
+    }
+  } catch(e) {}
+}
+
 function _getPendingNote(fileNum) {
   const key = String(fileNum);
   if (window._vapiqPendingNotes[key]) return window._vapiqPendingNotes[key];
@@ -7926,6 +7943,18 @@ async function loadQuickNotesFromDB() {
     allRows.forEach(r => { if (r.note_text) _quickNotesCache[String(r.file_number)] = r.note_text; });
     // Persist merged result back to localStorage
     try { localStorage.setItem('_qn', JSON.stringify(_quickNotesCache)); } catch(e) {}
+    // ── Step 3: Clear stale pending notes ────────────────────────────
+    // Any patient that now has a Supabase value has an authoritative note.
+    // Clear their entry from _vapiq_pending so old confirmed times don't
+    // override the real saved note on the next getQuickNote() call.
+    try {
+      const pending = JSON.parse(localStorage.getItem('_vapiq_pending') || '{}');
+      const toDelete = Object.keys(pending).filter(k => _quickNotesCache[k]);
+      if (toDelete.length > 0) {
+        toDelete.forEach(k => { delete pending[k]; if (window._vapiqPendingNotes) delete window._vapiqPendingNotes[k]; });
+        localStorage.setItem('_vapiq_pending', JSON.stringify(pending));
+      }
+    } catch(e) {}
   } catch(e) {
     // Supabase unavailable — already loaded from localStorage above, nothing to do
   }
@@ -7948,19 +7977,22 @@ async function _saveNoteDB(fileNum, text) {
 
 function getQuickNote(fileNum) {
   const key = String(fileNum);
-  // Layer 1: Dedicated pending notes (set by confirmAccepted, immune to cache resets)
-  const pending = _getPendingNote(key);
-  if (pending) {
-    _quickNotesCache[key] = pending; // promote to main cache
-    return pending;
-  }
-  // Layer 2: In-memory cache
+  // ── Priority: cache > localStorage > pending ──────────────────────
+  // CRITICAL ORDER: In-memory cache must be checked FIRST.
+  // If we checked pending notes first, a stale localStorage._vapiq_pending
+  // entry (set by confirmAccepted) would overwrite the user's saved edit
+  // every time getQuickNote is called — even after the user saves their note.
+  // Layer 1: In-memory cache (updated immediately by onNoteInput and at login)
   if (_quickNotesCache[key]) return _quickNotesCache[key];
-  // Layer 3: localStorage main notes store
+  // Layer 2: localStorage main notes (_qn) — set by _saveNoteDB
   try {
     const ls = JSON.parse(localStorage.getItem('_qn') || '{}');
     if (ls[key]) { _quickNotesCache[key] = ls[key]; return ls[key]; }
   } catch(e) {}
+  // Layer 3: Pending notes — ONLY if no saved note exists yet
+  // (covers the window between confirmAccepted and the user's first render)
+  const pending = _getPendingNote(key);
+  if (pending) { _quickNotesCache[key] = pending; return pending; }
   return '';
 }
 function hasQuickNote(fileNum) {
@@ -7982,7 +8014,7 @@ function onNoteInput(fileNum, val) {
   // ── Clear _confirmedNote when user edits the note ────────────────────
   const _cpat = patients.find(pt => String(pt['File Number']) === String(fileNum));
   if (_cpat?._confirmedNote) delete _cpat._confirmedNote;
-  if (window._vapiqPendingNotes) delete window._vapiqPendingNotes[String(fileNum)];
+  _clearPendingNote(fileNum);  // clears BOTH window AND localStorage._vapiq_pending
   // Debounce the Supabase save (expensive, network call)
   clearTimeout(_noteTimer);
   _noteTimer = setTimeout(() => _saveNoteDB(fileNum, val.trim()), 900);
@@ -8015,7 +8047,7 @@ async function clearQuickNote(fileNum) {
   _quickNotesCache[String(fileNum)] = '';
   const _clpat = patients.find(pt => String(pt['File Number']) === String(fileNum));
   if (_clpat) delete _clpat._confirmedNote;
-  if (window._vapiqPendingNotes) delete window._vapiqPendingNotes[String(fileNum)];
+  _clearPendingNote(fileNum);
   await _saveNoteDB(fileNum, '');
   const ta = document.querySelector('#narea-'+fileNum+' textarea');
   if (ta) ta.value = '';
@@ -8038,7 +8070,7 @@ async function saveNoteAndClose(fileNum) {
   _quickNotesCache[String(fileNum)] = val;
   const _svpat = patients.find(pt => String(pt['File Number']) === String(fileNum));
   if (_svpat) delete _svpat._confirmedNote;
-  if (window._vapiqPendingNotes) delete window._vapiqPendingNotes[String(fileNum)];
+  _clearPendingNote(fileNum);
   await _saveNoteDB(fileNum, val);
   const area = document.getElementById('narea-'+fileNum);
   if (area) area.classList.remove('open');
