@@ -514,6 +514,70 @@ input, select, textarea { font: inherit; }
   box-shadow: var(--shadow-md);
   transform: translateY(-1px);
 }
+/* ══ NMR / ZERO DOSES — card gradient indicator ═══════════════
+   Applied when doses_remaining = 0. Replaces the old Pending tab.
+   Removed automatically when extra doses are added. */
+.patient-card--nmr {
+  background: linear-gradient(135deg, rgba(220,38,38,.07) 0%, #fff 45%) !important;
+  border-color: rgba(220,38,38,.35) !important;
+  border-left-color: #DC2626 !important;
+  box-shadow: 0 2px 12px rgba(220,38,38,.1), 0 1px 4px rgba(0,0,0,.06) !important;
+}
+[data-theme="dark"] .patient-card--nmr {
+  background: linear-gradient(135deg, rgba(220,38,38,.12) 0%, var(--card) 50%) !important;
+  border-color: rgba(220,38,38,.4) !important;
+}
+.card-nmr-banner {
+  display: flex; align-items: center; gap: 6px;
+  margin-top: 7px; padding: 5px 10px;
+  background: linear-gradient(90deg, rgba(220,38,38,.1) 0%, rgba(220,38,38,.03) 100%);
+  border: 1px solid rgba(220,38,38,.28); border-left: 3px solid #DC2626;
+  border-radius: 6px; font-size: 11px; font-weight: 700; color: #B91C1C;
+}
+[data-theme="dark"] .card-nmr-banner { background:rgba(220,38,38,.12); border-color:rgba(220,38,38,.35); color:#FCA5A5; }
+.card-nmr-badge { margin-left:auto; font-size:9px; font-weight:800; background:#DC2626; color:#fff; padding:2px 7px; border-radius:12px; flex-shrink:0; }
+   Applied when doses_remaining = 0. Replaces the old Pending tab.
+   Removed automatically when extra doses are added to the record. */
+.patient-card--nmr {
+  background: linear-gradient(135deg, rgba(220,38,38,.07) 0%, #fff 45%) !important;
+  border-color: rgba(220,38,38,.35) !important;
+  border-left-color: #DC2626 !important;
+  box-shadow: 0 2px 12px rgba(220,38,38,.1), 0 1px 4px rgba(0,0,0,.06) !important;
+}
+[data-theme="dark"] .patient-card--nmr {
+  background: linear-gradient(135deg, rgba(220,38,38,.12) 0%, var(--card) 50%) !important;
+  border-color: rgba(220,38,38,.4) !important;
+}
+.card-nmr-banner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 7px;
+  padding: 5px 10px;
+  background: linear-gradient(90deg, rgba(220,38,38,.1) 0%, rgba(220,38,38,.03) 100%);
+  border: 1px solid rgba(220,38,38,.28);
+  border-left: 3px solid #DC2626;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #B91C1C;
+}
+[data-theme="dark"] .card-nmr-banner {
+  background: rgba(220,38,38,.12);
+  border-color: rgba(220,38,38,.35);
+  color: #FCA5A5;
+}
+.card-nmr-badge {
+  margin-left: auto;
+  font-size: 9px;
+  font-weight: 800;
+  background: #DC2626;
+  color: #fff;
+  padding: 2px 7px;
+  border-radius: 12px;
+  letter-spacing: .3px;
+  flex-shrink: 0;
+}
 @keyframes cardIn {
   from { opacity: 0.6; transform: translateY(6px); }
   to   { opacity: 1;   transform: translateY(0);   }
@@ -2872,7 +2936,6 @@ a:focus:not(:focus-visible) { outline: none; }
     <button class="tab-btn" data-tab="scheduled">Scheduled <span class="tab-count" id="cnt-scheduled">0</span></button>
     <button class="tab-btn" data-tab="all">All Active <span class="tab-count" id="cnt-all">0</span></button>
     <button class="tab-btn" data-tab="overdue">Overdue <span class="tab-count" id="cnt-overdue">0</span></button>
-    <button class="tab-btn" data-tab="pending">Pending <span class="tab-count" id="cnt-pending">0</span></button>
     <button class="tab-btn" data-tab="archived">Archived <span class="tab-count" id="cnt-archived">0</span></button>
     <button class="tab-btn" data-tab="cpp">CPP <span class="tab-count" id="cnt-cpp">0</span></button>
   </div>
@@ -4150,22 +4213,20 @@ function avatarColor(name) {
 // ========== FILTERING ==========
 function getDueCounts() {
   const today = todayStr();
-  const counts = { today:0, scheduled:0, all:0, overdue:0, pending:0, archived:0, cpp:0 };
+  // 'pending' key removed — patients with doses=0 now counted in 'all'
+  const counts = { today:0, scheduled:0, all:0, overdue:0, archived:0, cpp:0 };
   patients.forEach(p => {
     if (p['Archived']) { counts.archived++; return; }
-    if (p['Pending']) { counts.pending++; }
     if (p['CPP Patient']) counts.cpp++;
-    if (p['Pending']) return;
     const apptDate  = p['Appointment Date & Time'] ? p['Appointment Date & Time'].split('T')[0] : null;
-    const confirmed = !!(p['Appointment Confirmed'] && apptDate); // requires BOTH flag AND date
+    const confirmed = !!(p['Appointment Confirmed'] && apptDate);
     const isToday   = apptDate === today;
     const isFuture  = apptDate && apptDate > today;
     const overdue   = apptDate && apptDate < today && confirmed && !p['Injection Administered'];
-    if (isToday && confirmed && p['Injection Administered']) counts.administered++;
-    else if (isToday && confirmed) counts.today++;
+    if (isToday && confirmed && !p['Injection Administered']) counts.today++;
     else if (isFuture && confirmed) counts.scheduled++;
     else if (overdue) counts.overdue++;
-    else counts.all++;
+    else counts.all++; // includes Pending (zero doses) patients
   });
   return counts;
 }
@@ -4223,8 +4284,9 @@ function getFilteredPatients() {
     if (currentTab === 'archived') return false;
 
     if (currentTab === 'cpp') return !!p['CPP Patient'];
-    if (p['Pending']) return currentTab === 'pending';
-    if (currentTab === 'pending') return false;
+    // NOTE: Pending patients (doses_remaining=0) are NO LONGER routed to a
+    // separate tab. They stay in their natural tab (All Active, Today, etc.)
+    // and are visually distinguished by the NMR gradient card style.
 
     const apptDate  = p['Appointment Date & Time'] ? p['Appointment Date & Time'].split('T')[0] : null;
     const confirmed = !!(p['Appointment Confirmed'] && apptDate);
@@ -4523,9 +4585,11 @@ function renderCard(p, idx) {
   const special = (p['Special Instructions'] || '').trim();
   // Determine gradient class based on patient status
   let cardClass = '';
+  // isNMR = true when doses_remaining = 0 (regardless of Pending flag)
+  const isNMR = left === 0 && !p['Archived'];
   if (p['Archived'])                         cardClass = 'patient-card--archived';
-  else if (p['Pending'])                     cardClass = 'patient-card--pending';
-  else if (apptDate === today && confirmed)  cardClass = 'patient-card--today';   // today appointment always wins
+  else if (isNMR)                            cardClass = 'patient-card--nmr';
+  else if (apptDate === today && confirmed)  cardClass = 'patient-card--today';
   else if (apptDate && apptDate > today && confirmed) cardClass = 'patient-card--scheduled';
   else if (currentTab === 'all')             cardClass = 'patient-card--all';
   const cppClass  = p['CPP Patient'] ? 'patient-card--cpp' : '';
@@ -4543,12 +4607,12 @@ function renderCard(p, idx) {
     </svg>
   </button>` : '';
 
-  // Watermark colour matches the card's avatar gradient tint
+  // Watermark: red for NMR cards, otherwise gradient tint
   const wmColors = {
     teal:'var(--teal)', orange:'var(--orange)', navy:'var(--navy)',
     purple:'#7B68B6', green:'var(--green)',
   };
-  const wmColor = wmColors[color] || 'var(--teal)';
+  const wmColor = isNMR ? '#DC2626' : (wmColors[color] || 'var(--teal)');
 
   return `
 <div class="patient-card ${cardClass} ${cppClass}" data-id="${p.id}">
@@ -4577,6 +4641,10 @@ function renderCard(p, idx) {
         ${special ? `<div class="card-flag-strip">
           <span class="card-flag-icon">⚑</span>
           <span>${esc(special.length>80?special.substring(0,78)+'\u2026':special)}</span>
+        </div>` : ''}
+        ${isNMR ? `<div class="card-nmr-banner">
+          <span>🔴</span><span>NO MORE REPEATS — all doses completed</span>
+          <span class="card-nmr-badge">0 doses</span>
         </div>` : ''}
       </div>
     </div>
@@ -10994,7 +11062,7 @@ function navigateToPin(fn) {
   const conf     = !!(p['Appointment Confirmed'] && apptDate);
   let tab = 'all';
   if      (p['Archived'])                                 tab = 'archived';
-  else if (p['Pending'])                                  tab = 'pending';
+  else if (p['Pending'])                                  tab = 'all'; // NMR/zero-dose patients now in All Active
   // Appointment-based routing takes priority over injection_administered.
   // A patient with a new confirmed appointment must go to today/scheduled
   // even if injection_administered=true from a previous cycle.
