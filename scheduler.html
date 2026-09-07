@@ -647,7 +647,9 @@ async function reload(){
   if(lb){lb.textContent='Loading…';lb.disabled=true;}
   try{
     const{data,error}=await _sb.from('patients').select('*')
-      .eq('archived',false).eq('pending',false);
+      .eq('archived',false);
+    // Note: .eq('pending',false) removed — NMR patients (doses=0, pending=true)
+    // should appear in the scheduler so their visits can be planned and routed.
     if(error)throw error;
     allPats=data||[];
 
@@ -1950,7 +1952,8 @@ async function optimizeRoutes(){
 
   try{
     if(!allPats.length){
-      const{data}=await _sb.from('patients').select('*').eq('archived',false).eq('pending',false);
+      const{data}=await _sb.from('patients').select('*').eq('archived',false);
+      // pending=false filter removed — NMR patients are schedulable
       allPats=data||[];
     }
     await prog(1,'Classifying by zone & circuit…',20);
