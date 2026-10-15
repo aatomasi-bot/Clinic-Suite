@@ -91,6 +91,10 @@ body.arming .page{cursor:crosshair; outline:2px dashed var(--accent); outline-of
 .it img{width:100%; height:100%; display:block; pointer-events:none}
 .it svg{width:100%; height:100%; overflow:visible; pointer-events:none}
 .it.text{white-space:pre; line-height:1.2; font-family:Arial,Helvetica,sans-serif; padding:0}
+.it.slot{border:2px dashed var(--accent); background:rgba(45,140,138,.10); border-radius:6px; display:grid; place-items:center; cursor:pointer}
+.it.slot{overflow:hidden}
+.it.slot span{font-family:'DM Sans',sans-serif; font-weight:600; color:var(--accent-dark); white-space:nowrap; pointer-events:none; display:flex; gap:.4em; align-items:center}
+.it.slot span svg{width:1.2em; height:1.2em; flex:none}
 .it .h{position:absolute; right:-17px; bottom:-17px; width:26px; height:26px; border-radius:50%;
   background:var(--accent); border:3px solid #fff; box-shadow:var(--shadow); display:none; cursor:nwse-resize}
 .it.sel .h{display:block}
@@ -333,7 +337,12 @@ en:{share:'Share', emptyTitle:'Scan, fill & sign', emptySub:'Open the vendor’s
   sigTitle:'Clean the signature', sigSub:'Move the slider until only the ink remains', threshold:'Ink strength', useOnce:'Place on document', saveStamp:'Save to my stamps',
   loading:'Opening…', rendering:'Processing…', restored:'Your last document was restored', libFail:'Could not load the PDF engine. Connect to the internet once so the app can cache it.',
   openFail:'Could not open this file', noPages:'Add pages first', deleted:'Deleted', undone:'Undone', rename:'Document name', stampSaved:'Saved to my stamps',
-  placed:'Drag to move · pull the round handle to resize', pdfBuildFail:'Could not create the PDF', onlyLast:'A document needs at least one page'},
+  placed:'Drag to move · pull the round handle to resize', pdfBuildFail:'Could not create the PDF', onlyLast:'A document needs at least one page',
+  templates:'Form layouts', templatesSub:'Reuse positions on forms that repeat', saveTpl:'Save this layout', saveTplSub:'Text, dates, checks and signature boxes are remembered for this form',
+  tplName:'Layout name', tplSaved:'Layout saved', noTpl:'No saved layouts yet. Place your text, date, checks and the patient signature on a form, then save the layout.',
+  useTpl:'Same form as before?', useTplMsg:'Place the saved text, date, checks and signature box automatically:', noThanks:'No thanks', applied:'Layout applied — tap the dashed box to collect the signature',
+  deleteTpl:'Delete this layout?', builtIn:'Built-in', slotSign:'Patient signs here', slotIni:'Initials here', addSlot:'Signature box', addSlotSub:'Mark where the patient will sign',
+  slotsLeft:'signature box(es) still empty — they will not appear in the PDF.', addDate:'+ Date', apply:'Apply'},
 fr:{share:'Partager', emptyTitle:'Numériser, remplir et signer', emptySub:'Ouvrez le PDF ou la photo du fournisseur, faites signer le patient, ajoutez texte et dates, puis renvoyez-le.',
   scanDoc:'Numériser un document', scanDocSub:'Avec l’appareil photo — recadrage et nettoyage auto', openFile:'Ouvrir un PDF ou une image', openFileSub:'Depuis Fichiers, iCloud, Téléchargements…',
   privacy:'Tout reste sur cet appareil. Rien n’est téléversé.', tapPlace:'Touchez la page à l’endroit voulu', cancel:'Annuler',
@@ -361,7 +370,12 @@ fr:{share:'Partager', emptyTitle:'Numériser, remplir et signer', emptySub:'Ouvr
   sigTitle:'Nettoyer la signature', sigSub:'Ajustez le curseur pour ne garder que l’encre', threshold:'Intensité de l’encre', useOnce:'Placer sur le document', saveStamp:'Enregistrer dans mes tampons',
   loading:'Ouverture…', rendering:'Traitement…', restored:'Votre dernier document a été restauré', libFail:'Impossible de charger le moteur PDF. Connectez-vous à Internet une fois pour que l’app le mette en cache.',
   openFail:'Impossible d’ouvrir ce fichier', noPages:'Ajoutez d’abord des pages', deleted:'Supprimé', undone:'Annulé', rename:'Nom du document', stampSaved:'Enregistré dans mes tampons',
-  placed:'Glissez pour déplacer · tirez la poignée ronde pour redimensionner', pdfBuildFail:'Impossible de créer le PDF', onlyLast:'Un document doit avoir au moins une page'}
+  placed:'Glissez pour déplacer · tirez la poignée ronde pour redimensionner', pdfBuildFail:'Impossible de créer le PDF', onlyLast:'Un document doit avoir au moins une page',
+  templates:'Gabarits de formulaires', templatesSub:'Réutiliser les positions sur les formulaires répétitifs', saveTpl:'Enregistrer cette disposition', saveTplSub:'Texte, dates, crochets et zones de signature sont mémorisés pour ce formulaire',
+  tplName:'Nom du gabarit', tplSaved:'Gabarit enregistré', noTpl:'Aucun gabarit. Placez votre texte, la date, les crochets et la signature du patient sur un formulaire, puis enregistrez la disposition.',
+  useTpl:'Même formulaire que d’habitude ?', useTplMsg:'Placer automatiquement le texte, la date, les crochets et la zone de signature enregistrés :', noThanks:'Non merci', applied:'Gabarit appliqué — touchez la zone pointillée pour faire signer',
+  deleteTpl:'Supprimer ce gabarit ?', builtIn:'Intégré', slotSign:'Le patient signe ici', slotIni:'Initiales ici', addSlot:'Zone de signature', addSlotSub:'Indiquer où le patient signera',
+  slotsLeft:'zone(s) de signature encore vide(s) — elles n’apparaîtront pas dans le PDF.', addDate:'+ Date', apply:'Appliquer'}
 };
 let LANG = (()=>{ try{ const v = JSON.parse(localStorage.getItem('vsign_lang')); if(v) return v; }catch(e){}
   return /^fr/i.test(navigator.language||'') ? 'fr' : 'en'; })();
@@ -463,6 +477,8 @@ function disp(p){ // displayed size in points, plus total rotation
 }
 function inkAspectH(it, p){ const ink = S.inks[it.ink]; const d = disp(p); return it.w * (ink.h/ink.w) * (d.w/d.h); }
 function squareH(it, p){ const d = disp(p); return it.w * d.w/d.h; }
+function slotH(it, p){ const d = disp(p); return it.w * it.ar * d.w/d.h; } // ar = height/width in points
+function boxH(it, p){ return it.type==='ink' ? inkAspectH(it,p) : it.type==='slot' ? slotH(it,p) : squareH(it,p); }
 
 /* ───────────── PDF engine ───────────── */
 let libsOK = !!(window.pdfjsLib && window.PDFLib);
@@ -525,6 +541,7 @@ async function openFiles(files){
     }
   } finally { busy(false); }
   afterPagesChanged(firstNew);
+  if(firstNew===0) suggestTemplate();
 }
 async function addPdf(buf){
   const id = uid(); S.sources[id] = {bytes:buf};
@@ -656,6 +673,7 @@ function itemEl(it){
   const e = h('div',{class:'it '+it.type + (R.sel===it.id?' sel':'')}); e.dataset.id = it.id;
   if(it.type==='text'){ e.textContent = it.text; e.style.color = INK[it.color]; }
   else if(it.type==='ink'){ const im = h('img',{alt:''}); e.append(im); inkURL(it.ink, it.color).then(u=>im.src=u); }
+  else if(it.type==='slot') e.append(h('span',{html: ICON.pen.replace(/20/g,'14') + (it.kind==='initials' ? t('slotIni') : t('slotSign'))}));
   else e.innerHTML = shapeSVG(it.type, it.color);
   e.append(h('div',{class:'h'}));
   return e;
@@ -670,8 +688,9 @@ function layoutItems(pid){
       e.style.fontSize = (it.s*pw)+'px';
       it.w = e.offsetWidth/pw; it.h = e.offsetHeight/ph;
     } else {
-      it.h = it.type==='ink' ? inkAspectH(it,p) : squareH(it,p);
+      it.h = boxH(it,p);
       e.style.width = (it.w*100)+'%'; e.style.height = (it.h*100)+'%';
+      if(it.type==='slot') e.style.fontSize = clamp(Math.min(it.h*ph*0.42, it.w*pw/11), 6, 14)+'px';
     }
   });
 }
@@ -709,6 +728,7 @@ function wirePage(el){
     const up = ()=>{
       ie.removeEventListener('pointermove', move); ie.removeEventListener('pointerup', up); ie.removeEventListener('pointercancel', up);
       if(st.moved){ R.undo.push(st.snap); $('#undoBtn').disabled=false; persist(); }
+      else if(it.type==='slot' && !handle) fillSlot(it);
     };
     ie.addEventListener('pointermove', move); ie.addEventListener('pointerup', up); ie.addEventListener('pointercancel', up);
   });
@@ -731,6 +751,8 @@ function buildSelbar(){
   bar.append(h('button',{title:t('bigger'), onclick:()=>scaleItem(it, 1.12)}, 'A+'));
   bar.append(h('span',{class:'sep'}));
   if(it.type==='text') bar.append(h('button',{onclick:async()=>{ const v = await textPrompt(t('enterText'), it.text); if(v){ snapshot(); it.text=v; rerenderItem(it); persist(); } }}, t('edit')));
+  if(it.type==='ink') bar.append(h('button',{onclick:()=>{ const p = pageById(it.page), d = disp(p);
+    placeText(fmtDate(), it.page, it.x, it.y + it.h + (0.6*10+3)/d.h, 10, true); }}, t('addDate')));
   bar.append(h('button',{onclick:()=>{ snapshot(); const c = {...it, id:uid(), x:it.x+0.03, y:it.y+0.03}; S.items.push(c); renderLayer(it.page); select(c.id); persist(); }}, t('copy')));
   bar.append(h('button',{class:'del', title:t('del'), onclick:()=>{ snapshot(); S.items = S.items.filter(i=>i!==it); renderLayer(it.page); select(null); persist(); }}, icon('trash')));
   bar.hidden = false;
@@ -755,9 +777,118 @@ function disarm(){
   R.armed = null; document.body.classList.remove('arming'); $('#armBanner').hidden = true;
   document.querySelectorAll('.tool').forEach(b=>b.classList.remove('on'));
 }
-function placeText(text, pid, fx, fy, sizePt=11){
+function placeText(text, pid, fx, fy, sizePt=11, isDate=false){
   const d = disp(pageById(pid)); const s = sizePt/d.w;
-  addItem({id:uid(), page:pid, type:'text', text, s, color:settings.color, x:fx, y:fy - (0.6*sizePt)/d.h, w:0, h:0});
+  addItem({id:uid(), page:pid, type:'text', text, s, color:settings.color, x:fx, y:fy - (0.6*sizePt)/d.h, w:0, h:0, date:isDate||undefined});
+}
+function placeSlot(kind, pid, fx, fy){
+  const p = pageById(pid), d = disp(p); const wPt = kind==='initials' ? 60 : 170;
+  const it = {id:uid(), page:pid, type:'slot', kind, w:wPt/d.w, ar: kind==='initials' ? 0.5 : 0.28, x:0, y:0};
+  it.h = slotH(it,p); it.x = fx - it.w/2; it.y = fy - it.h/2; addItem(it);
+}
+async function fillSlot(slot){
+  // Hand the phone to the patient, then drop the signature into the dashed box.
+  const ink = await capturePad(slot.kind, true); if(!ink) return;
+  const p = pageById(slot.page), d = disp(p);
+  const id = addInk(ink); S.sigs.push({ink:id, kind:slot.kind});
+  const boxW = slot.w*d.w, boxH = slot.h*d.h, a = ink.h/ink.w;
+  const wPt = Math.min(boxW, boxH*1.4/a); // signatures may rise a little above a thin box
+  const it = {id:uid(), page:slot.page, type:'ink', ink:id, color:settings.color, w:wPt/d.w, x:0, y:0};
+  it.h = inkAspectH(it,p); it.x = slot.x + (slot.w-it.w)/2; it.y = slot.y + slot.h - it.h*0.85;
+  snapshot(); S.items = S.items.filter(i=>i!==slot); S.items.push(it); renderLayer(slot.page); select(it.id); persist();
+}
+
+/* ───────────── form layouts (templates) ───────────── */
+// Built-in layout measured from the Medicum "Eligard Home Injection Program" enrollment form.
+const BUILTIN_TPLS = [{
+  id:'builtin-eligard', builtin:true, name:'Eligard — Home Injection enrollment', keywords:['eligard','home injection program'],
+  pages:1, aspect:[0.7829],
+  items:[
+    {page:0, type:'slot', kind:'sign', x:0.682, y:0.468, w:0.272, ar:0.17},
+    {page:0, type:'check', x:0.737, y:0.5095, w:0.0185, color:'black'}
+  ]
+}];
+const allTemplates = () => [...LS.get('vsign_templates', []), ...BUILTIN_TPLS];
+function docShape(){ return {pages:S.pages.length, aspect:S.pages.map(p=>{ const d = disp(p); return +(d.w/d.h).toFixed(4); })}; }
+async function docText(){
+  // Searchable text of page 1 (for recognising known forms); empty for scans/images.
+  const p = S.pages[0]; let txt = (S.name||'');
+  if(p && p.kind==='pdf'){ try{ const pg = await (await pdfDoc(p.src)).getPage(p.index+1);
+    txt += ' ' + (await pg.getTextContent()).items.map(i=>i.str).join(' '); }catch(e){} }
+  return txt.toLowerCase();
+}
+async function matchingTemplates(){
+  const sh = docShape(), txt = await docText(); const out = [];
+  for(const tp of allTemplates()){
+    const kw = (tp.keywords||[]).some(k=>txt.includes(k));
+    const shape = tp.pages===sh.pages && tp.aspect.every((a,i)=>Math.abs(a - sh.aspect[i])/a < 0.035);
+    if(kw || shape) out.push({tp, score:(kw?2:0)+(shape?1:0)});
+  }
+  return out.sort((a,b)=>b.score-a.score).map(m=>m.tp);
+}
+async function suggestTemplate(){
+  if(!S.pages.length || S.items.length) return;
+  const list = await matchingTemplates(); if(!list.length) return;
+  const body = h('div',{class:'list'});
+  const pick = await new Promise(res=>{
+    for(const tp of list) body.append(li('grid', tp.name, tp.builtin ? t('builtIn') : '', ()=>{ close(tp); }));
+    const bd = h('div',{class:'bd center'}), box = h('div',{class:'dlg'}, h('h3',{}, t('useTpl')), h('p',{}, t('useTplMsg')), body,
+      h('div',{class:'row'}, h('button',{class:'btn', onclick:()=>close(null)}, t('noThanks'))));
+    const close = v=>{ bd.remove(); res(v); };
+    bd.append(box); document.body.append(bd);
+  });
+  if(pick) applyTemplate(pick);
+}
+function applyTemplate(tp){
+  snapshot();
+  for(const ti of tp.items){
+    const p = S.pages[ti.page]; if(!p) continue;
+    const it = {...ti, id:uid(), page:p.id, color: ti.color || settings.color};
+    if(ti.type==='text' && ti.date) it.text = fmtDate();
+    if(ti.type==='ink'){ it.ink = addInk({url:ti.url, w:ti.iw, h:ti.ih}); delete it.url; delete it.iw; delete it.ih; }
+    it.h = it.type==='text' ? 0 : boxH(it, p);
+    S.items.push(it);
+  }
+  for(const p of S.pages) renderLayer(p.id);
+  select(null); persist(); toast(t('applied'), 3500);
+}
+async function saveTemplate(){
+  if(!S.items.length) return toast(t('noTpl'), 4500);
+  const inp = h('input',{type:'text', value: (S.name||'').replace(/_signed$/,'')});
+  const name = await dialog({title:t('tplName'), body:inp, buttons:[{label:t('cancel'),value:null},{label:t('save'),pri:true,onClick:()=>inp.value.trim()}]});
+  if(!name) return;
+  const patientInks = new Map(S.sigs.map(s=>[s.ink, s.kind]));
+  const items = [];
+  for(const it of S.items){
+    const page = S.pages.findIndex(p=>p.id===it.page); if(page<0) continue;
+    const p = S.pages[page], d = disp(p);
+    const base = {page, type:it.type, x:it.x, y:it.y, w:it.w, color:it.color};
+    if(it.type==='text') items.push({...base, s:it.s, text: it.date ? '' : it.text, date:it.date});
+    else if(it.type==='ink' && patientInks.has(it.ink)) // a patient's signature becomes an empty box for next time
+      items.push({...base, type:'slot', kind:patientInks.get(it.ink), ar:(it.h*d.h)/(it.w*d.w)});
+    else if(it.type==='ink'){ const ink = S.inks[it.ink]; items.push({...base, url:ink.url, iw:ink.w, ih:ink.h}); }
+    else if(it.type==='slot') items.push({...base, kind:it.kind, ar:it.ar});
+    else items.push(base);
+  }
+  const all = LS.get('vsign_templates', []); all.unshift({id:uid(), name, ...docShape(), items}); LS.set('vsign_templates', all);
+  toast(t('tplSaved'));
+}
+function templatesSheet(){
+  sheet(t('templates'), (b, close)=>{
+    b.append(h('div',{class:'list'}, li('grid', t('saveTpl'), t('saveTplSub'), ()=>{ close(); saveTemplate(); })));
+    b.append(h('div',{style:'height:14px'}));
+    const user = LS.get('vsign_templates', []);
+    if(!user.length) b.append(h('p',{style:'margin:0 2px 10px;color:var(--text-2);font-size:13px;line-height:1.45'}, t('noTpl')));
+    const list = h('div',{class:'list'});
+    for(const tp of allTemplates()){
+      const del = tp.builtin ? null : h('span',{class:'ibtn', style:'color:var(--danger)', onclick:async e=>{ e.stopPropagation();
+        if(await dialog({title:t('deleteTpl'), msg:tp.name, buttons:[{label:t('cancel'),value:false},{label:t('del'),value:true,danger:true}]})){
+          LS.set('vsign_templates', LS.get('vsign_templates',[]).filter(x=>x.id!==tp.id)); close(); templatesSheet(); } }}, icon('trash'));
+      list.append(li('file', tp.name, `${tp.builtin ? t('builtIn')+' · ' : ''}${tp.pages} ${tp.pages>1?t('pages'):t('page')}`,
+        ()=>{ if(!S.pages.length) return toast(t('noPages')); close(); applyTemplate(tp); }, del));
+    }
+    b.append(list);
+  });
 }
 function placeInk(inkId, pid, fx, fy, widthPt){
   const p = pageById(pid), d = disp(p); const w = Math.min(0.8, widthPt/d.w);
@@ -823,7 +954,8 @@ function patientSheet(){
   sheet(t('tPatient'), (b, close)=>{
     b.append(h('div',{class:'list'},
       li('pen', t('patientSig'), t('patientSub'), async()=>{ close(); const ink = await capturePad('sign', true); if(ink) usePatientInk(ink, 'sign'); }),
-      li('ini', t('patientIni'), t('patientSub'), async()=>{ close(); const ink = await capturePad('initials', true); if(ink) usePatientInk(ink, 'initials'); })
+      li('ini', t('patientIni'), t('patientSub'), async()=>{ close(); const ink = await capturePad('initials', true); if(ink) usePatientInk(ink, 'initials'); }),
+      li('grid', t('addSlot'), t('addSlotSub'), ()=>{ close(); arm((pid,fx,fy)=>placeSlot('sign',pid,fx,fy), 'patient'); })
     ));
     if(S.sigs.length){
       b.append(h('div',{class:'sec'}, t('signedThisDoc')));
@@ -881,6 +1013,7 @@ function menuSheet(){
       li('camera', t('scanPages'), null, ()=>{ const p = pickFile('image/*',{capture:true}); close(); scanFlow(p); }),
       li('file', t('openPages'), null, ()=>{ const p = pickFile('application/pdf,image/*',{multiple:true}); close(); p.then(openFiles); }),
       S.pages.length ? li('grid', t('organize'), t('organizeSub'), ()=>{ close(); organizeSheet(); }) : null,
+      li('file', t('templates'), t('templatesSub'), ()=>{ close(); templatesSheet(); }),
     ));
     b.append(h('div',{class:'sec'}, t('dateFmt')), seg);
     b.append(h('div',{style:'height:14px'}));
@@ -943,7 +1076,7 @@ function rotatePage(p){
     const cx = it.x + it.w/2, cy = it.y + it.h/2;
     const ncx = 1 - cy, ncy = cx;
     if(it.type==='text'){ it.s = it.s*before.w/after.w; it.w = it.w*before.w/after.w; it.h = it.h*before.h/after.h; }
-    else { it.w = it.w*before.w/after.w; it.h = it.type==='ink' ? inkAspectH(it,p) : squareH(it,p); }
+    else { it.w = it.w*before.w/after.w; it.h = boxH(it,p); }
     it.x = ncx - it.w/2; it.y = ncy - it.h/2;
   }
 }
@@ -1265,7 +1398,7 @@ async function buildPdf(){
       case 180: return [x0 + W - fx*W, y0 + fy*H];
       case 270: return [x0 + W - fy*W, y0 + H - fx*H];
       default:  return [x0 + fx*W,     y0 + H - fy*H]; } };
-    for(const it of S.items.filter(i=>i.page===p.id)){
+    for(const it of S.items.filter(i=>i.page===p.id && i.type!=='slot')){
       const color = hexRgb(it.color);
       if(it.type==='text'){
         const size = it.s*dw;
@@ -1302,6 +1435,8 @@ function shareSheet(){
     const pvB = h('button',{class:'btn', style:'flex:1', disabled:true}, t('preview'));
     b.append(h('div',{class:'sec', style:'margin-top:4px'}, t('fileName')), name, status, shareB,
       h('div',{style:'display:flex; gap:8px; margin-top:8px'}, dlB, pvB),
+      S.items.some(i=>i.type==='slot') ? h('p',{style:'margin:12px 2px 0; color:var(--danger); font-size:13px; font-weight:600'},
+        `⚠ ${S.items.filter(i=>i.type==='slot').length} ${t('slotsLeft')}`) : '',
       h('p',{style:'margin:12px 2px 6px; color:var(--text-2); font-size:13px; line-height:1.45'}, t('shareHint')),
       h('button',{class:'btn danger wide', style:'margin-top:6px', onclick:()=>{ close(); closeDocument(); }}, t('finish')));
     let bytes = null;
@@ -1328,7 +1463,7 @@ $('#tools').addEventListener('click', e=>{
   switch(tool){
     case 'add': return addPagesSheet();
     case 'text': return arm(async (pid,fx,fy)=>{ const v = await textPrompt(t('enterText')); if(v) placeText(v,pid,fx,fy); }, 'text');
-    case 'date': return arm((pid,fx,fy)=>placeText(fmtDate(),pid,fx,fy), 'date');
+    case 'date': return arm((pid,fx,fy)=>placeText(fmtDate(),pid,fx,fy,11,true), 'date');
     case 'check': return arm((pid,fx,fy)=>placeShape('check',pid,fx,fy), 'check');
     case 'cross': return arm((pid,fx,fy)=>placeShape('cross',pid,fx,fy), 'cross');
     case 'patient': return patientSheet();

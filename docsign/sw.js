@@ -1,5 +1,5 @@
 /* VaPiq Sign service worker — offline app shell + cached PDF libraries. */
-const VERSION = 'vapiq-sign-v1';
+const VERSION = 'vapiq-sign-v2';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 const LIBS = [
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
