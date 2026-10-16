@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="referrer" content="no-referrer">
 <meta http-equiv="Content-Security-Policy"
   content="default-src 'self';
@@ -57,7 +57,8 @@
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
 html,body{margin:0; height:100%; background:var(--bg); color:var(--text);
   font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; font-size:15px;}
-body{display:flex; flex-direction:column; height:100dvh; overflow:hidden; overscroll-behavior:none}
+body{display:flex; flex-direction:column; height:100dvh; overflow:hidden; overscroll-behavior:none; touch-action:pan-x pan-y}
+.pages{transform-origin:0 0}
 button{font:inherit; color:inherit; background:none; border:0; cursor:pointer; padding:0}
 button:disabled{opacity:.35; cursor:default}
 svg{display:block}
@@ -1197,8 +1198,12 @@ function capturePad(mode, patient){
       $('#padCancel').textContent = tt('cancel'); $('#padClear').textContent = tt('clear'); $('#padDone').textContent = tt('done');
       $('#padLang').textContent = lang==='fr' ? 'EN' : 'FR';
     };
+    let cssW = 1, cssH = 1; // drawing surface size in CSS px
     const size = ()=>{ const r = area.getBoundingClientRect(), dpr = window.devicePixelRatio||1;
-      cv.width = Math.round(r.width*dpr); cv.height = Math.round(r.height*dpr); ctx.setTransform(dpr,0,0,dpr,0,0); redraw(); };
+      cssW = Math.max(1, r.width); cssH = Math.max(1, r.height);
+      cv.width = Math.round(cssW*dpr); cv.height = Math.round(cssH*dpr); ctx.setTransform(dpr,0,0,dpr,0,0); redraw(); };
+    // The pad changes size after rotation settles (not always with a 'resize' event): follow the area itself.
+    const ro = new ResizeObserver(()=>size());
     const path = (c, pts, lw, color)=>{
       c.strokeStyle = color; c.fillStyle = color; c.lineWidth = lw; c.lineCap='round'; c.lineJoin='round';
       if(pts.length===1){ c.beginPath(); c.arc(pts[0][0], pts[0][1], lw/2, 0, 7); c.fill(); return; }
@@ -1207,7 +1212,8 @@ function capturePad(mode, patient){
       const l = pts[pts.length-1]; c.lineTo(l[0], l[1]); c.stroke();
     };
     function redraw(){ raf = 0; ctx.clearRect(0,0,cv.width,cv.height); for(const s of strokes) path(ctx, s, LW, '#111'); }
-    const pos = e=>{ const r = cv.getBoundingClientRect(); return [e.clientX-r.left, e.clientY-r.top]; };
+    // Map the finger onto the drawing surface even if the canvas is momentarily stretched.
+    const pos = e=>{ const r = cv.getBoundingClientRect(); return [(e.clientX-r.left)*cssW/r.width, (e.clientY-r.top)*cssH/r.height]; };
     const down = e=>{ e.preventDefault(); cv.setPointerCapture(e.pointerId); cur = [pos(e)]; strokes.push(cur); if(!raf) raf=requestAnimationFrame(redraw); };
     const move = e=>{ if(!cur) return; e.preventDefault();
       const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e]; for(const ev of (evs.length?evs:[e])) cur.push(pos(ev));
@@ -1215,11 +1221,11 @@ function capturePad(mode, patient){
     const up = ()=>{ cur = null; };
     const finish = v=>{
       pad.hidden = true; cv.removeEventListener('pointerdown',down); cv.removeEventListener('pointermove',move);
-      cv.removeEventListener('pointerup',up); cv.removeEventListener('pointercancel',up); window.removeEventListener('resize', size);
+      cv.removeEventListener('pointerup',up); cv.removeEventListener('pointercancel',up); window.removeEventListener('resize', size); ro.disconnect();
       $('#padCancel').onclick = $('#padClear').onclick = $('#padDone').onclick = $('#padLang').onclick = null; resolve(v);
     };
     cv.addEventListener('pointerdown',down); cv.addEventListener('pointermove',move); cv.addEventListener('pointerup',up); cv.addEventListener('pointercancel',up);
-    window.addEventListener('resize', size);
+    window.addEventListener('resize', size); ro.observe(area);
     $('#padCancel').onclick = ()=>finish(null);
     $('#padClear').onclick = ()=>{ strokes = []; redraw(); };
     $('#padLang').onclick = ()=>{ lang = lang==='fr'?'en':'fr'; texts(); };
@@ -1585,13 +1591,44 @@ $('#docName').onclick = async()=>{ if(!S.pages.length) return;
   const inp = h('input',{type:'text', value:S.name||''});
   const v = await dialog({title:t('rename'), body:inp, buttons:[{label:t('cancel'),value:null},{label:t('save'),pri:true,onClick:()=>inp.value.trim()}]});
   if(v){ S.name = v; updateTitle(); persist(); } };
-const ZOOMS = [1, 1.5, 2, 3];
-function setZoom(dir){
-  const i = ZOOMS.indexOf(R.zoom); const ni = clamp(i+dir, 0, ZOOMS.length-1); if(ni===i) return;
-  const v = $('#viewer'); const fy = v.scrollTop/(v.scrollHeight||1), fx = (v.scrollLeft + v.clientWidth/2)/(v.scrollWidth||1);
-  R.zoom = ZOOMS[ni]; relayout();
-  v.scrollTop = fy*v.scrollHeight; v.scrollLeft = fx*v.scrollWidth - v.clientWidth/2;
+const ZOOMS = [1, 1.5, 2, 3], ZOOM_MAX = 4;
+function zoomTo(z, fx, fy){ // fx/fy: focal point in viewer coordinates (stays under the fingers)
+  const v = $('#viewer'); z = clamp(z, 1, ZOOM_MAX); if(Math.abs(z - R.zoom) < 0.01) return;
+  if(fx == null){ fx = v.clientWidth/2; fy = v.clientHeight/2; }
+  const k = z / R.zoom, sl = v.scrollLeft, st = v.scrollTop;
+  R.zoom = z; relayout();
+  v.scrollLeft = (sl + fx)*k - fx; v.scrollTop = (st + fy)*k - fy;
 }
+function setZoom(dir){
+  const next = dir > 0 ? ZOOMS.find(z=>z > R.zoom + 0.01) || ZOOM_MAX : [...ZOOMS].reverse().find(z=>z < R.zoom - 0.01) || 1;
+  zoomTo(next);
+}
+// Pinch-to-zoom inside the document only (the page itself never zooms, so the toolbar stays fixed).
+// iOS ignores user-scalable=no, so its native gesture is cancelled here too.
+['gesturestart','gesturechange','gestureend'].forEach(t=>document.addEventListener(t, e=>e.preventDefault(), {passive:false}));
+(function(){
+  const v = $('#viewer'), host = $('#pages'); let pz = null;
+  const dist = t => Math.hypot(t[0].clientX-t[1].clientX, t[0].clientY-t[1].clientY);
+  v.addEventListener('touchstart', e=>{
+    if(e.touches.length !== 2 || !S.pages.length) return;
+    const r = v.getBoundingClientRect();
+    const cx = (e.touches[0].clientX + e.touches[1].clientX)/2 - r.left, cy = (e.touches[0].clientY + e.touches[1].clientY)/2 - r.top;
+    pz = {d: dist(e.touches), z: R.zoom, cx, cy, s: 1};
+    host.style.transformOrigin = `${cx + v.scrollLeft}px ${cy + v.scrollTop}px`;
+  }, {passive:true});
+  document.addEventListener('touchmove', e=>{
+    if(e.touches.length < 2) return;
+    e.preventDefault();                                  // never let the browser zoom the page
+    if(!pz) return;
+    pz.s = clamp(dist(e.touches)/pz.d, 1/pz.z, ZOOM_MAX/pz.z);
+    host.style.transform = `scale(${pz.s})`;             // live preview; re-rendered sharply on release
+  }, {passive:false});
+  const end = ()=>{ if(!pz) return; const o = pz; pz = null;
+    host.style.transform = ''; host.style.transformOrigin = '';
+    zoomTo(o.z*o.s, o.cx, o.cy); };
+  v.addEventListener('touchend', e=>{ if(e.touches.length < 2) end(); });
+  v.addEventListener('touchcancel', end);
+})();
 $('#zoomIn').onclick = ()=>setZoom(1); $('#zoomOut').onclick = ()=>setZoom(-1);
 // iOS fires 'resize' whenever the toolbar slides in/out while scrolling; only a width change
 // (rotation, split view) needs the pages laid out again.
