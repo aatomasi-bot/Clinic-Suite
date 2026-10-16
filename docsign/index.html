@@ -140,6 +140,10 @@ body.arming .page{cursor:crosshair; outline:2px dashed var(--accent); outline-of
 .sw{width:24px; height:24px; border-radius:50%; border:3px solid var(--card); box-shadow:0 0 0 1.5px var(--border)}
 .selbar button.cur .sw{box-shadow:0 0 0 2.5px var(--accent)}
 .selbar .del{color:var(--danger)}
+.selbar .grp{display:flex; flex-direction:column; align-items:center; flex:none}
+.selbar .grp small{font-size:9px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--text-3); line-height:1; margin-top:2px}
+.selbar .grp-b{display:flex}
+.selbar .grp-b button{height:34px}
 
 /* toast */
 .toast{position:fixed; left:50%; bottom:calc(140px + var(--sab)); transform:translateX(-50%); z-index:200;
@@ -328,7 +332,7 @@ en:{share:'Share', emptyTitle:'Scan, fill & sign', emptySub:'Open the vendor’s
   myStamps:'My stamps', myStampsSub:'Saved on this phone. Tap one to place it.', addMySig:'Draw my signature', addMyIni:'Draw my initials',
   sigPhoto:'Signature from photo', sigPhotoSub:'Photograph a signature on paper', addTextStamp:'Text stamp', addTextStampSub:'Name, title, licence #…',
   noStamps:'No stamps yet.', mySig:'My signature', myIni:'My initials', stampText:'Stamp text', deleteStamp:'Delete this stamp?', del:'Delete',
-  enterText:'Enter text', ok:'OK', save:'Save', edit:'Edit', copy:'Copy', smaller:'Smaller', bigger:'Bigger', thinner:'Thinner stroke', thicker:'Thicker stroke',
+  enterText:'Enter text', ok:'OK', save:'Save', edit:'Edit', copy:'Copy', smaller:'Smaller', bigger:'Bigger', thinner:'Thinner stroke', thicker:'Thicker stroke', size:'Size', stroke:'Stroke',
   addOrReplace:'You already have a document open', addOrReplaceMsg:'Add the new pages to it, or start a new document?', addToDoc:'Add pages', replaceDoc:'New document',
   closeConfirm:'Close this document?', closeConfirmMsg:'Unsaved changes are lost. Share or download it first if you need it.', close:'Close',
   shareTitle:'Share or save', fileName:'File name', preparing:'Preparing PDF…', shareNow:'Share…', download:'Download', preview:'Preview',
@@ -364,7 +368,7 @@ fr:{share:'Partager', emptyTitle:'Numériser, remplir et signer', emptySub:'Ouvr
   myStamps:'Mes tampons', myStampsSub:'Enregistrés sur ce téléphone. Touchez pour placer.', addMySig:'Dessiner ma signature', addMyIni:'Dessiner mes initiales',
   sigPhoto:'Signature à partir d’une photo', sigPhotoSub:'Photographiez une signature sur papier', addTextStamp:'Tampon texte', addTextStampSub:'Nom, titre, n° de permis…',
   noStamps:'Aucun tampon pour l’instant.', mySig:'Ma signature', myIni:'Mes initiales', stampText:'Texte du tampon', deleteStamp:'Supprimer ce tampon ?', del:'Supprimer',
-  enterText:'Saisir le texte', ok:'OK', save:'Enregistrer', edit:'Modifier', copy:'Copier', smaller:'Plus petit', bigger:'Plus grand', thinner:'Trait plus fin', thicker:'Trait plus épais',
+  enterText:'Saisir le texte', ok:'OK', save:'Enregistrer', edit:'Modifier', copy:'Copier', smaller:'Plus petit', bigger:'Plus grand', thinner:'Trait plus fin', thicker:'Trait plus épais', size:'Taille', stroke:'Trait',
   addOrReplace:'Un document est déjà ouvert', addOrReplaceMsg:'Ajouter les nouvelles pages à ce document, ou commencer un nouveau document ?', addToDoc:'Ajouter les pages', replaceDoc:'Nouveau document',
   closeConfirm:'Fermer ce document ?', closeConfirmMsg:'Les modifications seront perdues. Partagez-le ou téléchargez-le d’abord au besoin.', close:'Fermer',
   shareTitle:'Partager ou enregistrer', fileName:'Nom du fichier', preparing:'Préparation du PDF…', shareNow:'Partager…', download:'Télécharger', preview:'Aperçu',
@@ -586,20 +590,27 @@ function afterPagesChanged(scrollToIndex){
 }
 
 /* ───────────── viewer ───────────── */
+let rzT, lastVW = 0; // viewer width at the last layout (see the resize handler)
+// Draw pages as they come near the screen; free their memory only once they are far away,
+// so small viewport changes (iOS toolbar, rotation) don't throw pages away and redraw them.
 const observer = new IntersectionObserver(entries=>{
-  for(const e of entries){ const el = e.target; el._visible = e.isIntersecting; if(e.isIntersecting) renderPage(el); else releasePage(el); }
-}, {root: document.getElementById('viewer'), rootMargin:'800px 0px'});
+  for(const e of entries){ const el = e.target; el._visible = e.isIntersecting; if(e.isIntersecting) renderPage(el); }
+}, {root: document.getElementById('viewer'), rootMargin:'300px 0px'});
+const releaser = new IntersectionObserver(entries=>{
+  for(const e of entries) if(!e.isIntersecting) releasePage(e.target);
+}, {root: document.getElementById('viewer'), rootMargin:'2000px 0px'});
 
 function pageCssWidth(){ const v = $('#viewer'); return Math.round(Math.min(v.clientWidth - 24, 900) * R.zoom); }
 function buildViewer(){
-  const host = $('#pages'); observer.disconnect(); host.innerHTML = ''; R.pageEls.clear();
+  const host = $('#pages'); observer.disconnect(); releaser.disconnect();
+  lastVW = $('#viewer').clientWidth; host.innerHTML = ''; R.pageEls.clear();
   $('#empty').hidden = !!S.pages.length; $('#zoomCtl').hidden = !S.pages.length;
   $('#shareBtn').disabled = !S.pages.length;
   document.querySelectorAll('.tool').forEach(b=>{ if(!['add','stamps'].includes(b.dataset.tool)) b.disabled = !S.pages.length; });
   S.pages.forEach((p, i)=>{
     const el = h('div',{class:'page'}, h('canvas'), h('div',{class:'layer'}), h('span',{class:'pnum'}, `${i+1} / ${S.pages.length}`));
     el._pid = p.id; R.pageEls.set(p.id, el); host.append(el);
-    sizePage(el, p); wirePage(el); observer.observe(el); renderLayer(p.id);
+    sizePage(el, p); wirePage(el); observer.observe(el); releaser.observe(el); renderLayer(p.id);
   });
 }
 function sizePage(el, p){
@@ -609,13 +620,23 @@ function sizePage(el, p){
 function relayout(){
   for(const p of S.pages){ const el = R.pageEls.get(p.id); if(!el) continue; sizePage(el, p); el._rw = 0; if(el._visible) renderPage(el); layoutItems(p.id); }
 }
-async function renderPage(el){
+// Pages render one at a time (phones choke on several big canvases at once),
+// and the canvas is capped at ~4 megapixels.
+let renderChain = Promise.resolve();
+function renderPage(el){
+  if(el._queued) return; el._queued = true;
+  renderChain = renderChain.then(()=>{ el._queued = false; return el._visible && el.isConnected ? drawPage(el) : null; }).catch(()=>{});
+}
+async function drawPage(el){
   const p = pageById(el._pid); if(!p) return;
-  const cssW = el.clientWidth; const dpr = Math.min(window.devicePixelRatio||1, 2.5);
-  const pxW = Math.round(Math.min(cssW*dpr, 2400));
+  const d = disp(p);
+  const cssW = el.clientWidth; const dpr = Math.min(window.devicePixelRatio||1, 2);
+  let pxW = Math.min(cssW*dpr, 1800);
+  const MAXPX = 4.2e6; if(pxW*pxW*d.h/d.w > MAXPX) pxW = Math.sqrt(MAXPX*d.w/d.h);
+  pxW = Math.round(pxW);
   if(el._rw === pxW) return;
   el._rw = pxW;
-  const d = disp(p); const pxH = Math.round(pxW*d.h/d.w);
+  const pxH = Math.round(pxW*d.h/d.w);
   const cv = h('canvas'); cv.width = pxW; cv.height = pxH; const ctx = cv.getContext('2d');
   ctx.fillStyle = '#fff'; ctx.fillRect(0,0,pxW,pxH);
   try{
@@ -652,7 +673,7 @@ function inkMask(id){
 const WEIGHT_MIN = -2, WEIGHT_MAX = 4; // stroke thickness steps (0 = as drawn)
 function thickenMask(c, weight){
   // Grow (weight>0) or shrink (weight<0) the ink by a min/max filter on the alpha channel.
-  const r = Math.abs(weight) * Math.max(1, Math.round(c.width/700)); if(!r) return;
+  const r = Math.abs(weight) * Math.max(1, Math.round(c.width/450)); if(!r) return;
   const W = c.width, H = c.height, x = c.getContext('2d'), im = x.getImageData(0,0,W,H), d = im.data;
   let a = new Uint8ClampedArray(W*H); for(let i=0;i<W*H;i++) a[i] = d[i*4+3];
   const pick = weight > 0 ? Math.max : Math.min;
@@ -777,14 +798,18 @@ function buildSelbar(){
     bar.append(h('button',{class: it.color===c?'cur':'', title:c, onclick:()=>{ snapshot(); it.color=c; settings.color=c; saveSettings(); rerenderItem(it); buildSelbar(); persist(); }},
       h('span',{class:'sw', style:`background:${INK[c]}`})));
   bar.append(h('span',{class:'sep'}));
+  const grp = (label, ...btns) => h('div',{class:'grp'}, h('small',{}, label), h('div',{class:'grp-b'}, ...btns));
+  const ic = d => h('span',{html:`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">${d}</svg>`});
+  bar.append(grp(t('size'),
+    h('button',{title:t('smaller'), onclick:()=>scaleItem(it, 1/1.12)}, ic('<path d="M6 12h12"/>')),
+    h('button',{title:t('bigger'), onclick:()=>scaleItem(it, 1.12)}, ic('<path d="M6 12h12M12 6v12"/>'))));
   if(['ink','check','cross'].includes(it.type)){
-    const wBtn = (dir, title, svgW) => h('button',{title, disabled:(it.weight||0)===(dir<0?WEIGHT_MIN:WEIGHT_MAX), onclick:()=>{
-      snapshot(); it.weight = clamp((it.weight||0)+dir, WEIGHT_MIN, WEIGHT_MAX); rerenderItem(it); buildSelbar(); persist(); }},
-      h('span',{html:`<svg width="26" height="18" viewBox="0 0 26 18" fill="none" stroke="currentColor" stroke-linecap="round"><path d="M3 9h12" stroke-width="${svgW}"/><path d="M19 9h5${dir>0?'M21.5 6.5v5':''}" stroke-width="1.8"/></svg>`}));
-    bar.append(wBtn(-1, t('thinner'), 1.4), wBtn(1, t('thicker'), 3.6), h('span',{class:'sep'}));
+    const lvl = it.weight||0;
+    const wBtn = (dir, title, sw) => h('button',{title, disabled: lvl===(dir<0?WEIGHT_MIN:WEIGHT_MAX), onclick:()=>{
+      snapshot(); it.weight = clamp(lvl+dir, WEIGHT_MIN, WEIGHT_MAX); rerenderItem(it); buildSelbar(); persist(); }},
+      h('span',{html:`<svg width="26" height="22" viewBox="0 0 26 22" fill="none" stroke="currentColor" stroke-linecap="round"><path d="M3 15c3-7 5-7 7-2s4 5 7-2 4-4 6-1" stroke-width="${sw}"/></svg>`}));
+    bar.append(h('span',{class:'sep'}), grp(`${t('stroke')} ${lvl>0?'+'+lvl:lvl}`, wBtn(-1, t('thinner'), 1.2), wBtn(1, t('thicker'), 3.8)));
   }
-  bar.append(h('button',{title:t('smaller'), onclick:()=>scaleItem(it, 1/1.12)}, 'A−'));
-  bar.append(h('button',{title:t('bigger'), onclick:()=>scaleItem(it, 1.12)}, 'A+'));
   bar.append(h('span',{class:'sep'}));
   if(it.type==='text') bar.append(h('button',{onclick:async()=>{ const v = await textPrompt(t('enterText'), it.text); if(v){ snapshot(); it.text=v; rerenderItem(it); persist(); } }}, t('edit')));
   if(it.type==='ink') bar.append(h('button',{onclick:()=>{ const p = pageById(it.page), d = disp(p);
@@ -1568,7 +1593,10 @@ function setZoom(dir){
   v.scrollTop = fy*v.scrollHeight; v.scrollLeft = fx*v.scrollWidth - v.clientWidth/2;
 }
 $('#zoomIn').onclick = ()=>setZoom(1); $('#zoomOut').onclick = ()=>setZoom(-1);
-let rzT; window.addEventListener('resize', ()=>{ clearTimeout(rzT); rzT = setTimeout(relayout, 150); });
+// iOS fires 'resize' whenever the toolbar slides in/out while scrolling; only a width change
+// (rotation, split view) needs the pages laid out again.
+window.addEventListener('resize', ()=>{ clearTimeout(rzT); rzT = setTimeout(()=>{
+  const w = $('#viewer').clientWidth; if(Math.abs(w - lastVW) < 2) return; lastVW = w; relayout(); }, 200); });
 document.addEventListener('keydown', e=>{
   if(e.target.matches('input,textarea')) return;
   if((e.key==='Delete'||e.key==='Backspace') && R.sel){ const it = S.items.find(i=>i.id===R.sel); if(it){ snapshot(); S.items=S.items.filter(i=>i!==it); renderLayer(it.page); select(null); persist(); } }
