@@ -781,14 +781,17 @@ input, select, textarea { font: inherit; }
   border: 1px solid rgba(45,140,138,0.35);
 }
 .card-meta { display: flex; flex-direction: column; gap: 3px; }
+.card-due-row { display: flex; align-items: center; gap: 6px 8px; flex-wrap: wrap; }
 .card-due {
   display: flex;
   align-items: center;
-  gap: 5px;
-  font-size: 0.75rem;
+  gap: 4px;
+  font-size: 9px;
   font-weight: 600;
   color: var(--orange);
 }
+.card-next { font-size: 0.75rem; color: var(--text-3); font-style: italic; }
+.card-next b { color: var(--text-2); font-weight: 700; }
 .card-due--future { color: var(--text-2); }
 .card-due--overdue { color: var(--red); }
 .card-due--ok { color: var(--text-2); }
@@ -4088,8 +4091,8 @@ function formatDate(dateStr) {
   const diff = Math.round((new Date(y,m-1,d) - new Date()) / 86400000);
   if (dateStr === today) return 'Due today';
   if (diff === 1) return 'Due tomorrow';
-  if (diff > 0 && diff < 7) return `Due in ${diff} days`;
-  if (diff < 0) return `Overdue by ${Math.abs(diff)} day${Math.abs(diff)>1?'s':''}`;
+  if (diff > 0 && diff < 7) return `Due in ${diff} D`;
+  if (diff < 0) return `Overdue ${Math.abs(diff)} D`;
   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   return `${months[m-1]} ${d}, ${y}`;
 }
@@ -4769,14 +4772,11 @@ function renderCard(p, idx) {
         <span class="card-doses-compact">${given}/${total}</span>
       </div>
       <div class="card-meta">
-        <div class="card-due ${dueClass}">
-          <span>📅</span> ${dueDisplay}
-        </div>
-        ${(confirmed && apptTime) || (apptDate && confirmed && !p['Injection Administered'] && weeks !== '?') ? `
-        <div style="display:flex;align-items:center;gap:5px;margin-top:2px;flex-wrap:wrap">
+        <div class="card-due-row">
+          <div class="card-due ${dueClass}"><span>📅</span> ${dueDisplay}</div>
           ${confirmed && apptTime ? `<span style="font-size:9px;background:rgba(45,140,138,.12);color:var(--teal-dark);border:1px solid rgba(45,140,138,.3);border-radius:4px;padding:1px 6px;font-weight:700">✓ ${apptTime}</span>` : ''}
-          ${(apptDate && confirmed && !p['Injection Administered'] && weeks !== '?') ? `<span style="font-size:9px;color:var(--text-3);font-style:italic">📅 Next due: <b style="color:var(--text-2)">${formatDateLong(addWeeks(apptDate, parseInt(DOSE_TO_WEEKS[dose]||4)))}</b></span>` : ''}
-        </div>` : ''}
+          ${(apptDate && confirmed && !p['Injection Administered'] && weeks !== '?') ? `<span class="card-next">Next: <b>${formatDateLong(addWeeks(apptDate, parseInt(DOSE_TO_WEEKS[dose]||4)))}</b></span>` : ''}
+        </div>
         ${addr ? `<div class="card-addr">${mapSVG}<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(formatAddrDisplay(addr))}</span></div>` : ''}
         ${special ? `<div class="card-flag-strip">
           <span class="card-flag-icon">⚑</span>
