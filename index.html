@@ -2856,72 +2856,61 @@ a:focus:not(:focus-visible) { outline: none; }
 }
 
 /* ════════════════════════════════════════════════
-   LIQUID GLASS pill — "crystal slide" (mobile/tablet < 960px)
-   Nearly clear glass: light blur, minimal tint, crisp bevelled
-   double edge, faint prismatic rim and a sharp top glint.
+   LIQUID GLASS pill — iOS dock style (mobile/tablet < 960px)
+   Matches the iOS Home Screen dock: almost no tint, the backdrop is
+   blurred and slightly brightened, a fine light rim just inside the
+   edge with a faint dark hairline outside, and barely any shadow.
    ════════════════════════════════════════════════ */
 @media (max-width: 959px) {
   .bottom-nav {
-    background: linear-gradient(180deg, rgba(255,255,255,.20) 0%, rgba(255,255,255,.06) 50%, rgba(255,255,255,.12) 100%) !important;
-    backdrop-filter: blur(7px) saturate(170%) brightness(1.07) contrast(1.06);
-    -webkit-backdrop-filter: blur(7px) saturate(170%) brightness(1.07) contrast(1.06);
-    border: 1px solid rgba(255,255,255,.6) !important;
+    background: rgba(255,255,255,.10) !important;
+    backdrop-filter: blur(18px) saturate(150%) brightness(1.12);
+    -webkit-backdrop-filter: blur(18px) saturate(150%) brightness(1.12);
+    border: 1px solid rgba(0,0,0,.14) !important;             /* faint dark hairline outside */
     box-shadow:
-      inset 0 1.5px 0 rgba(255,255,255,.95),       /* sharp top glint */
-      inset 0 -1.5px 0 rgba(255,255,255,.45),      /* bottom bevel */
-      inset 0 0 0 1.5px rgba(255,255,255,.18),     /* inner edge of the bevel */
-      inset 0 8px 14px -10px rgba(255,255,255,.7), /* thin top sheen */
-      0 10px 28px rgba(15,23,42,.16), 0 1px 3px rgba(15,23,42,.10);
+      inset 0 0 0 1px rgba(255,255,255,.30),                  /* fine light rim inside */
+      inset 0 1px 1.5px rgba(255,255,255,.45),                /* top edge catches light */
+      inset 0 -1px 1.5px rgba(255,255,255,.30),               /* bottom edge refraction */
+      inset 0 0 8px rgba(255,255,255,.10),                    /* soft lift along the rim */
+      0 4px 14px rgba(0,0,0,.06);
     isolation: isolate;
   }
-  /* crisp prismatic rim (faint cyan → white → pink, like cut crystal) */
+  /* subtle refraction band hugging the rim (brighter top and bottom, like the dock) */
   .bottom-nav::before {
-    content: ''; position: absolute; inset: -1px; border-radius: inherit; pointer-events: none; z-index: -1;
-    padding: 1.5px;
-    background: linear-gradient(110deg, rgba(255,255,255,1) 0%, rgba(190,235,255,.55) 18%, rgba(255,255,255,0) 42%,
-                rgba(255,255,255,0) 60%, rgba(255,205,240,.5) 82%, rgba(255,255,255,.95) 100%);
+    content: ''; position: absolute; inset: 1px; border-radius: inherit; pointer-events: none; z-index: -1;
+    padding: 2px;
+    background: linear-gradient(180deg, rgba(255,255,255,.28), rgba(255,255,255,.04) 40%, rgba(255,255,255,.04) 60%, rgba(255,255,255,.20));
     -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
     -webkit-mask-composite: xor; mask-composite: exclude;
   }
-  /* narrow specular streak across the top */
-  .bottom-nav::after {
-    content: ''; position: absolute; left: 10%; right: 10%; top: 3px; height: 30%; border-radius: 999px; pointer-events: none; z-index: -1;
-    background: linear-gradient(180deg, rgba(255,255,255,.45), rgba(255,255,255,0));
-  }
-  .bottom-nav.nav-hidden::before, .bottom-nav.nav-hidden::after { opacity: 0; }
-  /* active capsule: clear tinted crystal */
+  .bottom-nav::after { content: none; }
+  .bottom-nav.nav-hidden::before { opacity: 0; }
+  /* active capsule: the tab's colour as clear tinted glass */
   .nav-btn.active::before {
-    background:
-      linear-gradient(180deg, rgba(255,255,255,.45), rgba(255,255,255,0) 50%),
-      linear-gradient(140deg, color-mix(in srgb, var(--k) 65%, #fff) 0%, color-mix(in srgb, var(--k) 82%, transparent) 55%, color-mix(in srgb, var(--k) 80%, #000) 100%);
-    box-shadow: 0 6px 16px color-mix(in srgb, var(--k) 40%, transparent),
-                inset 0 1.5px 0 rgba(255,255,255,.75), inset 0 -1px 0 rgba(255,255,255,.25),
-                inset 0 0 0 1px rgba(255,255,255,.35);
+    background: linear-gradient(140deg, color-mix(in srgb, var(--k) 72%, #fff) 0%, color-mix(in srgb, var(--k) 85%, transparent) 55%, color-mix(in srgb, var(--k) 80%, #000) 100%);
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--k) 35%, transparent),
+                inset 0 0 0 1px rgba(255,255,255,.28), inset 0 1px 1.5px rgba(255,255,255,.5);
   }
   .nav-badge { border-color: rgba(255,255,255,.9) !important; }
 }
 @media (max-width: 959px) and (prefers-color-scheme: dark) {
   html:not([data-theme="light"]) .bottom-nav {
-    background: linear-gradient(180deg, rgba(255,255,255,.10) 0%, rgba(255,255,255,.02) 50%, rgba(255,255,255,.06) 100%) !important;
-    border: 1px solid rgba(255,255,255,.28) !important;
-    box-shadow: inset 0 1.5px 0 rgba(255,255,255,.55), inset 0 -1.5px 0 rgba(255,255,255,.18),
-      inset 0 0 0 1.5px rgba(255,255,255,.07), inset 0 8px 14px -10px rgba(255,255,255,.3),
-      0 14px 34px rgba(0,0,0,.5);
+    background: rgba(255,255,255,.07) !important;
+    border: 1px solid rgba(0,0,0,.35) !important;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.16), inset 0 1px 1.5px rgba(255,255,255,.28),
+      inset 0 -1px 1.5px rgba(255,255,255,.18), inset 0 0 8px rgba(255,255,255,.06), 0 4px 14px rgba(0,0,0,.25);
   }
   html:not([data-theme="light"]) .bottom-nav::before { opacity: .7; }
-  html:not([data-theme="light"]) .bottom-nav::after { opacity: .45; }
   html:not([data-theme="light"]) .nav-badge { border-color: rgba(20,28,42,.9) !important; }
 }
 @media (max-width: 959px) {
   [data-theme="dark"] .bottom-nav {
-    background: linear-gradient(180deg, rgba(255,255,255,.10) 0%, rgba(255,255,255,.02) 50%, rgba(255,255,255,.06) 100%) !important;
-    border: 1px solid rgba(255,255,255,.28) !important;
-    box-shadow: inset 0 1.5px 0 rgba(255,255,255,.55), inset 0 -1.5px 0 rgba(255,255,255,.18),
-      inset 0 0 0 1.5px rgba(255,255,255,.07), inset 0 8px 14px -10px rgba(255,255,255,.3),
-      0 14px 34px rgba(0,0,0,.5);
+    background: rgba(255,255,255,.07) !important;
+    border: 1px solid rgba(0,0,0,.35) !important;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.16), inset 0 1px 1.5px rgba(255,255,255,.28),
+      inset 0 -1px 1.5px rgba(255,255,255,.18), inset 0 0 8px rgba(255,255,255,.06), 0 4px 14px rgba(0,0,0,.25);
   }
   [data-theme="dark"] .bottom-nav::before { opacity: .7; }
-  [data-theme="dark"] .bottom-nav::after { opacity: .45; }
   [data-theme="dark"] .nav-badge { border-color: rgba(20,28,42,.9) !important; }
 }
 </style>
