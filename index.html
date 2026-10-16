@@ -2786,6 +2786,8 @@ a:focus:not(:focus-visible) { outline: none; }
    sliding-bubble highlight on the active tab.
    ════════════════════════════════════════════════ */
 :root { --pill-gap: 12px; --pill-h: 60px; }
+.nav-btn svg.solid { fill: currentColor; stroke: none; }
+#nav-dash{--k:#5B6CF0} #nav-patients{--k:#2D9C99} #nav-reminders{--k:#E39B22} #nav-invoice{--k:#2FA36B} #nav-report{--k:#9B5DE5}
 @media (max-width: 959px) {
   .bottom-nav {
     left: 14px; right: 14px;
@@ -2810,9 +2812,8 @@ a:focus:not(:focus-visible) { outline: none; }
   /* icon-only pill: labels stay for screen readers */
   .nav-btn > span:not(.nav-badge) { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
   .nav-btn svg { width: 1.5rem; height: 1.5rem; }
-  .nav-btn svg .duo { fill: currentColor; fill-opacity: .14; }
-  .nav-btn.active { color: #fff; }
-  .nav-btn.active svg .duo { fill-opacity: .3; }
+  .bottom-nav .nav-btn { color: var(--k); }
+  .bottom-nav .nav-btn.active { color: #fff; }
   .nav-btn.active svg { filter: drop-shadow(0 1px 1px rgba(0,0,0,.18)); }
   /* active bubble replaces the little underline pip */
   .nav-btn::after { display: none; }
@@ -2820,8 +2821,8 @@ a:focus:not(:focus-visible) { outline: none; }
     content: ''; position: absolute; inset: 0 4px; z-index: -1;
     border-radius: 999px;
     inset: 8px 5px;
-    background: linear-gradient(140deg, var(--teal-2, var(--teal)) 0%, var(--teal) 45%, var(--teal-dark) 100%);
-    box-shadow: 0 6px 16px color-mix(in srgb, var(--teal) 45%, transparent), inset 0 1px 0 rgba(255,255,255,.28);
+    background: linear-gradient(140deg, color-mix(in srgb, var(--k) 72%, #fff) 0%, var(--k) 50%, color-mix(in srgb, var(--k) 78%, #000) 100%);
+    box-shadow: 0 6px 16px color-mix(in srgb, var(--k) 48%, transparent), inset 0 1px 0 rgba(255,255,255,.3);
     opacity: 0; transform: scale(.6);
     transition: opacity .22s ease, transform .32s var(--ease-bounce);
   }
@@ -2839,6 +2840,7 @@ a:focus:not(:focus-visible) { outline: none; }
     box-shadow: 0 14px 36px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.06);
   }
   html:not([data-theme="light"]) .nav-badge { border-color: #162030; }
+  html:not([data-theme="light"]) .bottom-nav .nav-btn { color: var(--k); }
   html:not([data-theme="light"]) .bottom-nav .nav-btn.active { color: #fff; }
 }
 @media (max-width: 959px) {
@@ -2848,6 +2850,7 @@ a:focus:not(:focus-visible) { outline: none; }
     box-shadow: 0 14px 36px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.06);
   }
   [data-theme="dark"] .nav-badge { border-color: #162030; }
+  [data-theme="dark"] .bottom-nav .nav-btn { color: var(--k); }
   [data-theme="dark"] .bottom-nav .nav-btn.active { color: #fff; }
 }
 </style>
@@ -3439,26 +3442,26 @@ a:focus:not(:focus-visible) { outline: none; }
 <!-- BOTTOM NAV -->
 <nav class="bottom-nav">
   <button class="nav-btn" data-view="dash" id="nav-dash" aria-label="Dashboard" title="Dashboard">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect class="duo" x="3" y="3" width="8" height="9" rx="2.6"/><rect x="13" y="3" width="8" height="5" rx="2.2"/><rect class="duo" x="13" y="10" width="8" height="11" rx="2.6"/><rect x="3" y="14" width="8" height="7" rx="2.2"/></svg>
+    <svg viewBox="0 0 24 24" class="solid" fill="currentColor" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="2.4"/><rect x="13" y="3" width="8" height="8" rx="2.4"/><rect x="3" y="13" width="8" height="8" rx="2.4"/><rect x="13" y="13" width="8" height="8" rx="2.4" opacity=".55"/></svg>
     <span>Dashboard</span>
     <span class="nav-badge hidden" id="badge-overdue"></span>
   </button>
   <button class="nav-btn active" data-view="patients" id="nav-patients" aria-label="Patients" title="Patients">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle class="duo" cx="9" cy="7.5" r="3.6"/><path class="duo" d="M2.8 20.2c.5-3.6 3-5.7 6.2-5.7s5.7 2.1 6.2 5.7c.1.5-.3.8-.8.8H3.6c-.5 0-.9-.3-.8-.8z"/><path d="M15.6 4.2a3.6 3.6 0 0 1 0 6.6"/><path d="M18 14.9c1.8.7 3 2.4 3.3 4.8"/></svg>
+    <svg viewBox="0 0 24 24" class="solid" fill="currentColor" aria-hidden="true"><circle cx="9" cy="7.5" r="4"/><path d="M1.8 20c.4-4 3.4-6.5 7.2-6.5s6.8 2.5 7.2 6.5c0 .6-.4 1-1 1H2.8c-.6 0-1-.4-1-1z"/><circle cx="17" cy="8" r="3" opacity=".55"/><path d="M17.5 13.3c2.6.4 4.4 2.5 4.7 5.4 0 .5-.4.9-.9.9h-3.6c-.3-2.5-1.3-4.6-3-6 .9-.3 1.8-.4 2.8-.3z" opacity=".55"/></svg>
     <span>Patients</span>
   </button>
   <button class="nav-btn" data-view="reminders" id="nav-reminders" aria-label="Reminders" title="Reminders">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path class="duo" d="M6 10a6 6 0 0 1 12 0c0 4.2 1.2 6 2.2 7 .4.4.1 1-.4 1H4.2c-.5 0-.8-.6-.4-1 1-1 2.2-2.8 2.2-7z"/><path d="M10 21a2.2 2.2 0 0 0 4 0"/><path d="M12 2.5V4"/></svg>
+    <svg viewBox="0 0 24 24" class="solid" fill="currentColor" aria-hidden="true"><path d="M12 2.5a1.3 1.3 0 0 1 1.3 1.3v.5A6.5 6.5 0 0 1 18.5 10.7c0 3.9 1.1 5.6 2.1 6.6.6.6.2 1.7-.7 1.7H4.1c-.9 0-1.3-1.1-.7-1.7 1-1 2.1-2.7 2.1-6.6a6.5 6.5 0 0 1 5.2-6.4v-.5A1.3 1.3 0 0 1 12 2.5z"/><path d="M9.5 20h5a2.5 2.5 0 0 1-5 0z"/></svg>
     <span>Reminders</span>
     <span class="nav-badge hidden" id="badge-reminders" style="background:var(--red)"></span>
   </button>
   <button class="nav-btn" data-view="invoice" id="nav-invoice" aria-label="Invoice" title="Invoice">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path class="duo" d="M5 3.5h14v17l-2.3-1.4-2.4 1.4-2.3-1.4-2.3 1.4-2.4-1.4L5 20.5z"/><path d="M9 8h6M9 11.5h6"/><path d="M9 15h3.5"/></svg>
+    <svg viewBox="0 0 24 24" class="solid" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.5 2.5h13A1.5 1.5 0 0 1 20 4v17.2l-2.7-1.6-2.6 1.6-2.7-1.6-2.7 1.6-2.6-1.6L4 21.2V4a1.5 1.5 0 0 1 1.5-1.5zM8 7.2a.9.9 0 0 0 0 1.8h8a.9.9 0 0 0 0-1.8zm0 4a.9.9 0 0 0 0 1.8h8a.9.9 0 0 0 0-1.8zm0 4a.9.9 0 0 0 0 1.8h4.5a.9.9 0 0 0 0-1.8z"/></svg>
     <span>Invoice</span>
     <span class="nav-badge hidden" id="badge-invoice" style="background:var(--orange)"></span>
   </button>
   <button class="nav-btn" data-view="report" id="nav-report" aria-label="Reports" title="Reports">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect class="duo" x="3" y="3" width="18" height="18" rx="4.5"/><path d="M8 16v-3.5M12 16V8M16 16v-5.5"/></svg>
+    <svg viewBox="0 0 24 24" class="solid" fill="currentColor" aria-hidden="true"><rect x="3" y="12" width="4.5" height="9" rx="1.6"/><rect x="9.75" y="3" width="4.5" height="18" rx="1.6"/><rect x="16.5" y="8" width="4.5" height="13" rx="1.6" opacity=".55"/></svg>
     <span>Reports</span>
   </button>
 </nav>
