@@ -328,7 +328,7 @@ en:{share:'Share', emptyTitle:'Scan, fill & sign', emptySub:'Open the vendor’s
   myStamps:'My stamps', myStampsSub:'Saved on this phone. Tap one to place it.', addMySig:'Draw my signature', addMyIni:'Draw my initials',
   sigPhoto:'Signature from photo', sigPhotoSub:'Photograph a signature on paper', addTextStamp:'Text stamp', addTextStampSub:'Name, title, licence #…',
   noStamps:'No stamps yet.', mySig:'My signature', myIni:'My initials', stampText:'Stamp text', deleteStamp:'Delete this stamp?', del:'Delete',
-  enterText:'Enter text', ok:'OK', save:'Save', edit:'Edit', copy:'Copy', smaller:'Smaller', bigger:'Bigger',
+  enterText:'Enter text', ok:'OK', save:'Save', edit:'Edit', copy:'Copy', smaller:'Smaller', bigger:'Bigger', thinner:'Thinner stroke', thicker:'Thicker stroke',
   addOrReplace:'You already have a document open', addOrReplaceMsg:'Add the new pages to it, or start a new document?', addToDoc:'Add pages', replaceDoc:'New document',
   closeConfirm:'Close this document?', closeConfirmMsg:'Unsaved changes are lost. Share or download it first if you need it.', close:'Close',
   shareTitle:'Share or save', fileName:'File name', preparing:'Preparing PDF…', shareNow:'Share…', download:'Download', preview:'Preview',
@@ -364,7 +364,7 @@ fr:{share:'Partager', emptyTitle:'Numériser, remplir et signer', emptySub:'Ouvr
   myStamps:'Mes tampons', myStampsSub:'Enregistrés sur ce téléphone. Touchez pour placer.', addMySig:'Dessiner ma signature', addMyIni:'Dessiner mes initiales',
   sigPhoto:'Signature à partir d’une photo', sigPhotoSub:'Photographiez une signature sur papier', addTextStamp:'Tampon texte', addTextStampSub:'Nom, titre, n° de permis…',
   noStamps:'Aucun tampon pour l’instant.', mySig:'Ma signature', myIni:'Mes initiales', stampText:'Texte du tampon', deleteStamp:'Supprimer ce tampon ?', del:'Supprimer',
-  enterText:'Saisir le texte', ok:'OK', save:'Enregistrer', edit:'Modifier', copy:'Copier', smaller:'Plus petit', bigger:'Plus grand',
+  enterText:'Saisir le texte', ok:'OK', save:'Enregistrer', edit:'Modifier', copy:'Copier', smaller:'Plus petit', bigger:'Plus grand', thinner:'Trait plus fin', thicker:'Trait plus épais',
   addOrReplace:'Un document est déjà ouvert', addOrReplaceMsg:'Ajouter les nouvelles pages à ce document, ou commencer un nouveau document ?', addToDoc:'Ajouter les pages', replaceDoc:'Nouveau document',
   closeConfirm:'Fermer ce document ?', closeConfirmMsg:'Les modifications seront perdues. Partagez-le ou téléchargez-le d’abord au besoin.', close:'Fermer',
   shareTitle:'Partager ou enregistrer', fileName:'Nom du fichier', preparing:'Préparation du PDF…', shareNow:'Partager…', download:'Télécharger', preview:'Aperçu',
@@ -649,16 +649,37 @@ function inkMask(id){
   if(!R.inkImg.has(id)) R.inkImg.set(id, new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=S.inks[id].url; }));
   return R.inkImg.get(id);
 }
-async function inkCanvas(id, color){
+const WEIGHT_MIN = -2, WEIGHT_MAX = 4; // stroke thickness steps (0 = as drawn)
+function thickenMask(c, weight){
+  // Grow (weight>0) or shrink (weight<0) the ink by a min/max filter on the alpha channel.
+  const r = Math.abs(weight) * Math.max(1, Math.round(c.width/700)); if(!r) return;
+  const W = c.width, H = c.height, x = c.getContext('2d'), im = x.getImageData(0,0,W,H), d = im.data;
+  let a = new Uint8ClampedArray(W*H); for(let i=0;i<W*H;i++) a[i] = d[i*4+3];
+  const pick = weight > 0 ? Math.max : Math.min;
+  const pass = (src, horiz)=>{ const out = new Uint8ClampedArray(W*H);
+    for(let y=0;y<H;y++) for(let xx=0;xx<W;xx++){ let v = src[y*W+xx];
+      for(let k=1;k<=r;k++){
+        if(horiz){ if(xx-k>=0) v = pick(v, src[y*W+xx-k]); if(xx+k<W) v = pick(v, src[y*W+xx+k]); }
+        else { if(y-k>=0) v = pick(v, src[(y-k)*W+xx]); if(y+k<H) v = pick(v, src[(y+k)*W+xx]); } }
+      out[y*W+xx] = v; }
+    return out; };
+  a = pass(pass(a, true), false);
+  for(let i=0;i<W*H;i++) d[i*4+3] = a[i];
+  x.putImageData(im,0,0);
+}
+async function inkCanvas(id, color, weight=0){
   const img = await inkMask(id); const c = h('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight;
-  const x = c.getContext('2d'); x.drawImage(img,0,0); x.globalCompositeOperation='source-in'; x.fillStyle = INK[color]; x.fillRect(0,0,c.width,c.height);
+  const x = c.getContext('2d'); x.drawImage(img,0,0);
+  thickenMask(c, weight);
+  x.globalCompositeOperation='source-in'; x.fillStyle = INK[color]; x.fillRect(0,0,c.width,c.height);
   return c;
 }
-async function inkURL(id, color){
-  const k = id+'|'+color;
-  if(!R.inkCache.has(k)) R.inkCache.set(k, inkCanvas(id,color).then(c=>c.toDataURL('image/png')));
+async function inkURL(id, color, weight=0){
+  const k = id+'|'+color+'|'+weight;
+  if(!R.inkCache.has(k)) R.inkCache.set(k, inkCanvas(id,color,weight).then(c=>c.toDataURL('image/png')));
   return R.inkCache.get(k);
 }
+const shapeWidth = it => 11 * (1 + 0.3*(it.weight||0)); // check/cross stroke, in % of the box
 function addInk(ink){ // ink = {url,w,h}
   const id = uid(); S.inks[id] = {url:ink.url, w:ink.w, h:ink.h}; return id;
 }
@@ -668,9 +689,9 @@ const SHAPES = {
   check: [[[0.12,0.55],[0.40,0.84],[0.90,0.14]]],
   cross: [[[0.16,0.16],[0.84,0.84]], [[0.84,0.16],[0.16,0.84]]]
 };
-function shapeSVG(type, color){
+function shapeSVG(type, color, sw=11){
   const paths = SHAPES[type].map(pl=>'M'+pl.map(([x,y])=>`${x*100} ${y*100}`).join(' L')).join(' ');
-  return `<svg viewBox="0 0 100 100"><path d="${paths}" fill="none" stroke="${INK[color]}" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  return `<svg viewBox="0 0 100 100"><path d="${paths}" fill="none" stroke="${INK[color]}" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 }
 function renderLayer(pid){
   const el = R.pageEls.get(pid); if(!el) return;
@@ -681,9 +702,9 @@ function renderLayer(pid){
 function itemEl(it){
   const e = h('div',{class:'it '+it.type + (R.sel===it.id?' sel':'')}); e.dataset.id = it.id;
   if(it.type==='text'){ e.textContent = it.text; e.style.color = INK[it.color]; }
-  else if(it.type==='ink'){ const im = h('img',{alt:''}); e.append(im); inkURL(it.ink, it.color).then(u=>im.src=u); }
+  else if(it.type==='ink'){ const im = h('img',{alt:''}); e.append(im); inkURL(it.ink, it.color, it.weight||0).then(u=>im.src=u); }
   else if(it.type==='slot') e.append(h('span',{html: ICON.pen.replace(/20/g,'14') + (it.kind==='initials' ? t('slotIni') : t('slotSign'))}));
-  else e.innerHTML = shapeSVG(it.type, it.color);
+  else e.innerHTML = shapeSVG(it.type, it.color, shapeWidth(it));
   e.append(h('div',{class:'h'}));
   return e;
 }
@@ -756,6 +777,12 @@ function buildSelbar(){
     bar.append(h('button',{class: it.color===c?'cur':'', title:c, onclick:()=>{ snapshot(); it.color=c; settings.color=c; saveSettings(); rerenderItem(it); buildSelbar(); persist(); }},
       h('span',{class:'sw', style:`background:${INK[c]}`})));
   bar.append(h('span',{class:'sep'}));
+  if(['ink','check','cross'].includes(it.type)){
+    const wBtn = (dir, title, svgW) => h('button',{title, disabled:(it.weight||0)===(dir<0?WEIGHT_MIN:WEIGHT_MAX), onclick:()=>{
+      snapshot(); it.weight = clamp((it.weight||0)+dir, WEIGHT_MIN, WEIGHT_MAX); rerenderItem(it); buildSelbar(); persist(); }},
+      h('span',{html:`<svg width="26" height="18" viewBox="0 0 26 18" fill="none" stroke="currentColor" stroke-linecap="round"><path d="M3 9h12" stroke-width="${svgW}"/><path d="M19 9h5${dir>0?'M21.5 6.5v5':''}" stroke-width="1.8"/></svg>`}));
+    bar.append(wBtn(-1, t('thinner'), 1.4), wBtn(1, t('thicker'), 3.6), h('span',{class:'sep'}));
+  }
   bar.append(h('button',{title:t('smaller'), onclick:()=>scaleItem(it, 1/1.12)}, 'A−'));
   bar.append(h('button',{title:t('bigger'), onclick:()=>scaleItem(it, 1.12)}, 'A+'));
   bar.append(h('span',{class:'sep'}));
@@ -871,7 +898,7 @@ async function saveTemplate(){
   for(const it of S.items){
     const page = S.pages.findIndex(p=>p.id===it.page); if(page<0) continue;
     const p = S.pages[page], d = disp(p);
-    const base = {page, type:it.type, x:it.x, y:it.y, w:it.w, color:it.color};
+    const base = {page, type:it.type, x:it.x, y:it.y, w:it.w, color:it.color, weight:it.weight};
     if(it.type==='text') items.push({...base, s:it.s, text: it.date ? '' : it.text, date:it.date});
     else if(it.type==='ink' && patientInks.has(it.ink)) // a patient's signature becomes an empty box for next time
       items.push({...base, type:'slot', kind:patientInks.get(it.ink), ar:(it.h*d.h)/(it.w*d.w)});
@@ -1457,12 +1484,12 @@ async function buildPdf(){
           page.drawText(clean(line), {x, y, size, font, color, rotate:degrees(rot)});
         });
       } else if(it.type==='ink'){
-        const k = it.ink+'|'+it.color;
-        if(!embeds.has(k)){ const c = await inkCanvas(it.ink, it.color); embeds.set(k, await out.embedPng(c.toDataURL('image/png'))); }
+        const k = it.ink+'|'+it.color+'|'+(it.weight||0);
+        if(!embeds.has(k)){ const c = await inkCanvas(it.ink, it.color, it.weight||0); embeds.set(k, await out.embedPng(c.toDataURL('image/png'))); }
         const [x,y] = P(it.x, it.y + it.h);
         page.drawImage(embeds.get(k), {x, y, width:it.w*dw, height:it.h*dh, rotate:degrees(rot)});
       } else {
-        const th = it.w*dw*0.11;
+        const th = it.w*dw*shapeWidth(it)/100;
         for(const pl of SHAPES[it.type]) for(let i=0;i<pl.length-1;i++){
           const a = P(it.x + pl[i][0]*it.w, it.y + pl[i][1]*it.h), b = P(it.x + pl[i+1][0]*it.w, it.y + pl[i+1][1]*it.h);
           page.drawLine({start:{x:a[0],y:a[1]}, end:{x:b[0],y:b[1]}, thickness:th, color, lineCap:LineCapStyle.Round});
