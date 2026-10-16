@@ -2786,7 +2786,8 @@ a:focus:not(:focus-visible) { outline: none; }
    sliding-bubble highlight on the active tab.
    ════════════════════════════════════════════════ */
 :root { --pill-gap: 12px; --pill-h: 60px; }
-.nav-btn svg.solid { fill: currentColor; stroke: none; }
+.nav-btn svg.line { fill: none; stroke: currentColor; stroke-width: 1.7; }
+.nav-btn.active svg.line { stroke-width: 2; }
 #nav-dash{--k:#5B6CF0} #nav-patients{--k:#2D9C99} #nav-reminders{--k:#E39B22} #nav-invoice{--k:#2FA36B} #nav-report{--k:#9B5DE5}
 @media (max-width: 959px) {
   .bottom-nav {
@@ -3442,26 +3443,26 @@ a:focus:not(:focus-visible) { outline: none; }
 <!-- BOTTOM NAV -->
 <nav class="bottom-nav">
   <button class="nav-btn" data-view="dash" id="nav-dash" aria-label="Dashboard" title="Dashboard">
-    <svg viewBox="0 0 24 24" class="solid" fill="currentColor" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="2.4"/><rect x="13" y="3" width="8" height="8" rx="2.4"/><rect x="3" y="13" width="8" height="8" rx="2.4"/><rect x="13" y="13" width="8" height="8" rx="2.4" opacity=".55"/></svg>
+    <svg viewBox="0 0 24 24" class="line" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/></svg>
     <span>Dashboard</span>
     <span class="nav-badge hidden" id="badge-overdue"></span>
   </button>
   <button class="nav-btn active" data-view="patients" id="nav-patients" aria-label="Patients" title="Patients">
-    <svg viewBox="0 0 24 24" class="solid" fill="currentColor" aria-hidden="true"><circle cx="9" cy="7.5" r="4"/><path d="M1.8 20c.4-4 3.4-6.5 7.2-6.5s6.8 2.5 7.2 6.5c0 .6-.4 1-1 1H2.8c-.6 0-1-.4-1-1z"/><circle cx="17" cy="8" r="3" opacity=".55"/><path d="M17.5 13.3c2.6.4 4.4 2.5 4.7 5.4 0 .5-.4.9-.9.9h-3.6c-.3-2.5-1.3-4.6-3-6 .9-.3 1.8-.4 2.8-.3z" opacity=".55"/></svg>
+    <svg viewBox="0 0 24 24" class="line" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M3 20c.6-3.6 3-5.6 6-5.6s5.4 2 6 5.6"/><path d="M15.5 4.6a3.5 3.5 0 0 1 0 6.8"/><path d="M17.8 14.6c1.8.6 3 2.4 3.4 5.4"/></svg>
     <span>Patients</span>
   </button>
   <button class="nav-btn" data-view="reminders" id="nav-reminders" aria-label="Reminders" title="Reminders">
-    <svg viewBox="0 0 24 24" class="solid" fill="currentColor" aria-hidden="true"><path d="M12 2.5a1.3 1.3 0 0 1 1.3 1.3v.5A6.5 6.5 0 0 1 18.5 10.7c0 3.9 1.1 5.6 2.1 6.6.6.6.2 1.7-.7 1.7H4.1c-.9 0-1.3-1.1-.7-1.7 1-1 2.1-2.7 2.1-6.6a6.5 6.5 0 0 1 5.2-6.4v-.5A1.3 1.3 0 0 1 12 2.5z"/><path d="M9.5 20h5a2.5 2.5 0 0 1-5 0z"/></svg>
+    <svg viewBox="0 0 24 24" class="line" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 10.5a6 6 0 0 1 12 0c0 4 1.1 5.8 2 6.8H4c.9-1 2-2.8 2-6.8z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/></svg>
     <span>Reminders</span>
     <span class="nav-badge hidden" id="badge-reminders" style="background:var(--red)"></span>
   </button>
   <button class="nav-btn" data-view="invoice" id="nav-invoice" aria-label="Invoice" title="Invoice">
-    <svg viewBox="0 0 24 24" class="solid" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.5 2.5h13A1.5 1.5 0 0 1 20 4v17.2l-2.7-1.6-2.6 1.6-2.7-1.6-2.7 1.6-2.6-1.6L4 21.2V4a1.5 1.5 0 0 1 1.5-1.5zM8 7.2a.9.9 0 0 0 0 1.8h8a.9.9 0 0 0 0-1.8zm0 4a.9.9 0 0 0 0 1.8h8a.9.9 0 0 0 0-1.8zm0 4a.9.9 0 0 0 0 1.8h4.5a.9.9 0 0 0 0-1.8z"/></svg>
+    <svg viewBox="0 0 24 24" class="line" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 3.5h13v17l-2.2-1.3-2.2 1.3-2.1-1.3-2.1 1.3-2.2-1.3-2.2 1.3z"/><path d="M9 8.5h6M9 12h6M9 15.5h3"/></svg>
     <span>Invoice</span>
     <span class="nav-badge hidden" id="badge-invoice" style="background:var(--orange)"></span>
   </button>
   <button class="nav-btn" data-view="report" id="nav-report" aria-label="Reports" title="Reports">
-    <svg viewBox="0 0 24 24" class="solid" fill="currentColor" aria-hidden="true"><rect x="3" y="12" width="4.5" height="9" rx="1.6"/><rect x="9.75" y="3" width="4.5" height="18" rx="1.6"/><rect x="16.5" y="8" width="4.5" height="13" rx="1.6" opacity=".55"/></svg>
+    <svg viewBox="0 0 24 24" class="line" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20.5h16"/><rect x="5" y="12" width="3.2" height="6" rx="1"/><rect x="10.4" y="5" width="3.2" height="13" rx="1"/><rect x="15.8" y="9" width="3.2" height="9" rx="1"/></svg>
     <span>Reports</span>
   </button>
 </nav>
