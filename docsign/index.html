@@ -68,7 +68,9 @@ svg{display:block}
   background:var(--card); border-bottom:1px solid var(--border); z-index:20}
 .logo{width:32px;height:32px;border-radius:9px;background:var(--accent);display:grid;place-items:center;flex:none}
 .docname{flex:1; min-width:0; text-align:left; padding:4px 6px; border-radius:8px}
-.docname b{display:block; font-size:15px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.docname b{display:flex; align-items:center; gap:6px; font-size:15px; min-width:0}
+.docname b span{white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0}
+.docname .pen{flex:none; color:var(--accent)}
 .docname small{display:block; font-size:11px; color:var(--text-2)}
 .ibtn{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;color:var(--text);flex:none}
 .ibtn:active{background:var(--bg)}
@@ -231,7 +233,7 @@ input[type=range]{width:100%; accent-color:var(--accent)}
   <div class="logo" aria-hidden="true">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M8.5 16.5c1.2-1.6 2-2.4 2.6-1.3.5.9 1.2.9 2-.2.7-.9 1.4-.9 2.4.4"/></svg>
   </div>
-  <button class="docname" id="docName"><b id="docTitle">VaPiq Sign</b><small id="docSub"></small></button>
+  <button class="docname" id="docName"><b><span id="docTitle">VaPiq Sign</span><svg id="docPen" class="pen" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" hidden><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></svg></b><small id="docSub"></small></button>
   <button class="ibtn" id="undoBtn" title="Undo" disabled><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button>
   <button class="lang" id="langBtn">FR</button>
   <button class="ibtn" id="menuBtn" title="Menu"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button>
@@ -245,6 +247,7 @@ input[type=range]{width:100%; accent-color:var(--accent)}
     <p data-i18n="emptySub"></p>
     <button class="big" id="emptyScan"><span class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg></span><span><b data-i18n="scanDoc"></b><small data-i18n="scanDocSub"></small></span></button>
     <button class="big" id="emptyOpen"><span class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M12 12v6M9 15l3-3 3 3"/></svg></span><span><b data-i18n="openFile"></b><small data-i18n="openFileSub"></small></span></button>
+    <button class="btn" id="emptyRecent" style="max-width:360px;width:100%" data-i18n="recent"></button>
     <div class="privacy"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span data-i18n="privacy"></span></div>
   </div>
   <div class="zoom" id="zoomCtl" hidden>
@@ -342,7 +345,10 @@ en:{share:'Share', emptyTitle:'Scan, fill & sign', emptySub:'Open the vendor’s
   tplName:'Layout name', tplSaved:'Layout saved', noTpl:'No saved layouts yet. Place your text, date, checks and the patient signature on a form, then save the layout.',
   useTpl:'Same form as before?', useTplMsg:'Place the saved text, date, checks and signature box automatically:', noThanks:'No thanks', applied:'Layout applied — tap the dashed box to collect the signature',
   deleteTpl:'Delete this layout?', builtIn:'Built-in', slotSign:'Patient signs here', slotIni:'Initials here', addSlot:'Signature box', addSlotSub:'Mark where the patient will sign',
-  slotsLeft:'signature box(es) still empty — they will not appear in the PDF.', addDate:'+ Date', apply:'Apply'},
+  slotsLeft:'signature box(es) still empty — they will not appear in the PDF.', addDate:'+ Date', apply:'Apply',
+  recent:'Recent documents', recentSub:'Reopen to fix a mistake and share again', recentEmpty:'Closed documents are kept here for 7 days so you can fix mistakes. Then they are deleted automatically.',
+  closeKeepMsg:'It stays in Recent documents for 7 days in case you need to fix something, then it is deleted automatically.', deleteNow:'Delete now', savedOn:'closed',
+  fixHint:'Found a mistake after sending? Close this panel, move or delete anything, then share again — a new corrected PDF is created.', deleteAll:'Delete all', reopened:'Reopened — everything is still editable'},
 fr:{share:'Partager', emptyTitle:'Numériser, remplir et signer', emptySub:'Ouvrez le PDF ou la photo du fournisseur, faites signer le patient, ajoutez texte et dates, puis renvoyez-le.',
   scanDoc:'Numériser un document', scanDocSub:'Avec l’appareil photo — recadrage et nettoyage auto', openFile:'Ouvrir un PDF ou une image', openFileSub:'Depuis Fichiers, iCloud, Téléchargements…',
   privacy:'Tout reste sur cet appareil. Rien n’est téléversé.', tapPlace:'Touchez la page à l’endroit voulu', cancel:'Annuler',
@@ -375,7 +381,10 @@ fr:{share:'Partager', emptyTitle:'Numériser, remplir et signer', emptySub:'Ouvr
   tplName:'Nom du gabarit', tplSaved:'Gabarit enregistré', noTpl:'Aucun gabarit. Placez votre texte, la date, les crochets et la signature du patient sur un formulaire, puis enregistrez la disposition.',
   useTpl:'Même formulaire que d’habitude ?', useTplMsg:'Placer automatiquement le texte, la date, les crochets et la zone de signature enregistrés :', noThanks:'Non merci', applied:'Gabarit appliqué — touchez la zone pointillée pour faire signer',
   deleteTpl:'Supprimer ce gabarit ?', builtIn:'Intégré', slotSign:'Le patient signe ici', slotIni:'Initiales ici', addSlot:'Zone de signature', addSlotSub:'Indiquer où le patient signera',
-  slotsLeft:'zone(s) de signature encore vide(s) — elles n’apparaîtront pas dans le PDF.', addDate:'+ Date', apply:'Appliquer'}
+  slotsLeft:'zone(s) de signature encore vide(s) — elles n’apparaîtront pas dans le PDF.', addDate:'+ Date', apply:'Appliquer',
+  recent:'Documents récents', recentSub:'Rouvrir pour corriger une erreur et renvoyer', recentEmpty:'Les documents fermés sont conservés ici 7 jours pour corriger les erreurs, puis supprimés automatiquement.',
+  closeKeepMsg:'Il reste dans Documents récents pendant 7 jours au cas où une correction serait nécessaire, puis il est supprimé automatiquement.', deleteNow:'Supprimer maintenant', savedOn:'fermé le',
+  fixHint:'Une erreur après l’envoi ? Fermez ce panneau, déplacez ou supprimez ce qu’il faut, puis partagez de nouveau — un nouveau PDF corrigé est créé.', deleteAll:'Tout supprimer', reopened:'Rouvert — tout reste modifiable'}
 };
 let LANG = (()=>{ try{ const v = JSON.parse(localStorage.getItem('vsign_lang')); if(v) return v; }catch(e){}
   return /^fr/i.test(navigator.language||'') ? 'fr' : 'en'; })();
@@ -1014,6 +1023,7 @@ function menuSheet(){
       li('file', t('openPages'), null, ()=>{ const p = pickFile('application/pdf,image/*',{multiple:true}); close(); p.then(openFiles); }),
       S.pages.length ? li('grid', t('organize'), t('organizeSub'), ()=>{ close(); organizeSheet(); }) : null,
       li('file', t('templates'), t('templatesSub'), ()=>{ close(); templatesSheet(); }),
+      li('rot', t('recent'), t('recentSub'), ()=>{ close(); recentSheet(); }),
     ));
     b.append(h('div',{class:'sec'}, t('dateFmt')), seg);
     b.append(h('div',{style:'height:14px'}));
@@ -1024,13 +1034,53 @@ function menuSheet(){
     ));
   });
 }
+/* Recent documents: closed documents stay editable on this device for 7 days. */
+const RECENT_DAYS = 7;
+async function getRecent(){
+  const all = (await IDB.get('recent').catch(()=>null)) || [];
+  const keep = all.filter(r=>Date.now() - r.savedAt < RECENT_DAYS*864e5);
+  if(keep.length !== all.length) await IDB.set('recent', keep).catch(()=>{});
+  return keep;
+}
+async function stashCurrent(){
+  if(!S.pages.length) return;
+  S.rid = S.rid || uid();
+  const list = (await getRecent()).filter(r=>r.id!==S.rid);
+  list.unshift({id:S.rid, savedAt:Date.now(), name:S.name||t('untitled'), pages:S.pages.length, project:S});
+  await IDB.set('recent', list.slice(0,15)).catch(()=>{});
+}
+async function clearCurrent(){ resetProject(); imgCache.clear(); await IDB.del('project').catch(()=>{}); buildViewer(); updateTitle(); }
+function recentSheet(){
+  sheet(t('recent'), async (b, close)=>{
+    const list = await getRecent();
+    b.append(h('p',{style:'margin:0 2px 12px;color:var(--text-2);font-size:13px;line-height:1.45'}, t('recentEmpty')));
+    const box = h('div',{class:'list'});
+    for(const r of list){
+      const when = new Date(r.savedAt).toLocaleString(LANG==='fr'?'fr-CA':'en-CA', {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'});
+      const del = h('span',{class:'ibtn', style:'color:var(--danger)', onclick:async e=>{ e.stopPropagation();
+        await IDB.set('recent', (await getRecent()).filter(x=>x.id!==r.id)); close(); recentSheet(); }}, icon('trash'));
+      box.append(li('file', r.name, `${r.pages} ${r.pages>1?t('pages'):t('page')} · ${t('savedOn')} ${when}`, async()=>{
+        close(); if(S.pages.length && S.rid!==r.id) await stashCurrent();
+        resetProject(); imgCache.clear(); S = Object.assign(blankProject(), r.project);
+        buildViewer(); updateTitle(); persist(); toast(t('reopened'));
+      }, del));
+    }
+    b.append(box);
+    if(list.length) b.append(h('button',{class:'btn danger wide', style:'margin-top:14px', onclick:async()=>{
+      if(await dialog({title:t('deleteAll')+' ?', buttons:[{label:t('cancel'),value:false},{label:t('del'),value:true,danger:true}]})){ await IDB.del('recent'); close(); } }}, t('deleteAll')));
+  });
+}
 async function closeDocument(){
-  const ok = await dialog({title:t('closeConfirm'), msg:t('closeConfirmMsg'), buttons:[{label:t('cancel'),value:false},{label:t('close'),value:true,danger:true}]});
-  if(!ok) return;
-  resetProject(); imgCache.clear(); await IDB.del('project').catch(()=>{}); buildViewer(); updateTitle();
+  const v = await dialog({title:t('closeConfirm'), msg:t('closeKeepMsg'), buttons:[
+    {label:t('cancel'),value:null}, {label:t('deleteNow'),value:'delete',danger:true}, {label:t('close'),value:'keep',pri:true}]});
+  if(!v) return;
+  if(v==='keep') await stashCurrent();
+  else if(S.rid) await IDB.set('recent', (await getRecent()).filter(x=>x.id!==S.rid)).catch(()=>{});
+  await clearCurrent();
 }
 function updateTitle(){
   $('#docTitle').textContent = S.pages.length ? (S.name || t('untitled')) : 'VaPiq Sign';
+  $('#docPen').toggleAttribute('hidden', !S.pages.length);
   $('#docSub').textContent = S.pages.length ? `${S.pages.length} ${S.pages.length>1?t('pages'):t('page')}` : '';
 }
 
@@ -1438,6 +1488,7 @@ function shareSheet(){
       S.items.some(i=>i.type==='slot') ? h('p',{style:'margin:12px 2px 0; color:var(--danger); font-size:13px; font-weight:600'},
         `⚠ ${S.items.filter(i=>i.type==='slot').length} ${t('slotsLeft')}`) : '',
       h('p',{style:'margin:12px 2px 6px; color:var(--text-2); font-size:13px; line-height:1.45'}, t('shareHint')),
+      h('p',{style:'margin:0 2px 6px; color:var(--text-2); font-size:13px; line-height:1.45'}, t('fixHint')),
       h('button',{class:'btn danger wide', style:'margin-top:6px', onclick:()=>{ close(); closeDocument(); }}, t('finish')));
     let bytes = null;
     const file = ()=>{ const n = (baseName(name.value) || 'document') + '.pdf'; return new File([bytes], n, {type:'application/pdf'}); };
@@ -1474,6 +1525,7 @@ $('#armCancel').onclick = disarm;
 $('#emptyScan').onclick = ()=>scanFlow(pickFile('image/*',{capture:true}));
 $('#emptyOpen').onclick = ()=>pickFile('application/pdf,image/*',{multiple:true}).then(openFiles);
 $('#shareBtn').onclick = shareSheet;
+$('#emptyRecent').onclick = recentSheet;
 $('#menuBtn').onclick = menuSheet;
 $('#undoBtn').onclick = undo;
 $('#langBtn').onclick = ()=>{ LANG = LANG==='fr'?'en':'fr'; LS.set('vsign_lang', LANG); applyLang(); buildSelbar(); };
