@@ -2863,15 +2863,15 @@ a:focus:not(:focus-visible) { outline: none; }
    ════════════════════════════════════════════════ */
 @media (max-width: 959px) {
   .bottom-nav {
-    background: rgba(255,255,255,.10) !important;
-    backdrop-filter: blur(18px) saturate(150%) brightness(1.12);
-    -webkit-backdrop-filter: blur(18px) saturate(150%) brightness(1.12);
+    background: rgba(255,255,255,.04) !important;
+    backdrop-filter: blur(2px) saturate(135%) brightness(1.08);
+    -webkit-backdrop-filter: blur(2px) saturate(135%) brightness(1.08);
     border: 1px solid rgba(0,0,0,.14) !important;             /* faint dark hairline outside */
     box-shadow:
       inset 0 0 0 1px rgba(255,255,255,.30),                  /* fine light rim inside */
       inset 0 1px 1.5px rgba(255,255,255,.45),                /* top edge catches light */
       inset 0 -1px 1.5px rgba(255,255,255,.30),               /* bottom edge refraction */
-      inset 0 0 8px rgba(255,255,255,.10),                    /* soft lift along the rim */
+      inset 0 0 6px rgba(255,255,255,.08),                    /* soft lift along the rim */
       0 4px 14px rgba(0,0,0,.06);
     isolation: isolate;
   }
@@ -2895,7 +2895,7 @@ a:focus:not(:focus-visible) { outline: none; }
 }
 @media (max-width: 959px) and (prefers-color-scheme: dark) {
   html:not([data-theme="light"]) .bottom-nav {
-    background: rgba(255,255,255,.07) !important;
+    background: rgba(255,255,255,.03) !important;
     border: 1px solid rgba(0,0,0,.35) !important;
     box-shadow: inset 0 0 0 1px rgba(255,255,255,.16), inset 0 1px 1.5px rgba(255,255,255,.28),
       inset 0 -1px 1.5px rgba(255,255,255,.18), inset 0 0 8px rgba(255,255,255,.06), 0 4px 14px rgba(0,0,0,.25);
@@ -2905,7 +2905,7 @@ a:focus:not(:focus-visible) { outline: none; }
 }
 @media (max-width: 959px) {
   [data-theme="dark"] .bottom-nav {
-    background: rgba(255,255,255,.07) !important;
+    background: rgba(255,255,255,.03) !important;
     border: 1px solid rgba(0,0,0,.35) !important;
     box-shadow: inset 0 0 0 1px rgba(255,255,255,.16), inset 0 1px 1.5px rgba(255,255,255,.28),
       inset 0 -1px 1.5px rgba(255,255,255,.18), inset 0 0 8px rgba(255,255,255,.06), 0 4px 14px rgba(0,0,0,.25);
