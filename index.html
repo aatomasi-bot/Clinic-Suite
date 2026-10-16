@@ -2854,6 +2854,77 @@ a:focus:not(:focus-visible) { outline: none; }
   [data-theme="dark"] .bottom-nav .nav-btn { color: var(--k); }
   [data-theme="dark"] .bottom-nav .nav-btn.active { color: #fff; }
 }
+
+/* ════════════════════════════════════════════════
+   LIQUID GLASS pill (mobile/tablet < 960px)
+   Clear, refractive-looking glass: low-opacity fill, strong blur +
+   saturation, a bright specular rim, a top sheen and a soft inner glow.
+   ════════════════════════════════════════════════ */
+@media (max-width: 959px) {
+  .bottom-nav {
+    background: linear-gradient(180deg, rgba(255,255,255,.46) 0%, rgba(255,255,255,.28) 55%, rgba(255,255,255,.36) 100%) !important;
+    backdrop-filter: blur(16px) saturate(210%) brightness(1.06) contrast(1.04);
+    -webkit-backdrop-filter: blur(16px) saturate(210%) brightness(1.06) contrast(1.04);
+    border: 1px solid rgba(255,255,255,.42) !important;
+    box-shadow:
+      inset 0 1.5px 0 rgba(255,255,255,.85),      /* top specular edge */
+      inset 0 -1px 0 rgba(255,255,255,.28),       /* bottom rim */
+      inset 0 10px 22px -10px rgba(255,255,255,.55), /* top sheen */
+      inset 0 -12px 20px -14px rgba(0,0,0,.10),   /* depth at the bottom */
+      0 12px 32px rgba(15,23,42,.18), 0 2px 8px rgba(15,23,42,.08);
+    isolation: isolate;
+  }
+  /* bright rim that catches light at the corners */
+  .bottom-nav::before {
+    content: ''; position: absolute; inset: -1px; border-radius: inherit; pointer-events: none; z-index: -1;
+    padding: 1px;
+    background: linear-gradient(115deg, rgba(255,255,255,.95) 0%, rgba(255,255,255,.15) 28%, rgba(255,255,255,0) 50%, rgba(255,255,255,.12) 72%, rgba(255,255,255,.75) 100%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor; mask-composite: exclude;
+  }
+  /* soft glare across the upper half */
+  .bottom-nav::after {
+    content: ''; position: absolute; left: 8%; right: 8%; top: 2px; height: 45%; border-radius: 999px; pointer-events: none; z-index: -1;
+    background: radial-gradient(120% 100% at 50% 0%, rgba(255,255,255,.38), rgba(255,255,255,0) 70%);
+  }
+  .bottom-nav.nav-hidden::before, .bottom-nav.nav-hidden::after { opacity: 0; }
+  /* glassy active capsule: tinted, see-through, with its own highlight */
+  .nav-btn.active::before {
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.35), rgba(255,255,255,0) 55%),
+      linear-gradient(140deg, color-mix(in srgb, var(--k) 70%, #fff) 0%, color-mix(in srgb, var(--k) 88%, transparent) 55%, color-mix(in srgb, var(--k) 80%, #000) 100%);
+    box-shadow: 0 6px 18px color-mix(in srgb, var(--k) 45%, transparent),
+                inset 0 1px 0 rgba(255,255,255,.6), inset 0 -1px 0 rgba(0,0,0,.08),
+                inset 0 0 0 .5px rgba(255,255,255,.35);
+  }
+  .nav-badge { border-color: rgba(255,255,255,.9) !important; }
+  /* keep coloured icons legible over busy content behind the glass */
+  .bottom-nav .nav-btn:not(.active) svg { filter: drop-shadow(0 0 3px rgba(255,255,255,.9)) drop-shadow(0 0 1px rgba(255,255,255,.9)); }
+}
+@media (max-width: 959px) and (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) .bottom-nav {
+    background: linear-gradient(180deg, rgba(40,52,74,.55) 0%, rgba(18,26,40,.42) 55%, rgba(26,36,54,.5) 100%) !important;
+    border: 1px solid rgba(255,255,255,.16) !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.35), inset 0 -1px 0 rgba(255,255,255,.08),
+      inset 0 10px 22px -12px rgba(255,255,255,.22), 0 14px 36px rgba(0,0,0,.5);
+  }
+  html:not([data-theme="light"]) .bottom-nav::before { opacity: .45; }
+  html:not([data-theme="light"]) .bottom-nav::after { opacity: .35; }
+  html:not([data-theme="light"]) .nav-badge { border-color: rgba(20,28,42,.9) !important; }
+  html:not([data-theme="light"]) .bottom-nav .nav-btn:not(.active) svg { filter: drop-shadow(0 0 3px rgba(0,0,0,.55)) brightness(1.15); }
+}
+@media (max-width: 959px) {
+  [data-theme="dark"] .bottom-nav {
+    background: linear-gradient(180deg, rgba(40,52,74,.55) 0%, rgba(18,26,40,.42) 55%, rgba(26,36,54,.5) 100%) !important;
+    border: 1px solid rgba(255,255,255,.16) !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.35), inset 0 -1px 0 rgba(255,255,255,.08),
+      inset 0 10px 22px -12px rgba(255,255,255,.22), 0 14px 36px rgba(0,0,0,.5);
+  }
+  [data-theme="dark"] .bottom-nav::before { opacity: .45; }
+  [data-theme="dark"] .bottom-nav::after { opacity: .35; }
+  [data-theme="dark"] .nav-badge { border-color: rgba(20,28,42,.9) !important; }
+  [data-theme="dark"] .bottom-nav .nav-btn:not(.active) svg { filter: drop-shadow(0 0 3px rgba(0,0,0,.55)) brightness(1.15); }
+}
 </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script>
