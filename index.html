@@ -4025,6 +4025,27 @@ const COL = {
   'CPP Patient': 'cpp_patient'
 };
 
+// ── Parsed localStorage cache ─────────────────────────────────
+// Cards look up notes/pins for every patient on each render; re-reading and
+// JSON-parsing localStorage for each card made long lists very slow on phones.
+// Values are parsed once and dropped whenever the key is written (here or in
+// another tab), so reads always reflect the latest stored data.
+const _lsParsed = Object.create(null);
+function _lsGet(key, fallback) {
+  if (!(key in _lsParsed)) {
+    try { _lsParsed[key] = JSON.parse(localStorage.getItem(key) || fallback); }
+    catch(e) { _lsParsed[key] = JSON.parse(fallback); }
+  }
+  return _lsParsed[key];
+}
+(function(){
+  const proto = Storage.prototype, set = proto.setItem, rem = proto.removeItem, clr = proto.clear;
+  proto.setItem    = function(k, v){ delete _lsParsed[k]; return set.call(this, k, v); };
+  proto.removeItem = function(k){ delete _lsParsed[k]; return rem.call(this, k); };
+  proto.clear      = function(){ for (const k in _lsParsed) delete _lsParsed[k]; return clr.call(this); };
+  window.addEventListener('storage', e => { if (e.key) delete _lsParsed[e.key]; else for (const k in _lsParsed) delete _lsParsed[k]; });
+})();
+
 // State
 let _sb = null;
 let patients = [];
@@ -4048,6 +4069,7 @@ let confirmCallback = null;
 let apptConfirmedStatus = true;
 // Real-time listener state — declared early so dbUpdate can access without TDZ issues
 let _lastLocalUpdateTs = 0;
+let _batchRecording = false;   // set while recording a whole day (suppresses per-row reloads)
 let _realtimeDebounce  = null;
 
 // ========== DATE UTILS ==========
@@ -4121,11 +4143,12 @@ function formatDateTime(dtStr) {
   } catch { return dtStr; }
 }
 
+const _fmtTimeOnly = new Intl.DateTimeFormat('en-US', { hour:'numeric', minute:'2-digit', hour12:true });
 function formatTimeOnly(dtStr) {
   if (!dtStr) return '';
   try {
     const dt = new Date(dtStr);
-    return dt.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit', hour12:true });
+    return isNaN(dt) ? '' : _fmtTimeOnly.format(dt);
   } catch { return ''; }
 }
 
@@ -4235,9 +4258,10 @@ async function initSupabase() {
   }
 }
 
-async function loadPatients() {
+async function loadPatients(opts = {}) {
   if (!_sb) return;
-  setLoading(true, 'Loading patients…');
+  const silent = !!opts.silent;   // background refresh: keep the list on screen
+  if (!silent) setLoading(true, 'Loading patients…');
   try {
     // ── Paginate through ALL rows ──────────────────────────────
     // Supabase/PostgREST caps a single request at 1000 rows by default.
@@ -4268,9 +4292,10 @@ async function loadPatients() {
     _patientsByFileNum = new Map(patients.map(p => [String(p['File Number']).trim(), p]));
     renderView();
   } catch(e) {
-    toast('Failed to load: ' + e.message, 'error');
+    if (!silent) toast('Failed to load: ' + e.message, 'error');
+    else console.warn('[sync] background reload failed:', e.message);
   } finally {
-    setLoading(false);
+    if (!silent) setLoading(false);
   }
 }
 
@@ -4532,10 +4557,11 @@ function _vsReset() {
 // needed early so the patient card template can call isPinned().
 const _PIN_KEY = 'vapiq_pins';
 function loadPins() {
-  try { return JSON.parse(localStorage.getItem(_PIN_KEY) || '[]'); } catch { return []; }
+  const v = _lsGet(_PIN_KEY, '[]');
+  return Array.isArray(v) ? v.slice() : [];   // copy: callers may modify before savePins()
 }
 function savePins(pins) { localStorage.setItem(_PIN_KEY, JSON.stringify(pins)); }
-function isPinned(fileNum) { return loadPins().includes(String(fileNum)); }
+function isPinned(fileNum) { const v = _lsGet(_PIN_KEY, '[]'); return Array.isArray(v) && v.includes(String(fileNum)); }
 
 function renderPatientList() {
   const el = document.getElementById('mainContent');
@@ -8123,19 +8149,32 @@ function _clearPendingNote(fileNum) {
 function _getPendingNote(fileNum) {
   const key = String(fileNum);
   if (window._vapiqPendingNotes[key]) return window._vapiqPendingNotes[key];
-  try {
-    const stored = JSON.parse(localStorage.getItem('_vapiq_pending') || '{}');
-    if (stored[key]) { window._vapiqPendingNotes[key] = stored[key]; return stored[key]; }
-  } catch(e) {}
+  const stored = _lsGet('_vapiq_pending', '{}');
+  if (stored[key]) { window._vapiqPendingNotes[key] = stored[key]; return stored[key]; }
   return '';
 }
 
 let _quickNotesCache = {};  // fileNumber(string) → noteText
 
+// Notes edited on this device that have not reached Supabase yet (fileNumber → true).
+// They survive reloads and are retried; everything else follows the server.
+function _dirtyNotes() { return _lsGet('_qn_dirty', '{}'); }
+function _setNoteDirty(fileNum, dirty) {
+  const d = Object.assign({}, _dirtyNotes());
+  if (dirty) d[String(fileNum)] = true; else delete d[String(fileNum)];
+  try { localStorage.setItem('_qn_dirty', JSON.stringify(d)); } catch(e) {}
+}
+let _noteSyncWarned = false;
+async function _flushDirtyNotes() {
+  if (!_sb) return;
+  for (const fn of Object.keys(_dirtyNotes())) await _saveNoteDB(fn, _quickNotesCache[fn] || '');
+}
+
 async function loadQuickNotesFromDB() {
   // Step 1: Load localStorage immediately (instant, no network)
   try { _quickNotesCache = JSON.parse(localStorage.getItem('_qn') || '{}'); } catch(e) { _quickNotesCache = {}; }
-  // Step 2: Fetch from Supabase and MERGE (Supabase wins for same key, keeps local-only entries)
+  // Step 2: Fetch from Supabase. The server is the source of truth (so a note cleared
+  // on another device disappears here too); only notes still waiting to sync are kept.
   try {
     let allRows = [];
     let from = 0;
@@ -8148,7 +8187,17 @@ async function loadQuickNotesFromDB() {
       if (data.length < PAGE) break;
       from += PAGE;
     }
-    allRows.forEach(r => { if (r.note_text) _quickNotesCache[String(r.file_number)] = r.note_text; });
+    const local = _quickNotesCache, fresh = {};
+    allRows.forEach(r => { if (r.note_text) fresh[String(r.file_number)] = r.note_text; });
+    // One-time upgrade: notes that only ever lived on this device (older versions could
+    // fail to save silently) are uploaded instead of dropped.
+    if (!localStorage.getItem('_qn_v2')) {
+      Object.keys(local).forEach(k => { if (local[k] && !(k in fresh)) _setNoteDirty(k, true); });
+      try { localStorage.setItem('_qn_v2', '1'); } catch(e) {}
+    }
+    const dirty = _dirtyNotes();
+    Object.keys(dirty).forEach(k => { if (k in local) fresh[k] = local[k]; else delete fresh[k]; });
+    _quickNotesCache = fresh;
     // Persist merged result back to localStorage
     try { localStorage.setItem('_qn', JSON.stringify(_quickNotesCache)); } catch(e) {}
     // ── Step 3: Clear stale pending notes ────────────────────────────
@@ -8163,6 +8212,7 @@ async function loadQuickNotesFromDB() {
         localStorage.setItem('_vapiq_pending', JSON.stringify(pending));
       }
     } catch(e) {}
+    _flushDirtyNotes();   // push anything still waiting (background)
   } catch(e) {
     // Supabase unavailable — already loaded from localStorage above, nothing to do
   }
@@ -8170,18 +8220,27 @@ async function loadQuickNotesFromDB() {
 
 async function _saveNoteDB(fileNum, text) {
   try { localStorage.setItem('_qn', JSON.stringify(_quickNotesCache)); } catch(e) {}
+  _setNoteDirty(fileNum, true);           // cleared only once Supabase confirms
   if (!_sb) return;
   try {
-    if (text) {
-      await _sb.from('quick_notes').upsert(
-        { file_number: String(fileNum), note_text: text, updated_at: new Date().toISOString() },
-        { onConflict: 'file_number' }
-      );
-    } else {
-      await _sb.from('quick_notes').delete().eq('file_number', String(fileNum));
+    _noteLocalTs[String(fileNum)] = Date.now();
+    const { error } = text
+      ? await _sb.from('quick_notes').upsert(
+          { file_number: String(fileNum), note_text: text, updated_at: new Date().toISOString() },
+          { onConflict: 'file_number' })
+      : await _sb.from('quick_notes').delete().eq('file_number', String(fileNum));
+    if (error) throw error;
+    // Only clear if the note hasn't been edited again while this save was in flight
+    if ((_quickNotesCache[String(fileNum)] || '') === (text || '')) _setNoteDirty(fileNum, false);
+  } catch(e) {
+    console.warn('Note save:', e.message);
+    if (!_noteSyncWarned) {
+      _noteSyncWarned = true;
+      toast('Note saved on this device — it will sync when the connection is back', 'warning', '📝');
     }
-  } catch(e) { console.warn('Note save:', e.message); }
+  }
 }
+const _noteLocalTs = {};   // fileNumber → time of our last save (to ignore our own realtime echo)
 
 function getQuickNote(fileNum) {
   const key = String(fileNum);
@@ -8193,10 +8252,8 @@ function getQuickNote(fileNum) {
   // Layer 1: In-memory cache (updated immediately by onNoteInput and at login)
   if (_quickNotesCache[key]) return _quickNotesCache[key];
   // Layer 2: localStorage main notes (_qn) — set by _saveNoteDB
-  try {
-    const ls = JSON.parse(localStorage.getItem('_qn') || '{}');
-    if (ls[key]) { _quickNotesCache[key] = ls[key]; return ls[key]; }
-  } catch(e) {}
+  const ls = _lsGet('_qn', '{}');
+  if (ls[key]) { _quickNotesCache[key] = ls[key]; return ls[key]; }
   // Layer 3: Pending notes — ONLY if no saved note exists yet
   // (covers the window between confirmAccepted and the user's first render)
   const pending = _getPendingNote(key);
@@ -8205,7 +8262,7 @@ function getQuickNote(fileNum) {
 }
 function hasQuickNote(fileNum) {
   // Check patient object's _confirmedNote first (set by confirmAccepted)
-  const pat = patients.find(pt => String(pt['File Number']) === String(fileNum));
+  const pat = _patientsByFileNum.get(String(fileNum).trim());
   if (pat?._confirmedNote) return true;
   const n = getQuickNote(fileNum);
   return !!(n && n.trim());
@@ -8214,6 +8271,7 @@ function hasQuickNote(fileNum) {
 let _noteTimer = null;
 function onNoteInput(fileNum, val) {
   _quickNotesCache[String(fileNum)] = val;
+  if (!_dirtyNotes()[String(fileNum)]) _setNoteDirty(fileNum, true);   // never let a background sync overwrite typing
   // ── Save to localStorage IMMEDIATELY (not just after 900ms debounce) ──
   // If a re-render fires during typing (e.g. real-time listener from another
   // device), renderCard reads from getQuickNote() which checks localStorage.
@@ -10451,6 +10509,95 @@ async function _verifyRLS() {
   }
 }
 
+// Live sync lives at the top level so both the sign-in code and the
+// "already signed in" start-up path below can start it.
+// ════════════════════════════════════════════════════════════
+// SUPABASE REAL-TIME LISTENER
+// Subscribes to changes on the patients table so that updates
+// from the scheduler, another device, or another session appear
+// automatically without a manual refresh.
+// Debounced to avoid rapid consecutive reloads during bulk operations.
+// ════════════════════════════════════════════════════════════
+// _lastLocalUpdateTs declared early above
+
+let _rtChannel = null, _rtRetry = null, _rtStatus = '';
+let _noteRenderDebounce = null;
+function _initRealtime() {
+  if (!_sb || !_sb.channel) return;
+  try {
+    if (_rtChannel) { try { _sb.removeChannel(_rtChannel); } catch(e) {} _rtChannel = null; }
+    clearTimeout(_rtRetry);
+    _rtChannel = _sb.channel('vapiq-sync-' + Date.now())
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'patients' },
+        (payload) => {
+          // Skip if we just made this update ourselves (within 3s)
+          if (Date.now() - _lastLocalUpdateTs < 3000) return;
+          // Debounce: wait 800ms for rapid bulk changes before reloading
+          clearTimeout(_realtimeDebounce);
+          _realtimeDebounce = setTimeout(() => {
+            if (!_batchRecording) loadPatients({ silent: true });
+          }, 800);
+        }
+      )
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'quick_notes' },
+        (payload) => {
+          const row = payload.new && Object.keys(payload.new).length ? payload.new : null;
+          const fn = String((row || payload.old || {}).file_number || '');
+          if (!fn) { loadQuickNotesFromDB().then(() => renderView()); return; }
+          if (_dirtyNotes()[fn] || Date.now() - (_noteLocalTs[fn] || 0) < 3000) return; // our own edit
+          if (payload.eventType === 'DELETE' || !row?.note_text) delete _quickNotesCache[fn];
+          else _quickNotesCache[fn] = row.note_text;
+          _clearPendingNote(fn);
+          try { localStorage.setItem('_qn', JSON.stringify(_quickNotesCache)); } catch(e) {}
+          clearTimeout(_noteRenderDebounce);
+          _noteRenderDebounce = setTimeout(() => { if (currentView === 'patients') renderView(); }, 400);
+        }
+      )
+      .subscribe((status) => {
+        _rtStatus = status;
+        // iOS drops sockets in the background; reconnect instead of staying silent
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          clearTimeout(_rtRetry);
+          _rtRetry = setTimeout(() => { if (document.visibilityState === 'visible') _initRealtime(); }, 5000);
+        }
+      });
+    console.info('[VaPiq] Real-time sync active (patients + quick notes)');
+  } catch(e) {
+    console.warn('[VaPiq] Real-time unavailable:', e.message);
+  }
+}
+
+// ── Catch up when the app comes back to the foreground ────────────
+// Phones suspend the page (and its live connection) in the background, so
+// changes made on another device meanwhile are fetched here.
+let _lastSyncTs = Date.now(), _resyncing = false;
+async function _resyncNow() {
+  if (_resyncing || !_sb) return;
+  const { data: { session } } = await _sb.auth.getSession();
+  if (!session) return;
+  _resyncing = true;
+  try {
+    await _flushDirtyNotes();
+    await loadQuickNotesFromDB();
+    await loadPatients({ silent: true });
+    if (_rtStatus !== 'SUBSCRIBED') _initRealtime();
+    _lastSyncTs = Date.now();
+  } finally { _resyncing = false; }
+}
+function _maybeResync() {
+  if (document.visibilityState !== 'visible') return;
+  if (Date.now() - _lastSyncTs < 10000) return;   // just synced
+  _resyncNow();
+}
+document.addEventListener('visibilitychange', _maybeResync);
+window.addEventListener('pageshow', e => { if (e.persisted) _maybeResync(); });
+window.addEventListener('focus', _maybeResync);
+window.addEventListener('online', () => { _lastSyncTs = 0; _maybeResync(); });
+// Called after any local update so we don't double-reload
+function _markLocalUpdate() { _lastLocalUpdateTs = Date.now(); }
+
 document.addEventListener('DOMContentLoaded', async () => {
   // Supabase — init client first (no network call yet)
   if (!_sb) _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -10467,6 +10614,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadQuickNotesFromDB();
     await loadPatients();
     await loadInjectionHistoryFromDB();
+    _initRealtime();       // live sync was previously only started after typing the password
+    _lastSyncTs = Date.now();
   } else {
     // Not logged in — show login screen
     showLoginScreen();
@@ -10957,46 +11106,12 @@ window.setTheme = setTheme;
 // Flag set during batch recording to skip redundant loadPatients() calls.
 // recordAllForDate sets this before the loop and clears it after, then
 // does ONE final loadPatients(). Prevents N × full-reload on mobile.
-let _batchRecording = false;
+// _batchRecording is declared with the global state (it is also used outside this handler)
 // Invoice month navigation — stored on window so inline onclick handlers can access them
 // (let variables are NOT accessible from inline onclick attributes)
 window.window._invoiceViewYear  = null;
 window.window._invoiceViewMonth = null;
 
-// ════════════════════════════════════════════════════════════
-// SUPABASE REAL-TIME LISTENER
-// Subscribes to changes on the patients table so that updates
-// from the scheduler, another device, or another session appear
-// automatically without a manual refresh.
-// Debounced to avoid rapid consecutive reloads during bulk operations.
-// ════════════════════════════════════════════════════════════
-let _realtimeDebounce = null; // declared early — kept for reference
-// _lastLocalUpdateTs declared early above
-
-function _initRealtime() {
-  if (!_sb || !_sb.channel) return;
-  try {
-    _sb.channel('vapiq-patients-realtime')
-      .on('postgres_changes',
-        { event: '*', schema: 'public', table: 'patients' },
-        (payload) => {
-          // Skip if we just made this update ourselves (within 3s)
-          if (Date.now() - _lastLocalUpdateTs < 3000) return;
-          // Debounce: wait 800ms for rapid bulk changes before reloading
-          clearTimeout(_realtimeDebounce);
-          _realtimeDebounce = setTimeout(() => {
-            if (!_batchRecording) loadPatients();
-          }, 800);
-        }
-      )
-      .subscribe();
-    console.info('[VaPiq] Real-time patient sync active');
-  } catch(e) {
-    console.warn('[VaPiq] Real-time unavailable:', e.message);
-  }
-}
-// Called after any local update so we don't double-reload
-function _markLocalUpdate() { _lastLocalUpdateTs = Date.now(); }
 
 // ════════════════════════════════════════════════════════════
 // ── RAW PATIENT FINDER — diagnostic tool ─────────────────────
