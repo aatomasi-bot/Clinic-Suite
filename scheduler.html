@@ -77,7 +77,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 .pc.tsel{border-color:var(--teal);background:var(--tl)}
 .pc.outw{border-style:dashed}
 .pc.gsrc{opacity:.3}
-.pc-name{font-size:13px;font-weight:800;color:var(--t);
+.pc-name{font-size:10.5px;font-weight:800;color:var(--t);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px}
 .pc-meta{display:flex;align-items:center;gap:5px}
 .zpill{padding:1px 6px;border-radius:99px;font-size:9px;font-weight:800;color:#fff;flex-shrink:0}
@@ -106,13 +106,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 .dcol{display:flex;flex-direction:column;border-right:1px solid var(--b);min-height:0}
 .dcol:last-child{border-right:none}
 .dhdr{background:var(--card2);border-bottom:1px solid var(--b);
-  padding:6px 8px;position:sticky;top:0;z-index:10;flex-shrink:0}
+  padding:5px 7px;position:sticky;top:0;z-index:10;flex-shrink:0}
 .dhdr.has{background:var(--tl);border-bottom-color:var(--teal)}
 .dhdr.locked-hdr{background:rgba(232,162,58,.07);border-bottom-color:var(--amber)}
 .dhdr.edit-hdr{background:rgba(224,90,90,.06);border-bottom-color:var(--re)}
 .dhdr.cluster-day{background:rgba(124,58,237,.08);border-bottom-color:#7C3AED}
 /* Row 1: date + toggles */
-.dh-row1{display:flex;align-items:center;justify-content:space-between;gap:2px;margin-bottom:4px}
+.dh-row1{display:flex;align-items:center;justify-content:space-between;gap:2px;margin-bottom:3px}
 .dh-left{display:flex;align-items:baseline;gap:4px;flex:1;min-width:0;overflow:hidden}
 .dh-left .dname{font-size:8px;font-weight:800;letter-spacing:.7px;
   text-transform:uppercase;color:var(--t2);white-space:nowrap}
@@ -123,6 +123,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 .dh-toggles{display:flex;gap:2px;align-items:center;flex-shrink:0}
 /* Row 2: action buttons */
 .dh-row2{display:flex;gap:3px;flex-wrap:nowrap;align-items:center}
+.dh-conf{flex:1;min-width:0}
+.dh-conf .btn-conf-day{padding:3px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* Row 3: confirm (full width) */
 .dh-row3{margin-top:3px}
 .dh-top{display:flex;align-items:flex-start;justify-content:space-between;gap:4px}
@@ -157,7 +159,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 .sc.gsrc{opacity:.25}
 .sc.drop-above{box-shadow:0 -3px 0 var(--teal)}
 .sc.drop-below{box-shadow:0 3px 0 var(--teal)}
-.sc-name{font-size:13px;font-weight:800;color:var(--t);display:block;
+.sc-name{font-size:10.5px;font-weight:800;color:var(--t);display:block;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px}
 .sc-row{display:flex;align-items:center;gap:5px;margin-bottom:2px}
 .sc-bottom{display:flex;align-items:center;gap:6px;margin-top:3px}
@@ -349,6 +351,21 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 .only-m{display:none!important}
 .scrim{display:none}
 @media(max-width:1180px){ .hact .stot{display:none} }
+@media(min-width:901px){
+  :root{--hdr-h:37px}
+  .hdr{gap:5px;padding:0 8px}
+  .hb{height:26px;min-width:26px;font-size:12px;border-radius:7px;padding:0 5px}
+  .hnav{gap:3px}
+  .hnav .navlbl{font-size:10.5px;padding:4px 6px}
+  .hact{gap:5px}
+  .hact .stot{font-size:9px}
+  .hact .navBtn,.hact .opt-btn,.hact .undo-wk-btn,.hact .undo-batch-btn{padding:4px 8px;font-size:10px;border-radius:6px}
+  .hact .conf-all-btn{padding:5px 11px;font-size:10.5px;border-radius:6px}
+  .time-wrap{font-size:10px}
+  .hact .time-in{padding:3px 5px;font-size:10.5px}
+  .hsep{height:18px}
+  .legend.pop{top:32px}
+}
 /* phones & narrow windows */
 @media(max-width:900px){
   .hide-m{display:none!important}
@@ -493,7 +510,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 <div class="scrim" id="scrim" onclick="toggleMore(false);if(window.innerWidth<=900&&sbOpen)toggleSB()"></div>
 
 <div class="layout">
-  <div class="sb" id="sb">
+  <div class="sb off" id="sb">
     <div class="sbh">
       <h2>Eligible Pool</h2>
       <div class="badge" id="poolBadge">0</div>
@@ -511,7 +528,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   </div>
 
   <div class="ga" id="ga">
-    <button class="ctab" id="ctab" onclick="toggleSB()">◀</button>
+    <button class="ctab" id="ctab" onclick="toggleSB()">▶</button>
     <div class="grid" id="grid"></div>
   </div>
 </div>
@@ -615,7 +632,7 @@ let windowStart = '';   // YYYY-MM-DD
 let allPats = [];
 let days = mkDays();
 let pool = [];
-let sbOpen = true;
+let sbOpen = false;   // pool starts closed so the 7 days get the full width (☰ opens it)
 
 function mkDays(){
   return Array.from({length:7},()=>({conf:[],active:[],editMode:false,circ:'A'}));
@@ -1001,15 +1018,14 @@ function renderGrid(){
             ${toggleBtns}
           </div>
         </div>
-        <!-- Row 2: action buttons (undo, merge, re-sort) -->
-        ${actionBtns?`<div class="dh-row2">${actionBtns}</div>`:''}
-        <!-- Row 3: confirm (full width, only when unconfirmed exist) -->
-        ${confirmBtn?`<div class="dh-row3">${confirmBtn}</div>`:''}
-        <!-- Drag handle -->
-        ${total>0?`<div class="block-drag-handle${editMode?' edit-handle':''}" data-blockday="${i}"
-          title="${editMode?'Drag confirmed block to adjacent day':'Drag day to adjacent column'}"
-          style="margin-top:3px;font-size:8px;padding:2px 5px">
-          ⣿ ${editMode?'Confirmed block':'Drag block'}</div>`:''}
+        <!-- Row 2 (single line): actions · confirm · drag handle -->
+        ${(actionBtns||confirmBtn||total>0)?`<div class="dh-row2">
+          ${actionBtns}
+          ${confirmBtn?`<div class="dh-conf">${confirmBtn}</div>`:'<div class="dh-conf"></div>'}
+          ${total>0?`<div class="block-drag-handle${editMode?' edit-handle':''}" data-blockday="${i}"
+            title="${editMode?'Drag confirmed block to adjacent day':'Drag day to adjacent column'}"
+            style="font-size:9px;padding:2px 5px;flex-shrink:0">⣿</div>`:''}
+        </div>`:''}
       </div>
       <div class="dbody" id="db-${i}">`;
 
