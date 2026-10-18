@@ -351,6 +351,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 .only-m{display:none!important}
 .scrim{display:none}
 @media(max-width:1180px){ .hact .stot{display:none} }
+.appnav{display:flex;gap:4px;padding-right:4px;margin-right:2px;border-right:1px solid rgba(255,255,255,.12)}
+.appnav[hidden]{display:none}
 .mbar{display:flex;align-items:center;gap:6px;height:26px;padding:0 8px;flex-shrink:0;background:var(--card2);border-bottom:1px solid var(--b)}
 .mb-btn{background:var(--card);border:1px solid var(--b);color:var(--t2);width:24px;height:20px;border-radius:6px;cursor:pointer;font-size:9px;flex-shrink:0;font-family:inherit}
 .mb-btn:hover{border-color:var(--teal);color:var(--teal)}
@@ -469,6 +471,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 <header class="hdr" id="hdr">
   <button class="hb" id="sbtgl" onclick="toggleSB()" title="Eligible pool">☰</button>
   <a class="hb hide-m" href="./index.html" title="Back to VaPiq">🏠</a>
+  <!-- Shown only when opened in an app window (no browser toolbar): back / forward / refresh -->
+  <span class="appnav" id="appnav" hidden>
+    <button class="hb" onclick="history.back()" title="Back">←</button>
+    <button class="hb" onclick="history.forward()" title="Forward">→</button>
+    <button class="hb" onclick="location.reload()" title="Refresh page">↻</button>
+  </span>
   <div class="hnav">
     <button class="hb hide-xs" onclick="nav(-7)" title="Back 7 days">«</button>
     <button class="hb" onclick="nav(-1)" title="Back 1 day">‹</button>
@@ -1555,6 +1563,13 @@ function toggleSB(){
   if(sbOpen) toggleMore(false);
   _syncScrim();
 }
+// ── App windows (installed app / "open as window") have no browser toolbar:
+//    show our own back / forward / refresh buttons there ──
+(function(){
+  const mq = window.matchMedia('(display-mode: standalone), (display-mode: minimal-ui), (display-mode: window-controls-overlay), (display-mode: fullscreen)');
+  const set = () => { const el=document.getElementById('appnav'); if(el) el.hidden = !(mq.matches || window.navigator.standalone === true); };
+  set(); if(mq.addEventListener) mq.addEventListener('change', set);
+})();
 // ── Month bar: the track is the whole month, the handle is the 7-day window ──
 function navMonth(dir){
   const d=fromYMD(windowStart||todayYMD());
