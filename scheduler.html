@@ -363,6 +363,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 .mb-day:last-child{border-right:none}
 .mb-day.we{background:rgba(255,255,255,.03)}
 [data-theme="light"] .mb-day.we{background:rgba(0,0,0,.04)}
+.mb-day.nx{opacity:.45;font-style:italic}
+.mb-day.nx1{border-left:2px solid var(--t3)}
 .mb-day.today{color:var(--teal);font-weight:800;box-shadow:inset 0 -2px 0 var(--teal)}
 .mb-thumb{position:absolute;top:0;bottom:0;border-radius:6px;background:rgba(45,140,138,.28);border:1.5px solid var(--teal);cursor:grab;transition:left .15s,width .15s}
 .mb-thumb.drag{cursor:grabbing;transition:none;background:rgba(45,140,138,.4)}
@@ -1582,27 +1584,30 @@ function renderMonthBar(){
   const ws=fromYMD(windowStart), y=ws.getFullYear(), m=ws.getMonth(), N=new Date(y,m+1,0).getDate();
   const today=todayYMD();
   lbl.textContent=MFULL[m]+' '+y;
-  let h=''; for(let k=1;k<=N;k++){ const dt=new Date(y,m,k), we=dt.getDay()===0||dt.getDay()===6;
-    h+=`<div class="mb-day${we?' we':''}${toYMD(dt)===today?' today':''}">${k}</div>`; }
+  // The month plus the first 6 days of the next month (dimmed), so the handle is
+  // always a full 7-day week even when the week crosses into the next month.
+  const T=N+6;
+  let h=''; for(let k=1;k<=T;k++){ const dt=new Date(y,m,k), we=dt.getDay()===0||dt.getDay()===6, nx=k>N;
+    h+=`<div class="mb-day${we?' we':''}${nx?' nx':''}${k===N+1?' nx1':''}${toYMD(dt)===today?' today':''}">${dt.getDate()}</div>`; }
   days.innerHTML=h;
   const start=ws.getDate()-1;                      // 0-based day index of the window start
-  th.style.left=(start/N*100)+'%';
-  th.style.width=(Math.min(7,N-start)/N*100)+'%'; // window may run into next month
-  days.dataset.y=y; days.dataset.m=m; days.dataset.n=N;
+  th.style.left=(start/T*100)+'%';
+  th.style.width=(7/T*100)+'%';
+  days.dataset.y=y; days.dataset.m=m; days.dataset.n=N; days.dataset.t=T;
 }
 (function(){
   const track=document.getElementById('mTrack'), th=document.getElementById('mThumb'), tip=document.getElementById('mTip'), days=document.getElementById('mDays');
   if(!track) return;
-  const dayAt=x=>{ const r=track.getBoundingClientRect(), N=+days.dataset.n; return Math.max(0,Math.min(N-1,Math.floor((x-r.left)/r.width*N))); };
+  const dayAt=x=>{ const r=track.getBoundingClientRect(), T=+days.dataset.t; return Math.max(0,Math.min(T-1,Math.floor((x-r.left)/r.width*T))); };
   const dateOf=i=>new Date(+days.dataset.y, +days.dataset.m, i+1);
   let drag=null;
   th.addEventListener('pointerdown',e=>{ e.preventDefault(); e.stopPropagation(); th.setPointerCapture(e.pointerId);
     drag={x:e.clientX, start:fromYMD(windowStart).getDate()-1, idx:fromYMD(windowStart).getDate()-1}; th.classList.add('drag');
     const d=dateOf(drag.idx); tip.textContent=DAYS[(d.getDay()+6)%7]+' '+d.getDate()+' '+MONTHS[d.getMonth()]; });
   th.addEventListener('pointermove',e=>{ if(!drag) return;
-    const N=+days.dataset.n, w=track.getBoundingClientRect().width;
-    drag.idx=Math.max(0,Math.min(N-1, drag.start+Math.round((e.clientX-drag.x)/w*N)));
-    th.style.left=(drag.idx/N*100)+'%'; th.style.width=(Math.min(7,N-drag.idx)/N*100)+'%';
+    const N=+days.dataset.n, T=+days.dataset.t, w=track.getBoundingClientRect().width;
+    drag.idx=Math.max(0,Math.min(N-1, drag.start+Math.round((e.clientX-drag.x)/w*T)));   // week starts within this month
+    th.style.left=(drag.idx/T*100)+'%';
     const d=dateOf(drag.idx); tip.textContent=DAYS[(d.getDay()+6)%7]+' '+d.getDate()+' '+MONTHS[d.getMonth()]; });
   const end=()=>{ if(!drag) return; const idx=drag.idx, moved=idx!==drag.start; drag=null; th.classList.remove('drag');
     if(moved){ windowStart=toYMD(dateOf(idx)); reload(); } };
