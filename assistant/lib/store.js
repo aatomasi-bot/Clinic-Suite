@@ -88,6 +88,31 @@ export async function supabaseStore(cfg) {
       must(await sb.from('email_tasks').update({ status: 'failed', error: 'Interrupted while sending — check your Sent folder before retrying.' })
         .eq('status', 'sending').lt('decided_at', cutoff));
     },
+    // Everything the safety net looks at (open items + active patients' scheduling fields)
+    async snapshot() {
+      const since = new Date(Date.now() - 60 * 864e5).toISOString();
+      const pending = must(await sb.from('pending_patients').select('id,status,created_at,alerted_at,is_test').eq('status', 'pending'));
+      const tasks = must(await sb.from('email_tasks').select('id,kind,status,created_at,decided_at,alerted_at,asked_docs_at,documents,is_test')
+        .in('status', ['todo', 'waiting_docs', 'reply_ready', 'failed']).gte('created_at', since));
+      const patients = [];
+      for (let from = 0; ; from += 1000) {
+        const page = must(await sb.from('patients').select('id,archived,pending,due_date,appointment_date_time,appointment_confirmed').range(from, from + 999));
+        patients.push(...page);
+        if (page.length < 1000) break;
+      }
+      return { pending, tasks, patients };
+    },
+    async markAlerted(items) {
+      const at = new Date().toISOString();
+      for (const table of ['pending_patients', 'email_tasks']) {
+        const ids = items.filter(i => i.table === table).map(i => i.id);
+        if (ids.length) must(await sb.from(table).update({ alerted_at: at }).in('id', ids));
+      }
+    },
+    async log(kind, summary) {
+      const { error } = await sb.from('assistant_log').insert({ kind, summary });
+      if (error) console.warn('[assistant_log]', error.message);
+    },
     async pushSubscriptions() {
       return must(await sb.from('push_subscriptions').select('endpoint,p256dh,auth'));
     },
@@ -129,6 +154,9 @@ export function offlineStore({ patientsFile, outFile }) {
     async openPendingFileNumbers() { return rows.filter(r => r.status === 'pending').map(r => r.record.file_number); },
     async insertPending(row) { const id = `offline-${rows.length + 1}`; rows.push({ id, ...row }); save(); return id; },
     async audit() {},
+    async snapshot() { return { pending: rows.filter(r => r.status === 'pending'), tasks: tasks.filter(t => ['todo', 'waiting_docs', 'reply_ready', 'failed'].includes(t.status)), patients }; },
+    async markAlerted(items) { const at = new Date().toISOString(); for (const i of items) { const r = (i.table === 'pending_patients' ? rows : tasks).find(x => x.id === i.id); if (r) r.alerted_at = at; } save(); },
+    async log() {},
     async pushSubscriptions() { return []; },
     async removeSubscription() {},
     async purgeDecided() {},

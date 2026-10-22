@@ -25,6 +25,7 @@ import { supabaseStore, offlineStore } from './lib/store.js';
 import { summaryText, macNotification, pushToPhones } from './lib/notify.js';
 import { testMailer, liveMailer } from './lib/mailer.js';
 import { runOutbox } from './lib/outbox.js';
+import { overdueItems, dueForAlert, overdueText, forMode } from './lib/safety.js';
 
 const require = createRequire(import.meta.url);
 const { draftReply, detectLanguage, coordinatorFirstName, subjectReference, missingDocs } = require('../js/reply-templates.js');
@@ -245,12 +246,23 @@ async function main() {
     const out = await runOutbox({ store, mailer, testMailer: tMailer, rules: cfg.rules, live, moveToFolder: cfg.replies.moveToFolder });
     if (out.sent || out.failed) console.log(`  replies sent ${out.sent}, failed ${out.failed}`);
 
-    const body = summaryText(counts);
-    if (body && !offline) {
-      const title = live ? 'VaPiq' : 'VaPiq (test)';
+    const title = live ? 'VaPiq' : 'VaPiq (test)';
+    const notify = async body => {
+      if (offline) return;
       if (cfg.push.mac) macNotification(title, body);
       const r = await pushToPhones(store, { title, body, url: cfg.push.approvalsUrl, subject: cfg.push.subject });
       if (r.skipped) console.log('  push:', r.skipped); else console.log(`  push sent to ${r.sent} device(s)`);
+    };
+    const body = summaryText(counts);
+    if (body) await notify(body);
+
+    // Safety net: anything waiting too long → one reminder per item per day
+    const overdue = dueForAlert(overdueItems(forMode(await store.snapshot(), live), cfg.alerts));
+    if (overdue.length) {
+      console.log(`  overdue ${overdue.length}: ${[...new Set(overdue.map(o => o.why))].join(', ')}`);
+      await notify(overdueText(overdue));
+      await store.markAlerted(overdue);
+      await store.log('overdue_alert', { count: overdue.length, reasons: overdue.map(o => o.why) });
     }
     await store.purgeDecided(cfg.retentionDays);
   } finally {

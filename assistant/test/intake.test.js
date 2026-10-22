@@ -189,3 +189,35 @@ test('address: street, city, prov, postal, then the unit with its own label', ()
     '45 Graham Boulevard, Laval, QC, H7G 3A4, Unit C');
   assert.equal(formatAddress({ street: '9 Rue Z', city: 'Laval', prov: 'QC', postal: 'H7G 3A4', apt: '3' }), '9 Rue Z, Laval, QC, H7G 3A4, Apt. 3');
 });
+
+test('safety net: overdue items, scheduling gaps, morning text (counts only)', async () => {
+  const { overdueItems, dueForAlert, schedulingGaps, openCounts, morningText, forMode } = await import('../lib/safety.js');
+  const now = Date.parse('2026-10-22T12:00:00Z'), hAgo = h => new Date(now - h * 36e5).toISOString();
+  const alerts = { newPatientHours: 24, replyHours: 48, waitingDocsHours: 24 };
+  const snap = {
+    pending: [{ id: 'p1', status: 'pending', created_at: hAgo(30) }, { id: 'p2', status: 'pending', created_at: hAgo(2) }],
+    tasks: [
+      { id: 't1', kind: 'new_patient', status: 'reply_ready', decided_at: hAgo(50), created_at: hAgo(60) },
+      { id: 't2', kind: 'new_patient', status: 'todo', created_at: hAgo(30), documents: { assignment: true, enrollment: false } },
+      { id: 't3', kind: 'close_file', status: 'todo', created_at: hAgo(26), alerted_at: hAgo(3) },
+      { id: 't4', kind: 'close_file', status: 'todo', created_at: hAgo(1) },
+      { id: 't5', kind: 'prescription', status: 'todo', created_at: hAgo(40), is_test: true },
+    ],
+    patients: [
+      { id: 1, archived: false, due_date: '2026-10-20', appointment_date_time: null },
+      { id: 2, archived: false, due_date: '2026-10-30', appointment_date_time: null },
+      { id: 3, archived: false, due_date: '2026-10-25', appointment_date_time: '2026-10-22T10:00', appointment_confirmed: true },
+      { id: 4, archived: false, due_date: '2026-10-26', appointment_date_time: '2026-10-24T09:00', appointment_confirmed: false },
+      { id: 5, archived: true, due_date: '2026-10-01', appointment_date_time: null },
+    ],
+  };
+  const all = overdueItems(snap, alerts, now).map(i => i.id + ':' + i.why);
+  assert.deepEqual(all.sort(), ['p1:new_patient_not_added', 't1:reply_not_sent', 't2:documents_missing', 't3:file_not_closed', 't5:prescription_not_applied']);
+  assert.deepEqual(dueForAlert(overdueItems(snap, alerts, now), now).map(i => i.id).sort(), ['p1', 't1', 't2', 't5'], 't3 was alerted 3 h ago');
+  assert.ok(!overdueItems(forMode(snap, true), alerts, now).some(i => i.id === 't5'), 'live mode ignores TEST cards');
+  const g = schedulingGaps(snap.patients, 14, new Date('2026-10-22T12:00:00'));
+  assert.deepEqual(g, { noAppointment: 2, overdueNoAppointment: 1, unconfirmed: 1, visitsToday: 1 });
+  const text = morningText(openCounts(snap), g, 4);
+  assert.match(text, /to do · ⚠️ 4 overdue · 1 waiting for documents · 2 patients to schedule \(1 past due\) · 1 to confirm · 1 visit today/);
+  assert.doesNotMatch(text, /\d{5}/, 'no file numbers in notifications');
+});
