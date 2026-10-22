@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { CASES, CLOSE_CASES, writeFakeInbox } from '../make-fake-pdfs.js';
+import { CASES, CLOSE_CASES, PAIR_CASES, writeFakeInbox } from '../make-fake-pdfs.js';
 import { parsePdf } from '../lib/pdf.js';
 import { isAssignment, classifyEmail, subjectFileNumber } from '../lib/classify.js';
 import { findExisting, sameNameOtherFile } from '../lib/match.js';
@@ -53,7 +53,10 @@ test('classify: assignments, prescriptions and close-file requests', () => {
   assert.equal(k('a <a@medicum.ca>', 'Re: Fermeture de dossier S.S-G # 13623', []), null, 'replies are not new requests');
   assert.equal(k('a <a@medicum.ca>', 'File on Hold - MK 34451', []), null);
   assert.equal(k('a <a@medicum.ca>', 'Temporary Transfer - AG 35251', []), null);
-  assert.equal(k('a <a@medicum.ca>', 'New patient 11594', []), null, 'assignment needs a PDF');
+  assert.equal(k('a <a@medicum.ca>', 'New patient 11594', []), 'new_patient_notice', 'kept so it pairs with the reports@ fax');
+  assert.equal(k('a <a@medicum.ca>', 'Patient LPC 21403', []), null, 'other notes without PDF are left alone');
+  assert.equal(k('Kavya <kavyas@medicum.ca>', 'Enrollment signed by patient - SR 27740'), 'enrollment_doc');
+  assert.equal(k('Kavya <kavyas@medicum.ca>', 'Enrollment signed by patient - SR 27740', []), null);
   assert.ok(isAssignment({ from: 'Giulia <giuliar@medicum.ca>', subject: 'New Patient JGC 35290', pdfs }, rules).ok);
   assert.equal(subjectFileNumber('Patient\'s RC 23226 and AC 14092'), '14092');
   assert.equal(subjectFileNumber('fax - SS #33816'), '33816');
@@ -93,7 +96,7 @@ test('intake end to end (offline): new, prescription, close-file; re-run adds no
   const outFile = path.join(tmp, 'pending.json');
   const store = offlineStore({ patientsFile: fixtures, outFile });
   const counts = await runIntake({ source: testFolderSource(inbox), store, rules, replies: { signature: 'Sig' }, isTest: true, log: () => {} });
-  assert.equal(counts.emails, CASES.length + CLOSE_CASES.length);
+  assert.equal(counts.emails, CASES.length + CLOSE_CASES.length + PAIR_CASES.length);
   assert.equal(counts.prescriptions, 1);
   assert.equal(counts.closes, 3);
   const byFile = Object.fromEntries(store.rows.map(r => [r.record.file_number, r]));
@@ -102,7 +105,7 @@ test('intake end to end (offline): new, prescription, close-file; re-run adds no
   assert.ok(store.rows.every(r => r.is_test) && store.tasks.every(t => t.is_test));
   assert.ok(byFile['99002'].warnings.some(w => /Same name as existing patient #98002/.test(w)));
   assert.ok(byFile['99007'].missing_fields.includes('Dose Prescribed'));
-  assert.ok(byFile['99009'].warnings.some(w => /Scanned/.test(w)), 'scan flagged');
+  assert.ok(byFile['99009'].warnings.some(w => /scanned/i.test(w)), 'scan flagged');
   assert.equal(byFile['99009'].record.file_number, '99009', 'file # from subject');
 
   const task = (kind, file) => store.tasks.find(t => t.kind === kind && t.file_number === file);
@@ -110,11 +113,28 @@ test('intake end to end (offline): new, prescription, close-file; re-run adds no
   assert.equal(rx.existing_patient.patient_name, 'Existing Testperson');
   assert.equal(rx.details.pdf_dose, '30');
   assert.match(rx.reply_body, /^Hello Julie,/);
+  // Coordinator note + reports@ fax → ONE item, to the coordinator, CC reports@, documents complete
+  const pair = store.tasks.filter(t => t.kind === 'new_patient' && t.group_key === '99011');
+  assert.equal(pair.length, 1);
+  assert.equal(pair[0].to_address, 'julie.exemple@medicum.ca');
+  assert.deepEqual(pair[0].cc_addresses, ['reports@medicum.ca']);
+  assert.equal(pair[0].related_emails.length, 2);
+  assert.ok(pair[0].documents.assignment && pair[0].documents.enrollment);
+  assert.ok(pair[0].pending_id, 'card pre-filled from the fax');
+  assert.match(pair[0].reply_body, /along with the documents \(assignment form and enrollment form\)/);
+  assert.deepEqual(pair[0].warnings, []);
+  // Note with no documents → polite request for both, in French
+  assert.match(task('new_patient', '99013').reply_body, /je n'ai pas reçu le formulaire d'assignation ni le formulaire d'inscription/);
+  // Form only → asks for the enrollment form
+  assert.match(task('new_patient', '99001').reply_body, /did not receive the enrollment form/);
+  // Scanned fax from reports@ alone: document unknown → you tick it on the card
+  assert.equal(task('new_patient', '99009').documents.unknown, 1);
   const np = task('new_patient', '99006');
   assert.equal(np.status, 'todo');
   assert.equal(np.lang, 'fr');
   assert.equal(np.pending_id, byFile['99006'].id);
   assert.equal(task('new_patient', '99009').to_name, null, 'reports@ → no first name');
+  assert.deepEqual(task('new_patient', '99009').cc_addresses, [], 'no CC to reports@ when replying to reports@');
   assert.equal(task('close_file', '98004').existing_patient.status, 'Active');
   assert.ok(task('close_file', '98002').warnings.some(w => /already closed/.test(w)));
   assert.ok(task('close_file', '99999').warnings.some(w => /not in VaPiq/.test(w)));
@@ -122,7 +142,7 @@ test('intake end to end (offline): new, prescription, close-file; re-run adds no
 
   const before = { rows: store.rows.length, tasks: store.tasks.length };
   const again = await runIntake({ source: testFolderSource(inbox), store, rules, isTest: true, log: () => {} });
-  assert.equal(again.already, CASES.length + CLOSE_CASES.length);
+  assert.equal(again.already, CASES.length + CLOSE_CASES.length + PAIR_CASES.length);
   assert.deepEqual({ rows: store.rows.length, tasks: store.tasks.length }, before);
 });
 
@@ -145,7 +165,7 @@ test('outbox: only approved replies go, once, test replies are saved not sent, s
   const eml = fs.readFileSync(path.join(tmp, 'outbox-test', `${ok}.eml`), 'utf8');
   assert.match(eml, /Subject: Re: Close file 1/);
   assert.match(eml, /In-Reply-To: <m@x>/);
-  assert.deepEqual(tm.moves, [{ id: ok, toFolder: 'Medicum' }]);
+  assert.deepEqual(tm.moves, [{ id: ok, toFolder: 'Medicum', emails: 1 }]);
   const again = await runOutbox({ store, mailer: live, testMailer: tm, rules, live: false, moveToFolder: 'Medicum', log: () => {} });
   assert.equal(again.sent, 0, 'never sent twice');
 });

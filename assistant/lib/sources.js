@@ -15,8 +15,9 @@ export function testFolderSource(dir) {
       if (!fs.existsSync(dir)) return;
       for (const f of fs.readdirSync(dir).filter(f => f.endsWith('.json')).sort()) {
         const meta = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'));
-        const pdfPath = path.join(dir, f.replace(/\.json$/, '.pdf'));
-        const pdfs = fs.existsSync(pdfPath) ? [{ name: path.basename(pdfPath), bytes: fs.readFileSync(pdfPath) }] : [];
+        const names = meta.attachments || [f.replace(/\.json$/, '.pdf')];
+        const pdfs = names.filter(n => fs.existsSync(path.join(dir, n)))
+          .map(n => ({ name: n, bytes: fs.readFileSync(path.join(dir, n)) }));
         yield { folder: 'Inbox', bodyText: '', ...meta, pdfs };
       }
     },

@@ -15,7 +15,8 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import { classifyEmail, subjectFileNumber, senderAddress } from './lib/classify.js';
+import { classifyEmail, subjectFileNumber, senderAddress, isNewPatientSubject } from './lib/classify.js';
+import { documentTypes, summarizeDocuments } from './lib/doctype.js';
 import { findExisting, sameNameOtherFile, patientStatus, normFile } from './lib/match.js';
 import { buildRecord } from './lib/record.js';
 import { parsePdf } from './lib/pdf.js';
@@ -26,7 +27,7 @@ import { testMailer, liveMailer } from './lib/mailer.js';
 import { runOutbox } from './lib/outbox.js';
 
 const require = createRequire(import.meta.url);
-const { draftReply, detectLanguage, coordinatorFirstName, subjectReference } = require('../js/reply-templates.js');
+const { draftReply, detectLanguage, coordinatorFirstName, subjectReference, missingDocs } = require('../js/reply-templates.js');
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const stateDir = path.join(here, 'state');
@@ -35,7 +36,7 @@ export function loadConfig(file = path.join(here, 'config.json')) {
   const base = JSON.parse(fs.readFileSync(path.join(here, 'config.example.json'), 'utf8'));
   const own = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {};
   const merged = { ...base, ...own };
-  for (const k of ['imap', 'rules', 'supabase', 'push', 'replies']) merged[k] = { ...base[k], ...(own[k] || {}) };
+  for (const k of ['imap', 'rules', 'supabase', 'push', 'replies', 'alerts']) merged[k] = { ...base[k], ...(own[k] || {}) };
   return merged;
 }
 
@@ -46,10 +47,11 @@ function existingSummary(p) {
                dose_prescribed: p.dose_prescribed ?? null, doses_remaining: p.doses_remaining ?? null } : null;
 }
 
+const emailRef = e => ({ from: e.from, subject: e.subject, date: e.date, message_id: e.messageId, folder: e.folder || null });
+
 // Core pipeline — exported for tests.
 export async function runIntake({ source, store, rules, replies = {}, isTest, log = console.log }) {
   const patients = await store.loadPatients();
-  const queuedThisRun = new Set((await store.openPendingFileNumbers()).map(normFile));
   const counts = { emails: 0, skipped: 0, queued: 0, exists: 0, needsReview: 0, already: 0, prescriptions: 0, closes: 0 };
 
   for await (const email of source.emails()) {
@@ -88,75 +90,116 @@ export async function runIntake({ source, store, rules, replies = {}, isTest, lo
       continue;
     }
 
-    // ── Assignment PDFs: new patient or prescription for an existing one ──
-    const pdfKeys = email.pdfs.map(p => sha(`${email.messageId}|${p.name}`));
-    const knownPending = await store.knownSourceKeys(pdfKeys);
-    const knownTasks = await store.knownTaskKeys(pdfKeys);
+    // ── New patient (coordinator email ± reports@ fax) or prescription ────
+    // The coordinator's email and the reports@medicum.ca email about the same
+    // patient are joined by file number into ONE new-patient item: one card,
+    // one reply (to the coordinator, CC reports@) that confirms the documents
+    // or politely asks for what's missing.
+    if (await store.knownMessage(email.messageId)) { counts.already++; continue; }
+    const fromReports = senderAddress(email.from) === (replies.reportsAddress || 'reports@medicum.ca');
 
-    for (const [i, pdf] of email.pdfs.entries()) {
-      const key = pdfKeys[i];
-      if (knownPending.has(key) || knownTasks.has(key)) { counts.already++; continue; }
-
+    // Read every PDF: document type + parsed form fields
+    const files = [], parsedForms = [];
+    for (const pdf of email.pdfs) {
+      const key = sha(`${email.messageId}|${pdf.name}`);
       const warnings = [];
-      let parsed = null;
-      try {
-        const out = await parsePdf(pdf.bytes, pdf.name);
-        if (out.scanned) warnings.push('Scanned/faxed PDF — no text layer. Open it in the Medicum Parser (OCR) to read the fields.');
-        parsed = out.result;
-        if (parsed && !parsed.dose) warnings.push(`Dose not clearly marked on the form (${parsed.doseReason || 'unknown'}) — check the PDF.`);
-      } catch (e) {
-        warnings.push('Could not read this PDF: ' + e.message);
-      }
+      let out = { scanned: true, text: '', result: null };
+      try { out = await parsePdf(pdf.bytes, pdf.name); } catch (e) { warnings.push(`Could not read ${pdf.name}: ${e.message}`); }
+      let types = documentTypes({ text: out.text, scanned: out.scanned, name: pdf.name });
+      if (kind === 'enrollment_doc' && !types.length) types = ['enrollment'];   // the subject says what it is
+      files.push({ name: pdf.name, types, from: senderAddress(email.from) });
+      if (out.scanned) warnings.push(`${pdf.name}: scanned/faxed PDF — open it in the Medicum Parser (OCR) to read the fields.`);
+      const r = out.result;
+      if (r && !r.dose && types.includes('assignment')) warnings.push(`Dose not clearly marked on the form (${r.doseReason || 'unknown'}) — check the PDF.`);
+      parsedForms.push({ key, pdf, parsed: r, types, warnings, scanned: out.scanned });
+    }
+    // Best form to pre-fill the new-patient card: a parsed assignment form, else any parsed PDF, else the first PDF
+    const form = parsedForms.find(f => f.parsed && f.types.includes('assignment')) || parsedForms.find(f => f.parsed) || parsedForms[0] || null;
+    const groupKey = normFile(subjectFile || form?.parsed?.file || '') || null;
+    const existing = findExisting(groupKey, patients);
+    const group = groupKey ? await store.findGroupTask(groupKey, 14) : null;
 
-      let fileNumber = parsed?.file || '';
-      if (!fileNumber && subjectFile) { fileNumber = subjectFile; warnings.push('File # taken from the email subject (not found in the PDF).'); }
-      else if (fileNumber && subjectFile && normFile(fileNumber) !== normFile(subjectFile)) {
-        warnings.push(`File # in the PDF (${fileNumber}) differs from the email subject (${subjectFile}).`);
-      }
+    // Enrollment emails only complete an open new-patient item
+    if (kind === 'enrollment_doc' && !group) {
+      counts.skipped++;
+      log(`  skip    enrollment email for #${groupKey || '?'} — no open new-patient item (left in your inbox)`);
+      continue;
+    }
 
-      const existing = findExisting(fileNumber, patients);
-      if (existing) {
-        // Already a VaPiq patient → a new prescription to apply. Nothing is written to patients.
-        const id = await store.insertTask({ ...replyBase, kind: 'prescription', status: 'todo', source_key: key,
-          file_number: fileNumber, existing_patient: existingSummary(existing),
-          details: { pdf_dose: parsed?.dose || null, pdf_due_date: parsed?.date || null, attachment_name: pdf.name },
-          warnings, reply_body: draft('prescription', fileNumber) });
-        await store.audit('ASSISTANT_PRESCRIPTION', fileNumber, { task_id: id, test: !!isTest });
+    // Already a VaPiq patient and not part of a recent new-patient item → prescription to apply
+    if (existing && !group && kind === 'assignment' && !isNewPatientSubject(email.subject, rules)) {
+      for (const f of parsedForms) {
+        const id = await store.insertTask({ ...replyBase, kind: 'prescription', status: 'todo', source_key: f.key,
+          file_number: groupKey, group_key: groupKey, existing_patient: existingSummary(existing),
+          related_emails: [emailRef(email)],
+          details: { pdf_dose: f.parsed?.dose || null, pdf_due_date: f.parsed?.date || null, attachment_name: f.pdf.name },
+          warnings: f.warnings, reply_body: draft('prescription', groupKey) });
+        await store.audit('ASSISTANT_PRESCRIPTION', groupKey, { task_id: id, test: !!isTest });
         counts.prescriptions++;
         log(`  rx      card ${id}`);
-        continue;
       }
+      await source.markHandled(email);
+      continue;
+    }
 
-      const { record, missing } = buildRecord(parsed, { fileNumber });
-      const dupInQueue = fileNumber && queuedThisRun.has(normFile(fileNumber));
-      let status = 'pending', existingPatient = null;
-      if (dupInQueue) {
-        status = 'exists';
-        existingPatient = { file_number: fileNumber, patient_name: record.patient_name, status: 'Already awaiting your approval' };
-      } else {
-        for (const p of sameNameOtherFile(record.patient_name, fileNumber, patients)) {
-          warnings.push(`Same name as existing patient #${p.file_number} (${patientStatus(p)}) — possible duplicate.`);
-        }
-        if (fileNumber) queuedThisRun.add(normFile(fileNumber));
-      }
-
-      const id = await store.insertPending({
-        status, is_test: !!isTest, source_key: key,
+    // Pre-filled new-patient card from the best form (once per patient)
+    let pendingId = group?.pending_id || null;
+    const cardWarnings = form ? [...form.warnings] : [];
+    if (!pendingId && form && !existing) {
+      let fileNumber = form.parsed?.file || '';
+      if (!fileNumber && subjectFile) { fileNumber = subjectFile; cardWarnings.push('File # taken from the email subject (not found in the PDF).'); }
+      else if (fileNumber && subjectFile && normFile(fileNumber) !== normFile(subjectFile)) cardWarnings.push(`File # in the PDF (${fileNumber}) differs from the email subject (${subjectFile}).`);
+      const { record, missing } = buildRecord(form.parsed, { fileNumber });
+      for (const p of sameNameOtherFile(record.patient_name, fileNumber, patients)) cardWarnings.push(`Same name as existing patient #${p.file_number} (${patientStatus(p)}) — possible duplicate.`);
+      pendingId = await store.insertPending({
+        status: 'pending', is_test: !!isTest, source_key: form.key,
         email_from: email.from, email_subject: email.subject, email_date: email.date,
-        attachment_name: pdf.name, subject_file_number: subjectFile || null,
-        record, missing_fields: missing, warnings, existing_patient: existingPatient,
+        attachment_name: form.pdf.name, subject_file_number: subjectFile || null,
+        record, missing_fields: missing, warnings: cardWarnings, existing_patient: null,
       });
-      if (status === 'pending') {
-        // The reply waits until you add the patient ("todo" → "reply_ready").
-        await store.insertTask({ ...replyBase, kind: 'new_patient', status: 'todo', source_key: sha(`${key}|reply`),
-          pending_id: id, file_number: fileNumber || null, warnings: [], reply_body: draft('new_patient', fileNumber) });
-      }
-      await store.audit(status === 'exists' ? 'ASSISTANT_EXISTS' : 'ASSISTANT_QUEUED', fileNumber, { pending_id: id, test: !!isTest });
+      await store.audit('ASSISTANT_QUEUED', fileNumber, { pending_id: pendingId, test: !!isTest });
+      if (!form.parsed || missing.includes('Patient Name') || missing.includes('File Number')) counts.needsReview++; else counts.queued++;
+      log(`  pending card ${pendingId}${cardWarnings.length ? ` (${cardWarnings.length} warning${cardWarnings.length > 1 ? 's' : ''})` : ''}`);
+    }
 
-      if (status === 'exists') counts.exists++;
-      else if (!parsed || missing.includes('Patient Name') || missing.includes('File Number')) counts.needsReview++;
-      else counts.queued++;
-      log(`  ${status.padEnd(7)} card ${id}${warnings.length ? ` (${warnings.length} warning${warnings.length > 1 ? 's' : ''})` : ''}`);
+    // The new-patient item: create, or join this email to the existing one
+    const reports = replies.reportsAddress || 'reports@medicum.ca';
+    if (group) {
+      const related = [...(group.related_emails || []), emailRef(email)];
+      const allFiles = [...((group.documents && group.documents.files) || []), ...files];
+      const docs = summarizeDocuments(allFiles.map(f => ({ ...f, types: f.types || [] })));
+      const NO_DOCS = /^No documents attached/;
+      const warnings = (group.warnings || []).filter(w => !(allFiles.length && NO_DOCS.test(w)));
+      const fields = { related_emails: related, documents: docs, pending_id: pendingId, warnings };
+      // Reply goes to the coordinator, in the coordinator's thread
+      if (!fromReports && group.to_address === reports) {
+        Object.assign(fields, { to_address: senderAddress(email.from), to_name: coordinatorName || null,
+          email_message_id: email.messageId, email_folder: email.folder || null, email_from: email.from,
+          email_subject: email.subject, email_date: email.date, lang, subject_ref: subjectRef || group.subject_ref });
+      }
+      const to = fields.to_address || group.to_address;
+      fields.cc_addresses = to === reports ? [] : [reports];
+      if (group.status === 'waiting_docs' && !missingDocs(docs).length) fields.status = 'todo';   // documents arrived
+      if (['todo', 'waiting_docs', 'reply_ready', 'failed'].includes(fields.status || group.status)) {
+        fields.reply_body = replies.enabled === false ? null : draftReply({ kind: 'new_patient', lang: fields.lang || group.lang,
+          coordinatorName: (fields.to_name ?? group.to_name) || '', fileNumber: groupKey,
+          subjectRef: fields.subject_ref || group.subject_ref, signature: replies.signature || '', docs });
+      }
+      await store.updateTask(group.id, fields);
+      log(`  joined  ${fromReports ? 'reports@' : 'coordinator'} email → new-patient item ${group.id}`);
+    } else {
+      const docs = summarizeDocuments(files);
+      const warnings = [];
+      if (existing) warnings.push(`File #${existing.file_number} is already in VaPiq as ${existing.patient_name} (${patientStatus(existing)}).`);
+      if (!email.pdfs.length) warnings.push('No documents attached — the reports@medicum.ca fax usually follows.');
+      const to = senderAddress(email.from);
+      const id = await store.insertTask({ ...replyBase, kind: 'new_patient', status: 'todo',
+        source_key: sha(`${email.messageId}|new_patient`), pending_id: pendingId, group_key: groupKey,
+        file_number: groupKey, cc_addresses: to === reports ? [] : [reports],
+        existing_patient: existingSummary(existing), related_emails: [emailRef(email)], documents: docs, warnings,
+        reply_body: replies.enabled === false ? null : draftReply({ kind: 'new_patient', lang, coordinatorName, fileNumber: groupKey,
+          subjectRef, signature: replies.signature || '', docs }) });
+      log(`  new     patient item ${id}${missingDocs(docs).length ? ` (missing: ${missingDocs(docs).join(', ')})` : ''}`);
     }
     await source.markHandled(email);
   }

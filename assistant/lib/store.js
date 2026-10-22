@@ -55,6 +55,20 @@ export async function supabaseStore(cfg) {
       const rows = must(await sb.from('email_tasks').select('source_key').in('source_key', keys));
       return new Set(rows.map(r => r.source_key));
     },
+    // Has this email already been read? (joined into an item, or a card of its own)
+    async knownMessage(messageId) {
+      const a = must(await sb.from('email_tasks').select('id').contains('related_emails', [{ message_id: messageId }]).limit(1));
+      if (a.length) return true;
+      const b = must(await sb.from('email_tasks').select('id').eq('email_message_id', messageId).limit(1));
+      return b.length > 0;
+    },
+    // The open/recent new-patient item for a file number (pairs coordinator + reports@ emails)
+    async findGroupTask(groupKey, days) {
+      const since = new Date(Date.now() - days * 864e5).toISOString();
+      const rows = must(await sb.from('email_tasks').select('*').eq('kind', 'new_patient').eq('group_key', groupKey)
+        .gte('created_at', since).order('created_at', { ascending: false }).limit(1));
+      return rows[0] || null;
+    },
     async insertTask(row) {
       return must(await sb.from('email_tasks').insert(row).select('id').single()).id;
     },
@@ -100,6 +114,11 @@ export function offlineStore({ patientsFile, outFile }) {
     rows,
     tasks,
     async knownTaskKeys(keys) { return new Set(tasks.map(t => t.source_key).filter(k => keys.includes(k))); },
+    async knownMessage(id) { return tasks.some(t => t.email_message_id === id || (t.related_emails || []).some(r => r.message_id === id)); },
+    async findGroupTask(k, days) {
+      const since = Date.now() - days * 864e5;
+      return tasks.filter(t => t.kind === 'new_patient' && t.group_key === k && Date.parse(t.created_at) >= since).at(-1) || null;
+    },
     async insertTask(row) { const id = `task-${tasks.length + 1}`; tasks.push({ id, created_at: new Date().toISOString(), ...row }); save(); return id; },
     async tasksToSend() { return tasks.filter(t => t.status === 'send_approved'); },
     async claimTask(id) { const t = tasks.find(t => t.id === id); if (!t || t.status !== 'send_approved') return false; t.status = 'sending'; save(); return true; },

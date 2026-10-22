@@ -41,6 +41,16 @@
       "dosage",
       "confirm",
       "patient\\s+is\\s+back"
+    ],
+    "newPatientSubject": [
+      "new\\s*patient",
+      "nouve(?:au|lle)\\s*patient"
+    ],
+    "enrollmentSubject": [
+      "enrol",
+      "inscription",
+      "consentement",
+      "consent\\b"
     ]
   },
   "supabase": {
@@ -58,6 +68,14 @@
     "moveToFolder": "Medicum",
     "smtpHost": "smtp.mail.yahoo.com",
     "smtpPort": 465,
-    "saveToSent": false
+    "saveToSent": false,
+    "reportsAddress": "reports@medicum.ca"
+  },
+  "alerts": {
+    "newPatientHours": 24,
+    "replyHours": 48,
+    "waitingDocsHours": 24,
+    "morningSummary": "07:00",
+    "noAppointmentDays": 14
   }
 }

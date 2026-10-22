@@ -25,10 +25,19 @@ export function classifyEmail(email, rules) {
   const subject = String(email.subject || '');
   if (/^\s*(re|tr|fw|fwd)\s*:/i.test(subject)) return { kind: null, why: 'reply/forward' };
   if (any(rules.closeSubject, subject)) return { kind: 'close_file' };
+  // "Enrollment signed by patient - SR 27740" + PDF → completes that patient's documents
+  if (any(rules.enrollmentSubject, subject) && email.pdfs && email.pdfs.length) return { kind: 'enrollment_doc' };
   if (any(rules.excludeSubject, subject)) return { kind: null, why: 'excluded subject' };
   if (!any(rules.includeSubject, subject)) return { kind: null, why: 'subject' };
-  if (!email.pdfs || !email.pdfs.length) return { kind: null, why: 'no PDF' };
-  return { kind: 'assignment' };
+  if (email.pdfs && email.pdfs.length) return { kind: 'assignment' };
+  // Coordinator's "New patient 34734" note often comes without documents —
+  // the reports@ fax with the PDFs follows. Keep it so the two are paired.
+  if (isNewPatientSubject(subject, rules)) return { kind: 'new_patient_notice' };
+  return { kind: null, why: 'no PDF' };
+}
+
+export function isNewPatientSubject(subject, rules) {
+  return any(rules.newPatientSubject || ['new\\s*patient', 'nouve(?:au|lle)\\s*patient'], String(subject || ''));
 }
 
 // Kept for callers that only care about assignments.

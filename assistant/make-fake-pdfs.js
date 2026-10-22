@@ -106,6 +106,28 @@ const FROM_BY_CASE = {
   'fake-09-scanned': ['Medicum Reports <reports@medicum.ca>', 'fax - XX #99009', ''],
 };
 
+// A fake patient enrollment / consent form (text PDF)
+async function makeEnrollment(file, name) {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([612, 792]);
+  const bold = await doc.embedFont(StandardFonts.HelveticaBold), reg = await doc.embedFont(StandardFonts.Helvetica);
+  page.drawText('PATIENT ENROLLMENT FORM / FORMULAIRE D\'INSCRIPTION', { x: 40, y: 740, size: 13, font: bold });
+  page.drawText(`Patient: ${name}   File: ${file}`, { x: 40, y: 700, size: 11, font: reg });
+  page.drawText('I consent to the patient support program. / Je consens au programme de soutien.', { x: 40, y: 670, size: 10, font: reg });
+  page.drawText('Signature: ____________________', { x: 40, y: 630, size: 10, font: reg });
+  return doc.save();
+}
+
+// Paired emails: the coordinator's note and the reports@ fax for the SAME patient.
+export const PAIR_CASES = [
+  // Coordinator note (no PDF) + reports@ fax with form AND enrollment → complete
+  { id: 'fake-31-pair-coord', file: '99011', from: 'Julie Exemple <julie.exemple@medicum.ca>', subject: 'New patient AB 99011', body: 'Hello, new patient assigned, documents to follow.', pdfs: [] },
+  { id: 'fake-32-pair-fax', file: '99011', from: 'Medicum Reports <reports@medicum.ca>', subject: 'fax - AB #99011', body: '',
+    pdfs: [{ kind: 'form', name: 'Alice Paire', dose: '22.5' }, { kind: 'enrollment', name: 'Alice Paire' }] },
+  // Coordinator note only, no documents at all → ask for both
+  { id: 'fake-33-notice-only', file: '99013', from: 'Sophie Fictive <sophie.fictive@medicum.ca>', subject: 'Nouveau patient EF 99013', body: 'Bonjour, voici un nouveau patient.', pdfs: [] },
+];
+
 export async function writeFakeInbox(dir = outDir) {
   fs.mkdirSync(dir, { recursive: true });
   for (const c of CASES) {
@@ -113,6 +135,20 @@ export async function writeFakeInbox(dir = outDir) {
     fs.writeFileSync(path.join(dir, `${c.id}.pdf`), await makeForm(c));
     fs.writeFileSync(path.join(dir, `${c.id}.json`), JSON.stringify({
       messageId: `<${c.id}@fake.local>`, from, subject, bodyText: body, date: '2026-10-20T15:00:00Z',
+    }, null, 2));
+  }
+  for (const c of PAIR_CASES) {
+    const names = [];
+    for (const [i, d] of c.pdfs.entries()) {
+      const fname = `${c.id}-${i + 1}.pdf`;
+      const bytes = d.kind === 'enrollment' ? await makeEnrollment(c.file, d.name)
+        : await makeForm({ file: c.file, name: d.name, dose: d.dose, mark: 'x' });
+      fs.writeFileSync(path.join(dir, fname), bytes);
+      names.push(fname);
+    }
+    fs.writeFileSync(path.join(dir, `${c.id}.json`), JSON.stringify({
+      messageId: `<${c.id}@fake.local>`, from: c.from, subject: c.subject, bodyText: c.body,
+      date: '2026-10-22T14:00:00Z', attachments: names,
     }, null, 2));
   }
   for (const c of CLOSE_CASES) {
@@ -125,5 +161,5 @@ export async function writeFakeInbox(dir = outDir) {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const dir = await writeFakeInbox();
-  console.log(`Wrote ${CASES.length} fake assignment emails and ${CLOSE_CASES.length} close-file emails to ${dir}`);
+  console.log(`Wrote ${CASES.length + PAIR_CASES.length} fake new-patient emails and ${CLOSE_CASES.length} close-file emails to ${dir}`);
 }

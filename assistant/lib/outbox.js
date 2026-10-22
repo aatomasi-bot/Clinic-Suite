@@ -1,6 +1,6 @@
 // Sends replies YOU approved in the Approvals page (status "send_approved").
 // Safety checks before anything leaves:
-//   - only to the coordinator who wrote (allowed domain, not an excluded sender)
+//   - only to the coordinator who wrote (+ CC reports@) — allowed domain, not an excluded sender
 //   - test cards only ever go to the test mailer; real cards only in live mode
 //   - each task is claimed (send_approved → sending) so it can never go twice
 import { senderAllowed } from './classify.js';
@@ -12,7 +12,8 @@ export async function runOutbox({ store, mailer, testMailer, rules, live, moveTo
   for (const task of await store.tasksToSend()) {
     const m = task.is_test ? testMailer : (live ? mailer : null);
     if (!m) { counts.waiting++; continue; }                     // real reply, but service is in test mode
-    if (!senderAllowed(task.to_address, rules) || !String(task.reply_body || '').trim()) {
+    const recipients = [task.to_address, ...(task.cc_addresses || [])];
+    if (!recipients.every(a => senderAllowed(a, rules)) || !String(task.reply_body || '').trim()) {
       await store.updateTask(task.id, { status: 'failed', error: 'Blocked: recipient not an allowed coordinator, or empty reply.' });
       counts.failed++; continue;
     }

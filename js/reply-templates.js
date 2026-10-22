@@ -69,16 +69,42 @@ const T = {
   },
 };
 
-function draftReply({ kind, lang, coordinatorName, fileNumber, subjectRef, signature }) {
-  const t = T[lang === 'fr' ? 'fr' : 'en'];
+const DOC_NAMES = {
+  en: { assignment: 'assignment form', enrollment: 'enrollment form' },
+  fr: { assignment: "formulaire d'assignation", enrollment: "formulaire d'inscription" },
+};
+const joinList = (items, and) => items.length < 2 ? items.join('') : items.slice(0, -1).join(', ') + ` ${and} ` + items[items.length - 1];
+
+// New patient, with documents known: "received everything" or "please send X".
+// docs = { assignment: bool, enrollment: bool }
+function newPatientSentence(lang, r, docs) {
+  const missing = ['assignment', 'enrollment'].filter(k => !docs[k]);
+  if (lang === 'fr') {
+    const names = missing.map(k => 'le ' + DOC_NAMES.fr[k]);
+    if (!missing.length) return `Je confirme la réception de ce courriel ainsi que des documents (formulaire d'assignation et formulaire d'inscription)${r ? ` pour le dossier ${r}` : ''}. Le dossier a été ajouté à ma liste de patients et je communiquerai avec la personne pour planifier l'injection.`;
+    return `Je confirme la réception de ce courriel${r ? ` pour le dossier ${r}` : ''}. Cependant, je n'ai pas reçu ${joinList(names, 'ni')}. Pourriez-vous me ${missing.length > 1 ? 'les' : 'le'} faire parvenir dès que possible?`;
+  }
+  const names = missing.map(k => 'the ' + DOC_NAMES.en[k]);
+  if (!missing.length) return `I confirm the receipt of this email along with the documents (assignment form and enrollment form)${r ? ` for file ${r}` : ''}. The patient has been added to my patient list and I will contact them to schedule the injection.`;
+  return `I confirm the receipt of this email${r ? ` for file ${r}` : ''}. However, I did not receive ${joinList(names, 'or')}. Could you please send ${missing.length > 1 ? 'them' : 'it'} at your earliest convenience?`;
+}
+
+function draftReply({ kind, lang, coordinatorName, fileNumber, subjectRef, signature, docs }) {
+  const L = lang === 'fr' ? 'fr' : 'en', t = T[L];
   if (!t[kind]) throw new Error('Unknown reply kind: ' + kind);
-  const ref = subjectRef || fileNumber || '';
-  const lines = [t.hello(coordinatorName), '', t[kind](fmtRef(ref)), '', t.thanks];
+  const ref = fmtRef(subjectRef || fileNumber || '');
+  const body = kind === 'new_patient' && docs ? newPatientSentence(L, ref, docs) : t[kind](ref);
+  const lines = [t.hello(coordinatorName), '', body, '', t.thanks];
   if (signature) lines.push('', signature);   // blank line between "Thank you!" and the name
   return lines.join('\n');
 }
 
-const api = { draftReply, detectLanguage, coordinatorFirstName, subjectReference };
+// Which documents are still missing → for the card and the reply
+function missingDocs(docs) { return ['assignment', 'enrollment'].filter(k => !(docs && docs[k])); }
+// Scanned faxes the computer couldn't read: you tick what they contain before sending
+function needsDocCheck(docs) { return !!(docs && docs.unknown > 0 && !docs.checked); }
+
+const api = { draftReply, detectLanguage, coordinatorFirstName, subjectReference, missingDocs, needsDocCheck, DOC_NAMES };
 if (typeof module === 'object' && module.exports) module.exports = api;
 else Object.assign(root, api);
 })(typeof self !== 'undefined' ? self : this);
