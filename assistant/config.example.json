@@ -1,0 +1,33 @@
+{
+  "mode": "test",
+  "liveConfirmed": false,
+  "testInbox": "test-inbox",
+  "retentionDays": 30,
+
+  "imap": {
+    "host": "imap.mail.yahoo.com",
+    "port": 993,
+    "user": "",
+    "folder": "Inbox",
+    "lookbackDays": 7,
+    "flagHandled": true
+  },
+
+  "rules": {
+    "senderDomains": ["medicum.ca"],
+    "excludeSenders": ["no-reply@medicum.ca", "nsd@medicum.ca"],
+    "includeSubject": ["new\\s*patient", "nouve(?:au|lle)\\s*patient", "\\bpatient\\b", "\\bfax\\b", "#\\s*\\d{4,6}"],
+    "excludeSubject": ["close\\s*file", "fermeture", "on\\s*hold", "transf", "update", "enrol", "ordonnance", "prescription", "dosage", "confirm", "patient\\s+is\\s+back", "^re:"]
+  },
+
+  "supabase": {
+    "url": "https://wqlbmtjbjloxpvsbeqyb.supabase.co",
+    "publishableKey": "sb_publishable_gcyK2z_8lvbOgHNcJfdX1g_8QCWJ_Xi"
+  },
+
+  "push": {
+    "mac": true,
+    "approvalsUrl": "https://aatomasi-bot.github.io/Clinic-Suite/approvals/",
+    "subject": "https://aatomasi-bot.github.io/Clinic-Suite/"
+  }
+}

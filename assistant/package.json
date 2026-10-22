@@ -1,0 +1,25 @@
+{
+  "name": "vapiq-intake-assistant",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Watches the Medicum mailbox for patient assignments, checks VaPiq, and queues new patients for approval.",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "intake": "node intake.js",
+    "intake:offline": "node intake.js --offline",
+    "login": "node login.js",
+    "setup-push": "node setup-push.js",
+    "fake-pdfs": "node make-fake-pdfs.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.45.4",
+    "imapflow": "1.0.164",
+    "pdfjs-dist": "3.11.174",
+    "web-push": "3.6.7"
+  },
+  "devDependencies": {
+    "pdf-lib": "1.17.1"
+  }
+}

@@ -1,0 +1,5 @@
+[
+  { "id": 1, "file_number": "30001", "patient_name": "Existing Testperson", "archived": false, "pending": false },
+  { "id": 2, "file_number": "30002", "patient_name": "Marie Exemple",       "archived": true,  "pending": false },
+  { "id": 3, "file_number": " 30003 ", "patient_name": "Someone Else",      "archived": false, "pending": false }
+]
