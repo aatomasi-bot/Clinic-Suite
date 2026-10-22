@@ -2061,17 +2061,6 @@ function buildSlots(fromDate){
 }
 
 // ════════════════════════════════════════════════════════════
-// VERMETTE TRIGGER RULE
-// 32 Rue Vermette, Saint-Eustache → always placed FIRST on its day
-// regardless of step order. All other Vermette addresses unaffected.
-// ════════════════════════════════════════════════════════════
-function applyVermetteRule(patients){
-  const idx=patients.findIndex(p=>
-    /\b32\b[^,]*vermette|vermette[^,]*\b32\b/i.test(p.address||''));
-  if(idx>0)patients.unshift(patients.splice(idx,1)[0]);
-}
-
-// ════════════════════════════════════════════════════════════
 // 325 BOULEVARD DEGUIRE RULE  (confirmed Jun 2026)
 // 325 Boul Deguire is a PATIENT near home (H4N). Goes LAST
 // on whatever day it appears — any circuit, any day.
@@ -2104,7 +2093,6 @@ function applyDeguireLastRule(patients){
 //   Circuit A weekday  → step ascending  (NDG→Lachine→…→Anjou→Mtl-Est)
 //   Circuit A Saturday → step descending (farthest first, local last)
 //   Circuit B Friday   → step ascending  (home border→Ahuntsic→Laval→WI)
-//   + Vermette trigger (32 Rue Vermette always stop #1 on its day)
 // ════════════════════════════════════════════════════════════
 function runPlanner(pats,fromDate){
   const slots=buildSlots(fromDate);
@@ -2199,8 +2187,6 @@ function runPlanner(pats,fromDate){
     else sl.patients=loopSort(sl.patients,p=>weekdayKey(p._cl));
     // Group same-address patients consecutively (different apts = 15-min apart)
     sl.patients=groupByAddress(sl.patients);
-    // Vermette trigger: 32 Rue Vermette always goes first regardless of step
-    applyVermetteRule(sl.patients);
     applyDeguireLastRule(sl.patients);  // 325 Deguire always last
   });
 
@@ -2469,7 +2455,7 @@ async function undoLastBatch(){
 // ════════════════════════════════════════════════════════════
 // RE-SORT DAY — canonical version
 // Applies: weekdayKey / circBKey / satKey sort → groupByAddress
-// → Vermette first → Deguire last
+// → Deguire last
 // ════════════════════════════════════════════════════════════
 function resortDay(dayIdx){
   const active=days[dayIdx].active;
@@ -2482,7 +2468,6 @@ function resortDay(dayIdx){
     ? active.slice().sort((a,b)=>circBKey(optClassify(a))-circBKey(optClassify(b)))
     : loopSort(active,p=>weekdayKey(optClassify(p)));
   days[dayIdx].active=groupByAddress(sorted);
-  applyVermetteRule(days[dayIdx].active);
   applyDeguireLastRule(days[dayIdx].active);
   renderGrid();
   toast('↺ '+dayName+' re-sorted — same-address patients grouped'+(isFri?' (Fri: Laval arc)':' (loop from home)'));
