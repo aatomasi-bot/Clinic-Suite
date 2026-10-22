@@ -225,7 +225,6 @@ nav.tabbar .in{display:flex;width:100%;max-width:520px}
   width:60px;height:60px;border-radius:50%;border:0;color:#fff;display:grid;place-items:center;
   background:radial-gradient(circle at 30% 25%,var(--teal-2),var(--teal) 60%,var(--teal-ink));box-shadow:0 10px 28px color-mix(in srgb,var(--teal) 45%,transparent)}
 .fab svg{width:26px;height:26px}.fab:active{transform:scale(.94)}
-.fab.wake::after{content:'';position:absolute;inset:-5px;border-radius:50%;border:2px solid var(--teal-2);animation:ring 2.4s infinite}
 @keyframes ring{0%{opacity:.8;transform:scale(.92)}100%{opacity:0;transform:scale(1.25)}}
 .scrim{position:fixed;inset:0;z-index:30;background:rgba(10,16,24,.38);opacity:0;pointer-events:none;transition:opacity .2s}
 .scrim.on{opacity:1;pointer-events:auto}
@@ -241,8 +240,8 @@ nav.tabbar .in{display:flex;width:100%;max-width:520px}
 .msg.me{align-self:flex-end;background:var(--teal);color:#fff;border-bottom-right-radius:6px}
 .msg.bot{align-self:flex-start;background:var(--card);border:1px solid var(--line);border-bottom-left-radius:6px}
 .msg.sys{align-self:center;background:none;color:var(--ink-3);font-size:13px;padding:2px}
-.prop{align-self:stretch;background:var(--card);border:1.5px solid var(--teal);border-radius:16px;padding:12px;animation:rise .25s both}
-.prop p{margin:0 0 10px;font-size:14.5px}
+.card.flash{animation:flash 1.6s ease-out}
+@keyframes flash{0%,30%{box-shadow:0 0 0 3px var(--teal-2)}100%{box-shadow:0 0 0 0 transparent}}
 .suggest{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
 .suggest button{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:8px 12px;font-size:14px;font-weight:600;color:var(--ink-2)}
 .sbar{display:flex;align-items:center;gap:8px;padding:10px 12px;border-top:1px solid var(--line);background:var(--card)}
@@ -313,8 +312,8 @@ ol.steps{padding-left:20px;margin:8px 0;font-size:14px;line-height:1.5}
 </div>
 
 <!-- Dubbi voice assistant -->
-<button class="fab" id="fab" type="button" aria-label="Talk to Dubbi" hidden>
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><path d="M12 17v4"/></svg>
+<button class="fab" id="fab" type="button" aria-label="Ask Dubbi" hidden>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
 </button>
 <div class="scrim" id="scrim"></div>
 <section class="sheet" id="sheet" role="dialog" aria-label="Dubbi" aria-modal="true">
@@ -378,7 +377,7 @@ async function start() {
   const { data: { session } } = await sb.auth.getSession();
   user = session?.user || null;
   $('login').hidden = !!user; $('app').hidden = !user;
-  if (user) { await load(); setupPush(); resetInactivity(); $('fab').hidden = false; startWake(); }
+  if (user) { await load(); setupPush(); resetInactivity(); $('fab').hidden = false; }
   else $('fab').hidden = true;
 }
 $('loginForm').addEventListener('submit', async e => {
@@ -855,91 +854,201 @@ setInterval(() => { if (!document.hidden && user && !typing()) load(); }, 60000)
 
 
 // ── Dubbi: talk or type ─────────────────────────────────────────────────
-// The brain is the Supabase Edge Function "dubbi" (supabase/functions/dubbi).
-// It can look things up; for actions it only proposes — you confirm here.
-const DUBBI_URL = SUPABASE_URL + '/functions/v1/dubbi';
+// Dubbi runs entirely on this phone: no AI service, nothing sent anywhere new.
+// It understands a fixed set of requests (English or French), answers from the
+// same data this page shows, and opens the right card — you still do every
+// action yourself on the card. Answers are read aloud by the phone's own voices.
+// The microphone uses Apple's dictation, so it stays off until you turn it on in ⚙︎.
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 const PREF = (() => { try { return JSON.parse(localStorage.getItem('dubbi_prefs') || '{}'); } catch { return {}; } })();
 const pref = (k, d) => PREF[k] ?? d;
 const savePref = (k, v) => { PREF[k] = v; try { localStorage.setItem('dubbi_prefs', JSON.stringify(PREF)); } catch {} };
-const D = { conv: null, busy: false, rec: null, wake: null, open: false, lang: pref('lang', 'auto') };
+const D = { rec: null, open: false, lang: pref('lang', 'auto'), fr: false };
+const micOn = () => !!SR && pref('mic', false);
 
-function openSheet(listen = false) {
-  D.open = true; stopWake();
+function openSheet() {
+  D.open = true;
   $('sheet').classList.add('on'); $('scrim').classList.add('on');
-  $('settings').hidden = true; $('chat').hidden = false;
+  $('settings').hidden = true; $('chat').hidden = false; $('micBtn').hidden = !micOn();
   if (!$('chat').children.length) greetDubbi();
-  if (listen) startListening(); else setTimeout(() => $('askInput').focus({ preventScroll: true }), 300);
+  if (micOn()) startListening(); else setTimeout(() => $('askInput').focus({ preventScroll: true }), 300);
 }
 function closeSheet() {
   D.open = false; stopListening(); speechSynthesis?.cancel();
   $('sheet').classList.remove('on'); $('scrim').classList.remove('on');
-  startWake();
 }
 function bubble(text, who) {
   const b = document.createElement('div'); b.className = 'msg ' + who; b.textContent = text;
   $('chat').appendChild(b); $('chat').scrollTop = $('chat').scrollHeight; return b;
 }
+function buttons(list) {
+  if (!list.length) return;
+  const box = document.createElement('div'); box.className = 'suggest';
+  list.forEach(([label, fn]) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = label; b.onclick = fn; box.appendChild(b); });
+  $('chat').appendChild(box); $('chat').scrollTop = $('chat').scrollHeight;
+}
+const SUGGEST = { en: ["What's new?", 'Anything overdue?', 'Who needs an appointment?', 'Look for new assignments'],
+                  fr: ['Quoi de neuf?', 'Des retards?', 'Qui doit être planifié?', 'Cherche les nouvelles assignations'] };
 function greetDubbi() {
   const fr = D.lang === 'fr';
   bubble(fr ? 'Bonjour! Que puis-je faire pour vous?' : 'Hi! What can I do for you?', 'bot');
-  const box = document.createElement('div'); box.className = 'suggest';
-  (fr ? ['Quoi de neuf?', 'Des retards?', 'Qui doit être planifié?', 'Cherche les nouvelles assignations']
-      : ["What's new?", 'Anything overdue?', 'Who needs an appointment?', 'Look for new assignments'])
-    .forEach(q => { const b = document.createElement('button'); b.type = 'button'; b.textContent = q; b.onclick = () => ask(q); box.appendChild(b); });
-  $('chat').appendChild(box);
+  buttons(SUGGEST[fr ? 'fr' : 'en'].map(q => [q, () => ask(q)]));
 }
-function proposalCard(p) {
-  const c = document.createElement('div'); c.className = 'prop'; c.dataset.id = p.id;
-  c.innerHTML = `<p>${esc(p.describe)}</p><div class="acts" style="margin-top:0"><button class="btn ghost" type="button" data-x="cancel">Cancel</button><button class="btn pri" type="button" data-x="execute">Confirm</button></div>`;
-  c.addEventListener('click', e => { const x = e.target.closest('[data-x]'); if (x) { c.remove(); call({ [x.dataset.x]: p.id }); } });
-  $('chat').appendChild(c); $('chat').scrollTop = $('chat').scrollHeight;
-}
-async function call(payload, shown) {
-  if (D.busy) return; D.busy = true;
-  const wait = bubble('…', 'bot'); wait.style.opacity = '.6';
-  try {
-    const { data: { session } } = await sb.auth.getSession();
-    const res = await fetch(DUBBI_URL, { method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token, apikey: SUPABASE_ANON_KEY },
-      body: JSON.stringify({ ...payload, conversation_id: D.conv }) });
-    const out = await res.json().catch(() => ({}));
-    wait.remove();
-    if (res.status === 404) { bubble('Dubbi’s brain isn’t installed yet — see the setup steps in assistant/README.md.', 'sys'); return; }
-    D.conv = out.conversation_id || D.conv;
-    const reply = out.reply || 'Sorry, something went wrong.';
-    bubble(reply, 'bot'); speak(reply);
-    document.querySelectorAll('.prop').forEach(n => n.remove());
-    (out.proposals || []).forEach(proposalCard);
-    if (out.executed || out.cancelled) load();
-  } catch (e) {
-    wait.remove(); bubble('I can’t reach Dubbi right now. Check your connection.', 'sys');
-  } finally { D.busy = false; }
-}
-function ask(text) {
+async function ask(text) {
   text = String(text || '').trim(); if (!text) return;
-  document.querySelectorAll('.suggest').forEach(n => n.remove());
-  if (D.lang === 'auto' && /[éèêàçù]|\b(bonjour|merci|dossier|patients?|oui|quoi|qui|est-ce)\b/i.test(text)) D.spoken = 'fr';
-  bubble(text, 'me'); $('askInput').value = ''; call({ text });
+  document.querySelectorAll('#chat .suggest').forEach(n => n.remove());
+  D.fr = D.lang === 'fr' || (D.lang === 'auto' && /[éèêàçùô]|\b(bonjour|salut|quoi|qui|des|les|dossier|retards?|planifi\w*|rendez|cherche|trouve|aide|aujourd'hui|documents? manquants?)\b/i.test(text));
+  bubble(text, 'me'); $('askInput').value = '';
+  let out;
+  try { out = await answer(text); } catch (e) { out = { say: D.fr ? 'Je n’arrive pas à lire vos données. Vérifiez la connexion.' : 'I couldn’t read your data. Check your connection.' }; }
+  bubble(out.say, 'bot'); speak(out.say);
+  buttons(out.go || []);
 }
 
-// Speaking — the iPhone's built-in voices, in the language of the answer
+// ── Understanding (fixed rules, no AI) ──────────────────────────────────
+const plain = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const L = (en, fr) => D.fr ? fr : en;
+const n = (k, en1, enN, fr1, frN) => `${k} ${k === 1 ? L(en1, fr1) : L(enN, frN)}`;
+const fileOf = i => String(i.t?.file_number || i.r?.record?.file_number || '').trim();
+const KIND = { new: ['new patient', 'nouveau patient'], reply: ['reply to send', 'réponse à envoyer'], 'docs-done': ['confirmation to send', 'confirmation à envoyer'],
+  close: ['file to close', 'dossier à fermer'], rx: ['prescription to apply', 'ordonnance à appliquer'], waiting: ['waiting for documents', 'en attente de documents'], dup: ['duplicate', 'doublon'] };
+const kindOf = i => L(...KIND[i.view]);
+const itemLine = i => `${kindOf(i)}${fileOf(i) ? ' #' + fileOf(i) : ''}${i.late ? ' (' + i.late + ')' : ''}`;
+const showBtn = i => [`${L('Show', 'Voir')} #${fileOf(i) || '—'}`, () => showItem(i)];
+const listSay = (head, lines, max = 5) => head + ' ' + lines.slice(0, max).join('; ') + (lines.length > max ? L(`; and ${lines.length - max} more.`, `; et ${lines.length - max} autres.`) : '.');
+
+function showItem(i) {
+  tab = 'today'; render(); closeSheet();
+  const el = document.querySelector(i.t ? `[data-t="${CSS.escape(i.t.id)}"]` : `[data-r="${CSS.escape(i.r.id)}"]`);
+  if (!el) return;
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+}
+function showTab(t, jump) {
+  tab = t; render(); closeSheet();
+  if (jump) document.getElementById('sec-' + jump)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function briefing() {
+  const items = todoItems(), today = ymd(new Date());
+  const late = items.filter(i => i.late), todo = items.filter(i => i.view !== 'waiting' && i.view !== 'dup');
+  const waiting = items.filter(i => i.view === 'waiting').length, pastDue = S.sched.filter(p => p.due_date < today).length;
+  const parts = [];
+  if (late.length) parts.push(L(`${late.length} overdue`, `${late.length} en retard`));
+  parts.push(todo.length ? n(todo.length, 'thing to do', 'things to do', 'chose à faire', 'choses à faire') : L('nothing to do', 'rien à faire'));
+  if (waiting) parts.push(L(`${waiting} waiting for documents`, `${waiting} en attente de documents`));
+  if (S.sched.length) parts.push(L(`${n(S.sched.length, 'patient', 'patients')} to schedule${pastDue ? `, ${pastDue} past due` : ''}`,
+    `${n(S.sched.length, 'patient', 'patients', 'patient', 'patients')} à planifier${pastDue ? `, dont ${pastDue} en retard` : ''}`));
+  if (S.unconf.length) parts.push(L(`${S.unconf.length} to confirm`, `${S.unconf.length} à confirmer`));
+  const bt = S.beat?.created_at, mac = !bt ? L(' Your Mac hasn’t checked your email yet.', ' Votre Mac n’a pas encore vérifié vos courriels.')
+    : hoursSince(bt) > 0.25 ? L(` Careful: your Mac last checked email ${ago(bt)} ago.`, ` Attention : votre Mac a vérifié les courriels il y a ${ago(bt)}.`) : '';
+  const go = late.length ? [[L('Show overdue', 'Voir les retards'), () => showTab('today', 'overdue')]] : todo.length ? [[L('Show to do', 'Voir'), () => showTab('today')]] : [];
+  return { say: L('You have ', 'Vous avez ') + parts.join(', ') + '.' + mac, go };
+}
+
+async function answer(text) {
+  const q = plain(text);
+  const items = todoItems(), today = ymd(new Date());
+  const num = (q.match(/\b\d{4,6}\b/) || [])[0];
+
+  if (/\b(help|aide|what can you|que (peux|pouvez)|commands?)\b/.test(q))
+    return { say: L('Ask me what’s new, what’s overdue, who needs an appointment, who to confirm, today’s visits, replies to send, missing documents, or a file number or patient name. I open the card; you do the action.',
+      'Demandez-moi : quoi de neuf, les retards, qui planifier, qui confirmer, les visites d’aujourd’hui, les réponses à envoyer, les documents manquants, ou un numéro de dossier ou un nom. J’ouvre la carte; vous faites l’action.') };
+
+  if (/(new )?assign|nouvel\w* assign|check (my )?(e-?mails?|mail|inbox)|look for|cherche les|verifie|refresh|actualis|courriels?/.test(q) && !num) {
+    await load();
+    const now = todoItems().filter(i => i.view === 'new');
+    const bt = S.beat?.created_at;
+    const mac = !bt ? L('Your Mac hasn’t checked email yet.', 'Votre Mac n’a pas encore vérifié les courriels.')
+      : L(`Your Mac last checked email ${ago(bt)}${ago(bt) === 'just now' ? '' : ' ago'}.`, `Votre Mac a vérifié les courriels il y a ${ago(bt)}.`);
+    return { say: `${mac} ${now.length ? L(`${n(now.length, 'new patient', 'new patients')} waiting for you.`, `${n(now.length, 'nouveau patient', 'nouveaux patients', 'nouveau patient', 'nouveaux patients')} vous attendent.`) : L('No new assignments.', 'Aucune nouvelle assignation.')}`,
+      go: now.slice(0, 4).map(showBtn) };
+  }
+
+  if (num) {
+    const hits = items.filter(i => normFile(fileOf(i)) === normFile(num));
+    const { data: pts } = await sb.from('patients').select('file_number,patient_name,archived,pending,due_date,appointment_date_time,appointment_confirmed').eq('file_number', num).limit(1);
+    const p = pts && pts[0];
+    let say = '';
+    if (p) {
+      const st = p.archived ? L('archived', 'archivé') : p.pending ? L('pending', 'en attente') : L('active', 'actif');
+      const appt = p.appointment_date_time ? L(`appointment ${dayLabel(String(p.appointment_date_time).slice(0, 10))}${p.appointment_confirmed ? ', confirmed' : ', not confirmed'}`,
+        `rendez-vous le ${dayLabel(String(p.appointment_date_time).slice(0, 10))}${p.appointment_confirmed ? ', confirmé' : ', non confirmé'}`)
+        : p.due_date ? L(`no appointment, due ${dayLabel(p.due_date)}`, `pas de rendez-vous, dû le ${dayLabel(p.due_date)}`) : L('no appointment', 'pas de rendez-vous');
+      say = L(`File ${num} is ${p.patient_name}, ${st}, ${appt}.`, `Le dossier ${num} est ${p.patient_name}, ${st}, ${appt}.`);
+    } else say = L(`File ${num} isn’t in VaPiq.`, `Le dossier ${num} n’est pas dans VaPiq.`);
+    if (hits.length) say += ' ' + L('Open: ', 'Ouvert : ') + hits.map(kindOf).join(', ') + '.';
+    return { say, go: hits.map(showBtn) };
+  }
+
+  if (/overdue|late\b|behind|retard/.test(q)) {
+    const late = items.filter(i => i.late);
+    return late.length ? { say: listSay(L(`${n(late.length, 'item is', 'items are')} overdue:`, `${late.length} en retard :`), late.map(itemLine)), go: late.slice(0, 4).map(showBtn) }
+      : { say: L('Nothing is overdue. 👍', 'Rien n’est en retard. 👍') };
+  }
+  if (/confirm/.test(q)) {
+    return S.unconf.length ? { say: listSay(L(`${S.unconf.length} to confirm:`, `${S.unconf.length} à confirmer :`), S.unconf.map(p => `${p.patient_name}, ${dayLabel(String(p.appointment_date_time).slice(0, 10))}`)),
+      go: [[L('Open Patients', 'Ouvrir Patients'), () => showTab('patients')]] } : { say: L('All upcoming appointments are confirmed.', 'Tous les rendez-vous à venir sont confirmés.') };
+  }
+  if (/appointment|schedul|book|planifi|rendez|rdv|\bdue\b/.test(q)) {
+    return S.sched.length ? { say: listSay(L(`${S.sched.length} need an appointment:`, `${S.sched.length} à planifier :`), S.sched.map(p => `${p.patient_name}, ${L('due', 'dû le')} ${dayLabel(p.due_date)}${p.due_date < today ? L(' (past due)', ' (en retard)') : ''}`)),
+      go: [[L('Open Patients', 'Ouvrir Patients'), () => showTab('patients')]] } : { say: L('Everyone due in the next 14 days has an appointment.', 'Tous les patients dus dans les 14 prochains jours ont un rendez-vous.') };
+  }
+  if (/visit|today|aujourd/.test(q)) {
+    const { data } = await sb.from('patients').select('patient_name,appointment_date_time').eq('archived', false)
+      .gte('appointment_date_time', today).lte('appointment_date_time', today + 'T23:59').order('appointment_date_time');
+    const v = data || [];
+    const hm = iso => String(iso).slice(11, 16);
+    return v.length ? { say: listSay(L(`${n(v.length, 'visit', 'visits')} today:`, `${v.length} visite${v.length > 1 ? 's' : ''} aujourd’hui :`), v.map(p => `${hm(p.appointment_date_time)} ${p.patient_name}`), 12) }
+      : { say: L('No visits today.', 'Aucune visite aujourd’hui.') };
+  }
+  if (/document|doc\b|docs\b|waiting|attente|manquant/.test(q)) {
+    const w = items.filter(i => i.view === 'waiting' || (i.t && docsMissing(i.t)));
+    return w.length ? { say: listSay(L(`${w.length} missing documents:`, `${w.length} avec documents manquants :`), w.map(itemLine)), go: w.slice(0, 4).map(showBtn) }
+      : { say: L('No documents missing.', 'Aucun document manquant.') };
+  }
+  if (/repl|send|envoy|reponse/.test(q)) {
+    const r = items.filter(i => i.view === 'reply' || i.view === 'docs-done');
+    return r.length ? { say: listSay(L(`${n(r.length, 'reply', 'replies')} ready:`, `${r.length} réponse${r.length > 1 ? 's' : ''} prête${r.length > 1 ? 's' : ''} :`), r.map(itemLine)), go: r.slice(0, 4).map(showBtn) }
+      : { say: L('No replies waiting.', 'Aucune réponse en attente.') };
+  }
+  if (/prescri|ordonnance/.test(q)) {
+    const r = items.filter(i => i.view === 'rx');
+    return r.length ? { say: listSay(L(`${r.length} to apply:`, `${r.length} à appliquer :`), r.map(itemLine)), go: r.slice(0, 4).map(showBtn) } : { say: L('No prescriptions to apply.', 'Aucune ordonnance à appliquer.') };
+  }
+  if (/close|ferm/.test(q)) {
+    const r = items.filter(i => i.view === 'close');
+    return r.length ? { say: listSay(L(`${r.length} to close:`, `${r.length} à fermer :`), r.map(itemLine)), go: r.slice(0, 4).map(showBtn) } : { say: L('No files to close.', 'Aucun dossier à fermer.') };
+  }
+  const who = q.match(/\b(?:find|look up|search(?: for)?|who is|show me|trouve|cherche|qui est)\s+(?:patient\s+)?([a-z][a-z' -]{1,40})$/);
+  if (who && !/^(the |les |des )/.test(who[1])) {
+    const name = who[1].trim();
+    const { data } = await sb.from('patients').select('file_number,patient_name,archived,due_date,appointment_date_time').ilike('patient_name', `%${name.replace(/[%_]/g, '')}%`).order('archived').limit(6);
+    const list = data || [];
+    if (!list.length) return { say: L(`No patient matching “${name}”.`, `Aucun patient pour « ${name} ».`) };
+    return { say: listSay(L(`${n(list.length, 'match', 'matches')}:`, `${list.length} résultat${list.length > 1 ? 's' : ''} :`), list.map(p => `${p.patient_name} #${String(p.file_number).trim()}${p.archived ? L(' (archived)', ' (archivé)') : ''}`)),
+      go: list.slice(0, 4).map(p => [`#${String(p.file_number).trim()}`, () => ask(String(p.file_number).trim())]) };
+  }
+  if (/new|neuf|brief|summary|resume|status|hello|hi\b|hey|bonjour|salut|morning|matin/.test(q)) return briefing();
+  return { say: L('Sorry, I didn’t catch that. Try one of these:', 'Désolé, je n’ai pas compris. Essayez :'), go: SUGGEST[D.fr ? 'fr' : 'en'].map(s => [s, () => ask(s)]) };
+}
+
+// Speaking — the iPhone's built-in voices, on the device
 function speak(text) {
   if (!pref('speak', true) || !('speechSynthesis' in window)) return;
   speechSynthesis.cancel();
-  const fr = D.lang === 'fr' || (D.lang === 'auto' && /[éèêàçù]|\b(je|vous|le dossier|bonjour|merci|d'accord)\b/i.test(text));
-  const u = new SpeechSynthesisUtterance(text);
-  u.lang = fr ? 'fr-CA' : 'en-CA';
-  const v = speechSynthesis.getVoices().find(v => v.lang.replace('_', '-').startsWith(fr ? 'fr' : 'en'));
+  const u = new SpeechSynthesisUtterance(text.replace(/👍/g, ''));
+  u.lang = D.fr ? 'fr-CA' : 'en-CA';
+  const v = speechSynthesis.getVoices().find(v => v.lang.replace('_', '-').startsWith(D.fr ? 'fr' : 'en'));
   if (v) u.voice = v;
   u.rate = 1.03;
   speechSynthesis.speak(u);
 }
 
-// Listening — tap the mic; it stops when you stop talking
-function recLang() { return D.lang === 'fr' ? 'fr-CA' : D.lang === 'en' ? 'en-CA' : (D.spoken === 'fr' ? 'fr-CA' : 'en-CA'); }
+// Listening (only if you turned the microphone on) — tap the mic; it stops when you stop talking
+const recLang = () => D.lang === 'fr' ? 'fr-CA' : D.lang === 'en' ? 'en-CA' : (D.fr ? 'fr-CA' : 'en-CA');
 function startListening() {
-  if (!SR) { toast('Voice input isn’t available in this browser — type instead, or open Dubbi in Safari.'); return; }
+  if (!micOn()) return;
   speechSynthesis?.cancel(); stopListening();
   const r = new SR(); D.rec = r;
   r.lang = recLang(); r.interimResults = true; r.continuous = false; r.maxAlternatives = 1;
@@ -952,91 +1061,35 @@ function startListening() {
     }
     $('interim').textContent = (final + ' ' + interim).trim();
   };
-  r.onerror = e => { if (e.error === 'not-allowed') toast('Allow the microphone for this app in Settings to talk to Dubbi.'); };
+  r.onerror = e => { if (e.error === 'not-allowed') toast('Allow the microphone for this app in Settings, or type instead.'); };
   r.onend = () => { $('micBtn').classList.remove('live'); $('interim').textContent = ''; D.rec = null; if (final.trim()) ask(final); };
   $('micBtn').classList.add('live');
   try { r.start(); } catch { $('micBtn').classList.remove('live'); }
 }
 function stopListening() { try { D.rec?.stop(); } catch {} }
 
-// "Hey Dubbi" — listens only while the app is open on screen (Apple only
-// lets Siri listen in the background; for that, use "Hey Siri, Dubbi").
-const WAKE = /\b(hey|hi|ok|okay|salut|allo|allô)[\s,]+(dubbi|dubby|dubi|doobie|doobi|dobby|dubbie|debbie)\b[\s,.!]*(.*)$/i;
-function startWake() {
-  if (!SR || !pref('wake', false) || D.open || document.hidden || !user) { $('fab').classList.remove('wake'); return; }
-  stopWake();
-  const r = new SR(); D.wake = r;
-  r.lang = recLang(); r.continuous = true; r.interimResults = false;
-  r.onresult = e => {
-    const t = e.results[e.results.length - 1][0].transcript;
-    const m = t.match(WAKE);
-    if (m) { stopWake(); openSheet(false); if (m[3].trim()) ask(m[3]); else startListening(); }
-  };
-  r.onend = () => { if (D.wake === r) { D.wake = null; setTimeout(startWake, 400); } };
-  r.onerror = e => { if (e.error === 'not-allowed') { savePref('wake', false); D.wake = null; toast('Microphone not allowed — "Hey Dubbi" is off.'); } };
-  try { r.start(); $('fab').classList.add('wake'); } catch { D.wake = null; }
-}
-function stopWake() { const r = D.wake; D.wake = null; try { r?.stop(); } catch {} $('fab').classList.remove('wake'); }
-
-// Settings: speaking, language, "Hey Dubbi", Siri
-async function showSettings() {
+// Settings: speaking, language, microphone
+function showSettings() {
   $('chat').hidden = true; const s = $('settings'); s.hidden = false;
-  const { data: keys } = await sb.from('dubbi_tokens').select('id,label,created_at,last_used_at').order('created_at');
   s.innerHTML = `
-    <div class="setrow"><div>Speak answers aloud<small>Dubbi reads its answers using your phone's voice.</small></div><input type="checkbox" class="sw" data-p="speak" ${pref('speak', true) ? 'checked' : ''}></div>
-    <div class="setrow"><div>Language<small>Auto follows the language you speak.</small></div><div class="seg" data-p="lang">${['auto', 'en', 'fr'].map(l => `<button type="button" data-v="${l}" class="${D.lang === l ? 'on' : ''}">${l.toUpperCase()}</button>`).join('')}</div></div>
-    <div class="setrow"><div>Listen for “Hey Dubbi”<small>Only while this app is open on screen. Uses the microphone.</small></div><input type="checkbox" class="sw" data-p="wake" ${pref('wake', false) ? 'checked' : ''}></div>
-    <div class="sec" style="margin-top:18px">“Hey Siri, Dubbi”</div>
-    <p class="note">Talk to Dubbi hands-free, even with the phone locked, through a Siri Shortcut. It uses a personal Siri key — you can revoke it here any time.</p>
-    ${(keys || []).map(k => `<div class="setrow"><div>${esc(k.label)}<small>Created ${when(k.created_at)}${k.last_used_at ? ' · last used ' + when(k.last_used_at) : ' · never used'}</small></div><button class="btn ghost" style="flex:none;min-height:36px" type="button" data-revoke="${esc(k.id)}">Revoke</button></div>`).join('')}
-    <div id="siriBox"></div>
-    <button class="btn pri" type="button" id="newKey" style="width:100%;margin-top:10px">Set up “Hey Siri, Dubbi”</button>
+    <div class="setrow"><div>Speak answers aloud<small>Uses your iPhone’s own voices, on the phone.</small></div><input type="checkbox" class="sw" data-p="speak" ${pref('speak', true) ? 'checked' : ''}></div>
+    <div class="setrow"><div>Language<small>Auto follows the language you use.</small></div><div class="seg" data-p="lang">${['auto', 'en', 'fr'].map(l => `<button type="button" data-v="${l}" class="${D.lang === l ? 'on' : ''}">${l.toUpperCase()}</button>`).join('')}</div></div>
+    <div class="setrow"><div>Microphone<small>${SR ? 'Off by default. Speech goes through Apple’s dictation (like the keyboard’s mic). Turn on only once your privacy officer agrees.' : 'Not available in this browser.'}</small></div><input type="checkbox" class="sw" data-p="mic" ${micOn() ? 'checked' : ''} ${SR ? '' : 'disabled'}></div>
+    <p class="note">🔒 Dubbi works only on this phone. No AI service is used and nothing is sent anywhere new. It shows and reads; you do every action on the card.</p>
     <button class="btn ghost" type="button" id="backChat" style="width:100%;margin-top:8px">Back to Dubbi</button>`;
 }
-async function newSiriKey() {
-  const raw = crypto.getRandomValues(new Uint8Array(32));
-  const key = btoa(String.fromCharCode(...raw)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(key)))).map(b => b.toString(16).padStart(2, '0')).join('');
-  const { error } = await sb.from('dubbi_tokens').insert({ token_hash: hash, label: 'Siri — ' + new Date().toLocaleDateString('en-CA') });
-  if (error) return toast('Could not create the Siri key — ' + error.message);
-  $('siriBox').innerHTML = `
-    <div class="card" style="margin-top:12px">
-      <b>Your Siri key</b> — shown only once. Copy it into the Shortcut below.
-      <div class="keybox" id="keyTxt">${key}</div>
-      <button class="btn sec2" type="button" id="copyKey" style="width:100%">Copy key</button>
-      <ol class="steps">
-        <li>Open the <b>Shortcuts</b> app → <b>+</b> → name it <b>Dubbi</b>.</li>
-        <li>Add <b>Dictate Text</b> (language: Automatic, stop listening: After Pause).</li>
-        <li>Add <b>Get Contents of URL</b>: URL <span class="keybox" style="display:inline-block;margin:2px 0;padding:2px 6px">${esc(DUBBI_URL)}</span> · Method <b>POST</b> · Headers: <b>x-dubbi-token</b> = your key · Request Body <b>JSON</b>: <b>text</b> = <i>Dictated Text</i>.</li>
-        <li>Add <b>Get Dictionary Value</b>: key <b>reply</b>.</li>
-        <li>Add <b>Speak Text</b> (the Dictionary Value).</li>
-        <li>Say <b>“Hey Siri, Dubbi”</b>, then your request. To confirm an action, say “Hey Siri, Dubbi” again and answer “yes”.</li>
-      </ol>
-    </div>`;
-  $('copyKey').onclick = async () => { try { await navigator.clipboard.writeText(key); toast('Key copied'); } catch { toast('Select the key and copy it'); } };
-}
-$('settings').addEventListener('click', async e => {
+$('settings').addEventListener('click', e => {
   const t = e.target;
-  if (t.matches('.sw')) {
-    savePref(t.dataset.p, t.checked);
-    if (t.dataset.p === 'wake' && t.checked) { toast('“Hey Dubbi” is on while the app is open'); }
-    return;
-  }
+  if (t.matches('.sw')) { savePref(t.dataset.p, t.checked); $('micBtn').hidden = !micOn(); return; }
   const seg = t.closest('.seg button'); if (seg) { D.lang = seg.dataset.v; savePref('lang', D.lang); showSettings(); return; }
-  if (t.id === 'newKey') return newSiriKey();
-  if (t.id === 'backChat') { $('settings').hidden = true; $('chat').hidden = false; return; }
-  const rv = t.closest('[data-revoke]');
-  if (rv && confirm('Revoke this Siri key? The Shortcut using it stops working.')) {
-    await sb.from('dubbi_tokens').delete().eq('id', rv.dataset.revoke); toast('Siri key revoked'); showSettings();
-  }
+  if (t.id === 'backChat') { $('settings').hidden = true; $('chat').hidden = false; }
 });
-$('fab').addEventListener('click', () => openSheet(!!SR));
+$('fab').addEventListener('click', openSheet);
 $('scrim').addEventListener('click', closeSheet);
 $('closeSheet').addEventListener('click', closeSheet);
 $('setBtn').addEventListener('click', () => $('settings').hidden ? showSettings() : ($('settings').hidden = true, $('chat').hidden = false));
 $('micBtn').addEventListener('click', () => D.rec ? stopListening() : startListening());
 $('askForm').addEventListener('submit', e => { e.preventDefault(); ask($('askInput').value); });
-document.addEventListener('visibilitychange', () => { if (document.hidden) stopWake(); else startWake(); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && D.open) closeSheet(); });
 
 // ── iPhone / browser push ───────────────────────────────────────────────

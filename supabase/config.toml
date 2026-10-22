@@ -1,7 +1,0 @@
-# Supabase CLI settings for this repo's Edge Functions.
-project_id = "wqlbmtjbjloxpvsbeqyb"
-
-[functions.dubbi]
-# The function checks the caller itself: your VaPiq session (app) or your
-# personal Siri key (Siri Shortcut, which can't send a session).
-verify_jwt = false
