@@ -15,6 +15,22 @@ Home is ALWAYS the departure point. It is never counted as a stop.
 
 ---
 
+## LOOP ROUTE — Mon–Thu + Saturday (confirmed Oct 22, 2026)
+
+**Start and end: 42 Boulevard Deguire, H4N 1N4.** The route is one counter-clockwise loop,
+as drawn on the map: Saint-Laurent → Lachine/LaSalle → Verdun → Downtown → Plateau/Rosemont →
+east apex (Montréal-Est / Pointe-aux-Trembles) → back along the north (Montréal-Nord / Ahuntsic) → home.
+
+- `loopSort()` in scheduler.html: zone positions (FSA centroids, GeoNames, CC BY 4.0) →
+  counter-clockwise sweep from home → 2-opt removes all crossings → kept counter-clockwise.
+- No going back and forth: a tour without crossings is a clean loop.
+- Still applied after the loop: same-address grouping, Vermette first, 325 Deguire last.
+- Saturday now uses the loop too (replaces "start farthest"); start time stays 8:00 AM.
+- **Friday unchanged:** Laval horseshoe + West Island (`circBKey`).
+- Day assignment (which patients go on which day) is unchanged — only the order within a day.
+
+---
+
 ## SPECIAL TRIGGER RULES
 
 ### 32 Rue Vermette — Always FIRST
@@ -134,6 +150,7 @@ When multiple patients share the same building (same street number + street, dif
 | 8 | Jun 3 | Both | City-name fallback; H7 sub-steps | ✅ |
 | 9 | Jun 11 | Friday | Laval horseshoe arc confirmed | ✅ |
 | 10 | Jun 22 | Tuesday | weekdayKey + same-address 15-min grouping | ✅ |
+| 11 | Oct 22 | Mon–Thu + Sat | Counter-clockwise loop from 42 Deguire, no back-and-forth | ✅ |
 
 ---
 
@@ -143,4 +160,4 @@ When multiple patients share the same building (same street number + street, dif
 - **GitHub**: aatomasi-bot.github.io/Clinic-Suite/
 - **Supabase**: wqlbmtjbjloxpvsbeqyb.supabase.co
 
-*Last updated: Jun 22, 2026*
+*Last updated: Oct 22, 2026*
