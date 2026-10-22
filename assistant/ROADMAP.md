@@ -35,7 +35,14 @@ Open questions to settle before building:
 Run 3–5 real assignment PDFs through medicum-parser.html on your Mac and
 check the console line `[DOSE] … — <reason>`.
 
+## Done 2026-10-22 (afternoon)
+- Route loop Mon–Thu + Saturday; Vermette rule removed
+- Coordinator + reports@ pairing, document checks, CC reports@, ask for missing documents
+- Safety net: overdue alerts, 7:00 AM summary, journey tracker, Mac health check
+- Dubbi redesign + voice assistant (app, "Hey Dubbi" while open, "Hey Siri, Dubbi")
+
 ## Still open
+- Monthly list check: compare Medicum's Monthly Patient List PDF with VaPiq (needs a sample layout)
 - Signature line for replies (config.json → replies.signature)
 - Scanned/faxed PDFs: OCR on the Mac instead of opening the Medicum Parser
 - Other status emails (on hold, transfer, patient is back, update) — not handled yet

@@ -9,6 +9,10 @@ import nodemailer from 'nodemailer';
 import { ImapFlow } from 'imapflow';
 import { getSecret, SECRETS } from './keychain.js';
 
+// The email(s) a task replies to: all paired emails, or just the original.
+const emailsOf = task => (task.related_emails && task.related_emails.length) ? task.related_emails
+  : [{ message_id: task.email_message_id, folder: task.email_folder }];
+
 export function replySubject(subject) {
   const s = String(subject || '').trim();
   return /^re\s*:/i.test(s) ? s : `Re: ${s}`;
@@ -18,6 +22,7 @@ function message(task, from) {
   return {
     from,
     to: task.to_name ? { name: task.to_name, address: task.to_address } : task.to_address,
+    ...(task.cc_addresses && task.cc_addresses.length ? { cc: task.cc_addresses } : {}),
     subject: replySubject(task.email_subject),
     text: task.reply_body,
     ...(task.email_message_id ? { inReplyTo: task.email_message_id, references: [task.email_message_id] } : {}),
@@ -37,7 +42,7 @@ export function testMailer(outDir) {
       fs.writeFileSync(file, info.message);
       return { file };
     },
-    async moveOriginal(task, toFolder) { moves.push({ id: task.id, toFolder }); return true; },
+    async moveOriginal(task, toFolder) { moves.push({ id: task.id, toFolder, emails: emailsOf(task).length }); return true; },
     async close() {},
   };
 }
@@ -68,17 +73,20 @@ export function liveMailer(imapCfg, replyCfg) {
       }
       return { messageId: info.messageId };
     },
-    // Finds the original by Message-ID (UIDs can change) and moves it.
+    // Finds each original (coordinator + reports@) by Message-ID — UIDs can
+    // change — and moves it to the Medicum folder.
     async moveOriginal(task, toFolder) {
-      if (!task.email_message_id || !task.email_folder || task.email_folder === toFolder) return false;
       const c = await imapClient();
-      const lock = await c.getMailboxLock(task.email_folder);
-      try {
-        const uids = await c.search({ header: { 'message-id': task.email_message_id } }, { uid: true });
-        if (!uids.length) return false;
-        await c.messageMove(uids, toFolder, { uid: true });
-        return true;
-      } finally { lock.release(); }
+      let moved = 0;
+      for (const e of emailsOf(task)) {
+        if (!e.message_id || !e.folder || e.folder === toFolder) continue;
+        const lock = await c.getMailboxLock(e.folder);
+        try {
+          const uids = await c.search({ header: { 'message-id': e.message_id } }, { uid: true });
+          if (uids.length) { await c.messageMove(uids, toFolder, { uid: true }); moved++; }
+        } finally { lock.release(); }
+      }
+      return moved > 0;
     },
     async close() { try { await imap?.logout(); } catch {} smtp.close(); },
   };

@@ -20,8 +20,9 @@ put patient details in a notification.
 
 ## Setup (once)
 
-1. **Database**: in Supabase → SQL Editor, run `supabase/2026-10-20_intake_assistant.sql`,
-   then `supabase/2026-10-22_coordinator_replies.sql`.
+1. **Database**: in Supabase → SQL Editor, run each file in `supabase/` once, in date order:
+   `2026-10-20_intake_assistant.sql`, `2026-10-22_coordinator_replies.sql`,
+   `2026-10-22_lock_pins_reminders.sql`, `2026-10-22_pairing_safety_net.sql`, `2026-10-22_dubbi_voice.sql`.
 2. **Install**: in Terminal:
    ```bash
    cd ~/Downloads/Code/Clinic-Suite/assistant && npm install
@@ -40,7 +41,7 @@ put patient details in a notification.
    ```json
    { "replies": { "signature": "Your Name, RN" } }
    ```
-7. **Run every 2 minutes** in the background:
+7. **Run every 2 minutes + 7:00 AM summary** in the background:
    ```bash
    ./install-launchd.sh
    ```
@@ -86,3 +87,40 @@ bold option that singles out exactly one of them. If nothing does, or the marks
 disagree, the dose is left **blank** and the card asks you to check the PDF. It
 never guesses. Scanned/faxed PDFs have no text layer; their card says to open the
 PDF in the Medicum Parser (OCR).
+
+## Dubbi — voice assistant
+
+The microphone button in the Dubbi app (and "Hey Siri, Dubbi") talks to a small
+cloud function in your Supabase project: `supabase/functions/dubbi/`. It uses
+Claude (`claude-opus-5-5`) to understand you and look things up.
+
+- **It can only read** (overview, open items, patient lookup, scheduling lists,
+  reply drafts). For actions — send a reply, mark a prescription applied, close a
+  file, ask for documents, add a patient — it **proposes**; nothing happens until
+  you tap **Confirm** or say "yes"/"oui", and then fixed code (not the AI) does it,
+  re-checking first. TEST cards never change VaPiq.
+- Patient details it looks up are sent to Anthropic to answer you. Ask your privacy
+  officer to confirm this is acceptable (Quebec Law 25). Switch it off any time:
+  Supabase → Edge Functions → Secrets → `DUBBI_AI` = `off`.
+- Conversations are kept 7 days. Siri keys are stored only as a hash; revoke them in
+  Dubbi → ⚙︎.
+
+### Install Dubbi's brain (once)
+
+1. Run `supabase/2026-10-22_dubbi_voice.sql` (step 1 above).
+2. Create an API key at **console.anthropic.com → API Keys**. In Supabase →
+   **Edge Functions → Secrets**, add `ANTHROPIC_API_KEY` with that key (you type it
+   there yourself).
+3. In Terminal, sign the Supabase tool in (opens your browser):
+   ```bash
+   cd ~/Downloads/Code/Clinic-Suite && npx supabase@2.120.0 login
+   ```
+4. Upload the function:
+   ```bash
+   npx supabase@2.120.0 functions deploy dubbi --project-ref wqlbmtjbjloxpvsbeqyb --use-api --no-verify-jwt
+   ```
+5. Open Dubbi and tap the microphone. For "Hey Siri, Dubbi": Dubbi → ⚙︎ → **Set up
+   "Hey Siri, Dubbi"** and follow the steps shown.
+
+`npm test` (in `assistant/`) also runs Dubbi's tests with a scripted stand-in for
+Claude — no network, no cost.

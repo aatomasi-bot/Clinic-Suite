@@ -9,162 +9,377 @@
                  style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
                  font-src https://fonts.gstatic.com;
                  img-src 'self' data:;
-                 connect-src 'self' https://*.supabase.co;">
+                 connect-src 'self' https://*.supabase.co;
+                 media-src 'self';">
   <meta name="robots" content="noindex, nofollow">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Approvals">
-  <meta name="theme-color" content="#2D8C8A">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Dubbi">
+  <meta name="theme-color" content="#F4F6F9" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0E141D" media="(prefers-color-scheme: dark)">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&display=swap" rel="stylesheet">
-  <title>VaPiq Approvals</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&display=swap" rel="stylesheet">
+  <title>Dubbi</title>
 <style>
+/* ── Tokens ─────────────────────────────────────────────────────────── */
 :root{
-  --teal:#2D8C8A;--teal-dark:#1F6664;--teal-light:#E3F2F1;
-  --bg:#F2F4F8;--card:#FFFFFF;--border:#DDE3EC;--text:#1B2638;--text-2:#56627A;--text-3:#8A94A8;
-  --red:#C0392B;--red-bg:#FDEDED;--amber:#B7791F;--amber-bg:#FFF6E0;--green:#2F855A;--green-bg:#E6F4EC;
-  --violet:#6B46C1;--violet-bg:#EFE9FB;
+  --teal:#2D8C8A;--teal-2:#3AA8A5;--teal-ink:#1C6664;--teal-soft:#E4F3F2;
+  --bg:#F4F6F9;--card:#FFFFFF;--card-2:#F8FAFC;--line:#E3E8EF;--ink:#16202E;--ink-2:#55627A;--ink-3:#8C96A8;
+  --red:#D1453B;--red-soft:#FDECEA;--amber:#B7741A;--amber-soft:#FFF4DF;--green:#23855A;--green-soft:#E3F4EA;
+  --violet:#6B4FD0;--violet-soft:#EFEAFD;--blue:#2E6FD6;--blue-soft:#E7F0FD;
+  --shadow:0 1px 2px rgba(16,24,40,.05),0 4px 16px rgba(16,24,40,.06);
+  --radius:18px;--tabbar:64px;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
-    --teal:#3AA8A5;--teal-dark:#7FD3D0;--teal-light:#173B3B;
-    --bg:#0F1621;--card:#1A2335;--border:#2A3A55;--text:#E2E8F0;--text-2:#94A3B8;--text-3:#64748B;
-    --red:#F87171;--red-bg:#3A1C1C;--amber:#F6C05C;--amber-bg:#3A2E14;--green:#68D391;--green-bg:#173325;
-    --violet:#B794F4;--violet-bg:#2D2346;
+    --teal:#3DB3AF;--teal-2:#58C4C0;--teal-ink:#8FE0DC;--teal-soft:#13302F;
+    --bg:#0E141D;--card:#17202D;--card-2:#1C2735;--line:#273447;--ink:#E7ECF3;--ink-2:#9AA8BC;--ink-3:#66748A;
+    --red:#F07167;--red-soft:#3A1D1D;--amber:#F2B957;--amber-soft:#3A2E16;--green:#5CCB93;--green-soft:#15302A;
+    --violet:#A88BFA;--violet-soft:#2A2345;--blue:#7AA7F5;--blue-soft:#1B2A45;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 20px rgba(0,0,0,.25);
   }
 }
 :root[data-theme="dark"]{
-  --teal:#3AA8A5;--teal-dark:#7FD3D0;--teal-light:#173B3B;
-  --bg:#0F1621;--card:#1A2335;--border:#2A3A55;--text:#E2E8F0;--text-2:#94A3B8;--text-3:#64748B;
-  --red:#F87171;--red-bg:#3A1C1C;--amber:#F6C05C;--amber-bg:#3A2E14;--green:#68D391;--green-bg:#173325;
-  --violet:#B794F4;--violet-bg:#2D2346;
+  --teal:#3DB3AF;--teal-2:#58C4C0;--teal-ink:#8FE0DC;--teal-soft:#13302F;
+  --bg:#0E141D;--card:#17202D;--card-2:#1C2735;--line:#273447;--ink:#E7ECF3;--ink-2:#9AA8BC;--ink-3:#66748A;
+  --red:#F07167;--red-soft:#3A1D1D;--amber:#F2B957;--amber-soft:#3A2E16;--green:#5CCB93;--green-soft:#15302A;
+  --violet:#A88BFA;--violet-soft:#2A2345;--blue:#7AA7F5;--blue-soft:#1B2A45;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 20px rgba(0,0,0,.25);
 }
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:15px;
-  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
-header{position:sticky;top:0;z-index:5;background:var(--teal);color:#fff;padding:14px 16px 0}
-.hrow{display:flex;align-items:center;gap:10px;max-width:760px;margin:0 auto}
-.hrow h1{font-size:18px;font-weight:800;margin:0;flex:1}
-.hbtn{background:rgba(255,255,255,.16);border:0;color:#fff;font:inherit;font-size:13px;font-weight:700;padding:7px 11px;border-radius:9px;cursor:pointer;text-decoration:none}
-.tabs{display:flex;gap:4px;max-width:760px;margin:12px auto 0;overflow-x:auto}
-.tab{flex:1;min-width:max-content;background:none;border:0;color:rgba(255,255,255,.75);font:inherit;font-weight:700;font-size:14px;padding:9px 10px 11px;border-bottom:3px solid transparent;cursor:pointer}
-.tab.on{color:#fff;border-bottom-color:#fff}
-.tab .n{display:inline-block;min-width:20px;padding:1px 6px;margin-left:4px;border-radius:10px;background:rgba(255,255,255,.22);font-size:12px}
-main{max-width:760px;margin:0 auto;padding:14px 16px 40px}
-.banner{background:var(--amber-bg);color:var(--amber);border-radius:10px;padding:10px 12px;font-size:13px;font-weight:600;margin-bottom:12px}
-.empty{text-align:center;color:var(--text-3);padding:50px 10px;font-size:14px}
-.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px}
-.ctop{display:flex;align-items:flex-start;gap:8px;margin-bottom:10px}
+
+/* ── Base: phone-first, never wider than the screen ─────────────────── */
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+html,body{max-width:100%;overflow-x:hidden}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  font-size:15px;line-height:1.4;-webkit-font-smoothing:antialiased;
+  padding:0 env(safe-area-inset-right) calc(var(--tabbar) + env(safe-area-inset-bottom) + 12px) env(safe-area-inset-left)}
+/* iPhone zooms into any field under 16px — keep every field at 16px */
+input,select,textarea,button{font:inherit;color:inherit}
+input,select,textarea{font-size:16px;max-width:100%;min-width:0}
+button{cursor:pointer;-webkit-tap-highlight-color:transparent}
+a{color:var(--teal)}
+.wrap{max-width:720px;margin:0 auto;padding:0 16px}
+[hidden]{display:none!important}
+
+/* ── Header ─────────────────────────────────────────────────────────── */
+header.top{position:sticky;top:0;z-index:10;padding-top:env(safe-area-inset-top);
+  background:color-mix(in srgb,var(--bg) 82%,transparent);backdrop-filter:saturate(1.6) blur(18px);-webkit-backdrop-filter:saturate(1.6) blur(18px);
+  border-bottom:1px solid color-mix(in srgb,var(--line) 60%,transparent)}
+.hrow{display:flex;align-items:center;gap:10px;padding:10px 0 9px}
+.avatar{width:40px;height:40px;border-radius:14px;flex:none;display:grid;place-items:center;color:#fff;font-weight:800;font-size:19px;
+  background:linear-gradient(140deg,var(--teal-2),var(--teal) 55%,var(--teal-ink));box-shadow:0 4px 14px color-mix(in srgb,var(--teal) 35%,transparent)}
+.htxt{flex:1;min-width:0}
+.htxt h1{margin:0;font-size:19px;font-weight:800;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.htxt .sub{font-size:13px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.iconbtn{width:36px;height:36px;border-radius:12px;border:1px solid var(--line);background:var(--card);display:grid;place-items:center;flex:none;color:var(--ink-2)}
+.iconbtn:active{transform:scale(.94)}
+.iconbtn svg{width:18px;height:18px}
+.health{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--ink-2)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 0 3px var(--green-soft)}
+.health.bad .dot{background:var(--red);box-shadow:0 0 0 3px var(--red-soft);animation:pulse 1.6s infinite}
+.health.bad{color:var(--red)}
+@keyframes pulse{50%{opacity:.35}}
+
+/* ── Summary tiles ──────────────────────────────────────────────────── */
+.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:14px 0 4px}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:10px 10px 9px;text-align:left;min-width:0;box-shadow:var(--shadow);
+  transition:transform .15s}
+.tile:active{transform:scale(.97)}
+.tile b{display:block;font-size:24px;font-weight:800;letter-spacing:-.02em;line-height:1.1}
+.tile span{display:block;font-size:11.5px;font-weight:600;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile.hot{background:linear-gradient(160deg,var(--red-soft),var(--card));border-color:color-mix(in srgb,var(--red) 30%,var(--line))}
+.tile.hot b{color:var(--red)}
+.tile.ok b{color:var(--teal)}
+@media (max-width:340px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:420px){.tile{padding:9px 8px 8px}.tile b{font-size:22px}.tile span{font-size:11px}}
+
+/* ── Sections & cards ───────────────────────────────────────────────── */
+.sec{display:flex;align-items:center;gap:8px;margin:20px 2px 8px;font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-2)}
+.sec .count{font-size:12px;background:var(--line);color:var(--ink-2);border-radius:999px;padding:1px 8px;letter-spacing:0}
+.sec.red{color:var(--red)} .sec.red .count{background:var(--red-soft);color:var(--red)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px;margin-bottom:10px;box-shadow:var(--shadow);
+  animation:rise .35s cubic-bezier(.2,.8,.2,1) both;min-width:0;overflow-wrap:anywhere}
+.card.overdue{border-color:color-mix(in srgb,var(--red) 45%,var(--line));box-shadow:0 0 0 3px var(--red-soft),var(--shadow)}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.card,.tile{animation:none!important;transition:none!important}}
+.ctop{display:flex;align-items:flex-start;gap:10px}
+.cicon{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;flex:none;font-size:17px}
+.ic-new{background:var(--blue-soft)} .ic-reply{background:var(--teal-soft)} .ic-close{background:var(--amber-soft)}
+.ic-rx{background:var(--violet-soft)} .ic-wait{background:var(--card-2)} .ic-dup{background:var(--card-2)}
 .ctitle{flex:1;min-width:0}
-.ctitle b{font-size:16px;display:block;overflow-wrap:anywhere}
-.meta{font-size:12px;color:var(--text-3);margin-top:2px;overflow-wrap:anywhere}
-.pill{font-size:11px;font-weight:800;padding:3px 8px;border-radius:20px;white-space:nowrap}
-.pill.test{background:var(--violet-bg);color:var(--violet)}
-.pill.exists{background:var(--amber-bg);color:var(--amber)}
-.pill.ok{background:var(--green-bg);color:var(--green)}
-.pill.no{background:var(--red-bg);color:var(--red)}
-.warn{background:var(--amber-bg);color:var(--amber);font-size:13px;border-radius:9px;padding:8px 10px;margin:0 0 10px}
+.ctitle .kind{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3)}
+.ctitle b{display:block;font-size:16.5px;font-weight:700;line-height:1.25;margin-top:1px}
+.meta{font-size:12.5px;color:var(--ink-3);margin-top:3px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;flex:none;max-width:42%}
+.chip{font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap;background:var(--card-2);color:var(--ink-2);border:1px solid var(--line)}
+.chip.test{background:var(--violet-soft);color:var(--violet);border-color:transparent}
+.chip.late{background:var(--red-soft);color:var(--red);border-color:transparent}
+.chip.ok{background:var(--green-soft);color:var(--green);border-color:transparent}
+.chip.warn{background:var(--amber-soft);color:var(--amber);border-color:transparent}
+.note{font-size:13.5px;color:var(--ink-2);margin:10px 0 0}
+.warn{background:var(--amber-soft);color:var(--amber);font-size:13px;font-weight:500;border-radius:12px;padding:9px 11px;margin-top:10px}
 .warn div+div{margin-top:4px}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px}
-.fld{display:flex;flex-direction:column;gap:3px;min-width:0}
-.fld.wide{grid-column:1/-1}
-.fld label{font-size:11px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.03em}
-.fld input,.fld select{font:inherit;font-size:15px;padding:9px 10px;border:1.5px solid var(--border);border-radius:9px;background:var(--bg);color:var(--text);width:100%;min-width:0}
-.fld.miss input,.fld.miss select{border-color:var(--red);background:var(--red-bg)}
-.fld.miss label{color:var(--red)}
-.acts{display:flex;gap:8px;margin-top:12px}
-.btn{flex:1;font:inherit;font-weight:800;font-size:14px;padding:11px;border-radius:10px;border:0;cursor:pointer}
-.btn.ok{background:var(--teal);color:#fff}
-.btn.ghost{background:none;border:1.5px solid var(--border);color:var(--text-2)}
-.btn:disabled{opacity:.55;cursor:default}
-.exists-box{font-size:14px;line-height:1.45}
-.kind{display:block;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--teal);margin-bottom:2px}
-.facts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}
-.facts div{background:var(--bg);border-radius:9px;padding:8px 10px;min-width:0}
-.facts span{display:block;font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase}
+.err{background:var(--red-soft);color:var(--red)}
+
+/* documents checklist */
+.docs{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.doc{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;padding:6px 10px;border-radius:10px;border:1px solid var(--line);background:var(--card-2)}
+.doc.have{background:var(--green-soft);color:var(--green);border-color:transparent}
+.doc.miss{background:var(--red-soft);color:var(--red);border-color:transparent}
+.scan{margin-top:8px;border:1px dashed var(--line);border-radius:12px;padding:9px 10px;font-size:13px}
+.scan .t{font-weight:600;margin-bottom:6px}
+.toggle{border:1.5px solid var(--line);background:var(--card);border-radius:10px;padding:6px 10px;font-size:13px;font-weight:700;color:var(--ink-2);margin:2px 4px 2px 0}
+.toggle.on{border-color:var(--teal);background:var(--teal-soft);color:var(--teal-ink)}
+
+/* facts */
+.facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:10px}
+.facts div{background:var(--card-2);border-radius:12px;padding:8px 10px;min-width:0}
+.facts span{display:block;font-size:10.5px;font-weight:700;color:var(--ink-3);text-transform:uppercase;letter-spacing:.04em}
 .facts b{font-size:15px}.facts b.chg{color:var(--red)}
-.hint{font-size:13px;color:var(--text-2);margin:8px 0 0}
-.mailhead{font-size:13px;color:var(--text-2);margin-bottom:8px}
-.mailhead div{overflow-wrap:anywhere}.mailhead span{display:inline-block;width:62px;font-weight:700;color:var(--text-3)}
-textarea.reply{width:100%;font:inherit;font-size:15px;line-height:1.45;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);resize:vertical}
-pre.sent{white-space:pre-wrap;font:inherit;font-size:14px;background:var(--bg);border-radius:10px;padding:10px 12px;margin:0}
-a.btn{display:flex;align-items:center;justify-content:center;text-decoration:none}
-.hist{display:flex;align-items:center;gap:10px;font-size:13px}
-.hist .t{flex:1;min-width:0;overflow-wrap:anywhere}
-#login{max-width:380px;margin:60px auto;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:22px}
-#login h2{margin:0 0 4px;font-size:20px}
-#login p{margin:0 0 16px;color:var(--text-2);font-size:13px}
-#login .fld{margin-bottom:10px}
-.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(120px);background:var(--text);color:var(--bg);
-  padding:11px 16px;border-radius:12px;font-size:14px;font-weight:600;transition:transform .25s;max-width:calc(100% - 32px);z-index:20}
-.toast.on{transform:translateX(-50%) translateY(0)}
-@media (max-width:480px){.grid{grid-template-columns:1fr}.acts{flex-wrap:wrap}.acts .btn{min-width:40%}}
+
+/* form */
+details.form{margin-top:10px;border-top:1px solid var(--line);padding-top:8px}
+details.form summary{font-size:13.5px;font-weight:700;color:var(--teal);list-style:none;cursor:pointer;padding:4px 0}
+details.form summary::-webkit-details-marker{display:none}
+details.form summary::after{content:' ›';display:inline-block;transition:transform .2s}
+details.form[open] summary::after{transform:rotate(90deg)}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 10px;margin-top:8px}
+.fld{display:flex;flex-direction:column;gap:4px;min-width:0}
+.fld.wide{grid-column:1/-1}
+.fld label{font-size:11px;font-weight:700;color:var(--ink-3);text-transform:uppercase;letter-spacing:.04em}
+.fld input,.fld select{width:100%;padding:10px 11px;border:1.5px solid var(--line);border-radius:12px;background:var(--card-2);-webkit-appearance:none;appearance:none}
+.fld input[type=date]{min-height:44px}
+.fld.miss input,.fld.miss select{border-color:var(--red);background:var(--red-soft)}
+.fld.miss label{color:var(--red)}
+@media (max-width:420px){.grid{grid-template-columns:minmax(0,1fr)}}
+
+/* reply editor */
+.mailhead{font-size:13px;color:var(--ink-2);margin-top:10px;background:var(--card-2);border-radius:12px;padding:8px 10px}
+.mailhead div{display:flex;gap:8px;min-width:0}.mailhead div+div{margin-top:3px}
+.mailhead span{flex:none;width:52px;font-weight:700;color:var(--ink-3)}
+.mailhead em{font-style:normal;min-width:0;overflow-wrap:anywhere}
+.lang{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-top:8px}
+.lang button{border:0;background:none;padding:5px 12px;font-size:12.5px;font-weight:800;color:var(--ink-3)}
+.lang button.on{background:var(--teal);color:#fff}
+textarea.reply{display:block;width:100%;margin-top:8px;padding:11px 12px;line-height:1.5;border:1.5px solid var(--line);border-radius:14px;background:var(--card-2);resize:vertical;min-height:170px}
+textarea.reply:focus,.fld input:focus,.fld select:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-soft)}
+pre.sent{white-space:pre-wrap;font:inherit;font-size:14px;background:var(--card-2);border-radius:12px;padding:10px 12px;margin:10px 0 0}
+
+/* actions */
+.acts{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.btn{flex:1 1 30%;min-width:0;min-height:46px;border-radius:14px;border:0;font-weight:800;font-size:14.5px;padding:10px 12px;text-decoration:none;
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:transform .12s,filter .12s}
+.btn:active{transform:scale(.97)}
+.btn.pri{background:linear-gradient(180deg,var(--teal-2),var(--teal));color:#fff;box-shadow:0 4px 12px color-mix(in srgb,var(--teal) 30%,transparent)}
+.btn.sec2{background:var(--card-2);color:var(--ink);border:1px solid var(--line)}
+.btn.ghost{background:none;color:var(--ink-2);border:1px solid var(--line)}
+.btn.warnb{background:var(--amber-soft);color:var(--amber)}
+.btn:disabled{opacity:.5;pointer-events:none}
+
+/* journey */
+.journey{display:flex;align-items:flex-start;margin-top:12px}
+.step{flex:1;min-width:0;text-align:center;position:relative;font-size:10px;font-weight:700;color:var(--ink-3);line-height:1.2;overflow-wrap:normal;word-break:keep-all;letter-spacing:-.01em}
+.step i{display:grid;place-items:center;width:24px;height:24px;margin:0 auto 5px;border-radius:50%;background:var(--card-2);border:2px solid var(--line);font-style:normal;font-size:12px;position:relative;z-index:1}
+.step::before{content:'';position:absolute;top:11px;right:50%;width:100%;height:2px;background:var(--line)}
+.step:first-child::before{display:none}
+.step.done i{background:var(--teal);border-color:var(--teal);color:#fff}
+.step.done::before{background:var(--teal)}
+.step.late i{background:var(--red-soft);border-color:var(--red);color:var(--red)}
+.step.late{color:var(--red)}
+.step.done{color:var(--ink-2)}
+.row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.row:last-child{border-bottom:0}
+.row .t{flex:1;min-width:0}
+.row .t b{font-size:14.5px}
+
+/* tab bar */
+nav.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;justify-content:center;
+  padding:6px 8px calc(6px + env(safe-area-inset-bottom));
+  background:color-mix(in srgb,var(--card) 86%,transparent);backdrop-filter:saturate(1.6) blur(18px);-webkit-backdrop-filter:saturate(1.6) blur(18px);
+  border-top:1px solid var(--line)}
+nav.tabbar .in{display:flex;width:100%;max-width:520px}
+.tab{flex:1;border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0;font-size:11px;font-weight:700;color:var(--ink-3);position:relative}
+.tab svg{width:23px;height:23px}
+.tab.on{color:var(--teal)}
+.tab .badge{position:absolute;top:2px;left:calc(50% + 6px);min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--red);color:#fff;font-size:11px;line-height:18px;font-weight:800}
+.empty{text-align:center;padding:48px 16px;color:var(--ink-3)}
+.empty .big{font-size:42px;margin-bottom:8px}
+.banner{font-size:13px;font-weight:600;background:var(--violet-soft);color:var(--violet);border-radius:12px;padding:9px 12px;margin-top:12px}
+
+/* sign-in */
+#login{max-width:400px;margin:12vh auto 0;padding:0 16px}
+#login .card{padding:24px}
+#login h2{margin:14px 0 4px;font-size:22px}
+#login p{margin:0 0 16px;color:var(--ink-2);font-size:14px}
+#login .fld{margin-bottom:12px}
+.toast{position:fixed;left:50%;bottom:calc(var(--tabbar) + 18px + env(safe-area-inset-bottom));transform:translate(-50%,30px);opacity:0;pointer-events:none;
+  background:var(--ink);color:var(--bg);padding:11px 16px;border-radius:14px;font-size:14px;font-weight:600;transition:.25s;max-width:calc(100% - 32px);z-index:40;box-shadow:var(--shadow)}
+.toast.on{transform:translate(-50%,0);opacity:1}
+.skel{height:92px;border-radius:var(--radius);margin-bottom:10px;background:linear-gradient(90deg,var(--card) 25%,var(--card-2) 50%,var(--card) 75%);background-size:200% 100%;animation:sh 1.2s infinite}
+@keyframes sh{to{background-position:-200% 0}}
+/* ── Dubbi voice ────────────────────────────────────────────────────── */
+.fab{position:fixed;right:max(16px,env(safe-area-inset-right));bottom:calc(var(--tabbar) + 18px + env(safe-area-inset-bottom));z-index:25;
+  width:60px;height:60px;border-radius:50%;border:0;color:#fff;display:grid;place-items:center;
+  background:radial-gradient(circle at 30% 25%,var(--teal-2),var(--teal) 60%,var(--teal-ink));box-shadow:0 10px 28px color-mix(in srgb,var(--teal) 45%,transparent)}
+.fab svg{width:26px;height:26px}.fab:active{transform:scale(.94)}
+.fab.wake::after{content:'';position:absolute;inset:-5px;border-radius:50%;border:2px solid var(--teal-2);animation:ring 2.4s infinite}
+@keyframes ring{0%{opacity:.8;transform:scale(.92)}100%{opacity:0;transform:scale(1.25)}}
+.scrim{position:fixed;inset:0;z-index:30;background:rgba(10,16,24,.38);opacity:0;pointer-events:none;transition:opacity .2s}
+.scrim.on{opacity:1;pointer-events:auto}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:31;max-width:640px;margin:0 auto;height:min(86vh,760px);display:flex;flex-direction:column;
+  background:var(--bg);border-radius:24px 24px 0 0;box-shadow:0 -10px 40px rgba(0,0,0,.18);transform:translateY(105%);transition:transform .32s cubic-bezier(.2,.8,.2,1);
+  padding-bottom:env(safe-area-inset-bottom)}
+.sheet.on{transform:none}
+.sheet .grab{width:40px;height:5px;border-radius:3px;background:var(--line);margin:8px auto 2px}
+.shead{display:flex;align-items:center;gap:10px;padding:6px 16px 10px;border-bottom:1px solid var(--line)}
+.shead b{flex:1;font-size:17px}
+.chat{flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:10px;-webkit-overflow-scrolling:touch}
+.msg{max-width:86%;padding:10px 13px;border-radius:18px;font-size:15.5px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere;animation:rise .25s both}
+.msg.me{align-self:flex-end;background:var(--teal);color:#fff;border-bottom-right-radius:6px}
+.msg.bot{align-self:flex-start;background:var(--card);border:1px solid var(--line);border-bottom-left-radius:6px}
+.msg.sys{align-self:center;background:none;color:var(--ink-3);font-size:13px;padding:2px}
+.prop{align-self:stretch;background:var(--card);border:1.5px solid var(--teal);border-radius:16px;padding:12px;animation:rise .25s both}
+.prop p{margin:0 0 10px;font-size:14.5px}
+.suggest{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
+.suggest button{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:8px 12px;font-size:14px;font-weight:600;color:var(--ink-2)}
+.sbar{display:flex;align-items:center;gap:8px;padding:10px 12px;border-top:1px solid var(--line);background:var(--card)}
+.sbar input{flex:1;min-width:0;border:1.5px solid var(--line);border-radius:999px;padding:11px 14px;background:var(--card-2)}
+.sbar input:focus{outline:none;border-color:var(--teal)}
+.mic{width:48px;height:48px;border-radius:50%;border:0;flex:none;display:grid;place-items:center;color:#fff;background:var(--teal)}
+.mic svg{width:22px;height:22px}
+.mic.live{background:var(--red);animation:breathe 1.2s infinite}
+@keyframes breathe{50%{box-shadow:0 0 0 10px color-mix(in srgb,var(--red) 25%,transparent)}}
+.interim{min-height:20px;padding:0 18px 6px;font-size:14px;color:var(--ink-3);font-style:italic}
+.settings{padding:14px 16px;overflow-y:auto;flex:1}
+.setrow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid var(--line);font-size:15px}
+.setrow small{display:block;color:var(--ink-3);font-size:12.5px}
+.sw{appearance:none;-webkit-appearance:none;width:48px;height:28px;border-radius:999px;background:var(--line);position:relative;flex:none;transition:.2s}
+.sw::after{content:'';position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:.2s}
+.sw:checked{background:var(--teal)}.sw:checked::after{left:23px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{border:0;background:none;padding:6px 11px;font-size:13px;font-weight:800;color:var(--ink-3)}
+.seg button.on{background:var(--teal);color:#fff}
+.keybox{font-family:ui-monospace,Menlo,monospace;font-size:13px;background:var(--card-2);border:1px dashed var(--teal);border-radius:12px;padding:10px;word-break:break-all;margin:8px 0}
+ol.steps{padding-left:20px;margin:8px 0;font-size:14px;line-height:1.5}
+
 </style>
 </head>
 <body>
 
 <section id="login" hidden>
-  <h2>VaPiq Approvals</h2>
-  <p>Sign in with your VaPiq account.</p>
-  <form id="loginForm">
-    <div class="fld"><label for="em">Email</label><input id="em" type="email" autocomplete="username" required></div>
-    <div class="fld"><label for="pw">Password</label><input id="pw" type="password" autocomplete="current-password" required></div>
-    <button class="btn ok" style="width:100%;margin-top:6px" type="submit">Sign in</button>
-  </form>
+  <div class="card">
+    <div class="avatar">D</div>
+    <h2>Hi, I'm Dubbi</h2>
+    <p>Your VaPiq assistant. Sign in with your VaPiq account.</p>
+    <form id="loginForm">
+      <div class="fld"><label for="em">Email</label><input id="em" type="email" autocomplete="username" required></div>
+      <div class="fld"><label for="pw">Password</label><input id="pw" type="password" autocomplete="current-password" required></div>
+      <button class="btn pri" style="width:100%" type="submit">Sign in</button>
+    </form>
+  </div>
 </section>
 
 <div id="app" hidden>
-  <header>
-    <div class="hrow">
-      <h1>Approvals</h1>
-      <button class="hbtn" id="pushBtn" type="button" hidden>🔔 Notify me</button>
-      <button class="hbtn" id="refreshBtn" type="button" aria-label="Refresh">↻</button>
-      <a class="hbtn" href="../">VaPiq</a>
+  <header class="top">
+    <div class="wrap">
+      <div class="hrow">
+        <div class="avatar" aria-hidden="true">D</div>
+        <div class="htxt">
+          <h1 id="greet">Dubbi</h1>
+          <div class="sub"><span class="health" id="health"><span class="dot"></span><span id="healthTxt">…</span></span></div>
+        </div>
+        <button class="iconbtn" id="pushBtn" type="button" aria-label="Turn on notifications" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+        </button>
+        <button class="iconbtn" id="refreshBtn" type="button" aria-label="Refresh">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>
+        </button>
+        <a class="iconbtn" href="../" aria-label="Open VaPiq">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+        </a>
+      </div>
     </div>
-    <nav class="tabs" role="tablist">
-      <button class="tab on" data-tab="todo" role="tab">To do<span class="n" id="n-todo">0</span></button>
-      <button class="tab" data-tab="outbox" role="tab">Outbox<span class="n" id="n-outbox">0</span></button>
-      <button class="tab" data-tab="history" role="tab">History</button>
-    </nav>
   </header>
-  <main id="list"></main>
+  <main class="wrap" id="main"><div class="skel" style="margin-top:16px"></div><div class="skel"></div><div class="skel"></div></main>
+  <nav class="tabbar" aria-label="Sections"><div class="in">
+    <button class="tab on" data-tab="today"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Today<span class="badge" id="b-today" hidden></span></button>
+    <button class="tab" data-tab="patients"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>Patients<span class="badge" id="b-patients" hidden></span></button>
+    <button class="tab" data-tab="outbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7z"/></svg>Outbox<span class="badge" id="b-outbox" hidden></span></button>
+    <button class="tab" data-tab="history"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>History</button>
+  </div></nav>
 </div>
-<div class="toast" id="toast" role="status"></div>
+
+<!-- Dubbi voice assistant -->
+<button class="fab" id="fab" type="button" aria-label="Talk to Dubbi" hidden>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><path d="M12 17v4"/></svg>
+</button>
+<div class="scrim" id="scrim"></div>
+<section class="sheet" id="sheet" role="dialog" aria-label="Dubbi" aria-modal="true">
+  <div class="grab"></div>
+  <div class="shead">
+    <div class="avatar" style="width:34px;height:34px;font-size:16px;border-radius:12px">D</div>
+    <b id="sheetTitle">Dubbi</b>
+    <button class="iconbtn" id="setBtn" type="button" aria-label="Voice settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+    <button class="iconbtn" id="closeSheet" type="button" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+  </div>
+  <div class="chat" id="chat"></div>
+  <div class="settings" id="settings" hidden></div>
+  <div class="interim" id="interim"></div>
+  <form class="sbar" id="askForm">
+    <input id="askInput" type="text" enterkeyhint="send" autocomplete="off" placeholder="Ask Dubbi…" aria-label="Message to Dubbi">
+    <button class="mic" id="micBtn" type="button" aria-label="Speak"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><path d="M12 17v4"/></svg></button>
+  </form>
+</section>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="push-config.js"></script>
+<script src="../js/reply-templates.js"></script>
 <script>
 'use strict';
-// Same project and key as index.html — and the same browser session, so being
-// signed in to VaPiq signs you in here too.
+// Same project, key and browser session as VaPiq (index.html).
 const SUPABASE_URL = 'https://wqlbmtjbjloxpvsbeqyb.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_gcyK2z_8lvbOgHNcJfdX1g_8QCWJ_Xi';
 const DOSES = ['7.5', '22.5', '30', '45'];
-const INACTIVITY_LIMIT_MS = 30 * 60 * 1000;   // same as VaPiq
+const INACTIVITY_LIMIT_MS = 30 * 60 * 1000;                     // same as VaPiq
+const LATE = { newPatient: 24, reply: 48, docs: 24, asked: 48 }; // hours — same as assistant/config alerts
+const HEARTBEAT_ID = '00000000-0000-0000-0000-00000000beef';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const normFile = v => String(v ?? '').trim().toLowerCase();
-let rows = [], tasks = [], tab = 'todo', user = null;
+const hoursSince = iso => iso ? (Date.now() - Date.parse(iso)) / 36e5 : 0;
+const ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+let S = { rows: [], tasks: [], beat: null, sched: [], unconf: [], pts: {} }, tab = 'today', user = null;
 
-function toast(msg, ms = 2600) {
+function toast(msg, ms = 2800) {
   const t = $('toast'); t.textContent = msg; t.classList.add('on');
   clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('on'), ms);
 }
-function fmtDate(iso) {
+function ago(iso) {
+  if (!iso) return '';
+  const m = Math.round((Date.now() - Date.parse(iso)) / 6e4);
+  if (m < 1) return 'just now'; if (m < 60) return `${m} min`;
+  const h = Math.round(m / 60); if (h < 24) return `${h} h`;
+  const d = Math.round(h / 24); return d === 1 ? '1 day' : `${d} days`;
+}
+function when(iso) {
   if (!iso) return '';
   return new Date(iso).toLocaleString('en-CA', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
+const dayLabel = d => d ? new Date(d + 'T12:00:00').toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric' }) : '—';
 
 // ── Auth ────────────────────────────────────────────────────────────────
 async function start() {
   const { data: { session } } = await sb.auth.getSession();
   user = session?.user || null;
   $('login').hidden = !!user; $('app').hidden = !user;
-  if (user) { await load(); setupPush(); resetInactivity(); }
+  if (user) { await load(); setupPush(); resetInactivity(); $('fab').hidden = false; startWake(); }
+  else $('fab').hidden = true;
 }
 $('loginForm').addEventListener('submit', async e => {
   e.preventDefault();
@@ -183,13 +398,25 @@ function resetInactivity() {
 // ── Data ────────────────────────────────────────────────────────────────
 async function load() {
   const since = new Date(Date.now() - 30 * 864e5).toISOString();
-  const [p, t] = await Promise.all([
+  const horizon = ymd(new Date(Date.now() + 14 * 864e5)), today = ymd(new Date());
+  const [p, t, h, sc, uc] = await Promise.all([
     sb.from('pending_patients').select('*').gte('created_at', since).order('created_at', { ascending: false }),
     sb.from('email_tasks').select('*').gte('created_at', since).order('created_at', { ascending: false }),
+    sb.from('assistant_log').select('created_at,summary').eq('id', HEARTBEAT_ID).maybeSingle(),
+    sb.from('patients').select('id,file_number,patient_name,due_date,phone1').eq('archived', false).is('appointment_date_time', null).lte('due_date', horizon).order('due_date'),
+    sb.from('patients').select('id,file_number,patient_name,appointment_date_time,phone1').eq('archived', false).eq('appointment_confirmed', false)
+      .gte('appointment_date_time', today).lte('appointment_date_time', horizon + 'T23:59').order('appointment_date_time'),
   ]);
   const err = p.error || t.error;
-  if (err) { $('list').innerHTML = `<div class="banner">Could not load cards: ${esc(err.message)}. Have both database setup files in supabase/ been run?</div>`; return; }
-  rows = p.data; tasks = t.data;
+  if (err) { $('main').innerHTML = `<div class="warn err" style="margin-top:16px">Could not load: ${esc(err.message)}. Have all the database setup files in supabase/ been run?</div>`; return; }
+  S.rows = p.data; S.tasks = t.data; S.beat = h.data || null; S.sched = sc.data || []; S.unconf = uc.data || [];
+  // Patients added from Dubbi → their appointment status for the journey tracker
+  const ids = [...new Set(S.rows.filter(r => r.patient_id && !r.is_test).map(r => r.patient_id))];
+  S.pts = {};
+  if (ids.length) {
+    const { data } = await sb.from('patients').select('id,appointment_date_time,appointment_confirmed,archived').in('id', ids);
+    (data || []).forEach(x => { S.pts[String(x.id)] = x; });
+  }
   render();
 }
 
@@ -200,8 +427,7 @@ async function audit(action, fileNum, detail) {
   });
   if (error) console.warn('[audit]', error.message);
 }
-
-async function allFileNumbers() {
+async function allPatients() {
   const out = [];
   for (let from = 0; ; from += 1000) {
     const { data, error } = await sb.from('patients').select('id,file_number,patient_name,archived,pending').range(from, from + 999);
@@ -211,62 +437,151 @@ async function allFileNumbers() {
   }
 }
 
-// ── What goes where ─────────────────────────────────────────────────────
-const pendingById = id => rows.find(r => r.id === id);
-// A new-patient reply only shows once its patient card is decided.
-const replyVisible = t => t.kind !== 'new_patient' || t.status !== 'todo' ? true : (pendingById(t.pending_id)?.status !== 'pending');
-function todoItems() {
-  const items = [];
-  rows.filter(r => r.status === 'pending' || r.status === 'exists').forEach(r => items.push({ at: r.created_at, html: r.status === 'pending' ? pendingCard(r) : existsCard(r) }));
-  tasks.filter(t => ['todo', 'reply_ready', 'failed'].includes(t.status) && replyVisible(t)).forEach(t => {
-    const html = t.status === 'todo' && t.kind === 'prescription' ? rxCard(t)
-      : t.status === 'todo' && t.kind === 'close_file' ? closeCard(t)
-      : replyCard(t);
-    items.push({ at: t.created_at, html });
-  });
-  return items.sort((a, b) => String(b.at).localeCompare(String(a.at))).map(i => i.html);
+// ── Model: what needs you, and how urgently ─────────────────────────────
+const pendingOf = t => t && t.pending_id ? S.rows.find(r => r.id === t.pending_id) : null;
+const docsMissing = t => t.kind === 'new_patient' && missingDocs(t.documents || {}).length > 0;
+const unknownDocs = t => ((t.documents && t.documents.files) || []).filter(f => !(f.types || []).length && !f.checked);
+function lateness(item) {
+  const { t, r } = item;
+  if (r && (!t || t.status === 'todo') && r.status === 'pending' && hoursSince(r.created_at) > LATE.newPatient) return 'Not added · ' + ago(r.created_at);
+  if (!t) return '';
+  if (t.status === 'failed') return 'Send failed';
+  if (t.status === 'reply_ready' && hoursSince(t.decided_at || t.created_at) > LATE.reply) return 'Waiting ' + ago(t.decided_at || t.created_at);
+  if (t.status === 'todo' && t.kind !== 'new_patient' && hoursSince(t.created_at) > LATE.newPatient) return 'Waiting ' + ago(t.created_at);
+  if (t.status === 'todo' && docsMissing(t) && !t.asked_docs_at && hoursSince(t.created_at) > LATE.docs) return 'Docs missing · ' + ago(t.created_at);
+  if (t.status === 'waiting_docs' && hoursSince(t.asked_docs_at) > LATE.asked) return 'Asked ' + ago(t.asked_docs_at) + ' ago';
+  return '';
 }
+// One item per thing to do. A new-patient item = its email task + its pre-filled card.
+function todoItems() {
+  const items = [], used = new Set();
+  for (const t of S.tasks) {
+    if (!['todo', 'reply_ready', 'failed', 'waiting_docs'].includes(t.status)) continue;
+    const r = pendingOf(t); if (r) used.add(r.id);
+    if (t.kind === 'new_patient' && t.status === 'todo' && r && ['rejected', 'dismissed', 'exists'].includes(r.status)) continue;
+    let view;
+    if (t.status === 'reply_ready' || t.status === 'failed') view = 'reply';
+    else if (t.status === 'waiting_docs') view = 'waiting';
+    else if (t.kind === 'new_patient') view = (r && r.status === 'approved') ? 'docs-done' : 'new';
+    else view = t.kind === 'close_file' ? 'close' : 'rx';
+    items.push({ t, r, view });
+  }
+  for (const r of S.rows) {
+    if (used.has(r.id)) continue;
+    if (r.status === 'pending') items.push({ t: null, r, view: 'new' });
+    else if (r.status === 'exists') items.push({ t: null, r, view: 'dup' });
+  }
+  items.forEach(i => { i.late = lateness(i); });
+  return items;
+}
+const ORDER = { new: 1, 'docs-done': 2, reply: 2, close: 3, rx: 4, waiting: 5, dup: 6 };
+const SECTION = { new: 'New patients', 'docs-done': 'Replies to send', reply: 'Replies to send', close: 'Files to close', rx: 'Prescriptions to apply', waiting: 'Waiting for documents', dup: 'Duplicates' };
 
 // ── Render ──────────────────────────────────────────────────────────────
 function render() {
-  const todo = todoItems();
-  const outbox = tasks.filter(t => ['send_approved', 'sending'].includes(t.status));
-  $('n-todo').textContent = todo.length;
-  $('n-outbox').textContent = outbox.length;
+  const items = todoItems();
+  const outbox = S.tasks.filter(t => ['send_approved', 'sending'].includes(t.status));
+  const late = items.filter(i => i.late), active = items.filter(i => i.view !== 'waiting' && i.view !== 'dup');
+  const today = ymd(new Date());
+  const hr = new Date().getHours();
+  $('greet').textContent = hr < 12 ? 'Good morning' : hr < 18 ? 'Good afternoon' : 'Good evening';
+  const bt = S.beat && S.beat.created_at, stale = !bt || hoursSince(bt) > 0.25;
+  $('health').classList.toggle('bad', stale);
+  $('healthTxt').textContent = !bt ? 'Mac hasn’t checked in yet'
+    : stale ? `Mac offline · last check ${ago(bt)} ago`
+    : `Mac checked ${ago(bt)}${ago(bt) === 'just now' ? '' : ' ago'}${S.beat.summary?.mode === 'test' ? ' · test' : ''}`;
+  $('health').title = stale ? 'Your Mac assistant reads new emails every 2 minutes. Is your Mac on and awake?' : '';
+  const setBadge = (id, n) => { const b = $(id); b.hidden = !n; b.textContent = n; };
+  setBadge('b-today', active.length);
+  setBadge('b-patients', S.sched.filter(p => p.due_date < today).length);
+  setBadge('b-outbox', outbox.length);
   document.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
-  const list = $('list');
-  const anyTest = rows.some(r => r.is_test) || tasks.some(t => t.is_test);
-  const banner = anyTest ? '<div class="banner">TEST cards use fake data: VaPiq is never changed and replies are never really sent.</div>' : '';
-  if (tab === 'todo') list.innerHTML = banner + (todo.join('') || '<div class="empty">All done. 🎉</div>');
-  else if (tab === 'outbox') list.innerHTML = banner + (outbox.map(outboxCard).join('') || '<div class="empty">No replies waiting to go out.</div>');
-  else list.innerHTML = historyList();
-}
 
-function source(r) {
-  return `${esc(r.email_subject || r.attachment_name || '')} · ${esc((r.email_from || '').replace(/<.*>/, '').trim() || r.email_from)} · ${fmtDate(r.email_date || r.created_at)}`;
+  const anyTest = S.rows.some(r => r.is_test) || S.tasks.some(t => t.is_test);
+  const banner = anyTest && tab !== 'patients' ? '<div class="banner">🧪 TEST cards use fake data — VaPiq is never changed and replies are never really sent.</div>' : '';
+  let html = '';
+  if (tab === 'today') {
+    const waiting = items.filter(i => i.view === 'waiting').length;
+    html += `<div class="tiles">
+      ${tile(late.length, 'Overdue', late.length ? 'hot' : 'ok', 'overdue')}
+      ${tile(active.length, 'To do', '', 'todo')}
+      ${tile(waiting, 'Waiting docs', '', 'waiting')}
+      ${tile(S.sched.length, 'To schedule', S.sched.some(p => p.due_date < today) ? 'hot' : '', 'sched')}
+    </div>` + banner;
+    if (!items.length) html += `<div class="empty"><div class="big">✨</div><b>All clear.</b><br>Nothing needs you right now.</div>`;
+    else {
+      const byAge = (a, b) => String((a.t || a.r).created_at).localeCompare(String((b.t || b.r).created_at));
+      if (late.length) html += section('Overdue', late.length, 'red', 'overdue') + late.slice().sort(byAge).map(card).join('');
+      const groups = {};
+      items.filter(i => !i.late).sort((a, b) => (ORDER[a.view] - ORDER[b.view]) || byAge(a, b))
+        .forEach(i => { (groups[SECTION[i.view]] = groups[SECTION[i.view]] || []).push(i); });
+      for (const [name, list] of Object.entries(groups)) html += section(name, list.length, '', list[0].view === 'waiting' ? 'waiting' : '') + list.map(card).join('');
+    }
+  } else if (tab === 'patients') html += patientsView();
+  else if (tab === 'outbox') html += banner + (outbox.length ? section('Sending soon', outbox.length) + outbox.map(outboxCard).join('') : `<div class="empty"><div class="big">📭</div>No replies waiting to go out.</div>`);
+  else html += banner + historyView();
+  $('main').innerHTML = html;
 }
-const testPill = r => r.is_test ? '<span class="pill test">TEST</span>' : '';
-const warnBox = w => (w && w.length) ? `<div class="warn">${w.map(x => `<div>⚠️ ${esc(x)}</div>`).join('')}</div>` : '';
-const fileLabel = t => `#${esc(t.file_number || '—')}${t.subject_ref && !/^\d+$/.test(t.subject_ref) ? ` (${esc(t.subject_ref.replace(/\s*\d{4,6}$/, ''))})` : ''}`;
+const tile = (n, label, cls, jump) => `<button class="tile ${cls}" data-jump="${jump}"><b>${n}</b><span>${label}</span></button>`;
+const section = (name, n, cls = '', id = '') => `<div class="sec ${cls}"${id ? ` id="sec-${id}"` : ''}>${esc(name)}<span class="count">${n}</span></div>`;
+
+function from(t) {
+  const n = (t?.related_emails || []).length;
+  const name = (t?.email_from || '').replace(/<.*>/, '').trim() || t?.to_address || '';
+  return `${esc(name)}${n > 1 ? ` · ${n} emails` : ''}`;
+}
+const fileRef = (fn, ref) => `#${esc(String(fn || '—').trim())}${ref && !/^\d+$/.test(ref) ? ` (${esc(ref.replace(/\s*\d{4,6}$/, ''))})` : ''}`;
+function chips(item) {
+  const x = item.t || item.r;
+  return `<div class="chips">${x?.is_test ? '<span class="chip test">TEST</span>' : ''}${item.late ? `<span class="chip late">${esc(item.late)}</span>` : `<span class="chip">${ago(x?.created_at)}</span>`}</div>`;
+}
+function card(item) {
+  switch (item.view) {
+    case 'new': return newCard(item);
+    case 'reply': return replyCard(item);
+    case 'docs-done': return docsDoneCard(item);
+    case 'waiting': return waitingCard(item);
+    case 'close': return closeCard(item);
+    case 'rx': return rxCard(item);
+    default: return dupCard(item);
+  }
+}
+const cardOpen = (item, icon, cls) => `<article class="card${item.late ? ' overdue' : ''}" data-t="${esc(item.t?.id || '')}" data-r="${esc(item.r?.id || '')}">
+  <div class="ctop"><div class="cicon ${cls}" aria-hidden="true">${icon}</div>`;
+const warnBox = list => list && list.length ? `<div class="warn">${list.map(w => `<div>⚠️ ${esc(w)}</div>`).join('')}</div>` : '';
 
 function field(r, key, label, opts = {}) {
   const v = r.record[key] ?? '';
   const miss = (r.missing_fields || []).includes(label) || (opts.required && !String(v).trim());
   const id = `${key}-${r.id}`;
   const input = opts.select
-    ? `<select id="${id}" data-k="${key}"><option value="">— choose —</option>${opts.select.map(o => `<option${o === v ? ' selected' : ''}>${o}</option>`).join('')}</select>`
-    : `<input id="${id}" data-k="${key}" type="${opts.type || 'text'}" value="${esc(v)}" autocomplete="off">`;
-  return `<div class="fld${opts.wide ? ' wide' : ''}${miss ? ' miss' : ''}"><label for="${id}">${esc(label)}${miss ? ' — check' : ''}</label>${input}</div>`;
+    ? `<select id="${id}" data-k="${key}"><option value="">Choose…</option>${opts.select.map(o => `<option${o === v ? ' selected' : ''}>${o}</option>`).join('')}</select>`
+    : `<input id="${id}" data-k="${key}" type="${opts.type || 'text'}" value="${esc(v)}" autocomplete="off"${opts.type === 'tel' ? ' inputmode="tel"' : ''}>`;
+  return `<div class="fld${opts.wide ? ' wide' : ''}${miss ? ' miss' : ''}"><label for="${id}">${esc(label)}${miss ? ' · check' : ''}</label>${input}</div>`;
 }
-
-function pendingCard(r) {
-  return `<article class="card" data-type="pending" data-id="${esc(r.id)}">
-    <div class="ctop">
-      <div class="ctitle"><span class="kind">New patient</span><b>${esc(r.record.patient_name || 'Name not found')}</b><div class="meta">${source(r)}</div></div>
-      ${testPill(r)}
-    </div>
-    ${warnBox(r.warnings)}
-    <div class="grid">
+function docsBlock(t) {
+  if (!t || !t.documents) return '';
+  const d = t.documents, names = { assignment: 'Assignment form', enrollment: 'Enrollment form' };
+  let h = `<div class="docs">${['assignment', 'enrollment'].map(k => `<span class="doc ${d[k] ? 'have' : 'miss'}">${d[k] ? '✓' : '✕'} ${names[k]}</span>`).join('')}</div>`;
+  (d.files || []).forEach((f, i) => {
+    const auto = (f.types || []).length && !f.checked;   // recognised automatically → nothing to ask
+    if (auto) return;
+    const on = k => (f.types || []).includes(k) ? ' on' : '';
+    h += `<div class="scan"><div class="t">📠 ${esc(f.name)}${f.checked ? '' : ' — I couldn’t read this scan. What does it contain?'}</div>
+      <button class="toggle${on('assignment')}" data-act="doc" data-i="${i}" data-k="assignment">Assignment form</button>
+      <button class="toggle${on('enrollment')}" data-act="doc" data-i="${i}" data-k="enrollment">Enrollment form</button>
+      <button class="toggle${f.checked && !(f.types || []).length ? ' on' : ''}" data-act="doc" data-i="${i}" data-k="none">Neither</button></div>`;
+  });
+  return h;
+}
+function newCard(item) {
+  const { t, r } = item, missing = t ? docsMissing(t) : false, unk = t ? unknownDocs(t).length : 0;
+  const title = r?.record?.patient_name || (t ? `File ${fileRef(t.file_number, t.subject_ref)}` : 'New patient');
+  const sub = r ? `File ${fileRef(r.record.file_number, t?.subject_ref)} · ${from(t || r)}` : `${from(t)} · ${esc(t.email_subject || '')}`;
+  return `${cardOpen(item, '🩺', 'ic-new')}<div class="ctitle"><div class="kind">New patient</div><b>${esc(title)}</b><div class="meta">${sub}</div></div>${chips(item)}</div>
+    ${docsBlock(t)}
+    ${warnBox([...(t?.warnings || []), ...(r?.warnings || [])])}
+    ${r ? `<details class="form"${(r.missing_fields || []).length ? ' open' : ''}><summary>Review details</summary><div class="grid">
       ${field(r, 'patient_name', 'Patient Name', { wide: true, required: true })}
       ${field(r, 'file_number', 'File Number', { required: true })}
       ${field(r, 'dose_prescribed', 'Dose Prescribed', { select: DOSES, required: true })}
@@ -274,135 +589,150 @@ function pendingCard(r) {
       ${field(r, 'phone1', 'Phone 1', { type: 'tel' })}
       ${field(r, 'phone2', 'Phone 2', { type: 'tel' })}
       ${field(r, 'due_date', 'Due Date', { type: 'date' })}
-    </div>
+    </div></details>` : `<p class="note">The assignment form hasn't arrived yet — you can ask the coordinator for the documents now.</p>`}
     <div class="acts">
-      <button class="btn ghost" data-act="reject">Reject</button>
-      <button class="btn ok" data-act="approve">${r.is_test ? 'Add (test)' : 'Add to VaPiq'}</button>
-    </div>
-  </article>`;
+      <button class="btn ghost" data-act="reject">${r ? 'Reject' : 'Dismiss'}</button>
+      ${t && (missing || unk) ? `<button class="btn warnb" data-act="ask"${unk ? ' disabled title="Tick the scanned documents first"' : ''}>Ask for docs</button>` : ''}
+      ${r ? `<button class="btn pri" data-act="approve">${r.is_test ? 'Add (test)' : 'Add to VaPiq'}</button>` : ''}
+    </div></article>`;
 }
-
-function existsCard(r) {
-  const e = r.existing_patient || {};
-  return `<article class="card" data-type="pending" data-id="${esc(r.id)}">
-    <div class="ctop">
-      <div class="ctitle"><span class="kind">Duplicate</span><b>#${esc(e.file_number || r.record.file_number)} — ${esc(e.status || 'Exists')}</b><div class="meta">${source(r)}</div></div>
-      ${testPill(r)}
-    </div>
-    <div class="exists-box">Same file as <b>${esc(e.patient_name || '(blank name)')}</b>. Nothing was added or changed.</div>
-    <div class="acts"><button class="btn ghost" data-act="dismiss">Dismiss</button></div>
-  </article>`;
+function docsDoneCard(item) {
+  // Patient already added; documents arrived after you asked → send the confirmation
+  const t = item.t;
+  return `${cardOpen(item, '✉️', 'ic-reply')}<div class="ctitle"><div class="kind">Documents received</div><b>File ${fileRef(t.file_number, t.subject_ref)}</b><div class="meta">${from(t)}</div></div>${chips(item)}</div>
+    ${docsBlock(t)}
+    <div class="acts"><button class="btn ghost" data-act="dismiss-task">Dismiss</button><button class="btn pri" data-act="reply-anyway">Write the confirmation</button></div></article>`;
 }
-
+function replyCard(item) {
+  const t = item.t, ask = t.details && t.details.reply_mode === 'ask_docs';
+  const to = t.to_name ? `${esc(t.to_name)} &lt;${esc(t.to_address)}&gt;` : esc(t.to_address);
+  const done = ask ? 'Ask for documents' : { new_patient: 'Patient added ✓', prescription: 'Prescription applied ✓', close_file: 'File closed ✓' }[t.kind];
+  const subj = /^re\s*:/i.test(t.email_subject || '') ? t.email_subject : 'Re: ' + (t.email_subject || '');
+  return `${cardOpen(item, '✉️', 'ic-reply')}<div class="ctitle"><div class="kind">Reply · ${esc(done)}</div><b>File ${fileRef(t.file_number, t.subject_ref)}</b><div class="meta">${from(t)}</div></div>${chips(item)}</div>
+    ${t.status === 'failed' ? `<div class="warn err"><div>⚠️ Not sent: ${esc(t.error || 'unknown error')}</div></div>` : ''}
+    <div class="mailhead"><div><span>To</span><em>${to}</em></div>${(t.cc_addresses || []).length ? `<div><span>CC</span><em>${esc(t.cc_addresses.join(', '))}</em></div>` : ''}<div><span>Subject</span><em>${esc(subj)}</em></div></div>
+    <div class="lang" role="group" aria-label="Language"><button data-act="lang" data-l="en" class="${t.lang !== 'fr' ? 'on' : ''}">EN</button><button data-act="lang" data-l="fr" class="${t.lang === 'fr' ? 'on' : ''}">FR</button></div>
+    <textarea class="reply" data-k="reply_body" rows="9" aria-label="Reply text">${esc(t.reply_body || '')}</textarea>
+    <div class="acts">
+      <button class="btn ghost" data-act="no-reply">${ask ? 'Not now' : "Don't reply"}</button>
+      <button class="btn pri" data-act="send">${t.status === 'failed' ? 'Retry' : 'Send'}${t.is_test ? ' (test)' : ''}</button>
+    </div></article>`;
+}
+function waitingCard(item) {
+  const t = item.t, miss = missingDocs(t.documents || {}).map(k => DOC_NAMES.en[k]).join(' and ');
+  return `${cardOpen(item, '⏳', 'ic-wait')}<div class="ctitle"><div class="kind">Waiting for documents</div><b>File ${fileRef(t.file_number, t.subject_ref)}</b><div class="meta">Asked ${esc(t.to_name || t.to_address)} ${ago(t.asked_docs_at)} ago for the ${esc(miss || 'documents')}</div></div>${chips(item)}</div>
+    ${docsBlock(t)}
+    <div class="acts"><button class="btn ghost" data-act="dismiss-task">Dismiss</button><button class="btn sec2" data-act="ask-again">Ask again</button><button class="btn pri" data-act="docs-in">Got them</button></div></article>`;
+}
 function patientLine(e) {
-  if (!e) return '<div class="exists-box">Not found in VaPiq.</div>';
-  return `<div class="exists-box">In VaPiq as <b>${esc(e.patient_name || '(blank name)')}</b> <span class="pill ${e.status === 'Archived' ? 'exists' : 'ok'}">${esc(e.status)}</span></div>`;
+  if (!e) return '<p class="note">Not found in VaPiq.</p>';
+  return `<p class="note">In VaPiq as <b>${esc(e.patient_name || '(blank name)')}</b> <span class="chip ${e.status === 'Archived' ? 'warn' : 'ok'}">${esc(e.status)}</span></p>`;
 }
-
-function rxCard(t) {
-  const e = t.existing_patient || {}, d = t.details || {};
+function rxCard(item) {
+  const t = item.t, e = t.existing_patient || {}, d = t.details || {};
   const changed = d.pdf_dose && e.dose_prescribed && String(d.pdf_dose) !== String(e.dose_prescribed);
-  return `<article class="card" data-type="task" data-id="${esc(t.id)}">
-    <div class="ctop"><div class="ctitle"><span class="kind">New prescription</span><b>File ${fileLabel(t)}</b><div class="meta">${source(t)}</div></div>${testPill(t)}</div>
+  return `${cardOpen(item, '💊', 'ic-rx')}<div class="ctitle"><div class="kind">New prescription</div><b>File ${fileRef(t.file_number, t.subject_ref)}</b><div class="meta">${from(t)}</div></div>${chips(item)}</div>
     ${warnBox(t.warnings)}
     ${patientLine(t.existing_patient)}
-    <div class="facts">
-      <div><span>Dose in VaPiq</span><b>${esc(e.dose_prescribed || '—')} mg</b></div>
-      <div><span>Dose on prescription</span><b class="${changed ? 'chg' : ''}">${esc(d.pdf_dose || 'not read')}${d.pdf_dose ? ' mg' : ''}</b></div>
-      <div><span>Doses remaining</span><b>${esc(e.doses_remaining ?? '—')}</b></div>
-    </div>
-    <p class="hint">Apply the prescription in VaPiq, then tap <b>Applied</b> to reply.</p>
-    <div class="acts">
-      <button class="btn ghost" data-act="dismiss-task">Dismiss</button>
-      <a class="btn ghost" href="../" target="_blank" rel="noopener">Open VaPiq</a>
-      <button class="btn ok" data-act="applied">Applied ✓</button>
-    </div>
-  </article>`;
+    <div class="facts"><div><span>In VaPiq</span><b>${esc(e.dose_prescribed || '—')} mg</b></div>
+      <div><span>Prescription</span><b class="${changed ? 'chg' : ''}">${esc(d.pdf_dose || '?')}${d.pdf_dose ? ' mg' : ''}</b></div>
+      <div><span>Doses left</span><b>${esc(e.doses_remaining ?? '—')}</b></div></div>
+    <p class="note">Apply it in VaPiq, then tap <b>Applied</b> to reply.</p>
+    <div class="acts"><button class="btn ghost" data-act="dismiss-task">Dismiss</button><a class="btn sec2" href="../" target="_blank" rel="noopener">Open VaPiq</a><button class="btn pri" data-act="applied">Applied</button></div></article>`;
 }
-
-function closeCard(t) {
-  const e = t.existing_patient;
-  const active = e && e.status !== 'Archived';
-  const main = active
-    ? `<button class="btn ok" data-act="close-file">${t.is_test ? 'Close file (test)' : 'Close file in VaPiq'}</button>`
-    : `<button class="btn ok" data-act="reply-anyway">${e ? 'Already closed — reply' : 'Reply anyway'}</button>`;
-  return `<article class="card" data-type="task" data-id="${esc(t.id)}">
-    <div class="ctop"><div class="ctitle"><span class="kind">Close file</span><b>File ${fileLabel(t)}</b><div class="meta">${source(t)}</div></div>${testPill(t)}</div>
+function closeCard(item) {
+  const t = item.t, e = t.existing_patient, active = e && e.status !== 'Archived';
+  return `${cardOpen(item, '📁', 'ic-close')}<div class="ctitle"><div class="kind">Close file</div><b>File ${fileRef(t.file_number, t.subject_ref)}</b><div class="meta">${from(t)}</div></div>${chips(item)}</div>
     ${warnBox(t.warnings)}
     ${patientLine(e)}
-    <div class="acts"><button class="btn ghost" data-act="dismiss-task">Dismiss</button>${main}</div>
-  </article>`;
+    <div class="acts"><button class="btn ghost" data-act="dismiss-task">Dismiss</button>
+      ${active ? `<button class="btn pri" data-act="close-file">${t.is_test ? 'Close (test)' : 'Close file'}</button>` : `<button class="btn pri" data-act="reply-anyway">${e ? 'Already closed — reply' : 'Reply anyway'}</button>`}</div></article>`;
 }
-
-const DONE_TEXT = { new_patient: 'Patient added', prescription: 'Prescription applied', close_file: 'File closed' };
-function replyCard(t) {
-  const to = t.to_name ? `${esc(t.to_name)} &lt;${esc(t.to_address)}&gt;` : esc(t.to_address);
-  return `<article class="card" data-type="task" data-id="${esc(t.id)}">
-    <div class="ctop"><div class="ctitle"><span class="kind">Reply · ${esc(DONE_TEXT[t.kind])} ✓</span><b>File ${fileLabel(t)}</b><div class="meta">${source(t)}</div></div>${testPill(t)}</div>
-    ${t.status === 'failed' ? `<div class="warn"><div>⚠️ Not sent: ${esc(t.error || 'unknown error')}</div></div>` : ''}
-    <div class="mailhead"><div><span>To</span>${to}</div><div><span>Subject</span>${esc(/^re\s*:/i.test(t.email_subject || '') ? t.email_subject : 'Re: ' + (t.email_subject || ''))}</div></div>
-    <textarea class="reply" data-k="reply_body" rows="8" aria-label="Reply text">${esc(t.reply_body || '')}</textarea>
-    <div class="acts">
-      <button class="btn ghost" data-act="no-reply">Don't reply</button>
-      <button class="btn ok" data-act="send">${t.status === 'failed' ? 'Retry send' : 'Send reply'}${t.is_test ? ' (test)' : ''}</button>
-    </div>
-  </article>`;
+function dupCard(item) {
+  const r = item.r, e = r.existing_patient || {};
+  return `${cardOpen(item, '🔁', 'ic-dup')}<div class="ctitle"><div class="kind">Duplicate</div><b>File #${esc(e.file_number || r.record.file_number)}</b><div class="meta">${esc(e.status || '')} · same as ${esc(e.patient_name || '')}</div></div>${chips(item)}</div>
+    <p class="note">Nothing was added or changed.</p><div class="acts"><button class="btn ghost" data-act="dismiss">Dismiss</button></div></article>`;
 }
-
 function outboxCard(t) {
-  return `<article class="card" data-type="task" data-id="${esc(t.id)}">
-    <div class="ctop"><div class="ctitle"><span class="kind">${t.status === 'sending' ? 'Sending now…' : 'Sends within ~2 minutes'}</span><b>Reply to ${esc(t.to_name || t.to_address)} — file ${fileLabel(t)}</b><div class="meta">Approved ${fmtDate(t.decided_at)}</div></div>${testPill(t)}</div>
+  return `<article class="card" data-t="${esc(t.id)}"><div class="ctop"><div class="cicon ic-reply">📤</div><div class="ctitle"><div class="kind">${t.status === 'sending' ? 'Sending now…' : 'Your Mac sends it within ~2 min'}</div><b>To ${esc(t.to_name || t.to_address)} — file ${fileRef(t.file_number, t.subject_ref)}</b><div class="meta">Approved ${when(t.decided_at)}</div></div>${t.is_test ? '<div class="chips"><span class="chip test">TEST</span></div>' : ''}</div>
     <pre class="sent">${esc(t.reply_body)}</pre>
-    ${t.status === 'send_approved' ? '<div class="acts"><button class="btn ghost" data-act="cancel-send">Cancel — keep as draft</button></div>' : ''}
-  </article>`;
+    ${t.status === 'send_approved' ? '<div class="acts"><button class="btn ghost" data-act="cancel-send">Cancel — keep as draft</button></div>' : ''}</article>`;
 }
 
-function historyList() {
+// ── Patients: journey tracker + scheduling safety net ───────────────────
+function journey(t) {
+  const r = pendingOf(t), p = r && r.patient_id ? S.pts[String(r.patient_id)] : null;
+  const docsOk = !docsMissing(t), added = r && r.status === 'approved', replied = t.status === 'sent';
+  const booked = !!(p && p.appointment_date_time), confirmed = !!(p && p.appointment_confirmed);
+  const steps = [
+    { n: 'Email', done: true },
+    { n: 'Docs', done: docsOk, late: !docsOk && hoursSince(t.created_at) > LATE.docs },
+    { n: 'Added', done: added, late: !added && hoursSince(t.created_at) > LATE.newPatient },
+    { n: 'Replied', done: replied, late: !replied && added && hoursSince(r.decided_at) > LATE.reply },
+    { n: 'Booked', done: booked, late: !booked && added && !r.is_test && hoursSince(r.decided_at) > 72 },
+    { n: 'Confirmed', done: confirmed },
+  ];
+  return `<div class="journey">${steps.map(s => `<div class="step${s.done ? ' done' : s.late ? ' late' : ''}"><i>${s.done ? '✓' : s.late ? '!' : ''}</i>${s.n}</div>`).join('')}</div>`;
+}
+function patientsView() {
+  const today = ymd(new Date());
+  const newOnes = S.tasks.filter(t => t.kind === 'new_patient' && t.status !== 'dismissed');
+  let h = section('New patients — last 30 days', newOnes.length);
+  h += newOnes.length ? newOnes.map(t => {
+    const r = pendingOf(t);
+    return `<article class="card"><div class="ctop"><div class="ctitle"><b>${esc(r?.record?.patient_name || 'File ' + (t.file_number || '—'))}</b><div class="meta">File ${fileRef(t.file_number, t.subject_ref)} · email ${when(t.created_at)}</div></div>${t.is_test ? '<div class="chips"><span class="chip test">TEST</span></div>' : ''}</div>${journey(t)}</article>`;
+  }).join('') : '<div class="card"><p class="note" style="margin:0">No new patients in the last 30 days.</p></div>';
+  const past = S.sched.filter(p => p.due_date < today);
+  h += section('Need an appointment · due within 14 days', S.sched.length, past.length ? 'red' : '');
+  h += `<div class="card">${S.sched.length ? S.sched.map(p => `<div class="row"><div class="t"><b>${esc(p.patient_name)}</b><div class="meta">#${esc(String(p.file_number).trim())}${p.phone1 ? ' · ' + esc(p.phone1) : ''}</div></div><span class="chip ${p.due_date < today ? 'late' : ''}">Due ${dayLabel(p.due_date)}</span></div>`).join('') : '<p class="note" style="margin:0">✓ Everyone due in the next 14 days has an appointment.</p>'}</div>`;
+  h += section('Appointments to confirm', S.unconf.length);
+  h += `<div class="card">${S.unconf.length ? S.unconf.map(p => `<div class="row"><div class="t"><b>${esc(p.patient_name)}</b><div class="meta">#${esc(String(p.file_number).trim())}${p.phone1 ? ' · ' + esc(p.phone1) : ''}</div></div><span class="chip">${dayLabel(String(p.appointment_date_time).slice(0, 10))}</span></div>`).join('') : '<p class="note" style="margin:0">✓ All upcoming appointments are confirmed.</p>'}</div>`;
+  return h;
+}
+function historyView() {
   const items = [];
-  const pill = { approved: '<span class="pill ok">Added</span>', rejected: '<span class="pill no">Rejected</span>', dismissed: '<span class="pill exists">Dismissed</span>',
-                 sent: '<span class="pill ok">Reply sent</span>', done: '<span class="pill exists">No reply</span>' };
-  rows.filter(r => ['approved', 'rejected', 'dismissed'].includes(r.status)).forEach(r => items.push({ at: r.decided_at,
-    html: `<b>${esc(r.record.patient_name || '—')}</b> #${esc(r.record.file_number || '—')}<div class="meta">New patient · ${fmtDate(r.decided_at)}${r.is_test ? ' · TEST' : ''}</div>`, pill: pill[r.status] }));
-  tasks.filter(t => ['sent', 'done', 'dismissed'].includes(t.status)).forEach(t => items.push({ at: t.sent_at || t.decided_at,
-    html: `File ${fileLabel(t)} → ${esc(t.to_name || t.to_address)}<div class="meta">${esc({ new_patient: 'New patient', prescription: 'Prescription', close_file: 'Close file' }[t.kind])} · ${fmtDate(t.sent_at || t.decided_at)}${t.moved_to_folder ? ` · moved to ${esc(t.moved_to_folder)}` : ''}${t.is_test ? ' · TEST (not sent)' : ''}</div>`, pill: pill[t.status] }));
-  if (!items.length) return '<div class="empty">Nothing in the last 30 days.</div>';
+  const pill = { approved: '<span class="chip ok">Added</span>', rejected: '<span class="chip late">Rejected</span>', dismissed: '<span class="chip">Dismissed</span>', sent: '<span class="chip ok">Replied</span>', done: '<span class="chip">No reply</span>' };
+  S.rows.filter(r => ['approved', 'rejected', 'dismissed'].includes(r.status)).forEach(r => items.push({ at: r.decided_at,
+    html: `<b>${esc(r.record.patient_name || '—')}</b><div class="meta">New patient #${esc(r.record.file_number || '—')} · ${when(r.decided_at)}${r.is_test ? ' · TEST' : ''}</div>`, pill: pill[r.status] }));
+  S.tasks.filter(t => ['sent', 'done', 'dismissed'].includes(t.status)).forEach(t => items.push({ at: t.sent_at || t.decided_at,
+    html: `<b>Reply to ${esc(t.to_name || t.to_address)}</b><div class="meta">${esc({ new_patient: 'New patient', prescription: 'Prescription', close_file: 'Close file' }[t.kind])} ${fileRef(t.file_number, t.subject_ref)} · ${when(t.sent_at || t.decided_at)}${t.moved_to_folder ? ' · moved to ' + esc(t.moved_to_folder) : ''}${t.is_test ? ' · TEST' : ''}</div>`, pill: pill[t.status] }));
+  if (!items.length) return `<div class="empty"><div class="big">🗂️</div>Nothing in the last 30 days.</div>`;
   items.sort((a, b) => String(b.at).localeCompare(String(a.at)));
-  return '<div class="card">' + items.map(i => `<div class="hist" style="padding:8px 0;border-bottom:1px solid var(--border)"><div class="t">${i.html}</div>${i.pill || ''}</div>`).join('') + '</div>';
+  return section('Last 30 days', items.length) + `<div class="card">${items.map(i => `<div class="row"><div class="t">${i.html}</div>${i.pill || ''}</div>`).join('')}</div>`;
 }
 
 // ── Actions ─────────────────────────────────────────────────────────────
 async function decide(r, status, extra = {}) {
-  const { error } = await sb.from('pending_patients')
-    .update({ status, decided_at: new Date().toISOString(), decided_by: user.email, ...extra })
-    .eq('id', r.id).in('status', ['pending', 'exists']);   // never re-decide a card
+  const { error } = await sb.from('pending_patients').update({ status, decided_at: new Date().toISOString(), decided_by: user.email, ...extra })
+    .eq('id', r.id).in('status', ['pending', 'exists']);
   if (error) throw error;
 }
-
-// Moves a task forward only from the status it is in now (no double-actions).
+// Moves a task forward only from the status it is in now (no double actions)
 async function setTask(t, status, extra = {}) {
-  const { error } = await sb.from('email_tasks')
-    .update({ status, decided_at: new Date().toISOString(), decided_by: user.email, ...extra })
+  const { error } = await sb.from('email_tasks').update({ status, decided_at: new Date().toISOString(), decided_by: user.email, ...extra })
     .eq('id', t.id).eq('status', t.status);
   if (error) throw error;
 }
-async function setReplyFor(pendingId, status) {
-  const t = tasks.find(x => x.pending_id === pendingId && x.status === 'todo');
-  if (t) await setTask(t, status);
+const sig = t => (t.details && t.details.signature) || '';
+function redraft(t, over = {}) {
+  const x = { ...t, ...over };
+  return draftReply({ kind: x.kind, lang: x.lang, coordinatorName: x.to_name || '', fileNumber: x.file_number, subjectRef: x.subject_ref,
+    signature: sig(x), docs: x.kind === 'new_patient' ? (x.documents || {}) : undefined });
 }
 
-async function approve(r, card, btn) {
+async function approve(item, card, btn) {
+  const { r, t } = item;
   const rec = { ...r.record };
-  card.querySelectorAll('[data-k]').forEach(el => { rec[el.dataset.k] = el.value.trim(); });
-  rec.file_number = rec.file_number.trim();
-  if (!rec.patient_name) return toast('Patient name is required');
-  if (!rec.file_number) return toast('File number is required');
-  if (!DOSES.includes(rec.dose_prescribed)) return toast('Choose the dose — check the PDF');
-  if (!rec.due_date) return toast('Due date is required');
-
+  card.querySelectorAll('[data-k]').forEach(el => { if (el.dataset.k in rec) rec[el.dataset.k] = el.value.trim(); });
+  rec.file_number = String(rec.file_number || '').trim();
+  if (!rec.patient_name) return openDetails(card, 'Patient name is required');
+  if (!rec.file_number) return openDetails(card, 'File number is required');
+  if (!DOSES.includes(rec.dose_prescribed)) return openDetails(card, 'Choose the dose — check the PDF');
+  if (!rec.due_date) return openDetails(card, 'Due date is required');
   btn.disabled = true;
   try {
-    // Re-check right before writing: VaPiq's rule — an existing file number is never duplicated.
-    const existing = (await allFileNumbers()).find(p => normFile(p.file_number) === normFile(rec.file_number));
+    // VaPiq's rule, checked right before writing: an existing file number is never duplicated
+    const existing = (await allPatients()).find(p => normFile(p.file_number) === normFile(rec.file_number));
     if (existing) {
       const ep = { file_number: existing.file_number, patient_name: existing.patient_name, status: existing.archived ? 'Archived' : existing.pending ? 'Pending' : 'Active' };
       await sb.from('pending_patients').update({ status: 'exists', existing_patient: ep }).eq('id', r.id);
@@ -412,24 +742,26 @@ async function approve(r, card, btn) {
     if (r.is_test) {
       await decide(r, 'approved');
       await audit('ASSISTANT_TEST_APPROVED', rec.file_number, { pending_id: r.id });
-      await setReplyFor(r.id, 'reply_ready');
-      toast('Test card approved — nothing written to patients. Reply is ready.');
-      return load();
+    } else {
+      const { data, error } = await sb.from('patients').insert([rec]).select('id').single();
+      if (error) throw error;
+      await audit('INSERT', rec.file_number, { name: rec.patient_name, source: 'assistant', pending_id: r.id });
+      await decide(r, 'approved', { patient_id: String(data.id), record: rec });
     }
-    const { data, error } = await sb.from('patients').insert([rec]).select('id').single();
-    if (error) throw error;
-    await audit('INSERT', rec.file_number, { name: rec.patient_name, source: 'assistant', pending_id: r.id });
-    await decide(r, 'approved', { patient_id: String(data.id), record: rec });
-    await setReplyFor(r.id, 'reply_ready');
-    toast(`✓ ${rec.patient_name} added to VaPiq — reply is ready`);
+    if (t && t.status === 'todo') {
+      const ask = docsMissing(t);
+      await setTask(t, 'reply_ready', { reply_body: redraft(t), details: { ...(t.details || {}), reply_mode: ask ? 'ask_docs' : 'confirm' } });
+    }
+    toast(r.is_test ? 'Test card added — VaPiq not changed. Reply is ready.' : `✓ ${rec.patient_name} added to VaPiq — reply is ready`);
     load();
   } catch (e) {
     console.error('[approve]', e);
     toast('Could not save — ' + (e.message || 'please try again'));
   } finally { btn.disabled = false; }
 }
+function openDetails(card, msg) { const d = card.querySelector('details.form'); if (d) d.open = true; toast(msg); }
 
-// Close file = VaPiq's Archive (archivePatient in index.html).
+// Close file = VaPiq's Archive (archivePatient in index.html)
 async function closeFile(t) {
   const e = t.existing_patient, fn = String(e.file_number || '').trim();
   if (!confirm(`Close file #${fn} (${e.patient_name}) in VaPiq?\n\nThis archives the patient, like the Archive button in VaPiq.`)) return false;
@@ -442,44 +774,270 @@ async function closeFile(t) {
   return true;
 }
 
-$('list').addEventListener('click', async e => {
+async function toggleDoc(t, i, k) {
+  const docs = JSON.parse(JSON.stringify(t.documents || { files: [] }));
+  const f = docs.files[i]; if (!f) return;
+  f.types = f.types || [];
+  if (k === 'none') f.types = [];
+  else f.types = f.types.includes(k) ? f.types.filter(x => x !== k) : [...f.types, k];
+  f.checked = true;
+  docs.assignment = docs.files.some(x => (x.types || []).includes('assignment'));
+  docs.enrollment = docs.files.some(x => (x.types || []).includes('enrollment'));
+  docs.unknown = docs.files.filter(x => !(x.types || []).length && !x.checked).length;
+  const { error } = await sb.from('email_tasks').update({ documents: docs, reply_body: redraft(t, { documents: docs }) }).eq('id', t.id);
+  if (error) throw error;
+  t.documents = docs; t.reply_body = redraft(t, { documents: docs }); render();
+}
+
+$('main').addEventListener('click', async e => {
+  const jump = e.target.closest('[data-jump]');
+  if (jump) {
+    const j = jump.dataset.jump;
+    if (j === 'sched') { tab = 'patients'; render(); window.scrollTo({ top: 0 }); }
+    else { const el = $('sec-' + j); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+    return;
+  }
   const btn = e.target.closest('button[data-act]'); if (!btn) return;
-  const card = btn.closest('.card'); const act = btn.dataset.act;
+  const cardEl = btn.closest('.card'); const act = btn.dataset.act;
+  const t = S.tasks.find(x => x.id === cardEl.dataset.t) || null;
+  const r = S.rows.find(x => x.id === cardEl.dataset.r) || (t ? pendingOf(t) : null);
   try {
-    if (card.dataset.type === 'pending') {
-      const r = rows.find(x => String(x.id) === card.dataset.id); if (!r) return;
-      if (act === 'approve') return approve(r, card, btn);
-      btn.disabled = true;
-      if (act === 'reject') {
-        await decide(r, 'rejected'); await audit('ASSISTANT_REJECTED', r.record.file_number, { pending_id: r.id, test: r.is_test });
-        await setReplyFor(r.id, 'dismissed'); toast('Rejected');
-      }
-      if (act === 'dismiss') { await decide(r, 'dismissed'); toast('Dismissed'); }
-      return load();
+    if (act === 'approve') return approve({ t, r }, cardEl, btn);
+    if (act === 'doc') return toggleDoc(t, +btn.dataset.i, btn.dataset.k);
+    if (act === 'lang') {
+      const l = btn.dataset.l; if (l === t.lang) return;
+      const body = redraft(t, { lang: l });
+      const { error } = await sb.from('email_tasks').update({ lang: l, reply_body: body }).eq('id', t.id);
+      if (error) throw error; t.lang = l; t.reply_body = body; return render();
     }
-    const t = tasks.find(x => String(x.id) === card.dataset.id); if (!t) return;
     btn.disabled = true;
-    if (act === 'applied' || act === 'reply-anyway') await setTask(t, 'reply_ready');
-    if (act === 'close-file') { if (!(await closeFile(t))) { btn.disabled = false; return; } await setTask(t, 'reply_ready'); }
+    if (act === 'reject') {
+      if (r) { await decide(r, 'rejected'); await audit('ASSISTANT_REJECTED', r.record.file_number, { pending_id: r.id, test: r.is_test }); }
+      if (t && t.status === 'todo') await setTask(t, 'dismissed');
+      toast(r ? 'Rejected' : 'Dismissed');
+    }
+    if (act === 'dismiss' && r) { await decide(r, 'dismissed'); toast('Dismissed'); }
+    if (act === 'ask' || act === 'ask-again') {
+      await setTask(t, 'reply_ready', { reply_body: redraft(t), details: { ...(t.details || {}), reply_mode: 'ask_docs' } });
+      toast('Draft ready — check it, then tap Send');
+    }
+    if (act === 'docs-in') { await setTask(t, 'todo'); toast('Back in your list'); }
+    if (act === 'applied' || act === 'reply-anyway') {
+      await setTask(t, 'reply_ready', { reply_body: redraft(t), details: { ...(t.details || {}), reply_mode: 'confirm' } });
+    }
+    if (act === 'close-file') {
+      if (!(await closeFile(t))) { btn.disabled = false; return; }
+      await setTask(t, 'reply_ready');
+    }
     if (act === 'dismiss-task') { await setTask(t, 'dismissed'); toast('Dismissed'); }
-    if (act === 'no-reply') { await setTask(t, 'done'); toast('Marked done — no reply sent'); }
+    if (act === 'no-reply') {
+      const ask = t.details && t.details.reply_mode === 'ask_docs';
+      if (ask) { await setTask(t, 'todo', { details: { ...t.details, reply_mode: 'confirm' } }); toast('Not sent — back in your list'); }
+      else { await setTask(t, 'done'); toast('Marked done — no reply sent'); }
+    }
     if (act === 'cancel-send') { await setTask(t, 'reply_ready'); toast('Kept as draft'); }
     if (act === 'send') {
-      const body = card.querySelector('[data-k="reply_body"]').value.trim();
+      const body = cardEl.querySelector('[data-k="reply_body"]').value.trim();
       if (!body) { btn.disabled = false; return toast('The reply is empty'); }
       await setTask(t, 'send_approved', { reply_body: body, error: null });
       await audit('ASSISTANT_REPLY_APPROVED', t.file_number, { task_id: t.id, kind: t.kind, test: t.is_test });
-      toast(t.is_test ? 'Test reply queued — it will be saved, not sent' : 'Reply queued — your Mac sends it within ~2 minutes');
+      toast(t.is_test ? 'Test reply queued — it will be saved, not sent' : 'Queued — your Mac sends it within ~2 minutes');
     }
     load();
   } catch (err) { btn.disabled = false; toast('Could not save — ' + err.message); }
 });
-document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => { tab = b.dataset.tab; render(); }));
-$('refreshBtn').addEventListener('click', () => load().then(() => toast('Updated')));
-// Refresh when you come back to the page — but not while you're editing a reply.
-document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && user && !document.activeElement?.matches('textarea, input, select')) load();
+document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => { tab = b.dataset.tab; render(); window.scrollTo({ top: 0 }); }));
+$('refreshBtn').addEventListener('click', () => load().then(() => toast('Up to date')));
+// Fresh data when you come back — never while you're typing
+const typing = () => document.activeElement?.matches('textarea, input, select');
+document.addEventListener('visibilitychange', () => { if (!document.hidden && user && !typing()) load(); });
+setInterval(() => { if (!document.hidden && user && !typing()) load(); }, 60000);
+
+
+// ── Dubbi: talk or type ─────────────────────────────────────────────────
+// The brain is the Supabase Edge Function "dubbi" (supabase/functions/dubbi).
+// It can look things up; for actions it only proposes — you confirm here.
+const DUBBI_URL = SUPABASE_URL + '/functions/v1/dubbi';
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+const PREF = (() => { try { return JSON.parse(localStorage.getItem('dubbi_prefs') || '{}'); } catch { return {}; } })();
+const pref = (k, d) => PREF[k] ?? d;
+const savePref = (k, v) => { PREF[k] = v; try { localStorage.setItem('dubbi_prefs', JSON.stringify(PREF)); } catch {} };
+const D = { conv: null, busy: false, rec: null, wake: null, open: false, lang: pref('lang', 'auto') };
+
+function openSheet(listen = false) {
+  D.open = true; stopWake();
+  $('sheet').classList.add('on'); $('scrim').classList.add('on');
+  $('settings').hidden = true; $('chat').hidden = false;
+  if (!$('chat').children.length) greetDubbi();
+  if (listen) startListening(); else setTimeout(() => $('askInput').focus({ preventScroll: true }), 300);
+}
+function closeSheet() {
+  D.open = false; stopListening(); speechSynthesis?.cancel();
+  $('sheet').classList.remove('on'); $('scrim').classList.remove('on');
+  startWake();
+}
+function bubble(text, who) {
+  const b = document.createElement('div'); b.className = 'msg ' + who; b.textContent = text;
+  $('chat').appendChild(b); $('chat').scrollTop = $('chat').scrollHeight; return b;
+}
+function greetDubbi() {
+  const fr = D.lang === 'fr';
+  bubble(fr ? 'Bonjour! Que puis-je faire pour vous?' : 'Hi! What can I do for you?', 'bot');
+  const box = document.createElement('div'); box.className = 'suggest';
+  (fr ? ['Quoi de neuf?', 'Des retards?', 'Qui doit être planifié?', 'Cherche les nouvelles assignations']
+      : ["What's new?", 'Anything overdue?', 'Who needs an appointment?', 'Look for new assignments'])
+    .forEach(q => { const b = document.createElement('button'); b.type = 'button'; b.textContent = q; b.onclick = () => ask(q); box.appendChild(b); });
+  $('chat').appendChild(box);
+}
+function proposalCard(p) {
+  const c = document.createElement('div'); c.className = 'prop'; c.dataset.id = p.id;
+  c.innerHTML = `<p>${esc(p.describe)}</p><div class="acts" style="margin-top:0"><button class="btn ghost" type="button" data-x="cancel">Cancel</button><button class="btn pri" type="button" data-x="execute">Confirm</button></div>`;
+  c.addEventListener('click', e => { const x = e.target.closest('[data-x]'); if (x) { c.remove(); call({ [x.dataset.x]: p.id }); } });
+  $('chat').appendChild(c); $('chat').scrollTop = $('chat').scrollHeight;
+}
+async function call(payload, shown) {
+  if (D.busy) return; D.busy = true;
+  const wait = bubble('…', 'bot'); wait.style.opacity = '.6';
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    const res = await fetch(DUBBI_URL, { method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token, apikey: SUPABASE_ANON_KEY },
+      body: JSON.stringify({ ...payload, conversation_id: D.conv }) });
+    const out = await res.json().catch(() => ({}));
+    wait.remove();
+    if (res.status === 404) { bubble('Dubbi’s brain isn’t installed yet — see the setup steps in assistant/README.md.', 'sys'); return; }
+    D.conv = out.conversation_id || D.conv;
+    const reply = out.reply || 'Sorry, something went wrong.';
+    bubble(reply, 'bot'); speak(reply);
+    document.querySelectorAll('.prop').forEach(n => n.remove());
+    (out.proposals || []).forEach(proposalCard);
+    if (out.executed || out.cancelled) load();
+  } catch (e) {
+    wait.remove(); bubble('I can’t reach Dubbi right now. Check your connection.', 'sys');
+  } finally { D.busy = false; }
+}
+function ask(text) {
+  text = String(text || '').trim(); if (!text) return;
+  document.querySelectorAll('.suggest').forEach(n => n.remove());
+  if (D.lang === 'auto' && /[éèêàçù]|\b(bonjour|merci|dossier|patients?|oui|quoi|qui|est-ce)\b/i.test(text)) D.spoken = 'fr';
+  bubble(text, 'me'); $('askInput').value = ''; call({ text });
+}
+
+// Speaking — the iPhone's built-in voices, in the language of the answer
+function speak(text) {
+  if (!pref('speak', true) || !('speechSynthesis' in window)) return;
+  speechSynthesis.cancel();
+  const fr = D.lang === 'fr' || (D.lang === 'auto' && /[éèêàçù]|\b(je|vous|le dossier|bonjour|merci|d'accord)\b/i.test(text));
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = fr ? 'fr-CA' : 'en-CA';
+  const v = speechSynthesis.getVoices().find(v => v.lang.replace('_', '-').startsWith(fr ? 'fr' : 'en'));
+  if (v) u.voice = v;
+  u.rate = 1.03;
+  speechSynthesis.speak(u);
+}
+
+// Listening — tap the mic; it stops when you stop talking
+function recLang() { return D.lang === 'fr' ? 'fr-CA' : D.lang === 'en' ? 'en-CA' : (D.spoken === 'fr' ? 'fr-CA' : 'en-CA'); }
+function startListening() {
+  if (!SR) { toast('Voice input isn’t available in this browser — type instead, or open Dubbi in Safari.'); return; }
+  speechSynthesis?.cancel(); stopListening();
+  const r = new SR(); D.rec = r;
+  r.lang = recLang(); r.interimResults = true; r.continuous = false; r.maxAlternatives = 1;
+  let final = '';
+  r.onresult = e => {
+    let interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const t = e.results[i][0].transcript;
+      if (e.results[i].isFinal) final += t; else interim += t;
+    }
+    $('interim').textContent = (final + ' ' + interim).trim();
+  };
+  r.onerror = e => { if (e.error === 'not-allowed') toast('Allow the microphone for this app in Settings to talk to Dubbi.'); };
+  r.onend = () => { $('micBtn').classList.remove('live'); $('interim').textContent = ''; D.rec = null; if (final.trim()) ask(final); };
+  $('micBtn').classList.add('live');
+  try { r.start(); } catch { $('micBtn').classList.remove('live'); }
+}
+function stopListening() { try { D.rec?.stop(); } catch {} }
+
+// "Hey Dubbi" — listens only while the app is open on screen (Apple only
+// lets Siri listen in the background; for that, use "Hey Siri, Dubbi").
+const WAKE = /\b(hey|hi|ok|okay|salut|allo|allô)[\s,]+(dubbi|dubby|dubi|doobie|doobi|dobby|dubbie|debbie)\b[\s,.!]*(.*)$/i;
+function startWake() {
+  if (!SR || !pref('wake', false) || D.open || document.hidden || !user) { $('fab').classList.remove('wake'); return; }
+  stopWake();
+  const r = new SR(); D.wake = r;
+  r.lang = recLang(); r.continuous = true; r.interimResults = false;
+  r.onresult = e => {
+    const t = e.results[e.results.length - 1][0].transcript;
+    const m = t.match(WAKE);
+    if (m) { stopWake(); openSheet(false); if (m[3].trim()) ask(m[3]); else startListening(); }
+  };
+  r.onend = () => { if (D.wake === r) { D.wake = null; setTimeout(startWake, 400); } };
+  r.onerror = e => { if (e.error === 'not-allowed') { savePref('wake', false); D.wake = null; toast('Microphone not allowed — "Hey Dubbi" is off.'); } };
+  try { r.start(); $('fab').classList.add('wake'); } catch { D.wake = null; }
+}
+function stopWake() { const r = D.wake; D.wake = null; try { r?.stop(); } catch {} $('fab').classList.remove('wake'); }
+
+// Settings: speaking, language, "Hey Dubbi", Siri
+async function showSettings() {
+  $('chat').hidden = true; const s = $('settings'); s.hidden = false;
+  const { data: keys } = await sb.from('dubbi_tokens').select('id,label,created_at,last_used_at').order('created_at');
+  s.innerHTML = `
+    <div class="setrow"><div>Speak answers aloud<small>Dubbi reads its answers using your phone's voice.</small></div><input type="checkbox" class="sw" data-p="speak" ${pref('speak', true) ? 'checked' : ''}></div>
+    <div class="setrow"><div>Language<small>Auto follows the language you speak.</small></div><div class="seg" data-p="lang">${['auto', 'en', 'fr'].map(l => `<button type="button" data-v="${l}" class="${D.lang === l ? 'on' : ''}">${l.toUpperCase()}</button>`).join('')}</div></div>
+    <div class="setrow"><div>Listen for “Hey Dubbi”<small>Only while this app is open on screen. Uses the microphone.</small></div><input type="checkbox" class="sw" data-p="wake" ${pref('wake', false) ? 'checked' : ''}></div>
+    <div class="sec" style="margin-top:18px">“Hey Siri, Dubbi”</div>
+    <p class="note">Talk to Dubbi hands-free, even with the phone locked, through a Siri Shortcut. It uses a personal Siri key — you can revoke it here any time.</p>
+    ${(keys || []).map(k => `<div class="setrow"><div>${esc(k.label)}<small>Created ${when(k.created_at)}${k.last_used_at ? ' · last used ' + when(k.last_used_at) : ' · never used'}</small></div><button class="btn ghost" style="flex:none;min-height:36px" type="button" data-revoke="${esc(k.id)}">Revoke</button></div>`).join('')}
+    <div id="siriBox"></div>
+    <button class="btn pri" type="button" id="newKey" style="width:100%;margin-top:10px">Set up “Hey Siri, Dubbi”</button>
+    <button class="btn ghost" type="button" id="backChat" style="width:100%;margin-top:8px">Back to Dubbi</button>`;
+}
+async function newSiriKey() {
+  const raw = crypto.getRandomValues(new Uint8Array(32));
+  const key = btoa(String.fromCharCode(...raw)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(key)))).map(b => b.toString(16).padStart(2, '0')).join('');
+  const { error } = await sb.from('dubbi_tokens').insert({ token_hash: hash, label: 'Siri — ' + new Date().toLocaleDateString('en-CA') });
+  if (error) return toast('Could not create the Siri key — ' + error.message);
+  $('siriBox').innerHTML = `
+    <div class="card" style="margin-top:12px">
+      <b>Your Siri key</b> — shown only once. Copy it into the Shortcut below.
+      <div class="keybox" id="keyTxt">${key}</div>
+      <button class="btn sec2" type="button" id="copyKey" style="width:100%">Copy key</button>
+      <ol class="steps">
+        <li>Open the <b>Shortcuts</b> app → <b>+</b> → name it <b>Dubbi</b>.</li>
+        <li>Add <b>Dictate Text</b> (language: Automatic, stop listening: After Pause).</li>
+        <li>Add <b>Get Contents of URL</b>: URL <span class="keybox" style="display:inline-block;margin:2px 0;padding:2px 6px">${esc(DUBBI_URL)}</span> · Method <b>POST</b> · Headers: <b>x-dubbi-token</b> = your key · Request Body <b>JSON</b>: <b>text</b> = <i>Dictated Text</i>.</li>
+        <li>Add <b>Get Dictionary Value</b>: key <b>reply</b>.</li>
+        <li>Add <b>Speak Text</b> (the Dictionary Value).</li>
+        <li>Say <b>“Hey Siri, Dubbi”</b>, then your request. To confirm an action, say “Hey Siri, Dubbi” again and answer “yes”.</li>
+      </ol>
+    </div>`;
+  $('copyKey').onclick = async () => { try { await navigator.clipboard.writeText(key); toast('Key copied'); } catch { toast('Select the key and copy it'); } };
+}
+$('settings').addEventListener('click', async e => {
+  const t = e.target;
+  if (t.matches('.sw')) {
+    savePref(t.dataset.p, t.checked);
+    if (t.dataset.p === 'wake' && t.checked) { toast('“Hey Dubbi” is on while the app is open'); }
+    return;
+  }
+  const seg = t.closest('.seg button'); if (seg) { D.lang = seg.dataset.v; savePref('lang', D.lang); showSettings(); return; }
+  if (t.id === 'newKey') return newSiriKey();
+  if (t.id === 'backChat') { $('settings').hidden = true; $('chat').hidden = false; return; }
+  const rv = t.closest('[data-revoke]');
+  if (rv && confirm('Revoke this Siri key? The Shortcut using it stops working.')) {
+    await sb.from('dubbi_tokens').delete().eq('id', rv.dataset.revoke); toast('Siri key revoked'); showSettings();
+  }
 });
+$('fab').addEventListener('click', () => openSheet(!!SR));
+$('scrim').addEventListener('click', closeSheet);
+$('closeSheet').addEventListener('click', closeSheet);
+$('setBtn').addEventListener('click', () => $('settings').hidden ? showSettings() : ($('settings').hidden = true, $('chat').hidden = false));
+$('micBtn').addEventListener('click', () => D.rec ? stopListening() : startListening());
+$('askForm').addEventListener('submit', e => { e.preventDefault(); ask($('askInput').value); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) stopWake(); else startWake(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && D.open) closeSheet(); });
 
 // ── iPhone / browser push ───────────────────────────────────────────────
 const b64ToBytes = s => { const p = '='.repeat((4 - s.length % 4) % 4); const r = atob((s + p).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from(r, c => c.charCodeAt(0)); };
@@ -490,7 +1048,7 @@ async function setupPush() {
   const isIOS = /iPhone|iPad/.test(navigator.userAgent);
   const installed = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
   if (!self.VAPID_PUBLIC_KEY || !('PushManager' in window)) {
-    if (isIOS && !installed) { $('pushBtn').hidden = false; $('pushBtn').onclick = () => toast('On iPhone: Share → Add to Home Screen, then open Approvals from the Home Screen', 6000); }
+    if (isIOS && !installed) { $('pushBtn').hidden = false; $('pushBtn').onclick = () => toast('On iPhone: Share → Add to Home Screen, then open Dubbi from the Home Screen', 6000); }
     return;
   }
   const sub = await reg.pushManager.getSubscription();

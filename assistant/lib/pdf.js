@@ -19,14 +19,15 @@ export async function openPdf(bytes) {
   }).promise;
 }
 
-// Returns { result, scanned } — scanned = no usable text layer (fax/image);
-// those need OCR, which v1 leaves to the Medicum Parser page.
+// Returns { result, scanned, text } — scanned = no usable text layer (fax/image);
+// those need OCR, which v1 leaves to the Medicum Parser page. `text` is only
+// used in memory to recognise the document type; it is never stored.
 export async function parsePdf(bytes, fname) {
   const pdf = await openPdf(bytes);
   try {
     const ex = await shared.extractMedicumText(pdf, { OPS: pdfjsLib.OPS });
     const scanned = ex.txt.replace(/\s+/g, '').length <= 80;   // same threshold as medicum-parser.html
-    return { scanned, result: scanned ? null : shared.parseMedicumPdf(ex, fname) };
+    return { scanned, text: ex.txt, result: scanned ? null : shared.parseMedicumPdf(ex, fname) };
   } finally {
     await pdf.destroy();
   }

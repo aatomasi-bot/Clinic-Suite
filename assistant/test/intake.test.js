@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { CASES, CLOSE_CASES, writeFakeInbox } from '../make-fake-pdfs.js';
+import { CASES, CLOSE_CASES, PAIR_CASES, writeFakeInbox } from '../make-fake-pdfs.js';
 import { parsePdf } from '../lib/pdf.js';
 import { isAssignment, classifyEmail, subjectFileNumber } from '../lib/classify.js';
 import { findExisting, sameNameOtherFile } from '../lib/match.js';
@@ -53,7 +53,10 @@ test('classify: assignments, prescriptions and close-file requests', () => {
   assert.equal(k('a <a@medicum.ca>', 'Re: Fermeture de dossier S.S-G # 13623', []), null, 'replies are not new requests');
   assert.equal(k('a <a@medicum.ca>', 'File on Hold - MK 34451', []), null);
   assert.equal(k('a <a@medicum.ca>', 'Temporary Transfer - AG 35251', []), null);
-  assert.equal(k('a <a@medicum.ca>', 'New patient 11594', []), null, 'assignment needs a PDF');
+  assert.equal(k('a <a@medicum.ca>', 'New patient 11594', []), 'new_patient_notice', 'kept so it pairs with the reports@ fax');
+  assert.equal(k('a <a@medicum.ca>', 'Patient LPC 21403', []), null, 'other notes without PDF are left alone');
+  assert.equal(k('Kavya <kavyas@medicum.ca>', 'Enrollment signed by patient - SR 27740'), 'enrollment_doc');
+  assert.equal(k('Kavya <kavyas@medicum.ca>', 'Enrollment signed by patient - SR 27740', []), null);
   assert.ok(isAssignment({ from: 'Giulia <giuliar@medicum.ca>', subject: 'New Patient JGC 35290', pdfs }, rules).ok);
   assert.equal(subjectFileNumber('Patient\'s RC 23226 and AC 14092'), '14092');
   assert.equal(subjectFileNumber('fax - SS #33816'), '33816');
@@ -93,7 +96,7 @@ test('intake end to end (offline): new, prescription, close-file; re-run adds no
   const outFile = path.join(tmp, 'pending.json');
   const store = offlineStore({ patientsFile: fixtures, outFile });
   const counts = await runIntake({ source: testFolderSource(inbox), store, rules, replies: { signature: 'Sig' }, isTest: true, log: () => {} });
-  assert.equal(counts.emails, CASES.length + CLOSE_CASES.length);
+  assert.equal(counts.emails, CASES.length + CLOSE_CASES.length + PAIR_CASES.length);
   assert.equal(counts.prescriptions, 1);
   assert.equal(counts.closes, 3);
   const byFile = Object.fromEntries(store.rows.map(r => [r.record.file_number, r]));
@@ -102,7 +105,7 @@ test('intake end to end (offline): new, prescription, close-file; re-run adds no
   assert.ok(store.rows.every(r => r.is_test) && store.tasks.every(t => t.is_test));
   assert.ok(byFile['99002'].warnings.some(w => /Same name as existing patient #98002/.test(w)));
   assert.ok(byFile['99007'].missing_fields.includes('Dose Prescribed'));
-  assert.ok(byFile['99009'].warnings.some(w => /Scanned/.test(w)), 'scan flagged');
+  assert.ok(byFile['99009'].warnings.some(w => /scanned/i.test(w)), 'scan flagged');
   assert.equal(byFile['99009'].record.file_number, '99009', 'file # from subject');
 
   const task = (kind, file) => store.tasks.find(t => t.kind === kind && t.file_number === file);
@@ -110,11 +113,28 @@ test('intake end to end (offline): new, prescription, close-file; re-run adds no
   assert.equal(rx.existing_patient.patient_name, 'Existing Testperson');
   assert.equal(rx.details.pdf_dose, '30');
   assert.match(rx.reply_body, /^Hello Julie,/);
+  // Coordinator note + reports@ fax → ONE item, to the coordinator, CC reports@, documents complete
+  const pair = store.tasks.filter(t => t.kind === 'new_patient' && t.group_key === '99011');
+  assert.equal(pair.length, 1);
+  assert.equal(pair[0].to_address, 'julie.exemple@medicum.ca');
+  assert.deepEqual(pair[0].cc_addresses, ['reports@medicum.ca']);
+  assert.equal(pair[0].related_emails.length, 2);
+  assert.ok(pair[0].documents.assignment && pair[0].documents.enrollment);
+  assert.ok(pair[0].pending_id, 'card pre-filled from the fax');
+  assert.match(pair[0].reply_body, /along with the documents \(assignment form and enrollment form\)/);
+  assert.deepEqual(pair[0].warnings, []);
+  // Note with no documents → polite request for both, in French
+  assert.match(task('new_patient', '99013').reply_body, /je n'ai pas reçu le formulaire d'assignation ni le formulaire d'inscription/);
+  // Form only → asks for the enrollment form
+  assert.match(task('new_patient', '99001').reply_body, /did not receive the enrollment form/);
+  // Scanned fax from reports@ alone: document unknown → you tick it on the card
+  assert.equal(task('new_patient', '99009').documents.unknown, 1);
   const np = task('new_patient', '99006');
   assert.equal(np.status, 'todo');
   assert.equal(np.lang, 'fr');
   assert.equal(np.pending_id, byFile['99006'].id);
   assert.equal(task('new_patient', '99009').to_name, null, 'reports@ → no first name');
+  assert.deepEqual(task('new_patient', '99009').cc_addresses, [], 'no CC to reports@ when replying to reports@');
   assert.equal(task('close_file', '98004').existing_patient.status, 'Active');
   assert.ok(task('close_file', '98002').warnings.some(w => /already closed/.test(w)));
   assert.ok(task('close_file', '99999').warnings.some(w => /not in VaPiq/.test(w)));
@@ -122,7 +142,7 @@ test('intake end to end (offline): new, prescription, close-file; re-run adds no
 
   const before = { rows: store.rows.length, tasks: store.tasks.length };
   const again = await runIntake({ source: testFolderSource(inbox), store, rules, isTest: true, log: () => {} });
-  assert.equal(again.already, CASES.length + CLOSE_CASES.length);
+  assert.equal(again.already, CASES.length + CLOSE_CASES.length + PAIR_CASES.length);
   assert.deepEqual({ rows: store.rows.length, tasks: store.tasks.length }, before);
 });
 
@@ -145,7 +165,7 @@ test('outbox: only approved replies go, once, test replies are saved not sent, s
   const eml = fs.readFileSync(path.join(tmp, 'outbox-test', `${ok}.eml`), 'utf8');
   assert.match(eml, /Subject: Re: Close file 1/);
   assert.match(eml, /In-Reply-To: <m@x>/);
-  assert.deepEqual(tm.moves, [{ id: ok, toFolder: 'Medicum' }]);
+  assert.deepEqual(tm.moves, [{ id: ok, toFolder: 'Medicum', emails: 1 }]);
   const again = await runOutbox({ store, mailer: live, testMailer: tm, rules, live: false, moveToFolder: 'Medicum', log: () => {} });
   assert.equal(again.sent, 0, 'never sent twice');
 });
@@ -168,4 +188,36 @@ test('address: street, city, prov, postal, then the unit with its own label', ()
   assert.equal(formatAddress({ street: '45 Graham Boulevard', city: 'Laval', prov: 'QC', postal: 'H7G 3A4', apt: 'Unit C' }),
     '45 Graham Boulevard, Laval, QC, H7G 3A4, Unit C');
   assert.equal(formatAddress({ street: '9 Rue Z', city: 'Laval', prov: 'QC', postal: 'H7G 3A4', apt: '3' }), '9 Rue Z, Laval, QC, H7G 3A4, Apt. 3');
+});
+
+test('safety net: overdue items, scheduling gaps, morning text (counts only)', async () => {
+  const { overdueItems, dueForAlert, schedulingGaps, openCounts, morningText, forMode } = await import('../lib/safety.js');
+  const now = Date.parse('2026-10-22T12:00:00Z'), hAgo = h => new Date(now - h * 36e5).toISOString();
+  const alerts = { newPatientHours: 24, replyHours: 48, waitingDocsHours: 24 };
+  const snap = {
+    pending: [{ id: 'p1', status: 'pending', created_at: hAgo(30) }, { id: 'p2', status: 'pending', created_at: hAgo(2) }],
+    tasks: [
+      { id: 't1', kind: 'new_patient', status: 'reply_ready', decided_at: hAgo(50), created_at: hAgo(60) },
+      { id: 't2', kind: 'new_patient', status: 'todo', created_at: hAgo(30), documents: { assignment: true, enrollment: false } },
+      { id: 't3', kind: 'close_file', status: 'todo', created_at: hAgo(26), alerted_at: hAgo(3) },
+      { id: 't4', kind: 'close_file', status: 'todo', created_at: hAgo(1) },
+      { id: 't5', kind: 'prescription', status: 'todo', created_at: hAgo(40), is_test: true },
+    ],
+    patients: [
+      { id: 1, archived: false, due_date: '2026-10-20', appointment_date_time: null },
+      { id: 2, archived: false, due_date: '2026-10-30', appointment_date_time: null },
+      { id: 3, archived: false, due_date: '2026-10-25', appointment_date_time: '2026-10-22T10:00', appointment_confirmed: true },
+      { id: 4, archived: false, due_date: '2026-10-26', appointment_date_time: '2026-10-24T09:00', appointment_confirmed: false },
+      { id: 5, archived: true, due_date: '2026-10-01', appointment_date_time: null },
+    ],
+  };
+  const all = overdueItems(snap, alerts, now).map(i => i.id + ':' + i.why);
+  assert.deepEqual(all.sort(), ['p1:new_patient_not_added', 't1:reply_not_sent', 't2:documents_missing', 't3:file_not_closed', 't5:prescription_not_applied']);
+  assert.deepEqual(dueForAlert(overdueItems(snap, alerts, now), now).map(i => i.id).sort(), ['p1', 't1', 't2', 't5'], 't3 was alerted 3 h ago');
+  assert.ok(!overdueItems(forMode(snap, true), alerts, now).some(i => i.id === 't5'), 'live mode ignores TEST cards');
+  const g = schedulingGaps(snap.patients, 14, new Date('2026-10-22T12:00:00'));
+  assert.deepEqual(g, { noAppointment: 2, overdueNoAppointment: 1, unconfirmed: 1, visitsToday: 1 });
+  const text = morningText(openCounts(snap), g, 4);
+  assert.match(text, /to do · ⚠️ 4 overdue · 1 waiting for documents · 2 patients to schedule \(1 past due\) · 1 to confirm · 1 visit today/);
+  assert.doesNotMatch(text, /\d{5}/, 'no file numbers in notifications');
 });
