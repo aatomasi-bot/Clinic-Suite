@@ -74,7 +74,7 @@ function draftReply({ kind, lang, coordinatorName, fileNumber, subjectRef, signa
   if (!t[kind]) throw new Error('Unknown reply kind: ' + kind);
   const ref = subjectRef || fileNumber || '';
   const lines = [t.hello(coordinatorName), '', t[kind](fmtRef(ref)), '', t.thanks];
-  if (signature) lines.push(signature);
+  if (signature) lines.push('', signature);   // blank line between "Thank you!" and the name
   return lines.join('\n');
 }
 
