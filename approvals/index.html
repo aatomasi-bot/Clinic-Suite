@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self';
+                 script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net;
+                 style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+                 font-src https://fonts.gstatic.com;
+                 img-src 'self' data:;
+                 connect-src 'self' https://*.supabase.co;">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Approvals">
+  <meta name="theme-color" content="#2D8C8A">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <title>VaPiq Approvals</title>
+<style>
+:root{
+  --teal:#2D8C8A;--teal-dark:#1F6664;--teal-light:#E3F2F1;
+  --bg:#F2F4F8;--card:#FFFFFF;--border:#DDE3EC;--text:#1B2638;--text-2:#56627A;--text-3:#8A94A8;
+  --red:#C0392B;--red-bg:#FDEDED;--amber:#B7791F;--amber-bg:#FFF6E0;--green:#2F855A;--green-bg:#E6F4EC;
+  --violet:#6B46C1;--violet-bg:#EFE9FB;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --teal:#3AA8A5;--teal-dark:#7FD3D0;--teal-light:#173B3B;
+    --bg:#0F1621;--card:#1A2335;--border:#2A3A55;--text:#E2E8F0;--text-2:#94A3B8;--text-3:#64748B;
+    --red:#F87171;--red-bg:#3A1C1C;--amber:#F6C05C;--amber-bg:#3A2E14;--green:#68D391;--green-bg:#173325;
+    --violet:#B794F4;--violet-bg:#2D2346;
+  }
+}
+:root[data-theme="dark"]{
+  --teal:#3AA8A5;--teal-dark:#7FD3D0;--teal-light:#173B3B;
+  --bg:#0F1621;--card:#1A2335;--border:#2A3A55;--text:#E2E8F0;--text-2:#94A3B8;--text-3:#64748B;
+  --red:#F87171;--red-bg:#3A1C1C;--amber:#F6C05C;--amber-bg:#3A2E14;--green:#68D391;--green-bg:#173325;
+  --violet:#B794F4;--violet-bg:#2D2346;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:15px;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+header{position:sticky;top:0;z-index:5;background:var(--teal);color:#fff;padding:14px 16px 0}
+.hrow{display:flex;align-items:center;gap:10px;max-width:760px;margin:0 auto}
+.hrow h1{font-size:18px;font-weight:800;margin:0;flex:1}
+.hbtn{background:rgba(255,255,255,.16);border:0;color:#fff;font:inherit;font-size:13px;font-weight:700;padding:7px 11px;border-radius:9px;cursor:pointer;text-decoration:none}
+.tabs{display:flex;gap:4px;max-width:760px;margin:12px auto 0;overflow-x:auto}
+.tab{flex:1;min-width:max-content;background:none;border:0;color:rgba(255,255,255,.75);font:inherit;font-weight:700;font-size:14px;padding:9px 10px 11px;border-bottom:3px solid transparent;cursor:pointer}
+.tab.on{color:#fff;border-bottom-color:#fff}
+.tab .n{display:inline-block;min-width:20px;padding:1px 6px;margin-left:4px;border-radius:10px;background:rgba(255,255,255,.22);font-size:12px}
+main{max-width:760px;margin:0 auto;padding:14px 16px 40px}
+.banner{background:var(--amber-bg);color:var(--amber);border-radius:10px;padding:10px 12px;font-size:13px;font-weight:600;margin-bottom:12px}
+.empty{text-align:center;color:var(--text-3);padding:50px 10px;font-size:14px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px}
+.ctop{display:flex;align-items:flex-start;gap:8px;margin-bottom:10px}
+.ctitle{flex:1;min-width:0}
+.ctitle b{font-size:16px;display:block;overflow-wrap:anywhere}
+.meta{font-size:12px;color:var(--text-3);margin-top:2px;overflow-wrap:anywhere}
+.pill{font-size:11px;font-weight:800;padding:3px 8px;border-radius:20px;white-space:nowrap}
+.pill.test{background:var(--violet-bg);color:var(--violet)}
+.pill.exists{background:var(--amber-bg);color:var(--amber)}
+.pill.ok{background:var(--green-bg);color:var(--green)}
+.pill.no{background:var(--red-bg);color:var(--red)}
+.warn{background:var(--amber-bg);color:var(--amber);font-size:13px;border-radius:9px;padding:8px 10px;margin:0 0 10px}
+.warn div+div{margin-top:4px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px}
+.fld{display:flex;flex-direction:column;gap:3px;min-width:0}
+.fld.wide{grid-column:1/-1}
+.fld label{font-size:11px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.03em}
+.fld input,.fld select{font:inherit;font-size:15px;padding:9px 10px;border:1.5px solid var(--border);border-radius:9px;background:var(--bg);color:var(--text);width:100%;min-width:0}
+.fld.miss input,.fld.miss select{border-color:var(--red);background:var(--red-bg)}
+.fld.miss label{color:var(--red)}
+.acts{display:flex;gap:8px;margin-top:12px}
+.btn{flex:1;font:inherit;font-weight:800;font-size:14px;padding:11px;border-radius:10px;border:0;cursor:pointer}
+.btn.ok{background:var(--teal);color:#fff}
+.btn.ghost{background:none;border:1.5px solid var(--border);color:var(--text-2)}
+.btn:disabled{opacity:.55;cursor:default}
+.exists-box{font-size:14px;line-height:1.45}
+.kind{display:block;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--teal);margin-bottom:2px}
+.facts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}
+.facts div{background:var(--bg);border-radius:9px;padding:8px 10px;min-width:0}
+.facts span{display:block;font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase}
+.facts b{font-size:15px}.facts b.chg{color:var(--red)}
+.hint{font-size:13px;color:var(--text-2);margin:8px 0 0}
+.mailhead{font-size:13px;color:var(--text-2);margin-bottom:8px}
+.mailhead div{overflow-wrap:anywhere}.mailhead span{display:inline-block;width:62px;font-weight:700;color:var(--text-3)}
+textarea.reply{width:100%;font:inherit;font-size:15px;line-height:1.45;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);resize:vertical}
+pre.sent{white-space:pre-wrap;font:inherit;font-size:14px;background:var(--bg);border-radius:10px;padding:10px 12px;margin:0}
+a.btn{display:flex;align-items:center;justify-content:center;text-decoration:none}
+.hist{display:flex;align-items:center;gap:10px;font-size:13px}
+.hist .t{flex:1;min-width:0;overflow-wrap:anywhere}
+#login{max-width:380px;margin:60px auto;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:22px}
+#login h2{margin:0 0 4px;font-size:20px}
+#login p{margin:0 0 16px;color:var(--text-2);font-size:13px}
+#login .fld{margin-bottom:10px}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(120px);background:var(--text);color:var(--bg);
+  padding:11px 16px;border-radius:12px;font-size:14px;font-weight:600;transition:transform .25s;max-width:calc(100% - 32px);z-index:20}
+.toast.on{transform:translateX(-50%) translateY(0)}
+@media (max-width:480px){.grid{grid-template-columns:1fr}.acts{flex-wrap:wrap}.acts .btn{min-width:40%}}
+</style>
+</head>
+<body>
+
+<section id="login" hidden>
+  <h2>VaPiq Approvals</h2>
+  <p>Sign in with your VaPiq account.</p>
+  <form id="loginForm">
+    <div class="fld"><label for="em">Email</label><input id="em" type="email" autocomplete="username" required></div>
+    <div class="fld"><label for="pw">Password</label><input id="pw" type="password" autocomplete="current-password" required></div>
+    <button class="btn ok" style="width:100%;margin-top:6px" type="submit">Sign in</button>
+  </form>
+</section>
+
+<div id="app" hidden>
+  <header>
+    <div class="hrow">
+      <h1>Approvals</h1>
+      <button class="hbtn" id="pushBtn" type="button" hidden>🔔 Notify me</button>
+      <button class="hbtn" id="refreshBtn" type="button" aria-label="Refresh">↻</button>
+      <a class="hbtn" href="../">VaPiq</a>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button class="tab on" data-tab="todo" role="tab">To do<span class="n" id="n-todo">0</span></button>
+      <button class="tab" data-tab="outbox" role="tab">Outbox<span class="n" id="n-outbox">0</span></button>
+      <button class="tab" data-tab="history" role="tab">History</button>
+    </nav>
+  </header>
+  <main id="list"></main>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="push-config.js"></script>
+<script>
+'use strict';
+// Same project and key as index.html — and the same browser session, so being
+// signed in to VaPiq signs you in here too.
+const SUPABASE_URL = 'https://wqlbmtjbjloxpvsbeqyb.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_gcyK2z_8lvbOgHNcJfdX1g_8QCWJ_Xi';
+const DOSES = ['7.5', '22.5', '30', '45'];
+const INACTIVITY_LIMIT_MS = 30 * 60 * 1000;   // same as VaPiq
+
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const normFile = v => String(v ?? '').trim().toLowerCase();
+let rows = [], tasks = [], tab = 'todo', user = null;
+
+function toast(msg, ms = 2600) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('on');
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('on'), ms);
+}
+function fmtDate(iso) {
+  if (!iso) return '';
+  return new Date(iso).toLocaleString('en-CA', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+// ── Auth ────────────────────────────────────────────────────────────────
+async function start() {
+  const { data: { session } } = await sb.auth.getSession();
+  user = session?.user || null;
+  $('login').hidden = !!user; $('app').hidden = !user;
+  if (user) { await load(); setupPush(); resetInactivity(); }
+}
+$('loginForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const { error } = await sb.auth.signInWithPassword({ email: $('em').value.trim(), password: $('pw').value });
+  $('pw').value = '';
+  if (error) { toast('Sign-in failed — check email and password'); return; }
+  start();
+});
+let _idle;
+function resetInactivity() {
+  clearTimeout(_idle);
+  _idle = setTimeout(async () => { await sb.auth.signOut(); toast('Signed out after 30 minutes of inactivity'); start(); }, INACTIVITY_LIMIT_MS);
+}
+['click', 'keydown', 'touchstart'].forEach(ev => document.addEventListener(ev, () => user && resetInactivity(), { passive: true }));
+
+// ── Data ────────────────────────────────────────────────────────────────
+async function load() {
+  const since = new Date(Date.now() - 30 * 864e5).toISOString();
+  const [p, t] = await Promise.all([
+    sb.from('pending_patients').select('*').gte('created_at', since).order('created_at', { ascending: false }),
+    sb.from('email_tasks').select('*').gte('created_at', since).order('created_at', { ascending: false }),
+  ]);
+  const err = p.error || t.error;
+  if (err) { $('list').innerHTML = `<div class="banner">Could not load cards: ${esc(err.message)}. Have both database setup files in supabase/ been run?</div>`; return; }
+  rows = p.data; tasks = t.data;
+  render();
+}
+
+async function audit(action, fileNum, detail) {
+  const { error } = await sb.from('audit_log').insert({
+    user_email: user.email, action, patient_file_num: String(fileNum || ''),
+    detail: detail ? JSON.stringify(detail).slice(0, 500) : null, created_at: new Date().toISOString(),
+  });
+  if (error) console.warn('[audit]', error.message);
+}
+
+async function allFileNumbers() {
+  const out = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await sb.from('patients').select('id,file_number,patient_name,archived,pending').range(from, from + 999);
+    if (error) throw error;
+    out.push(...data);
+    if (data.length < 1000) return out;
+  }
+}
+
+// ── What goes where ─────────────────────────────────────────────────────
+const pendingById = id => rows.find(r => r.id === id);
+// A new-patient reply only shows once its patient card is decided.
+const replyVisible = t => t.kind !== 'new_patient' || t.status !== 'todo' ? true : (pendingById(t.pending_id)?.status !== 'pending');
+function todoItems() {
+  const items = [];
+  rows.filter(r => r.status === 'pending' || r.status === 'exists').forEach(r => items.push({ at: r.created_at, html: r.status === 'pending' ? pendingCard(r) : existsCard(r) }));
+  tasks.filter(t => ['todo', 'reply_ready', 'failed'].includes(t.status) && replyVisible(t)).forEach(t => {
+    const html = t.status === 'todo' && t.kind === 'prescription' ? rxCard(t)
+      : t.status === 'todo' && t.kind === 'close_file' ? closeCard(t)
+      : replyCard(t);
+    items.push({ at: t.created_at, html });
+  });
+  return items.sort((a, b) => String(b.at).localeCompare(String(a.at))).map(i => i.html);
+}
+
+// ── Render ──────────────────────────────────────────────────────────────
+function render() {
+  const todo = todoItems();
+  const outbox = tasks.filter(t => ['send_approved', 'sending'].includes(t.status));
+  $('n-todo').textContent = todo.length;
+  $('n-outbox').textContent = outbox.length;
+  document.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
+  const list = $('list');
+  const anyTest = rows.some(r => r.is_test) || tasks.some(t => t.is_test);
+  const banner = anyTest ? '<div class="banner">TEST cards use fake data: VaPiq is never changed and replies are never really sent.</div>' : '';
+  if (tab === 'todo') list.innerHTML = banner + (todo.join('') || '<div class="empty">All done. 🎉</div>');
+  else if (tab === 'outbox') list.innerHTML = banner + (outbox.map(outboxCard).join('') || '<div class="empty">No replies waiting to go out.</div>');
+  else list.innerHTML = historyList();
+}
+
+function source(r) {
+  return `${esc(r.email_subject || r.attachment_name || '')} · ${esc((r.email_from || '').replace(/<.*>/, '').trim() || r.email_from)} · ${fmtDate(r.email_date || r.created_at)}`;
+}
+const testPill = r => r.is_test ? '<span class="pill test">TEST</span>' : '';
+const warnBox = w => (w && w.length) ? `<div class="warn">${w.map(x => `<div>⚠️ ${esc(x)}</div>`).join('')}</div>` : '';
+const fileLabel = t => `#${esc(t.file_number || '—')}${t.subject_ref && !/^\d+$/.test(t.subject_ref) ? ` (${esc(t.subject_ref.replace(/\s*\d{4,6}$/, ''))})` : ''}`;
+
+function field(r, key, label, opts = {}) {
+  const v = r.record[key] ?? '';
+  const miss = (r.missing_fields || []).includes(label) || (opts.required && !String(v).trim());
+  const id = `${key}-${r.id}`;
+  const input = opts.select
+    ? `<select id="${id}" data-k="${key}"><option value="">— choose —</option>${opts.select.map(o => `<option${o === v ? ' selected' : ''}>${o}</option>`).join('')}</select>`
+    : `<input id="${id}" data-k="${key}" type="${opts.type || 'text'}" value="${esc(v)}" autocomplete="off">`;
+  return `<div class="fld${opts.wide ? ' wide' : ''}${miss ? ' miss' : ''}"><label for="${id}">${esc(label)}${miss ? ' — check' : ''}</label>${input}</div>`;
+}
+
+function pendingCard(r) {
+  return `<article class="card" data-type="pending" data-id="${esc(r.id)}">
+    <div class="ctop">
+      <div class="ctitle"><span class="kind">New patient</span><b>${esc(r.record.patient_name || 'Name not found')}</b><div class="meta">${source(r)}</div></div>
+      ${testPill(r)}
+    </div>
+    ${warnBox(r.warnings)}
+    <div class="grid">
+      ${field(r, 'patient_name', 'Patient Name', { wide: true, required: true })}
+      ${field(r, 'file_number', 'File Number', { required: true })}
+      ${field(r, 'dose_prescribed', 'Dose Prescribed', { select: DOSES, required: true })}
+      ${field(r, 'address', 'Address', { wide: true })}
+      ${field(r, 'phone1', 'Phone 1', { type: 'tel' })}
+      ${field(r, 'phone2', 'Phone 2', { type: 'tel' })}
+      ${field(r, 'due_date', 'Due Date', { type: 'date' })}
+    </div>
+    <div class="acts">
+      <button class="btn ghost" data-act="reject">Reject</button>
+      <button class="btn ok" data-act="approve">${r.is_test ? 'Add (test)' : 'Add to VaPiq'}</button>
+    </div>
+  </article>`;
+}
+
+function existsCard(r) {
+  const e = r.existing_patient || {};
+  return `<article class="card" data-type="pending" data-id="${esc(r.id)}">
+    <div class="ctop">
+      <div class="ctitle"><span class="kind">Duplicate</span><b>#${esc(e.file_number || r.record.file_number)} — ${esc(e.status || 'Exists')}</b><div class="meta">${source(r)}</div></div>
+      ${testPill(r)}
+    </div>
+    <div class="exists-box">Same file as <b>${esc(e.patient_name || '(blank name)')}</b>. Nothing was added or changed.</div>
+    <div class="acts"><button class="btn ghost" data-act="dismiss">Dismiss</button></div>
+  </article>`;
+}
+
+function patientLine(e) {
+  if (!e) return '<div class="exists-box">Not found in VaPiq.</div>';
+  return `<div class="exists-box">In VaPiq as <b>${esc(e.patient_name || '(blank name)')}</b> <span class="pill ${e.status === 'Archived' ? 'exists' : 'ok'}">${esc(e.status)}</span></div>`;
+}
+
+function rxCard(t) {
+  const e = t.existing_patient || {}, d = t.details || {};
+  const changed = d.pdf_dose && e.dose_prescribed && String(d.pdf_dose) !== String(e.dose_prescribed);
+  return `<article class="card" data-type="task" data-id="${esc(t.id)}">
+    <div class="ctop"><div class="ctitle"><span class="kind">New prescription</span><b>File ${fileLabel(t)}</b><div class="meta">${source(t)}</div></div>${testPill(t)}</div>
+    ${warnBox(t.warnings)}
+    ${patientLine(t.existing_patient)}
+    <div class="facts">
+      <div><span>Dose in VaPiq</span><b>${esc(e.dose_prescribed || '—')} mg</b></div>
+      <div><span>Dose on prescription</span><b class="${changed ? 'chg' : ''}">${esc(d.pdf_dose || 'not read')}${d.pdf_dose ? ' mg' : ''}</b></div>
+      <div><span>Doses remaining</span><b>${esc(e.doses_remaining ?? '—')}</b></div>
+    </div>
+    <p class="hint">Apply the prescription in VaPiq, then tap <b>Applied</b> to reply.</p>
+    <div class="acts">
+      <button class="btn ghost" data-act="dismiss-task">Dismiss</button>
+      <a class="btn ghost" href="../" target="_blank" rel="noopener">Open VaPiq</a>
+      <button class="btn ok" data-act="applied">Applied ✓</button>
+    </div>
+  </article>`;
+}
+
+function closeCard(t) {
+  const e = t.existing_patient;
+  const active = e && e.status !== 'Archived';
+  const main = active
+    ? `<button class="btn ok" data-act="close-file">${t.is_test ? 'Close file (test)' : 'Close file in VaPiq'}</button>`
+    : `<button class="btn ok" data-act="reply-anyway">${e ? 'Already closed — reply' : 'Reply anyway'}</button>`;
+  return `<article class="card" data-type="task" data-id="${esc(t.id)}">
+    <div class="ctop"><div class="ctitle"><span class="kind">Close file</span><b>File ${fileLabel(t)}</b><div class="meta">${source(t)}</div></div>${testPill(t)}</div>
+    ${warnBox(t.warnings)}
+    ${patientLine(e)}
+    <div class="acts"><button class="btn ghost" data-act="dismiss-task">Dismiss</button>${main}</div>
+  </article>`;
+}
+
+const DONE_TEXT = { new_patient: 'Patient added', prescription: 'Prescription applied', close_file: 'File closed' };
+function replyCard(t) {
+  const to = t.to_name ? `${esc(t.to_name)} &lt;${esc(t.to_address)}&gt;` : esc(t.to_address);
+  return `<article class="card" data-type="task" data-id="${esc(t.id)}">
+    <div class="ctop"><div class="ctitle"><span class="kind">Reply · ${esc(DONE_TEXT[t.kind])} ✓</span><b>File ${fileLabel(t)}</b><div class="meta">${source(t)}</div></div>${testPill(t)}</div>
+    ${t.status === 'failed' ? `<div class="warn"><div>⚠️ Not sent: ${esc(t.error || 'unknown error')}</div></div>` : ''}
+    <div class="mailhead"><div><span>To</span>${to}</div><div><span>Subject</span>${esc(/^re\s*:/i.test(t.email_subject || '') ? t.email_subject : 'Re: ' + (t.email_subject || ''))}</div></div>
+    <textarea class="reply" data-k="reply_body" rows="8" aria-label="Reply text">${esc(t.reply_body || '')}</textarea>
+    <div class="acts">
+      <button class="btn ghost" data-act="no-reply">Don't reply</button>
+      <button class="btn ok" data-act="send">${t.status === 'failed' ? 'Retry send' : 'Send reply'}${t.is_test ? ' (test)' : ''}</button>
+    </div>
+  </article>`;
+}
+
+function outboxCard(t) {
+  return `<article class="card" data-type="task" data-id="${esc(t.id)}">
+    <div class="ctop"><div class="ctitle"><span class="kind">${t.status === 'sending' ? 'Sending now…' : 'Sends within ~2 minutes'}</span><b>Reply to ${esc(t.to_name || t.to_address)} — file ${fileLabel(t)}</b><div class="meta">Approved ${fmtDate(t.decided_at)}</div></div>${testPill(t)}</div>
+    <pre class="sent">${esc(t.reply_body)}</pre>
+    ${t.status === 'send_approved' ? '<div class="acts"><button class="btn ghost" data-act="cancel-send">Cancel — keep as draft</button></div>' : ''}
+  </article>`;
+}
+
+function historyList() {
+  const items = [];
+  const pill = { approved: '<span class="pill ok">Added</span>', rejected: '<span class="pill no">Rejected</span>', dismissed: '<span class="pill exists">Dismissed</span>',
+                 sent: '<span class="pill ok">Reply sent</span>', done: '<span class="pill exists">No reply</span>' };
+  rows.filter(r => ['approved', 'rejected', 'dismissed'].includes(r.status)).forEach(r => items.push({ at: r.decided_at,
+    html: `<b>${esc(r.record.patient_name || '—')}</b> #${esc(r.record.file_number || '—')}<div class="meta">New patient · ${fmtDate(r.decided_at)}${r.is_test ? ' · TEST' : ''}</div>`, pill: pill[r.status] }));
+  tasks.filter(t => ['sent', 'done', 'dismissed'].includes(t.status)).forEach(t => items.push({ at: t.sent_at || t.decided_at,
+    html: `File ${fileLabel(t)} → ${esc(t.to_name || t.to_address)}<div class="meta">${esc({ new_patient: 'New patient', prescription: 'Prescription', close_file: 'Close file' }[t.kind])} · ${fmtDate(t.sent_at || t.decided_at)}${t.moved_to_folder ? ` · moved to ${esc(t.moved_to_folder)}` : ''}${t.is_test ? ' · TEST (not sent)' : ''}</div>`, pill: pill[t.status] }));
+  if (!items.length) return '<div class="empty">Nothing in the last 30 days.</div>';
+  items.sort((a, b) => String(b.at).localeCompare(String(a.at)));
+  return '<div class="card">' + items.map(i => `<div class="hist" style="padding:8px 0;border-bottom:1px solid var(--border)"><div class="t">${i.html}</div>${i.pill || ''}</div>`).join('') + '</div>';
+}
+
+// ── Actions ─────────────────────────────────────────────────────────────
+async function decide(r, status, extra = {}) {
+  const { error } = await sb.from('pending_patients')
+    .update({ status, decided_at: new Date().toISOString(), decided_by: user.email, ...extra })
+    .eq('id', r.id).in('status', ['pending', 'exists']);   // never re-decide a card
+  if (error) throw error;
+}
+
+// Moves a task forward only from the status it is in now (no double-actions).
+async function setTask(t, status, extra = {}) {
+  const { error } = await sb.from('email_tasks')
+    .update({ status, decided_at: new Date().toISOString(), decided_by: user.email, ...extra })
+    .eq('id', t.id).eq('status', t.status);
+  if (error) throw error;
+}
+async function setReplyFor(pendingId, status) {
+  const t = tasks.find(x => x.pending_id === pendingId && x.status === 'todo');
+  if (t) await setTask(t, status);
+}
+
+async function approve(r, card, btn) {
+  const rec = { ...r.record };
+  card.querySelectorAll('[data-k]').forEach(el => { rec[el.dataset.k] = el.value.trim(); });
+  rec.file_number = rec.file_number.trim();
+  if (!rec.patient_name) return toast('Patient name is required');
+  if (!rec.file_number) return toast('File number is required');
+  if (!DOSES.includes(rec.dose_prescribed)) return toast('Choose the dose — check the PDF');
+  if (!rec.due_date) return toast('Due date is required');
+
+  btn.disabled = true;
+  try {
+    // Re-check right before writing: VaPiq's rule — an existing file number is never duplicated.
+    const existing = (await allFileNumbers()).find(p => normFile(p.file_number) === normFile(rec.file_number));
+    if (existing) {
+      const ep = { file_number: existing.file_number, patient_name: existing.patient_name, status: existing.archived ? 'Archived' : existing.pending ? 'Pending' : 'Active' };
+      await sb.from('pending_patients').update({ status: 'exists', existing_patient: ep }).eq('id', r.id);
+      toast(`#${rec.file_number} already exists — not added`);
+      return load();
+    }
+    if (r.is_test) {
+      await decide(r, 'approved');
+      await audit('ASSISTANT_TEST_APPROVED', rec.file_number, { pending_id: r.id });
+      await setReplyFor(r.id, 'reply_ready');
+      toast('Test card approved — nothing written to patients. Reply is ready.');
+      return load();
+    }
+    const { data, error } = await sb.from('patients').insert([rec]).select('id').single();
+    if (error) throw error;
+    await audit('INSERT', rec.file_number, { name: rec.patient_name, source: 'assistant', pending_id: r.id });
+    await decide(r, 'approved', { patient_id: String(data.id), record: rec });
+    await setReplyFor(r.id, 'reply_ready');
+    toast(`✓ ${rec.patient_name} added to VaPiq — reply is ready`);
+    load();
+  } catch (e) {
+    console.error('[approve]', e);
+    toast('Could not save — ' + (e.message || 'please try again'));
+  } finally { btn.disabled = false; }
+}
+
+// Close file = VaPiq's Archive (archivePatient in index.html).
+async function closeFile(t) {
+  const e = t.existing_patient, fn = String(e.file_number || '').trim();
+  if (!confirm(`Close file #${fn} (${e.patient_name}) in VaPiq?\n\nThis archives the patient, like the Archive button in VaPiq.`)) return false;
+  if (t.is_test) { toast('Test card — VaPiq not changed. Reply is ready.'); return true; }
+  const { data, error } = await sb.from('patients').update({ archived: true }).eq('id', e.id).select('id,file_number');
+  if (error) throw error;
+  if (!data.length || normFile(data[0].file_number) !== normFile(e.file_number)) throw new Error('patient not found — open VaPiq and close it there');
+  await audit('UPDATE', fn, { id: e.id, source: 'assistant', action: 'close_file', task_id: t.id });
+  toast(`✓ File #${fn} closed — reply is ready`);
+  return true;
+}
+
+$('list').addEventListener('click', async e => {
+  const btn = e.target.closest('button[data-act]'); if (!btn) return;
+  const card = btn.closest('.card'); const act = btn.dataset.act;
+  try {
+    if (card.dataset.type === 'pending') {
+      const r = rows.find(x => String(x.id) === card.dataset.id); if (!r) return;
+      if (act === 'approve') return approve(r, card, btn);
+      btn.disabled = true;
+      if (act === 'reject') {
+        await decide(r, 'rejected'); await audit('ASSISTANT_REJECTED', r.record.file_number, { pending_id: r.id, test: r.is_test });
+        await setReplyFor(r.id, 'dismissed'); toast('Rejected');
+      }
+      if (act === 'dismiss') { await decide(r, 'dismissed'); toast('Dismissed'); }
+      return load();
+    }
+    const t = tasks.find(x => String(x.id) === card.dataset.id); if (!t) return;
+    btn.disabled = true;
+    if (act === 'applied' || act === 'reply-anyway') await setTask(t, 'reply_ready');
+    if (act === 'close-file') { if (!(await closeFile(t))) { btn.disabled = false; return; } await setTask(t, 'reply_ready'); }
+    if (act === 'dismiss-task') { await setTask(t, 'dismissed'); toast('Dismissed'); }
+    if (act === 'no-reply') { await setTask(t, 'done'); toast('Marked done — no reply sent'); }
+    if (act === 'cancel-send') { await setTask(t, 'reply_ready'); toast('Kept as draft'); }
+    if (act === 'send') {
+      const body = card.querySelector('[data-k="reply_body"]').value.trim();
+      if (!body) { btn.disabled = false; return toast('The reply is empty'); }
+      await setTask(t, 'send_approved', { reply_body: body, error: null });
+      await audit('ASSISTANT_REPLY_APPROVED', t.file_number, { task_id: t.id, kind: t.kind, test: t.is_test });
+      toast(t.is_test ? 'Test reply queued — it will be saved, not sent' : 'Reply queued — your Mac sends it within ~2 minutes');
+    }
+    load();
+  } catch (err) { btn.disabled = false; toast('Could not save — ' + err.message); }
+});
+document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => { tab = b.dataset.tab; render(); }));
+$('refreshBtn').addEventListener('click', () => load().then(() => toast('Updated')));
+// Refresh when you come back to the page — but not while you're editing a reply.
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && user && !document.activeElement?.matches('textarea, input, select')) load();
+});
+
+// ── iPhone / browser push ───────────────────────────────────────────────
+const b64ToBytes = s => { const p = '='.repeat((4 - s.length % 4) % 4); const r = atob((s + p).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from(r, c => c.charCodeAt(0)); };
+async function setupPush() {
+  if (!('serviceWorker' in navigator)) return;
+  const reg = await navigator.serviceWorker.register('sw.js');
+  navigator.serviceWorker.addEventListener('message', ev => { if (ev.data === 'refresh') load(); });
+  const isIOS = /iPhone|iPad/.test(navigator.userAgent);
+  const installed = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+  if (!self.VAPID_PUBLIC_KEY || !('PushManager' in window)) {
+    if (isIOS && !installed) { $('pushBtn').hidden = false; $('pushBtn').onclick = () => toast('On iPhone: Share → Add to Home Screen, then open Approvals from the Home Screen', 6000); }
+    return;
+  }
+  const sub = await reg.pushManager.getSubscription();
+  $('pushBtn').hidden = !!sub && Notification.permission === 'granted';
+  $('pushBtn').onclick = async () => {
+    try {
+      if ((await Notification.requestPermission()) !== 'granted') return toast('Notifications are blocked in Settings');
+      const s = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(self.VAPID_PUBLIC_KEY) });
+      const j = s.toJSON();
+      const { error } = await sb.from('push_subscriptions').upsert({ endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth, user_agent: navigator.userAgent.slice(0, 200) }, { onConflict: 'endpoint' });
+      if (error) throw error;
+      $('pushBtn').hidden = true;
+      toast('🔔 Notifications on for this device');
+    } catch (e) { toast('Could not enable notifications — ' + e.message); }
+  };
+}
+
+sb.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_OUT') start(); });
+start();
+</script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+[
+  { "id": 1, "file_number": "98001", "patient_name": "Existing Testperson", "archived": false, "pending": false, "dose_prescribed": "22.5", "doses_remaining": "1" },
+  { "id": 2, "file_number": "98002", "patient_name": "Marie Exemple",       "archived": true,  "pending": false, "dose_prescribed": "45",   "doses_remaining": "0" },
+  { "id": 3, "file_number": " 98003 ", "patient_name": "Someone Else",      "archived": false, "pending": false, "dose_prescribed": "30",   "doses_remaining": "2" },
+  { "id": 4, "file_number": "98004", "patient_name": "Closing Testcase",    "archived": false, "pending": false, "dose_prescribed": "7.5",  "doses_remaining": "3" }
+]

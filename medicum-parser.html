@@ -127,8 +127,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       <div class="row2">
         <div class="fld"><label>Postal Code</label>
           <input id="fpo" type="text" placeholder="H8T 3A3" oninput="build()"></div>
-        <div class="fld"><label>Apt #</label>
-          <input id="fa" type="text" placeholder="Apt. 5" oninput="build()"></div>
+        <div class="fld"><label>Apt / Unit</label>
+          <input id="fa" type="text" placeholder="Apt. 5 or Unit C" oninput="build()"></div>
       </div>
       <div class="row2">
         <div class="fld"><label>Phone 1</label>
@@ -161,6 +161,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="js/medicum-parse.js"></script>
 <script>
 // ── Theme
 const isDk=()=>document.documentElement.getAttribute('data-theme')==='dark';
@@ -244,94 +245,19 @@ async function doPDF(file){
     pdfjsLib.GlobalWorkerOptions.workerSrc=
       'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     const buf=await file.arrayBuffer();
-    const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+    const pdf=await pdfjsLib.getDocument({data:buf,isEvalSupported:false}).promise; // blocks CVE-2024-4367 (script in a malicious PDF)
     prog(15,'🖼 Reading pages…',pdf.numPages+' page(s)');
 
-    // Extract text + detect selected dose via multiple strategies
-    let txt='';
-    const bold=[];
-    let formDose=''; // dose from AcroForm checkbox field
-
-    for(let i=1;i<=pdf.numPages;i++){
-      const pg=await pdf.getPage(i);
-
-      // ── Strategy A: Read PDF form field annotations (most reliable)
-      try{
-        const annotations=await pg.getAnnotations();
-        for(const ann of annotations){
-          // Look for checked checkboxes or radio buttons near dose options
-          if((ann.fieldType==='Btn')&&ann.fieldValue&&ann.fieldValue!=='Off'){
-            const v=String(ann.fieldValue).toLowerCase();
-            if(/6m|6-m|45/.test(v))formDose='45';
-            else if(/4m|4-m|30/.test(v))formDose='30';
-            else if(/3m|3-m|22/.test(v))formDose='22.5';
-            else if(/1m|1-m|7/.test(v))formDose='7.5';
-          }
-          // Also check button field names which often encode the dose
-          if(ann.fieldType==='Btn'&&ann.fieldName){
-            const fn=String(ann.fieldName).toLowerCase();
-            if(/45/.test(fn))formDose='45';
-            else if(/30/.test(fn)&&!formDose)formDose='30';
-            else if(/22/.test(fn)&&!formDose)formDose='22.5';
-            else if(/7/.test(fn)&&!formDose)formDose='7.5';
-          }
-        }
-      }catch(e){/* annotations not available */}
-
-      // ── Strategy B: Text content + bold font detection
-      const tc=await pg.getTextContent();
-      for(const item of tc.items){
-        if(!item.str||!item.str.trim())continue;
-        txt+=item.str+' ';
-        // Bold: font name contains Bold/Heavy/Black OR has different rendering
-        const isBold=item.fontName&&/Bold|Heavy|Black|BoldIt|Bd/i.test(item.fontName);
-        // Also flag items rendered in a distinct font from surrounding text
-        const fs=item.transform?Math.abs(item.transform[3]):0;
-        if(isBold||(fs>11&&/m\s*\(?\s*(?:7\.5|22\.5|30|45)\s*mg/i.test(item.str))){
-          bold.push(item.str.trim());
-        }
-      }
-    }
-    // If AcroForm gave us the dose, inject it into bold array
-    if(formDose)bold.unshift(formDose+' mg');
-
-    // Font-diversity detection: find dose item with DIFFERENT font from siblings
-    if(!bold.length&&!formDose){
-      try{
-        const _fontMap={}; // fontName -> [dose values seen]
-        for(let _pi=1;_pi<=pdf.numPages;_pi++){
-          const _pg2=await pdf.getPage(_pi);
-          const _tc2=await _pg2.getTextContent();
-          for(const _it of _tc2.items){
-            if(!_it.str)continue;
-            const _s=_it.str.trim();
-            const _fn=_it.fontName||'unknown';
-            if(/6[\s-]*m|45/i.test(_s))_fontMap[_fn]=(_fontMap[_fn]||[]).concat('45');
-            else if(/4[\s-]*m|30/i.test(_s))_fontMap[_fn]=(_fontMap[_fn]||[]). concat('30');
-            else if(/3[\s-]*m|22\.5/i.test(_s))_fontMap[_fn]=(_fontMap[_fn]||[]).concat('22.5');
-            else if(/1[\s-]*m|7\.5/i.test(_s))_fontMap[_fn]=(_fontMap[_fn]||[]).concat('7.5');
-          }
-        }
-        // Font used by only ONE dose value = that dose is selected (different font = bold)
-        const _fontEntries=Object.entries(_fontMap);
-        if(_fontEntries.length>1){
-          // Find font that appears for only one specific dose
-          for(const[_fn,_doses]of _fontEntries){
-            const _unique=[...new Set(_doses)];
-            if(_unique.length===1&&_fontEntries.filter(([f])=>f!==_fn).some(([,d])=>d.length>0)){
-              bold.push(_unique[0]+' mg');
-              break;
-            }
-          }
-        }
-        console.log('[DOSE] font map:',_fontMap,'bold:',bold);
-      }catch(e){console.log('[DOSE] font detect error:',e.message);}
-    }
+    // Extract text + detect selected dose (shared with the intake assistant)
+    const ex=await extractMedicumText(pdf);
+    const txt=ex.txt;
 
     const meaningful=txt.replace(/\s+/g,'').length;
     if(meaningful>80){
       prog(85,'🔍 Parsing fields…','Analysing form data');
-      fill(parse(txt,bold,file.name));
+      const r=parseMedicumPdf(ex,file.name);
+      console.log('[DOSE]',r.dose||'(none)','—',r.doseReason);
+      fill(r);
       hideProg();
       return;
     }
@@ -388,211 +314,8 @@ async function ocrCV(cv,fname){
   hideProg();
 }
 
-// ─────────────────────────────────────────────────────────────
-// PARSER — built from actual Medicum form OCR text
-// OCR sample: "33631 7.5 mg 290 54e Avenue CITY/VILLE Montréal,
-//   QC, H8T 3A3 TELEPHONE/TELEPHONE 438 351-4765 SECONDARY
-//   CONTACT ... 514 817-7388 DATE OF BIRTH 04/11/2017
-//   INJECTION DUE DAY OF: [date or blank/ASAP]
-//   PRESCRIPTION DATE 05/11/2026  MEDICUM #: 33631"
-// ─────────────────────────────────────────────────────────────
-function parse(text, bold, fname){
-  const r={name:'',file:'',dose:'',street:'',city:'',prov:'QC',
-           postal:'',apt:'',ph1:'',ph2:'',date:''};
-
-  // ── helpers ────────────────────────────────────────────────
-  function fmtPh(raw){
-    if(!raw)return'';
-    const d=raw.replace(/\D/g,'');
-    if(d.length===10)return d.slice(0,3)+'-'+d.slice(3,6)+'-'+d.slice(6);
-    if(d.length===11&&d[0]==='1')return d.slice(1,4)+'-'+d.slice(4,7)+'-'+d.slice(7);
-    return'';
-  }
-  const MO_EN=['January','February','March','April','May','June',
-               'July','August','September','October','November','December'];
-  const MO_FR=['Janvier','Février','Mars','Avril','Mai','Juin',
-               'Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
-  const MO_FR2=['janvier','fevrier','mars','avril','mai','juin',
-                'juillet','aout','septembre','octobre','novembre','decembre'];
-  function fmtDate(raw){
-    if(!raw)return'';
-    raw=raw.trim();
-    // "21 Avril 2026" or "21 April 2026" format
-    const wordy=raw.match(/(\d{1,2})\s+([A-Za-z\u00C0-\u00FF]+)\s+(\d{4})/);
-    if(wordy){
-      const dd=+wordy[1], mon=wordy[2], yy=+wordy[3];
-      let mm=-1;
-      MO_EN.forEach((m,i)=>{if(m.toLowerCase()===mon.toLowerCase())mm=i;});
-      MO_FR.forEach((m,i)=>{if(m.toLowerCase()===mon.toLowerCase())mm=i;});
-      MO_FR2.forEach((m,i)=>{if(mon.toLowerCase().startsWith(m.slice(0,4)))mm=i;});
-      if(mm>=0)return dd+' '+MO_EN[mm]+' '+yy;
-    }
-    // "MM/DD/YYYY" or "DD/MM/YYYY"
-    const slashed=raw.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
-    if(slashed){
-      let a=+slashed[1],b=+slashed[2],c=+slashed[3];
-      if(c<100)c+=2000;
-      let mm,dd;
-      if(a>12&&b<=12){mm=b;dd=a;}else{mm=a;dd=b;}
-      if(mm<1||mm>12||dd<1||dd>31||c<2000)return'';
-      return dd+' '+MO_EN[mm-1]+' '+c;
-    }
-    return'';
-  }
-
-  // ── 1. FILE NUMBER ─────────────────────────────────────────
-  // "MEDICUM #: 33243"
-  const fm=text.match(/MEDICUM\s*#\s*:?\s*(\d{3,8})/i)
-          ||text.match(/FILE\s*(?:NUMBER|NO|#)\s*:?\s*([A-Z0-9\-]{3,10})/i);
-  if(fm)r.file=fm[1].trim();
-  if(!r.file){const fn=fname.replace(/\.pdf$/i,'').match(/(\d{4,8})/);if(fn)r.file=fn[1];}
-
-  // ── 2. PATIENT NAME ────────────────────────────────────────
-  // Form table: "PATIENT NAME/NOM DU PATIENT | Marc BALOR **"
-  // OCR reads this as: "PATIENT NAME/NOM DU PATIENT Marc BALOR **"
-  // Strategy 1: text starts with "Marc BALOR 33243," (name + file# at top)
-  const startM=text.match(/^([A-Z][a-z\u00C0-\u00FF]+(?:\s+[A-Z][A-Za-z\u00C0-\u00FF\-]+)+)\s+\d{3,8}[,\s]/);
-  if(startM&&!/PATIENT|MEDICUM|ADDRESS|TELEPHONE|LOGO|ELIGARD/i.test(startM[1])){
-    r.name=startM[1].replace(/[*#@!?]+/g,'').replace(/\s+/g,' ').trim();
-  }
-  // Strategy 2: explicit PATIENT NAME label in table row
-  if(!r.name){
-    const nameLbl=text.match(/PATIENT\s+NAME\s*\/\s*NOM\s+DU\s+PATIENT\s+([^\n\r]+)/i)
-                 ||text.match(/NOM\s+DU\s+PATIENT\s+([^\n\r]+)/i)
-                 ||text.match(/PATIENT\s+NAME\s+([^\n\r]+)/i);
-    if(nameLbl){
-      r.name=nameLbl[1]
-        .replace(/[*#@!?]+/g,'')               // strip *** *** etc
-        .replace(/(?:ADDRESS|ADRESSE|CITY|VILLE|MEDICUM).*/i,'')
-        .replace(/\s+/g,' ').trim();
-    }
-  }
-
-  // ── 3. DOSE ────────────────────────────────────────────────
-  // For DIGITAL PDFs: bold items from PDF.js font name detection
-  // For SCANNED PDFs: look for dose before the options list
-  // The form lists: 1-m (7.5mg)  3-m (22.5mg)  4-m (30mg)  6-m (45mg)
-  // Selected one is bold + underlined — appears in boldItems array if digital
-  // Selected dose is BOLD + UNDERLINED: "6-m (45mg)"
-  // boldItems from PDF.js captures this
-  const dmap=[
-    {v:'45',  rx:[/45\s*mg/i, /6\s*-?\s*m\b/i]},
-    {v:'30',  rx:[/30\s*mg/i, /4\s*-?\s*m\b/i]},
-    {v:'22.5',rx:[/22\.5\s*mg/i,/3\s*-?\s*m\b/i]},
-    {v:'7.5', rx:[/7\.5\s*mg/i, /1\s*-?\s*m\b/i]},
-  ];
-  // Check bold/styled items first (most reliable for digital PDFs)
-  for(const item of bold){
-    for(const{v,rx}of dmap){if(rx.some(r=>r.test(item))){r.dose=v;break;}}
-    if(r.dose)break;
-  }
-  // OCR fallback: look for dose appearing BEFORE the options list line
-  if(!r.dose){
-    const listIdx=text.search(/1\s*-?\s*m\s*\(?\s*7\.5/i);
-    if(listIdx>0){
-      const before=text.slice(0,listIdx);
-      for(const{v,rx}of dmap){if(rx.some(p=>p.test(before))){r.dose=v;break;}}
-    }
-  }
-
-  // ── 4. ADDRESS ─────────────────────────────────────────────
-  // Table row: "ADDRESS/ADRESSE | 1 Boulevard De Maisonneuve Ouest Appartement 703"
-  // OCR:       "ADDRESS/ADRESSE 1 Boulevard De Maisonneuve Ouest Appartement 703"
-  // Street extraction — 3 strategies:
-  // 1. Standard label: "ADDRESS/ADRESSE [street] CITY/VILLE"
-  // 2. No label: "[Name] [File#], [street] CITY/VILLE" (your actual OCR format)
-  // 3. "Page 1" summary at end of OCR text
-  let addrRaw='';
-  const addrLbl=text.match(/ADDRESS\s*\/\s*ADRESSE\s+(.+?)(?=\s+CITY\s*\/|\s+CITY\s+VILLE)/i)
-               ||text.match(/ADRESSE\s+(.+?)(?=\s+CITY\s*\/|\s+CITY\s+VILLE)/i);
-  if(addrLbl){
-    addrRaw=addrLbl[1].replace(/\s+/g,' ').trim();
-  } else {
-    // Format: "Name FileNum, [street] CITY/VILLE"
-    const noLbl=text.match(/\d{3,8}\s*,\s*(.+?)(?=\s+CITY\s*\/|\s+CITY\s+VILLE)/i);
-    if(noLbl)addrRaw=noLbl[1].replace(/\s+/g,' ').trim();
-  }
-  if(addrRaw){
-    // Extract inline apartment: "Appartement 703" / "Apt 5"
-    const aptM=addrRaw.match(/(?:Appartement|Apartment|APT\.?|APP\.?)\s*#?\s*(\w+)/i);
-    if(aptM){r.apt=aptM[1];addrRaw=addrRaw.replace(aptM[0],'').replace(/,\s*$/,'').trim();}
-    r.street=addrRaw;
-  }
-  // Apt fallback from "Page 1" summary: "Page 1, City, Prov, Postal, AptNum, Ph1, Ph2, Date"
-  if(!r.apt){
-    const pgM=text.match(/Page\s+\d\s*,\s*[^,]+,\s*[A-Z]{2}\s*,\s*[A-Z]\d[A-Z]\s*\d[A-Z]\d\s*,\s*(\d+)\s*,/i);
-    if(pgM)r.apt=pgM[1];
-  }
-
-  // City/Province/Postal — "CITY/VILLE | Montreal, QC, H2X 0E3"
-  const cityM=text.match(/CITY\s*[\/|]\s*VILLE\s+([^\n\r]+)/i)
-             ||text.match(/VILLE\s+([^\n\r]{2,60})/i);
-  if(cityM){
-    const parts=cityM[1].split(',').map(s=>s.trim()).filter(Boolean);
-    if(parts[0])r.city=parts[0];
-    if(parts[1])r.prov=parts[1].toUpperCase();
-    if(parts[2]){const pM=parts[2].match(/([A-Z]\d[A-Z]\s*\d[A-Z]\d)/i);if(pM)r.postal=pM[1].toUpperCase();}
-  }
-  // Postal fallback
-  if(!r.postal){const pM=text.match(/\b([A-Z]\d[A-Z]\s*\d[A-Z]\d)\b/i);if(pM)r.postal=pM[1].toUpperCase();}
-
-  // ── 5. PHONES ──────────────────────────────────────────────
-  // Build exclusion set (doctor tel/fax + pharmacy)
-  const excl=new Set();
-  const drB=text.match(/DOCTOR.{0,5}NAME[\s\S]{0,300}?(?=PRESCRIPTION|DATE\s+OF\s+BIRTH|LAST\s+INJECTION|$)/i);
-  if(drB)(drB[0].match(/\d{3}[\s\-]?\d{3}[\s\-]?\d{4}/g)||[]).forEach(p=>excl.add(fmtPh(p)));
-  const phB=text.match(/PHARMACY\s*#[\s\S]{0,80}?(?=DOCTOR|DATE|LAST|$)/i);
-  if(phB)(phB[0].match(/\d{3}[\s\-]?\d{3}[\s\-]?\d{4}/g)||[]).forEach(p=>excl.add(fmtPh(p)));
-
-  // Phone 1: right after TELEPHONE label
-  const t1=text.match(/TELEPHONE\s*[\/|]\s*TELEPHONE\s*(\d{3}[\s\-]?\d{3}[\s\-]?\d{4})/i)
-          ||text.match(/TELEPHONE\s*:?\s*(\d{3}[\s\-]?\d{3}[\s\-]?\d{4})/i);
-  if(t1){const p=fmtPh(t1[1]);if(!excl.has(p))r.ph1=p;}
-
-  // Phone 2: SECONDARY CONTACT block — strip labels like "Cellulaire/ Tel:"
-  const secRaw=text.match(/SECONDARY\s*CONTACT[\s\S]{0,300}?(?=DATE\s*OF\s*BIRTH|LAST\s*INJECTION|PHARMACY|DOCTOR|$)/i);
-  if(secRaw){
-    const secTxt=secRaw[0];
-    // Skip if secondary contact says "no other contact" or similar
-    if(!/no\s+other\s+contact|aucun\s+autre|sans\s+contact/i.test(secTxt)){
-      const secPhs=(secTxt.match(/\d{3}[\s\-]?\d{3}[\s\-]?\d{4}/g)||[])
-        .map(p=>fmtPh(p))
-        .filter(p=>p&&p!==r.ph1&&!excl.has(p));
-      if(secPhs.length)r.ph2=secPhs[secPhs.length-1];
-    }
-  }
-  // Fallback: all phones in text minus excluded
-  if(!r.ph1||!r.ph2){
-    const allPh=[...text.matchAll(/\d{3}[\s\-]?\d{3}[\s\-]?\d{4}/g)]
-      .map(m=>fmtPh(m[0])).filter((v,i,a)=>v&&a.indexOf(v)===i&&!excl.has(v));
-    if(!r.ph1&&allPh[0])r.ph1=allPh[0];
-    if(!r.ph2)r.ph2=allPh.find(p=>p!==r.ph1)||'';
-  }
-
-  // ── 6. DUE DATE ────────────────────────────────────────────
-  // Check "INJECTION DUE DAY OF:" first
-  const dueDayM=text.match(/INJECTION\s*DUE\s*DAY\s*OF[^:]*:\s*([^\n\r]{0,40})/i);
-  if(dueDayM){
-    const dM=dueDayM[1].match(/(\d{1,2}[\s\w]*\d{4}|\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i);
-    if(dM)r.date=fmtDate(dM[1]);
-  }
-  // "INJECTION WILL BE READY" — often has the actual ready date (e.g. "21 Avril 2026")
-  if(!r.date){
-    const readyM=text.match(/INJECTION\s*WILL\s*BE\s*READY[^0-9\n\r]*([^\n\r]{0,40})/i);
-    if(readyM){
-      // Match "21 Avril 2026" or "21 April 2026" or "MM/DD/YYYY"
-      const dM=readyM[1].match(/(\d{1,2}\s+[A-Za-z\u00C0-\u00FF]+\s+\d{4}|\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i);
-      if(dM)r.date=fmtDate(dM[1]);
-    }
-  }
-  // "NEXT INJECTION" fallback
-  if(!r.date){
-    const nxtM=text.match(/NEXT\s*INJECTION[^0-9\n\r]*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i);
-    if(nxtM)r.date=fmtDate(nxtM[1]);
-  }
-
-  return r;
-}
+// PARSER — parseMedicum() lives in js/medicum-parse.js (shared with the intake assistant)
+const parse=parseMedicum;
 
 
 
@@ -640,9 +363,8 @@ function fill(r){
 function build(){
   const v=id=>(document.getElementById(id)?.value||'').trim();
   const name=v('fn'),file=v('ff'),dose=v('fd')?v('fd')+' mg':'';
-  const apt=v('fa')?'Apt. '+v('fa'):'';
-  const parts=[v('fst'),v('fci'),v('fpr'),v('fpo'),apt].filter(Boolean);
-  const addr=parts.join(', ');
+  // street, city, prov, postal, unit — unit keeps its label (Apt. 3 / Unit C)
+  const addr=formatAddress({street:v('fst'),city:v('fci'),prov:v('fpr'),postal:v('fpo'),apt:v('fa')});
   const ph1=v('fp1'),ph2=v('fp2'),dt=v('fdt');
   const segments=[];
   if(name||file)segments.push('<b>'+(name+(file?' '+file:'')).trim()+'</b>');

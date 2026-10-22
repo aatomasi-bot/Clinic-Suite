@@ -1,0 +1,11 @@
+# Intake assistant — local only. This repo is public: never commit config,
+# state (it holds parsed assignment data), PDFs or dependencies.
+assistant/node_modules/
+assistant/config.json
+assistant/state/
+assistant/test-inbox/
+*.pdf
+.DS_Store
+
+# Local Claude preview settings
+.claude/
