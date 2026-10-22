@@ -56,16 +56,16 @@ const T = {
   en: {
     hello: n => n ? `Hello ${n},` : 'Hello,',
     new_patient: r => `I confirm the receipt of this email${r ? ` for file ${r}` : ''}. The patient has been added to my patient list and I will contact them to schedule the injection.`,
-    prescription: r => `Thank you for the new prescription${r ? ` for file ${r}` : ''}. I have added this prescription to the file.`,
-    close_file: r => `Thank you for letting me know. I have closed the file${r ? ` ${r}` : ''}.`,
-    thanks: 'Thank you,',
+    prescription: r => `I have added this prescription to the file${r ? ` ${r}` : ''}.`,
+    close_file: r => `I have closed the file${r ? ` ${r}` : ''}.`,
+    thanks: 'Thank you!',
   },
   fr: {
     hello: n => n ? `Bonjour ${n},` : 'Bonjour,',
     new_patient: r => `Je confirme la réception de ce courriel${r ? ` pour le dossier ${r}` : ''}. Le dossier a été ajouté à ma liste de patients et je communiquerai avec la personne pour planifier l'injection.`,
-    prescription: r => `Merci pour la nouvelle ordonnance${r ? ` du dossier ${r}` : ''}. J'ai ajouté cette ordonnance au dossier.`,
-    close_file: r => `Merci de m'avoir avisé. J'ai fermé le dossier${r ? ` ${r}` : ''}.`,
-    thanks: 'Merci,',
+    prescription: r => `J'ai ajouté cette ordonnance au dossier${r ? ` ${r}` : ''}.`,
+    close_file: r => `J'ai fermé le dossier${r ? ` ${r}` : ''}.`,
+    thanks: 'Merci!',
   },
 };
 
