@@ -10383,7 +10383,7 @@ async function doLogin() {
 async function doLogout() {
   try {
     clearInactivityTimer();
-    await _sb.auth.signOut();
+    await _sb.auth.signOut({ scope: 'local' });
     patients = [];
     showLoginScreen();
     closeMenuDrawer();
@@ -10406,7 +10406,7 @@ window.doSetNewPassword   = doSetNewPassword;
 window.showNewPasswordForm= showNewPasswordForm;
 
 async function doLogout() {
-  await _sb.auth.signOut();
+  await _sb.auth.signOut({ scope: 'local' });
   patients = [];
   showLoginScreen();
   closeMenuDrawer();

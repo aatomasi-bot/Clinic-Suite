@@ -390,7 +390,7 @@ $('loginForm').addEventListener('submit', async e => {
 let _idle;
 function resetInactivity() {
   clearTimeout(_idle);
-  _idle = setTimeout(async () => { await sb.auth.signOut(); toast('Signed out after 30 minutes of inactivity'); start(); }, INACTIVITY_LIMIT_MS);
+  _idle = setTimeout(async () => { await sb.auth.signOut({ scope: 'local' }); toast('Signed out after 30 minutes of inactivity'); start(); }, INACTIVITY_LIMIT_MS);
 }
 ['click', 'keydown', 'touchstart'].forEach(ev => document.addEventListener(ev, () => user && resetInactivity(), { passive: true }));
 
