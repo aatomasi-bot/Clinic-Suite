@@ -76,9 +76,9 @@ test('reply drafts: coordinator name, language, file reference, gender-neutral',
 
 test('match: file number is identity (trim + case), name match is only a warning', () => {
   const pts = JSON.parse(fs.readFileSync(fixtures, 'utf8'));
-  assert.equal(findExisting('30003', pts).id, 3);
+  assert.equal(findExisting('98003', pts).id, 3);
   assert.equal(findExisting('99999', pts), null);
-  assert.equal(sameNameOtherFile('Marié Exemple', '39002', pts).length, 1);
+  assert.equal(sameNameOtherFile('Marié Exemple', '99002', pts).length, 1);
 });
 
 test('record: VaPiq defaults, missing fields flagged, dose never defaulted', () => {
@@ -97,28 +97,28 @@ test('intake end to end (offline): new, prescription, close-file; re-run adds no
   assert.equal(counts.prescriptions, 1);
   assert.equal(counts.closes, 3);
   const byFile = Object.fromEntries(store.rows.map(r => [r.record.file_number, r]));
-  assert.equal(byFile['30001'], undefined, 'existing patient → prescription task, not a new-patient card');
-  assert.equal(byFile['39001'].status, 'pending');
+  assert.equal(byFile['98001'], undefined, 'existing patient → prescription task, not a new-patient card');
+  assert.equal(byFile['99001'].status, 'pending');
   assert.ok(store.rows.every(r => r.is_test) && store.tasks.every(t => t.is_test));
-  assert.ok(byFile['39002'].warnings.some(w => /Same name as existing patient #30002/.test(w)));
-  assert.ok(byFile['39007'].missing_fields.includes('Dose Prescribed'));
-  assert.ok(byFile['39009'].warnings.some(w => /Scanned/.test(w)), 'scan flagged');
-  assert.equal(byFile['39009'].record.file_number, '39009', 'file # from subject');
+  assert.ok(byFile['99002'].warnings.some(w => /Same name as existing patient #98002/.test(w)));
+  assert.ok(byFile['99007'].missing_fields.includes('Dose Prescribed'));
+  assert.ok(byFile['99009'].warnings.some(w => /Scanned/.test(w)), 'scan flagged');
+  assert.equal(byFile['99009'].record.file_number, '99009', 'file # from subject');
 
   const task = (kind, file) => store.tasks.find(t => t.kind === kind && t.file_number === file);
-  const rx = task('prescription', '30001');
+  const rx = task('prescription', '98001');
   assert.equal(rx.existing_patient.patient_name, 'Existing Testperson');
   assert.equal(rx.details.pdf_dose, '30');
   assert.match(rx.reply_body, /^Hello Julie,/);
-  const np = task('new_patient', '39006');
+  const np = task('new_patient', '99006');
   assert.equal(np.status, 'todo');
   assert.equal(np.lang, 'fr');
-  assert.equal(np.pending_id, byFile['39006'].id);
-  assert.equal(task('new_patient', '39009').to_name, null, 'reports@ → no first name');
-  assert.equal(task('close_file', '30004').existing_patient.status, 'Active');
-  assert.ok(task('close_file', '30002').warnings.some(w => /already closed/.test(w)));
-  assert.ok(task('close_file', '39999').warnings.some(w => /not in VaPiq/.test(w)));
-  assert.equal(task('close_file', '30002').lang, 'fr');
+  assert.equal(np.pending_id, byFile['99006'].id);
+  assert.equal(task('new_patient', '99009').to_name, null, 'reports@ → no first name');
+  assert.equal(task('close_file', '98004').existing_patient.status, 'Active');
+  assert.ok(task('close_file', '98002').warnings.some(w => /already closed/.test(w)));
+  assert.ok(task('close_file', '99999').warnings.some(w => /not in VaPiq/.test(w)));
+  assert.equal(task('close_file', '98002').lang, 'fr');
 
   const before = { rows: store.rows.length, tasks: store.tasks.length };
   const again = await runIntake({ source: testFolderSource(inbox), store, rules, isTest: true, log: () => {} });

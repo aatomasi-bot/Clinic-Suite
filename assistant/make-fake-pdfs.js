@@ -16,19 +16,19 @@ const outDir = path.resolve(process.argv[2] || path.join(here, 'test-inbox'));
 const OPTIONS_EN = [['1-m', '7.5mg', '7.5'], ['3-m', '22.5mg', '22.5'], ['4-m', '30mg', '30'], ['6-m', '45mg', '45']];
 const OPTIONS_FR = [['1 mois', '7,5 mg', '7.5'], ['3 mois', '22,5 mg', '22.5'], ['4 mois', '30 mg', '30'], ['6 mois', '45 mg', '45']];
 
-// expected = what a correct parser must return; fileNumber 30001 also exists in
+// expected = what a correct parser must return; fileNumber 98001 also exists in
 // test/fixtures/patients.json to exercise the "already exists" path.
 export const CASES = [
-  { id: 'fake-01-checkbox',   file: '39001', name: 'Jean Testpatient',    dose: '45',   mark: 'acroform' },
-  { id: 'fake-02-bold',       file: '39002', name: 'Marie Exemple',       dose: '22.5', mark: 'bold' },
-  { id: 'fake-03-xmark',      file: '39003', name: 'Paul Fictif',         dose: '30',   mark: 'x' },
-  { id: 'fake-04-filled',     file: '39004', name: 'Lucie Demo',          dose: '7.5',  mark: 'filled' },
-  { id: 'fake-05-underline',  file: '39005', name: 'Andre Essai',         dose: '45',   mark: 'underline' },
-  { id: 'fake-06-french',     file: '39006', name: 'Sophie Factice',      dose: '22.5', mark: 'x', french: true },
-  { id: 'fake-07-noselect',   file: '39007', name: 'Marc Vide',           dose: '',     mark: 'none' },
-  { id: 'fake-08-exists',     file: '30001', name: 'Existing Testperson', dose: '30',   mark: 'bold' },
-  { id: 'fake-09-scanned',    file: '39009', name: '',                    dose: '',     mark: 'scan' },
-  { id: 'fake-10-checkbox17', file: '39010', name: 'Nina Cocher',         dose: '22.5', mark: 'acroform', trickyNames: true },
+  { id: 'fake-01-checkbox',   file: '99001', name: 'Jean Testpatient',    dose: '45',   mark: 'acroform' },
+  { id: 'fake-02-bold',       file: '99002', name: 'Marie Exemple',       dose: '22.5', mark: 'bold' },
+  { id: 'fake-03-xmark',      file: '99003', name: 'Paul Fictif',         dose: '30',   mark: 'x' },
+  { id: 'fake-04-filled',     file: '99004', name: 'Lucie Demo',          dose: '7.5',  mark: 'filled' },
+  { id: 'fake-05-underline',  file: '99005', name: 'Andre Essai',         dose: '45',   mark: 'underline' },
+  { id: 'fake-06-french',     file: '99006', name: 'Sophie Factice',      dose: '22.5', mark: 'x', french: true },
+  { id: 'fake-07-noselect',   file: '99007', name: 'Marc Vide',           dose: '',     mark: 'none' },
+  { id: 'fake-08-exists',     file: '98001', name: 'Existing Testperson', dose: '30',   mark: 'bold' },
+  { id: 'fake-09-scanned',    file: '99009', name: '',                    dose: '',     mark: 'scan' },
+  { id: 'fake-10-checkbox17', file: '99010', name: 'Nina Cocher',         dose: '22.5', mark: 'acroform', trickyNames: true },
 ];
 
 async function makeForm(c) {
@@ -92,18 +92,18 @@ async function makeForm(c) {
   return doc.save();
 }
 
-// Close-file requests (no PDF). 30004 is active in the fixtures, 30002 is
-// already archived, 39999 doesn't exist.
+// Close-file requests (no PDF). 98004 is active in the fixtures, 98002 is
+// already archived, 99999 doesn't exist.
 export const CLOSE_CASES = [
-  { id: 'fake-21-close-en',     file: '30004', from: 'Julie Exemple <julie.exemple@medicum.ca>', subject: 'Close file 30004', body: 'Hello, please close this file. Thank you' },
-  { id: 'fake-22-close-fr',     file: '30002', from: 'Sophie Fictive <sophie.fictive@medicum.ca>', subject: 'Fermeture de dossier T.P # 30002', body: 'Bonjour, merci de fermer le dossier.' },
-  { id: 'fake-23-close-unknown', file: '39999', from: 'Julie Exemple <julie.exemple@medicum.ca>', subject: 'Close File - ZZ 39999', body: '' },
+  { id: 'fake-21-close-en',     file: '98004', from: 'Julie Exemple <julie.exemple@medicum.ca>', subject: 'Close file 98004', body: 'Hello, please close this file. Thank you' },
+  { id: 'fake-22-close-fr',     file: '98002', from: 'Sophie Fictive <sophie.fictive@medicum.ca>', subject: 'Fermeture de dossier T.P # 98002', body: 'Bonjour, merci de fermer le dossier.' },
+  { id: 'fake-23-close-unknown', file: '99999', from: 'Julie Exemple <julie.exemple@medicum.ca>', subject: 'Close File - ZZ 99999', body: '' },
 ];
 
 const FROM_BY_CASE = {
-  'fake-06-french': ['Sophie Fictive <sophie.fictive@medicum.ca>', 'Nouveau patient SF 39006', 'Bonjour, voici un nouveau patient.'],
-  'fake-08-exists': ['Julie Exemple <julie.exemple@medicum.ca>', 'Prescription ET 30001', 'Hello, new prescription attached.'],
-  'fake-09-scanned': ['Medicum Reports <reports@medicum.ca>', 'fax - XX #39009', ''],
+  'fake-06-french': ['Sophie Fictive <sophie.fictive@medicum.ca>', 'Nouveau patient SF 99006', 'Bonjour, voici un nouveau patient.'],
+  'fake-08-exists': ['Julie Exemple <julie.exemple@medicum.ca>', 'Prescription ET 98001', 'Hello, new prescription attached.'],
+  'fake-09-scanned': ['Medicum Reports <reports@medicum.ca>', 'fax - XX #99009', ''],
 };
 
 export async function writeFakeInbox(dir = outDir) {
