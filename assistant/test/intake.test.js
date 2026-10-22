@@ -149,3 +149,23 @@ test('outbox: only approved replies go, once, test replies are saved not sent, s
   const again = await runOutbox({ store, mailer: live, testMailer: tm, rules, live: false, moveToFolder: 'Medicum', log: () => {} });
   assert.equal(again.sent, 0, 'never sent twice');
 });
+
+test('address: street, city, prov, postal, then the unit with its own label', () => {
+  const { splitUnit, formatAddress } = require('../../js/medicum-parse.js');
+  const cases = [
+    ['1 Boulevard De Maisonneuve Ouest Appartement 703', '1 Boulevard De Maisonneuve Ouest', 'Apt. 703'],
+    ['45 Graham Boulevard, Unit C', '45 Graham Boulevard', 'Unit C'],
+    ['45 Graham Boulevard Unité c', '45 Graham Boulevard', 'Unit C'],
+    ['12 Rue Fictive #5', '12 Rue Fictive', 'Apt. 5'],
+    ['3-123 Boulevard Deguire', '123 Boulevard Deguire', 'Apt. 3'],
+    ['100 Rue Y Suite 200', '100 Rue Y', 'Suite 200'],
+    ['290 54e Avenue', '290 54e Avenue', ''],
+    ['1234 Rue Unitaire', '1234 Rue Unitaire', ''],
+  ];
+  for (const [raw, street, unit] of cases) assert.deepEqual(splitUnit(raw), { street, unit }, raw);
+  assert.equal(formatAddress({ street: '123 Boulevard Deguire', city: 'Montreal', prov: 'QC', postal: 'H4M 0A4', apt: 'Apt. 3' }),
+    '123 Boulevard Deguire, Montreal, QC, H4M 0A4, Apt. 3');
+  assert.equal(formatAddress({ street: '45 Graham Boulevard', city: 'Laval', prov: 'QC', postal: 'H7G 3A4', apt: 'Unit C' }),
+    '45 Graham Boulevard, Laval, QC, H7G 3A4, Unit C');
+  assert.equal(formatAddress({ street: '9 Rue Z', city: 'Laval', prov: 'QC', postal: 'H7G 3A4', apt: '3' }), '9 Rue Z, Laval, QC, H7G 3A4, Apt. 3');
+});

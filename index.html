@@ -4902,13 +4902,14 @@ function esc(s) {
 // Move apt/unit to END: "40 Boul. Deguire, Apt: #3, Montréal, QC" → "40 Boul. Deguire, Montréal, QC, Apt. 3"
 function formatAddrDisplay(addr) {
   if (!addr) return '';
-  // Match apt/suite/unit anywhere in the string
-  const aptRe = /,?\s*(?:Apt\.?|Appartement|Suite|Unit|App\.?)\s*:?\s*#?(\w+[-\w]*)/i;
+  // Move the apartment/unit to the end, keeping its kind:
+  // "…, Apt. 3" / "…, Unit C" / "…, Suite 200" (same rule as js/medicum-parse.js)
+  const aptRe = /,?\s*\b(Appartement|Apartment|Appt\.?|Apt\.?|App\.?|Logement|Suite|Bureau|Unit[ée]?|Unite)(?![a-z])\s*:?\s*#?\s*(\w+[-\w]*)/i;
   const m = addr.match(aptRe);
   if (!m) return addr;
-  const aptLabel = `Apt. ${m[1]}`;
-  const base = addr.replace(m[0], '').replace(/,\s*$/, '').trim();
-  return `${base}, ${aptLabel}`;
+  const kind = /^(suite|bureau)/i.test(m[1]) ? 'Suite' : /^unit/i.test(m[1]) ? 'Unit' : 'Apt.';
+  const base = addr.replace(m[0], '').replace(/,\s*$/, '').replace(/\s+,/g, ',').trim();
+  return `${base}, ${kind} ${m[2].toUpperCase()}`;
 }
 
 // For Google Maps query keep original (works better for geocoding)

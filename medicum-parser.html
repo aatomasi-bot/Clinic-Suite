@@ -127,8 +127,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       <div class="row2">
         <div class="fld"><label>Postal Code</label>
           <input id="fpo" type="text" placeholder="H8T 3A3" oninput="build()"></div>
-        <div class="fld"><label>Apt #</label>
-          <input id="fa" type="text" placeholder="Apt. 5" oninput="build()"></div>
+        <div class="fld"><label>Apt / Unit</label>
+          <input id="fa" type="text" placeholder="Apt. 5 or Unit C" oninput="build()"></div>
       </div>
       <div class="row2">
         <div class="fld"><label>Phone 1</label>
@@ -363,9 +363,8 @@ function fill(r){
 function build(){
   const v=id=>(document.getElementById(id)?.value||'').trim();
   const name=v('fn'),file=v('ff'),dose=v('fd')?v('fd')+' mg':'';
-  const apt=v('fa')?'Apt. '+v('fa'):'';
-  const parts=[v('fst'),v('fci'),v('fpr'),v('fpo'),apt].filter(Boolean);
-  const addr=parts.join(', ');
+  // street, city, prov, postal, unit — unit keeps its label (Apt. 3 / Unit C)
+  const addr=formatAddress({street:v('fst'),city:v('fci'),prov:v('fpr'),postal:v('fpo'),apt:v('fa')});
   const ph1=v('fp1'),ph2=v('fp2'),dt=v('fdt');
   const segments=[];
   if(name||file)segments.push('<b>'+(name+(file?' '+file:'')).trim()+'</b>');

@@ -3,6 +3,9 @@
 // Anything the parser could not find is listed in missingFields so the
 // approval card highlights it — defaults are never silently trusted.
 
+import { createRequire } from 'node:module';
+const { formatAddress: sharedFormatAddress } = createRequire(import.meta.url)('../../js/medicum-parse.js');
+
 const MONTHS = ['january','february','march','april','may','june','july','august','september','october','november','december'];
 const pad = n => String(n).padStart(2, '0');
 
@@ -18,10 +21,8 @@ export function toIsoDate(s) {
   return mm < 0 ? '' : `${m[3]}-${pad(mm + 1)}-${pad(+m[1])}`;
 }
 
-// Same shape as medicum-parser.html build(): "street, city, prov, postal, Apt. N"
-export function formatAddress(r) {
-  return [r.street, r.city, r.prov, r.postal, r.apt ? 'Apt. ' + r.apt : ''].filter(Boolean).join(', ');
-}
+// Same as medicum-parser.html: "street, city, prov, postal, Apt. 3" / "…, Unit C"
+export const formatAddress = r => sharedFormatAddress(r);
 
 export function buildRecord(parsed, { fileNumber } = {}) {
   const r = parsed || {};

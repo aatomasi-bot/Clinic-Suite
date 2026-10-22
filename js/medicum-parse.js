@@ -247,6 +247,49 @@ async function extractMedicumText(pdf, opts){
     return {txt,bold,dose};
 }
 
+// ── Address helpers ─────────────────────────────────────────────────────
+// VaPiq address format: "street, city, prov, postal, <unit>", e.g.
+//   "123 Boulevard Deguire, Montreal, QC, H4M 0A4, Apt. 3"
+//   "45 Graham Boulevard, Laval, QC, H7G 3A4, Unit C"
+// The unit keeps the label written on the form (Apt. / Unit / Suite).
+const UNIT_LABELS=[
+  {label:'Apt.',  rx:'Appartement|Apartment|Appt\\.?|Apt\\.?|App\\.?|Logement|Log\\.'},
+  {label:'Unit',  rx:'Unit[ée]?|Unite'},
+  {label:'Suite', rx:'Suite|Bureau'},
+];
+// "Unit C" → "Unit C", "appartement 703" → "Apt. 703", "3" → "Apt. 3"
+function formatUnit(v){
+  v=String(v||'').trim().replace(/^[,#\s]+/,'');
+  if(!v)return'';
+  for(const{label,rx}of UNIT_LABELS){
+    const m=v.match(new RegExp('^(?:'+rx+')\\s*[:#]?\\s*(.+)$','i'));
+    if(m)return label+' '+m[1].trim().toUpperCase();
+  }
+  return 'Apt. '+v.toUpperCase();
+}
+// Pulls the apartment/unit out of a street line:
+//   "1 Boulevard X Appartement 703" · "45 Graham Boulevard, Unit C" · "12 Rue Y #5" · "3-123 Rue Z"
+function splitUnit(street){
+  let s=String(street||'').replace(/\s+/g,' ').trim(), unit='';
+  for(const{label,rx}of UNIT_LABELS){
+    const m=s.match(new RegExp('[,\\s]*\\b(?:'+rx+')(?![a-z])\\s*[:#]?\\s*([A-Za-z0-9-]{1,6})\\b','i'));
+    if(m){unit=label+' '+m[1].toUpperCase();s=(s.slice(0,m.index)+' '+s.slice(m.index+m[0].length));break;}
+  }
+  if(!unit){
+    const h=s.match(/\s*#\s*([A-Za-z0-9-]{1,6})\s*$/);              // "12 Rue Y #5"
+    if(h){unit='Apt. '+h[1].toUpperCase();s=s.slice(0,h.index);}
+  }
+  if(!unit){
+    const q=s.match(/^([A-Za-z0-9]{1,5})\s*-\s*(\d+[A-Za-z]?)\s+(?=\D)/); // Quebec "3-123 Rue Z" = unit 3, civic 123
+    if(q){unit='Apt. '+q[1].toUpperCase();s=q[2]+' '+s.slice(q[0].length);}
+  }
+  s=s.replace(/\s+,/g,',').replace(/\s{2,}/g,' ').replace(/^[,\s]+|[,\s]+$/g,'');
+  return {street:s,unit};
+}
+function formatAddress(r){
+  return [r.street,r.city,r.prov,r.postal,formatUnit(r.apt)].map(x=>String(x||'').trim()).filter(Boolean).join(', ');
+}
+
 // ─────────────────────────────────────────────────────────────
 // PARSER — built from actual Medicum form OCR text
 // OCR sample: "33631 7.5 mg 290 54e Avenue CITY/VILLE Montréal,
@@ -381,15 +424,14 @@ function parse(text, bold, fname){
     if(noLbl)addrRaw=noLbl[1].replace(/\s+/g,' ').trim();
   }
   if(addrRaw){
-    // Extract inline apartment: "Appartement 703" / "Apt 5"
-    const aptM=addrRaw.match(/(?:Appartement|Apartment|APT\.?|APP\.?)\s*#?\s*(\w+)/i);
-    if(aptM){r.apt=aptM[1];addrRaw=addrRaw.replace(aptM[0],'').replace(/,\s*$/,'').trim();}
-    r.street=addrRaw;
+    // Apartment / unit → kept with its label, placed after the postal code
+    const u=splitUnit(addrRaw);
+    r.street=u.street; r.apt=u.unit;
   }
   // Apt fallback from "Page 1" summary: "Page 1, City, Prov, Postal, AptNum, Ph1, Ph2, Date"
   if(!r.apt){
     const pgM=text.match(/Page\s+\d\s*,\s*[^,]+,\s*[A-Z]{2}\s*,\s*[A-Z]\d[A-Z]\s*\d[A-Z]\d\s*,\s*(\d+)\s*,/i);
-    if(pgM)r.apt=pgM[1];
+    if(pgM)r.apt='Apt. '+pgM[1];
   }
 
   // City/Province/Postal — "CITY/VILLE | Montreal, QC, H2X 0E3"
@@ -474,7 +516,7 @@ function parseMedicumPdf(ex, fname){
   return r;
 }
 
-const api = { extractMedicumText, parseMedicum: parse, parseMedicumPdf };
+const api = { extractMedicumText, parseMedicum: parse, parseMedicumPdf, formatAddress, formatUnit, splitUnit };
 if (typeof module === 'object' && module.exports) module.exports = api;
 else Object.assign(root, api);
 })(typeof self !== 'undefined' ? self : this);
