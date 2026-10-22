@@ -40,3 +40,4 @@ check the console line `[DOSE] … — <reason>`.
 - Scanned/faxed PDFs: OCR on the Mac instead of opening the Medicum Parser
 - Other status emails (on hold, transfer, patient is back, update) — not handled yet
 - Optional: AI-polished reply wording — only once an approved setup (BAA) is in place
+- pdf.js 3.11.174 → current version (browser CDN + assistant together), then re-run the dose tests
