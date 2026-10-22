@@ -39,10 +39,11 @@ check the console line `[DOSE] … — <reason>`.
 - Route loop Mon–Thu + Saturday; Vermette rule removed
 - Coordinator + reports@ pairing, document checks, CC reports@, ask for missing documents
 - Safety net: overdue alerts, 7:00 AM summary, journey tracker, Mac health check
-- Dubbi redesign + voice assistant (app, "Hey Dubbi" while open, "Hey Siri, Dubbi")
+- Dubbi redesign + on-phone assistant (fixed rules, no AI service; mic opt-in)
+- Later, only with privacy officer approval: AI understanding, "Hey Dubbi", "Hey Siri, Dubbi"
 
 ## Still open
-- Monthly list check: compare Medicum's Monthly Patient List PDF with VaPiq (needs a sample layout)
+- Monthly list check: covered by your own Excel ↔ Apple Notes comparator (could be linked to Dubbi later)
 - Signature line for replies (config.json → replies.signature)
 - Scanned/faxed PDFs: OCR on the Mac instead of opening the Medicum Parser
 - Other status emails (on hold, transfer, patient is back, update) — not handled yet
