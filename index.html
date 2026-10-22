@@ -6698,7 +6698,7 @@ async function ensurePDFJS() {
 async function extractPDFText(file) {
   try {
   const buf = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  const pdf = await pdfjsLib.getDocument({ data: buf, isEvalSupported: false }).promise; // blocks CVE-2024-4367 (script in a malicious PDF)
   let text = '';
   const styledItems = []; // collects text that is bold OR underlined = selected dose
 

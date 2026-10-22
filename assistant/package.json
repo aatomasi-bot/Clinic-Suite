@@ -16,9 +16,9 @@
     "test": "node --test test/*.test.js"
   },
   "dependencies": {
-    "@supabase/supabase-js": "2.45.4",
-    "imapflow": "1.0.164",
-    "nodemailer": "6.9.15",
+    "@supabase/supabase-js": "2.118.0",
+    "imapflow": "1.7.8",
+    "nodemailer": "10.2.1",
     "pdfjs-dist": "3.11.174",
     "web-push": "3.6.7"
   },
