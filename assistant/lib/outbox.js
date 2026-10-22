@@ -20,6 +20,17 @@ export async function runOutbox({ store, mailer, testMailer, rules, live, moveTo
     if (!(await store.claimTask(task.id))) continue;            // someone else took it / you cancelled
     try {
       await m.send(task);
+      const askDocs = task.details && task.details.reply_mode === 'ask_docs';
+      if (askDocs) {
+        // Asked for missing documents: keep the item open until they arrive; the email stays in Inbox
+        const now = new Date().toISOString();
+        await store.updateTask(task.id, { status: 'waiting_docs', asked_docs_at: now, sent_at: now, error: null,
+          details: { ...task.details, reply_mode: 'confirm', asked: [...((task.details.asked) || []), now] } });
+        await store.audit('ASSISTANT_DOCS_REQUESTED', task.file_number, { task_id: task.id, test: task.is_test });
+        log(`  sent    documents request ${task.id}${task.is_test ? ' (test — saved, not sent)' : ''}`);
+        counts.sent++;
+        continue;
+      }
       const moved = moveToFolder ? await m.moveOriginal(task, moveToFolder).catch(e => { log('  move failed:', e.message); return false; }) : false;
       await store.updateTask(task.id, { status: 'sent', sent_at: new Date().toISOString(), error: null, moved_to_folder: moved ? moveToFolder : null });
       await store.audit('ASSISTANT_REPLY_SENT', task.file_number, { task_id: task.id, kind: task.kind, test: task.is_test });

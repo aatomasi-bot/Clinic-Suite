@@ -83,7 +83,8 @@ export async function runIntake({ source, store, rules, replies = {}, isTest, lo
       else if (!existing) warnings.push(`File #${subjectFile} is not in VaPiq.`);
       else if (existing.archived) warnings.push('This file is already closed (archived) in VaPiq.');
       const id = await store.insertTask({ ...replyBase, kind: 'close_file', status: 'todo', source_key: key,
-        file_number: subjectFile || null, existing_patient: existingSummary(existing), warnings, reply_body: draft('close_file', subjectFile) });
+        file_number: subjectFile || null, existing_patient: existingSummary(existing), warnings, reply_body: draft('close_file', subjectFile),
+        details: { signature: replies.signature || '' } });
       await store.audit('ASSISTANT_CLOSE_REQUEST', subjectFile, { task_id: id, test: !!isTest });
       counts.closes++;
       log(`  close   card ${id}${warnings.length ? ` (${warnings.length} warning${warnings.length > 1 ? 's' : ''})` : ''}`);
@@ -133,7 +134,7 @@ export async function runIntake({ source, store, rules, replies = {}, isTest, lo
         const id = await store.insertTask({ ...replyBase, kind: 'prescription', status: 'todo', source_key: f.key,
           file_number: groupKey, group_key: groupKey, existing_patient: existingSummary(existing),
           related_emails: [emailRef(email)],
-          details: { pdf_dose: f.parsed?.dose || null, pdf_due_date: f.parsed?.date || null, attachment_name: f.pdf.name },
+          details: { pdf_dose: f.parsed?.dose || null, pdf_due_date: f.parsed?.date || null, attachment_name: f.pdf.name, signature: replies.signature || '' },
           warnings: f.warnings, reply_body: draft('prescription', groupKey) });
         await store.audit('ASSISTANT_PRESCRIPTION', groupKey, { task_id: id, test: !!isTest });
         counts.prescriptions++;
@@ -196,6 +197,7 @@ export async function runIntake({ source, store, rules, replies = {}, isTest, lo
       const to = senderAddress(email.from);
       const id = await store.insertTask({ ...replyBase, kind: 'new_patient', status: 'todo',
         source_key: sha(`${email.messageId}|new_patient`), pending_id: pendingId, group_key: groupKey,
+        details: { signature: replies.signature || '' },
         file_number: groupKey, cc_addresses: to === reports ? [] : [reports],
         existing_patient: existingSummary(existing), related_emails: [emailRef(email)], documents: docs, warnings,
         reply_body: replies.enabled === false ? null : draftReply({ kind: 'new_patient', lang, coordinatorName, fileNumber: groupKey,
@@ -239,6 +241,7 @@ async function main() {
     console.log(`  emails ${counts.emails}, ignored ${counts.skipped}, already handled ${counts.already}, ` +
       `new ${counts.queued}, prescriptions ${counts.prescriptions}, close-file ${counts.closes}, ` +
       `duplicates ${counts.exists}, needs reading ${counts.needsReview}`);
+    const sourceName = source.name;
     await source.close(); source = null;
 
     // Replies you approved
@@ -265,6 +268,7 @@ async function main() {
       await store.log('overdue_alert', { count: overdue.length, reasons: overdue.map(o => o.why) });
     }
     await store.purgeDecided(cfg.retentionDays);
+    await store.heartbeat({ mode: live ? 'live' : 'test', source: sourceName });
   } finally {
     await source?.close();
     await mailer?.close();

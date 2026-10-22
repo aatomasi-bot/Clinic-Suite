@@ -8,6 +8,8 @@ import path from 'node:path';
 import { createClient } from '@supabase/supabase-js';
 import { getSecret, setSecret, SECRETS } from './keychain.js';
 
+export const HEARTBEAT_ID = '00000000-0000-0000-0000-00000000beef';
+
 export async function supabaseStore(cfg) {
   const sb = createClient(cfg.url, cfg.publishableKey, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
@@ -109,6 +111,11 @@ export async function supabaseStore(cfg) {
         if (ids.length) must(await sb.from(table).update({ alerted_at: at }).in('id', ids));
       }
     },
+    // One fixed row the Dubbi page reads: "Mac assistant checked 1 min ago"
+    async heartbeat(summary) {
+      const { error } = await sb.from('assistant_log').upsert({ id: HEARTBEAT_ID, kind: 'heartbeat', created_at: new Date().toISOString(), summary });
+      if (error) console.warn('[heartbeat]', error.message);
+    },
     async log(kind, summary) {
       const { error } = await sb.from('assistant_log').insert({ kind, summary });
       if (error) console.warn('[assistant_log]', error.message);
@@ -157,6 +164,7 @@ export function offlineStore({ patientsFile, outFile }) {
     async snapshot() { return { pending: rows.filter(r => r.status === 'pending'), tasks: tasks.filter(t => ['todo', 'waiting_docs', 'reply_ready', 'failed'].includes(t.status)), patients }; },
     async markAlerted(items) { const at = new Date().toISOString(); for (const i of items) { const r = (i.table === 'pending_patients' ? rows : tasks).find(x => x.id === i.id); if (r) r.alerted_at = at; } save(); },
     async log() {},
+    async heartbeat() {},
     async pushSubscriptions() { return []; },
     async removeSubscription() {},
     async purgeDecided() {},

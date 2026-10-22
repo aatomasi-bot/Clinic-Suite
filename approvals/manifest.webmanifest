@@ -1,15 +1,28 @@
 {
-  "name": "VaPiq Approvals",
-  "short_name": "Approvals",
-  "description": "Review new patient assignments found by the VaPiq intake assistant.",
+  "name": "Dubbi — VaPiq assistant",
+  "short_name": "Dubbi",
+  "description": "Your VaPiq assistant: new patients, replies, and nothing falls through the cracks.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "background_color": "#F2F4F8",
   "theme_color": "#2D8C8A",
   "icons": [
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ]
 }
