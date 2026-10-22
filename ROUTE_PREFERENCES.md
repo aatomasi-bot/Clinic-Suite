@@ -24,6 +24,7 @@ east apex (Montréal-Est / Pointe-aux-Trembles) → back along the north (Montr�
 - `loopSort()` in scheduler.html: zone positions (FSA centroids, GeoNames, CC BY 4.0) →
   counter-clockwise sweep from home → 2-opt removes all crossings → kept counter-clockwise.
 - No going back and forth: a tour without crossings is a clean loop.
+- **Cartierville (H4J): FIRST on Thursday and Friday, LAST on Mon/Tue/Wed/Saturday** (confirmed Oct 23, 2026).
 - Still applied after the loop: same-address grouping, 325 Deguire last.
 - Saturday now uses the loop too (replaces "start farthest"); start time stays 8:00 AM.
 - **Friday unchanged:** Laval horseshoe + West Island (`circBKey`).
@@ -150,6 +151,7 @@ When multiple patients share the same building (same street number + street, dif
 | 9 | Jun 11 | Friday | Laval horseshoe arc confirmed | ✅ |
 | 10 | Jun 22 | Tuesday | weekdayKey + same-address 15-min grouping | ✅ |
 | 11 | Oct 22 | Mon–Thu + Sat | Counter-clockwise loop from 42 Deguire, no back-and-forth | ✅ |
+| 12 | Oct 23 | All days | Cartierville (H4J) first Thu + Fri, last Mon/Tue/Wed/Sat | ✅ |
 
 ---
 
