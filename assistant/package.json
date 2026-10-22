@@ -4,7 +4,9 @@
   "private": true,
   "description": "Watches the Medicum mailbox for patient assignments, checks VaPiq, and queues new patients for approval.",
   "type": "module",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "intake": "node intake.js",
     "intake:offline": "node intake.js --offline",
@@ -16,6 +18,7 @@
   "dependencies": {
     "@supabase/supabase-js": "2.45.4",
     "imapflow": "1.0.164",
+    "nodemailer": "6.9.15",
     "pdfjs-dist": "3.11.174",
     "web-push": "3.6.7"
   },

@@ -80,6 +80,17 @@ main{max-width:760px;margin:0 auto;padding:14px 16px 40px}
 .btn.ghost{background:none;border:1.5px solid var(--border);color:var(--text-2)}
 .btn:disabled{opacity:.55;cursor:default}
 .exists-box{font-size:14px;line-height:1.45}
+.kind{display:block;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--teal);margin-bottom:2px}
+.facts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}
+.facts div{background:var(--bg);border-radius:9px;padding:8px 10px;min-width:0}
+.facts span{display:block;font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase}
+.facts b{font-size:15px}.facts b.chg{color:var(--red)}
+.hint{font-size:13px;color:var(--text-2);margin:8px 0 0}
+.mailhead{font-size:13px;color:var(--text-2);margin-bottom:8px}
+.mailhead div{overflow-wrap:anywhere}.mailhead span{display:inline-block;width:62px;font-weight:700;color:var(--text-3)}
+textarea.reply{width:100%;font:inherit;font-size:15px;line-height:1.45;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);resize:vertical}
+pre.sent{white-space:pre-wrap;font:inherit;font-size:14px;background:var(--bg);border-radius:10px;padding:10px 12px;margin:0}
+a.btn{display:flex;align-items:center;justify-content:center;text-decoration:none}
 .hist{display:flex;align-items:center;gap:10px;font-size:13px}
 .hist .t{flex:1;min-width:0;overflow-wrap:anywhere}
 #login{max-width:380px;margin:60px auto;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:22px}
@@ -89,7 +100,7 @@ main{max-width:760px;margin:0 auto;padding:14px 16px 40px}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(120px);background:var(--text);color:var(--bg);
   padding:11px 16px;border-radius:12px;font-size:14px;font-weight:600;transition:transform .25s;max-width:calc(100% - 32px);z-index:20}
 .toast.on{transform:translateX(-50%) translateY(0)}
-@media (max-width:480px){.grid{grid-template-columns:1fr}}
+@media (max-width:480px){.grid{grid-template-columns:1fr}.acts{flex-wrap:wrap}.acts .btn{min-width:40%}}
 </style>
 </head>
 <body>
@@ -113,8 +124,8 @@ main{max-width:760px;margin:0 auto;padding:14px 16px 40px}
       <a class="hbtn" href="../">VaPiq</a>
     </div>
     <nav class="tabs" role="tablist">
-      <button class="tab on" data-tab="pending" role="tab">To review<span class="n" id="n-pending">0</span></button>
-      <button class="tab" data-tab="exists" role="tab">Already in VaPiq<span class="n" id="n-exists">0</span></button>
+      <button class="tab on" data-tab="todo" role="tab">To do<span class="n" id="n-todo">0</span></button>
+      <button class="tab" data-tab="outbox" role="tab">Outbox<span class="n" id="n-outbox">0</span></button>
       <button class="tab" data-tab="history" role="tab">History</button>
     </nav>
   </header>
@@ -137,7 +148,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const normFile = v => String(v ?? '').trim().toLowerCase();
-let rows = [], tab = 'pending', user = null;
+let rows = [], tasks = [], tab = 'todo', user = null;
 
 function toast(msg, ms = 2600) {
   const t = $('toast'); t.textContent = msg; t.classList.add('on');
@@ -172,9 +183,13 @@ function resetInactivity() {
 // ── Data ────────────────────────────────────────────────────────────────
 async function load() {
   const since = new Date(Date.now() - 30 * 864e5).toISOString();
-  const { data, error } = await sb.from('pending_patients').select('*').gte('created_at', since).order('created_at', { ascending: false });
-  if (error) { $('list').innerHTML = `<div class="banner">Could not load cards: ${esc(error.message)}. Has the database setup (supabase/2026-10-20_intake_assistant.sql) been run?</div>`; return; }
-  rows = data;
+  const [p, t] = await Promise.all([
+    sb.from('pending_patients').select('*').gte('created_at', since).order('created_at', { ascending: false }),
+    sb.from('email_tasks').select('*').gte('created_at', since).order('created_at', { ascending: false }),
+  ]);
+  const err = p.error || t.error;
+  if (err) { $('list').innerHTML = `<div class="banner">Could not load cards: ${esc(err.message)}. Have both database setup files in supabase/ been run?</div>`; return; }
+  rows = p.data; tasks = t.data;
   render();
 }
 
@@ -196,24 +211,43 @@ async function allFileNumbers() {
   }
 }
 
+// ── What goes where ─────────────────────────────────────────────────────
+const pendingById = id => rows.find(r => r.id === id);
+// A new-patient reply only shows once its patient card is decided.
+const replyVisible = t => t.kind !== 'new_patient' || t.status !== 'todo' ? true : (pendingById(t.pending_id)?.status !== 'pending');
+function todoItems() {
+  const items = [];
+  rows.filter(r => r.status === 'pending' || r.status === 'exists').forEach(r => items.push({ at: r.created_at, html: r.status === 'pending' ? pendingCard(r) : existsCard(r) }));
+  tasks.filter(t => ['todo', 'reply_ready', 'failed'].includes(t.status) && replyVisible(t)).forEach(t => {
+    const html = t.status === 'todo' && t.kind === 'prescription' ? rxCard(t)
+      : t.status === 'todo' && t.kind === 'close_file' ? closeCard(t)
+      : replyCard(t);
+    items.push({ at: t.created_at, html });
+  });
+  return items.sort((a, b) => String(b.at).localeCompare(String(a.at))).map(i => i.html);
+}
+
 // ── Render ──────────────────────────────────────────────────────────────
 function render() {
-  const pending = rows.filter(r => r.status === 'pending');
-  const exists = rows.filter(r => r.status === 'exists');
-  $('n-pending').textContent = pending.length;
-  $('n-exists').textContent = exists.length;
+  const todo = todoItems();
+  const outbox = tasks.filter(t => ['send_approved', 'sending'].includes(t.status));
+  $('n-todo').textContent = todo.length;
+  $('n-outbox').textContent = outbox.length;
   document.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
   const list = $('list');
-  const anyTest = rows.some(r => r.is_test);
-  const banner = anyTest ? '<div class="banner">TEST cards use fake data. Approving one never writes to your patient list.</div>' : '';
-  if (tab === 'pending') list.innerHTML = banner + (pending.map(pendingCard).join('') || '<div class="empty">Nothing to review. 🎉</div>');
-  else if (tab === 'exists') list.innerHTML = banner + (exists.map(existsCard).join('') || '<div class="empty">No recent assignments for existing patients.</div>');
-  else list.innerHTML = historyList(rows.filter(r => !['pending', 'exists'].includes(r.status)));
+  const anyTest = rows.some(r => r.is_test) || tasks.some(t => t.is_test);
+  const banner = anyTest ? '<div class="banner">TEST cards use fake data: VaPiq is never changed and replies are never really sent.</div>' : '';
+  if (tab === 'todo') list.innerHTML = banner + (todo.join('') || '<div class="empty">All done. 🎉</div>');
+  else if (tab === 'outbox') list.innerHTML = banner + (outbox.map(outboxCard).join('') || '<div class="empty">No replies waiting to go out.</div>');
+  else list.innerHTML = historyList();
 }
 
 function source(r) {
   return `${esc(r.email_subject || r.attachment_name || '')} · ${esc((r.email_from || '').replace(/<.*>/, '').trim() || r.email_from)} · ${fmtDate(r.email_date || r.created_at)}`;
 }
+const testPill = r => r.is_test ? '<span class="pill test">TEST</span>' : '';
+const warnBox = w => (w && w.length) ? `<div class="warn">${w.map(x => `<div>⚠️ ${esc(x)}</div>`).join('')}</div>` : '';
+const fileLabel = t => `#${esc(t.file_number || '—')}${t.subject_ref && !/^\d+$/.test(t.subject_ref) ? ` (${esc(t.subject_ref.replace(/\s*\d{4,6}$/, ''))})` : ''}`;
 
 function field(r, key, label, opts = {}) {
   const v = r.record[key] ?? '';
@@ -226,13 +260,12 @@ function field(r, key, label, opts = {}) {
 }
 
 function pendingCard(r) {
-  const w = r.warnings || [];
-  return `<article class="card" data-id="${esc(r.id)}">
+  return `<article class="card" data-type="pending" data-id="${esc(r.id)}">
     <div class="ctop">
-      <div class="ctitle"><b>${esc(r.record.patient_name || 'Name not found')}</b><div class="meta">${source(r)}</div></div>
-      ${r.is_test ? '<span class="pill test">TEST</span>' : ''}
+      <div class="ctitle"><span class="kind">New patient</span><b>${esc(r.record.patient_name || 'Name not found')}</b><div class="meta">${source(r)}</div></div>
+      ${testPill(r)}
     </div>
-    ${w.length ? `<div class="warn">${w.map(x => `<div>⚠️ ${esc(x)}</div>`).join('')}</div>` : ''}
+    ${warnBox(r.warnings)}
     <div class="grid">
       ${field(r, 'patient_name', 'Patient Name', { wide: true, required: true })}
       ${field(r, 'file_number', 'File Number', { required: true })}
@@ -244,31 +277,97 @@ function pendingCard(r) {
     </div>
     <div class="acts">
       <button class="btn ghost" data-act="reject">Reject</button>
-      <button class="btn ok" data-act="approve">${r.is_test ? 'Approve (test)' : 'Add to VaPiq'}</button>
+      <button class="btn ok" data-act="approve">${r.is_test ? 'Add (test)' : 'Add to VaPiq'}</button>
     </div>
   </article>`;
 }
 
 function existsCard(r) {
   const e = r.existing_patient || {};
-  return `<article class="card" data-id="${esc(r.id)}">
+  return `<article class="card" data-type="pending" data-id="${esc(r.id)}">
     <div class="ctop">
-      <div class="ctitle"><b>Patient already exists — #${esc(e.file_number || r.record.file_number)}</b><div class="meta">${source(r)}</div></div>
-      ${r.is_test ? '<span class="pill test">TEST</span>' : ''}<span class="pill exists">${esc(e.status || 'Exists')}</span>
+      <div class="ctitle"><span class="kind">Duplicate</span><b>#${esc(e.file_number || r.record.file_number)} — ${esc(e.status || 'Exists')}</b><div class="meta">${source(r)}</div></div>
+      ${testPill(r)}
     </div>
-    <div class="exists-box">In VaPiq as <b>${esc(e.patient_name || '(blank name)')}</b>.
-      ${e.patient_name && r.record.patient_name && e.patient_name !== r.record.patient_name ? `<br><span class="meta">Assignment says: ${esc(r.record.patient_name)}</span>` : ''}
-      <br><span class="meta">Nothing was added or changed.</span></div>
+    <div class="exists-box">Same file as <b>${esc(e.patient_name || '(blank name)')}</b>. Nothing was added or changed.</div>
     <div class="acts"><button class="btn ghost" data-act="dismiss">Dismiss</button></div>
   </article>`;
 }
 
-function historyList(list) {
-  if (!list.length) return '<div class="empty">No decisions in the last 30 days.</div>';
-  const pill = { approved: '<span class="pill ok">Added</span>', rejected: '<span class="pill no">Rejected</span>', dismissed: '<span class="pill exists">Dismissed</span>' };
-  return '<div class="card">' + list.map(r => `<div class="hist" style="padding:8px 0;border-bottom:1px solid var(--border)">
-    <div class="t"><b>${esc(r.record.patient_name || '—')}</b> #${esc(r.record.file_number || '—')}
-      <div class="meta">${fmtDate(r.decided_at)}${r.is_test ? ' · TEST' : ''}</div></div>${pill[r.status] || ''}</div>`).join('') + '</div>';
+function patientLine(e) {
+  if (!e) return '<div class="exists-box">Not found in VaPiq.</div>';
+  return `<div class="exists-box">In VaPiq as <b>${esc(e.patient_name || '(blank name)')}</b> <span class="pill ${e.status === 'Archived' ? 'exists' : 'ok'}">${esc(e.status)}</span></div>`;
+}
+
+function rxCard(t) {
+  const e = t.existing_patient || {}, d = t.details || {};
+  const changed = d.pdf_dose && e.dose_prescribed && String(d.pdf_dose) !== String(e.dose_prescribed);
+  return `<article class="card" data-type="task" data-id="${esc(t.id)}">
+    <div class="ctop"><div class="ctitle"><span class="kind">New prescription</span><b>File ${fileLabel(t)}</b><div class="meta">${source(t)}</div></div>${testPill(t)}</div>
+    ${warnBox(t.warnings)}
+    ${patientLine(t.existing_patient)}
+    <div class="facts">
+      <div><span>Dose in VaPiq</span><b>${esc(e.dose_prescribed || '—')} mg</b></div>
+      <div><span>Dose on prescription</span><b class="${changed ? 'chg' : ''}">${esc(d.pdf_dose || 'not read')}${d.pdf_dose ? ' mg' : ''}</b></div>
+      <div><span>Doses remaining</span><b>${esc(e.doses_remaining ?? '—')}</b></div>
+    </div>
+    <p class="hint">Apply the prescription in VaPiq, then tap <b>Applied</b> to reply.</p>
+    <div class="acts">
+      <button class="btn ghost" data-act="dismiss-task">Dismiss</button>
+      <a class="btn ghost" href="../" target="_blank" rel="noopener">Open VaPiq</a>
+      <button class="btn ok" data-act="applied">Applied ✓</button>
+    </div>
+  </article>`;
+}
+
+function closeCard(t) {
+  const e = t.existing_patient;
+  const active = e && e.status !== 'Archived';
+  const main = active
+    ? `<button class="btn ok" data-act="close-file">${t.is_test ? 'Close file (test)' : 'Close file in VaPiq'}</button>`
+    : `<button class="btn ok" data-act="reply-anyway">${e ? 'Already closed — reply' : 'Reply anyway'}</button>`;
+  return `<article class="card" data-type="task" data-id="${esc(t.id)}">
+    <div class="ctop"><div class="ctitle"><span class="kind">Close file</span><b>File ${fileLabel(t)}</b><div class="meta">${source(t)}</div></div>${testPill(t)}</div>
+    ${warnBox(t.warnings)}
+    ${patientLine(e)}
+    <div class="acts"><button class="btn ghost" data-act="dismiss-task">Dismiss</button>${main}</div>
+  </article>`;
+}
+
+const DONE_TEXT = { new_patient: 'Patient added', prescription: 'Prescription applied', close_file: 'File closed' };
+function replyCard(t) {
+  const to = t.to_name ? `${esc(t.to_name)} &lt;${esc(t.to_address)}&gt;` : esc(t.to_address);
+  return `<article class="card" data-type="task" data-id="${esc(t.id)}">
+    <div class="ctop"><div class="ctitle"><span class="kind">Reply · ${esc(DONE_TEXT[t.kind])} ✓</span><b>File ${fileLabel(t)}</b><div class="meta">${source(t)}</div></div>${testPill(t)}</div>
+    ${t.status === 'failed' ? `<div class="warn"><div>⚠️ Not sent: ${esc(t.error || 'unknown error')}</div></div>` : ''}
+    <div class="mailhead"><div><span>To</span>${to}</div><div><span>Subject</span>${esc(/^re\s*:/i.test(t.email_subject || '') ? t.email_subject : 'Re: ' + (t.email_subject || ''))}</div></div>
+    <textarea class="reply" data-k="reply_body" rows="8" aria-label="Reply text">${esc(t.reply_body || '')}</textarea>
+    <div class="acts">
+      <button class="btn ghost" data-act="no-reply">Don't reply</button>
+      <button class="btn ok" data-act="send">${t.status === 'failed' ? 'Retry send' : 'Send reply'}${t.is_test ? ' (test)' : ''}</button>
+    </div>
+  </article>`;
+}
+
+function outboxCard(t) {
+  return `<article class="card" data-type="task" data-id="${esc(t.id)}">
+    <div class="ctop"><div class="ctitle"><span class="kind">${t.status === 'sending' ? 'Sending now…' : 'Sends within ~2 minutes'}</span><b>Reply to ${esc(t.to_name || t.to_address)} — file ${fileLabel(t)}</b><div class="meta">Approved ${fmtDate(t.decided_at)}</div></div>${testPill(t)}</div>
+    <pre class="sent">${esc(t.reply_body)}</pre>
+    ${t.status === 'send_approved' ? '<div class="acts"><button class="btn ghost" data-act="cancel-send">Cancel — keep as draft</button></div>' : ''}
+  </article>`;
+}
+
+function historyList() {
+  const items = [];
+  const pill = { approved: '<span class="pill ok">Added</span>', rejected: '<span class="pill no">Rejected</span>', dismissed: '<span class="pill exists">Dismissed</span>',
+                 sent: '<span class="pill ok">Reply sent</span>', done: '<span class="pill exists">No reply</span>' };
+  rows.filter(r => ['approved', 'rejected', 'dismissed'].includes(r.status)).forEach(r => items.push({ at: r.decided_at,
+    html: `<b>${esc(r.record.patient_name || '—')}</b> #${esc(r.record.file_number || '—')}<div class="meta">New patient · ${fmtDate(r.decided_at)}${r.is_test ? ' · TEST' : ''}</div>`, pill: pill[r.status] }));
+  tasks.filter(t => ['sent', 'done', 'dismissed'].includes(t.status)).forEach(t => items.push({ at: t.sent_at || t.decided_at,
+    html: `File ${fileLabel(t)} → ${esc(t.to_name || t.to_address)}<div class="meta">${esc({ new_patient: 'New patient', prescription: 'Prescription', close_file: 'Close file' }[t.kind])} · ${fmtDate(t.sent_at || t.decided_at)}${t.moved_to_folder ? ` · moved to ${esc(t.moved_to_folder)}` : ''}${t.is_test ? ' · TEST (not sent)' : ''}</div>`, pill: pill[t.status] }));
+  if (!items.length) return '<div class="empty">Nothing in the last 30 days.</div>';
+  items.sort((a, b) => String(b.at).localeCompare(String(a.at)));
+  return '<div class="card">' + items.map(i => `<div class="hist" style="padding:8px 0;border-bottom:1px solid var(--border)"><div class="t">${i.html}</div>${i.pill || ''}</div>`).join('') + '</div>';
 }
 
 // ── Actions ─────────────────────────────────────────────────────────────
@@ -277,6 +376,18 @@ async function decide(r, status, extra = {}) {
     .update({ status, decided_at: new Date().toISOString(), decided_by: user.email, ...extra })
     .eq('id', r.id).in('status', ['pending', 'exists']);   // never re-decide a card
   if (error) throw error;
+}
+
+// Moves a task forward only from the status it is in now (no double-actions).
+async function setTask(t, status, extra = {}) {
+  const { error } = await sb.from('email_tasks')
+    .update({ status, decided_at: new Date().toISOString(), decided_by: user.email, ...extra })
+    .eq('id', t.id).eq('status', t.status);
+  if (error) throw error;
+}
+async function setReplyFor(pendingId, status) {
+  const t = tasks.find(x => x.pending_id === pendingId && x.status === 'todo');
+  if (t) await setTask(t, status);
 }
 
 async function approve(r, card, btn) {
@@ -301,14 +412,16 @@ async function approve(r, card, btn) {
     if (r.is_test) {
       await decide(r, 'approved');
       await audit('ASSISTANT_TEST_APPROVED', rec.file_number, { pending_id: r.id });
-      toast('Test card approved — nothing written to patients');
+      await setReplyFor(r.id, 'reply_ready');
+      toast('Test card approved — nothing written to patients. Reply is ready.');
       return load();
     }
     const { data, error } = await sb.from('patients').insert([rec]).select('id').single();
     if (error) throw error;
     await audit('INSERT', rec.file_number, { name: rec.patient_name, source: 'assistant', pending_id: r.id });
     await decide(r, 'approved', { patient_id: String(data.id), record: rec });
-    toast(`✓ ${rec.patient_name} added to VaPiq`);
+    await setReplyFor(r.id, 'reply_ready');
+    toast(`✓ ${rec.patient_name} added to VaPiq — reply is ready`);
     load();
   } catch (e) {
     console.error('[approve]', e);
@@ -316,20 +429,57 @@ async function approve(r, card, btn) {
   } finally { btn.disabled = false; }
 }
 
+// Close file = VaPiq's Archive (archivePatient in index.html).
+async function closeFile(t) {
+  const e = t.existing_patient, fn = String(e.file_number || '').trim();
+  if (!confirm(`Close file #${fn} (${e.patient_name}) in VaPiq?\n\nThis archives the patient, like the Archive button in VaPiq.`)) return false;
+  if (t.is_test) { toast('Test card — VaPiq not changed. Reply is ready.'); return true; }
+  const { data, error } = await sb.from('patients').update({ archived: true }).eq('id', e.id).select('id,file_number');
+  if (error) throw error;
+  if (!data.length || normFile(data[0].file_number) !== normFile(e.file_number)) throw new Error('patient not found — open VaPiq and close it there');
+  await audit('UPDATE', fn, { id: e.id, source: 'assistant', action: 'close_file', task_id: t.id });
+  toast(`✓ File #${fn} closed — reply is ready`);
+  return true;
+}
+
 $('list').addEventListener('click', async e => {
   const btn = e.target.closest('button[data-act]'); if (!btn) return;
-  const card = btn.closest('.card'); const r = rows.find(x => String(x.id) === card.dataset.id); if (!r) return;
+  const card = btn.closest('.card'); const act = btn.dataset.act;
   try {
-    if (btn.dataset.act === 'approve') return approve(r, card, btn);
+    if (card.dataset.type === 'pending') {
+      const r = rows.find(x => String(x.id) === card.dataset.id); if (!r) return;
+      if (act === 'approve') return approve(r, card, btn);
+      btn.disabled = true;
+      if (act === 'reject') {
+        await decide(r, 'rejected'); await audit('ASSISTANT_REJECTED', r.record.file_number, { pending_id: r.id, test: r.is_test });
+        await setReplyFor(r.id, 'dismissed'); toast('Rejected');
+      }
+      if (act === 'dismiss') { await decide(r, 'dismissed'); toast('Dismissed'); }
+      return load();
+    }
+    const t = tasks.find(x => String(x.id) === card.dataset.id); if (!t) return;
     btn.disabled = true;
-    if (btn.dataset.act === 'reject') { await decide(r, 'rejected'); await audit('ASSISTANT_REJECTED', r.record.file_number, { pending_id: r.id, test: r.is_test }); toast('Rejected'); }
-    if (btn.dataset.act === 'dismiss') { await decide(r, 'dismissed'); toast('Dismissed'); }
+    if (act === 'applied' || act === 'reply-anyway') await setTask(t, 'reply_ready');
+    if (act === 'close-file') { if (!(await closeFile(t))) { btn.disabled = false; return; } await setTask(t, 'reply_ready'); }
+    if (act === 'dismiss-task') { await setTask(t, 'dismissed'); toast('Dismissed'); }
+    if (act === 'no-reply') { await setTask(t, 'done'); toast('Marked done — no reply sent'); }
+    if (act === 'cancel-send') { await setTask(t, 'reply_ready'); toast('Kept as draft'); }
+    if (act === 'send') {
+      const body = card.querySelector('[data-k="reply_body"]').value.trim();
+      if (!body) { btn.disabled = false; return toast('The reply is empty'); }
+      await setTask(t, 'send_approved', { reply_body: body, error: null });
+      await audit('ASSISTANT_REPLY_APPROVED', t.file_number, { task_id: t.id, kind: t.kind, test: t.is_test });
+      toast(t.is_test ? 'Test reply queued — it will be saved, not sent' : 'Reply queued — your Mac sends it within ~2 minutes');
+    }
     load();
   } catch (err) { btn.disabled = false; toast('Could not save — ' + err.message); }
 });
 document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => { tab = b.dataset.tab; render(); }));
 $('refreshBtn').addEventListener('click', () => load().then(() => toast('Updated')));
-document.addEventListener('visibilitychange', () => { if (!document.hidden && user) load(); });
+// Refresh when you come back to the page — but not while you're editing a reply.
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && user && !document.activeElement?.matches('textarea, input, select')) load();
+});
 
 // ── iPhone / browser push ───────────────────────────────────────────────
 const b64ToBytes = s => { const p = '='.repeat((4 - s.length % 4) % 4); const r = atob((s + p).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from(r, c => c.charCodeAt(0)); };

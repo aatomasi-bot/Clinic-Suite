@@ -5,10 +5,12 @@ import { execFile } from 'node:child_process';
 import webpush from 'web-push';
 import { getSecret, SECRETS } from './keychain.js';
 
-export function summaryText({ queued, exists, needsReview }) {
+export function summaryText({ queued, exists, needsReview, prescriptions, closes }) {
   const parts = [];
   if (queued) parts.push(`${queued} new patient${queued > 1 ? 's' : ''} to review`);
-  if (exists) parts.push(`${exists} already in VaPiq`);
+  if (prescriptions) parts.push(`${prescriptions} prescription${prescriptions > 1 ? 's' : ''} to apply`);
+  if (closes) parts.push(`${closes} file${closes > 1 ? 's' : ''} to close`);
+  if (exists) parts.push(`${exists} duplicate${exists > 1 ? 's' : ''}`);
   if (needsReview) parts.push(`${needsReview} need${needsReview > 1 ? '' : 's'} manual reading`);
   return parts.join(' · ');
 }

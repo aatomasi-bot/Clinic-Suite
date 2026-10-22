@@ -6,3 +6,6 @@ assistant/state/
 assistant/test-inbox/
 *.pdf
 .DS_Store
+
+# Local Claude preview settings
+.claude/

@@ -1,4 +1,11 @@
-# Intake assistant — next steps (agreed 2026-10-20)
+# Intake assistant — roadmap
+
+**Done 2026-10-22:** Inbox folder, reply drafts + Send (EN/FR, gender-neutral "the file"),
+prescription and close-file cards, outbox, move to Medicum after sending.
+
+---
+
+## Original notes (2026-10-20)
 
 ## Correction: where the emails arrive
 Coordinator emails arrive in Yahoo **Inbox**, not Medicum. You move the
@@ -27,3 +34,9 @@ Open questions to settle before building:
 ## Before trusting the dose detection
 Run 3–5 real assignment PDFs through medicum-parser.html on your Mac and
 check the console line `[DOSE] … — <reason>`.
+
+## Still open
+- Signature line for replies (config.json → replies.signature)
+- Scanned/faxed PDFs: OCR on the Mac instead of opening the Medicum Parser
+- Other status emails (on hold, transfer, patient is back, update) — not handled yet
+- Optional: AI-polished reply wording — only once an approved setup (BAA) is in place

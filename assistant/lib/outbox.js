@@ -1,0 +1,34 @@
+// Sends replies YOU approved in the Approvals page (status "send_approved").
+// Safety checks before anything leaves:
+//   - only to the coordinator who wrote (allowed domain, not an excluded sender)
+//   - test cards only ever go to the test mailer; real cards only in live mode
+//   - each task is claimed (send_approved → sending) so it can never go twice
+import { senderAllowed } from './classify.js';
+
+export async function runOutbox({ store, mailer, testMailer, rules, live, moveToFolder, log = console.log }) {
+  const counts = { sent: 0, failed: 0, waiting: 0 };
+  await store.failStuckSending(15);   // crashed mid-send → failed, so you check before retrying
+
+  for (const task of await store.tasksToSend()) {
+    const m = task.is_test ? testMailer : (live ? mailer : null);
+    if (!m) { counts.waiting++; continue; }                     // real reply, but service is in test mode
+    if (!senderAllowed(task.to_address, rules) || !String(task.reply_body || '').trim()) {
+      await store.updateTask(task.id, { status: 'failed', error: 'Blocked: recipient not an allowed coordinator, or empty reply.' });
+      counts.failed++; continue;
+    }
+    if (!(await store.claimTask(task.id))) continue;            // someone else took it / you cancelled
+    try {
+      await m.send(task);
+      const moved = moveToFolder ? await m.moveOriginal(task, moveToFolder).catch(e => { log('  move failed:', e.message); return false; }) : false;
+      await store.updateTask(task.id, { status: 'sent', sent_at: new Date().toISOString(), error: null, moved_to_folder: moved ? moveToFolder : null });
+      await store.audit('ASSISTANT_REPLY_SENT', task.file_number, { task_id: task.id, kind: task.kind, test: task.is_test });
+      log(`  sent    reply ${task.id}${task.is_test ? ' (test — saved, not sent)' : ''}${moved ? ` · moved to ${moveToFolder}` : ''}`);
+      counts.sent++;
+    } catch (e) {
+      await store.updateTask(task.id, { status: 'failed', error: String(e.message || e).slice(0, 300) });
+      log(`  failed  reply ${task.id}: ${e.message}`);
+      counts.failed++;
+    }
+  }
+  return counts;
+}

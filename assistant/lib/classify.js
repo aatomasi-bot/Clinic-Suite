@@ -1,24 +1,40 @@
-// Decides whether an email is a patient assignment, from headers only.
-// Rules come from config.json (see config.example.json):
-//   - sender's domain is allowed (medicum.ca) and the sender isn't excluded
-//   - subject matches an include pattern and no exclude pattern
-//   - it has at least one PDF attachment
+// Sorts coordinator emails, from headers only. Rules come from config.json
+// (see config.example.json):
+//   close_file  — subject asks to close a file ("Close file 32604", "Fermeture de dossier …")
+//   assignment  — subject matches an include pattern, has a PDF (new patient, or a
+//                 new prescription when the file number already exists in VaPiq)
+//   null        — everything else (replies, on-hold, transfers, updates… left for you)
+// Always: sender's domain must be allowed and the sender not excluded.
 
 export function senderAddress(from) {
   const m = String(from || '').match(/<([^>]+)>/);
   return (m ? m[1] : String(from || '')).trim().toLowerCase();
 }
 
-export function isAssignment(email, rules) {
-  const addr = senderAddress(email.from);
+export function senderAllowed(from, rules) {
+  const addr = senderAddress(from);
   const domain = addr.split('@')[1] || '';
-  if (!rules.senderDomains.map(d => d.toLowerCase()).includes(domain)) return { ok: false, why: 'sender domain' };
-  if (rules.excludeSenders.map(s => s.toLowerCase()).includes(addr)) return { ok: false, why: 'excluded sender' };
+  return rules.senderDomains.map(d => d.toLowerCase()).includes(domain)
+    && !rules.excludeSenders.map(s => s.toLowerCase()).includes(addr);
+}
+
+const any = (list, s) => (list || []).some(rx => new RegExp(rx, 'i').test(s));
+
+export function classifyEmail(email, rules) {
+  if (!senderAllowed(email.from, rules)) return { kind: null, why: 'sender' };
   const subject = String(email.subject || '');
-  if (rules.excludeSubject.some(rx => new RegExp(rx, 'i').test(subject))) return { ok: false, why: 'excluded subject' };
-  if (!rules.includeSubject.some(rx => new RegExp(rx, 'i').test(subject))) return { ok: false, why: 'subject' };
-  if (!email.pdfs || !email.pdfs.length) return { ok: false, why: 'no PDF' };
-  return { ok: true };
+  if (/^\s*(re|tr|fw|fwd)\s*:/i.test(subject)) return { kind: null, why: 'reply/forward' };
+  if (any(rules.closeSubject, subject)) return { kind: 'close_file' };
+  if (any(rules.excludeSubject, subject)) return { kind: null, why: 'excluded subject' };
+  if (!any(rules.includeSubject, subject)) return { kind: null, why: 'subject' };
+  if (!email.pdfs || !email.pdfs.length) return { kind: null, why: 'no PDF' };
+  return { kind: 'assignment' };
+}
+
+// Kept for callers that only care about assignments.
+export function isAssignment(email, rules) {
+  const c = classifyEmail(email, rules);
+  return { ok: c.kind === 'assignment', why: c.why };
 }
 
 // "New patient 34734", "Patient JGC 35290", "fax - SS #33816" → last 4–6 digit number

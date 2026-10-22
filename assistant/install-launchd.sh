@@ -1,5 +1,6 @@
 #!/bin/zsh
-# Runs the intake assistant every 10 minutes while you're logged in.
+# Runs the intake assistant every 2 minutes while you're logged in
+# (reads new email, and sends the replies you approved).
 #   ./install-launchd.sh            install / update
 #   ./install-launchd.sh remove     stop and remove
 set -e
@@ -19,11 +20,11 @@ cat > "$PLIST" <<PL
   <key>Label</key><string>$LABEL</string>
   <key>ProgramArguments</key><array><string>$NODE</string><string>$DIR/intake.js</string></array>
   <key>WorkingDirectory</key><string>$DIR</string>
-  <key>StartInterval</key><integer>600</integer>
+  <key>StartInterval</key><integer>120</integer>
   <key>RunAtLoad</key><true/>
   <key>StandardOutPath</key><string>$DIR/state/intake.log</string>
   <key>StandardErrorPath</key><string>$DIR/state/intake.log</string>
 </dict></plist>
 PL
 launchctl bootstrap "gui/$(id -u)" "$PLIST"
-echo "Installed: runs every 10 minutes. Log: $DIR/state/intake.log"
+echo "Installed: runs every 2 minutes. Log: $DIR/state/intake.log"

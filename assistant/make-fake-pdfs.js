@@ -92,15 +92,32 @@ async function makeForm(c) {
   return doc.save();
 }
 
+// Close-file requests (no PDF). 30004 is active in the fixtures, 30002 is
+// already archived, 39999 doesn't exist.
+export const CLOSE_CASES = [
+  { id: 'fake-21-close-en',     file: '30004', from: 'Julie Exemple <julie.exemple@medicum.ca>', subject: 'Close file 30004', body: 'Hello, please close this file. Thank you' },
+  { id: 'fake-22-close-fr',     file: '30002', from: 'Sophie Fictive <sophie.fictive@medicum.ca>', subject: 'Fermeture de dossier T.P # 30002', body: 'Bonjour, merci de fermer le dossier.' },
+  { id: 'fake-23-close-unknown', file: '39999', from: 'Julie Exemple <julie.exemple@medicum.ca>', subject: 'Close File - ZZ 39999', body: '' },
+];
+
+const FROM_BY_CASE = {
+  'fake-06-french': ['Sophie Fictive <sophie.fictive@medicum.ca>', 'Nouveau patient SF 39006', 'Bonjour, voici un nouveau patient.'],
+  'fake-08-exists': ['Julie Exemple <julie.exemple@medicum.ca>', 'Prescription ET 30001', 'Hello, new prescription attached.'],
+  'fake-09-scanned': ['Medicum Reports <reports@medicum.ca>', 'fax - XX #39009', ''],
+};
+
 export async function writeFakeInbox(dir = outDir) {
   fs.mkdirSync(dir, { recursive: true });
   for (const c of CASES) {
+    const [from, subject, body] = FROM_BY_CASE[c.id] || ['Julie Exemple <julie.exemple@medicum.ca>', `New patient ${c.file}`, 'Hello, please find the new patient attached.'];
     fs.writeFileSync(path.join(dir, `${c.id}.pdf`), await makeForm(c));
     fs.writeFileSync(path.join(dir, `${c.id}.json`), JSON.stringify({
-      messageId: `<${c.id}@fake.local>`,
-      from: 'Coordinator Test <coordinator.test@medicum.ca>',
-      subject: c.mark === 'scan' ? `fax - XX #${c.file}` : `New patient ${c.file}`,
-      date: '2026-10-20T15:00:00Z',
+      messageId: `<${c.id}@fake.local>`, from, subject, bodyText: body, date: '2026-10-20T15:00:00Z',
+    }, null, 2));
+  }
+  for (const c of CLOSE_CASES) {
+    fs.writeFileSync(path.join(dir, `${c.id}.json`), JSON.stringify({
+      messageId: `<${c.id}@fake.local>`, from: c.from, subject: c.subject, bodyText: c.body, date: '2026-10-21T15:00:00Z',
     }, null, 2));
   }
   return dir;
@@ -108,5 +125,5 @@ export async function writeFakeInbox(dir = outDir) {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const dir = await writeFakeInbox();
-  console.log(`Wrote ${CASES.length} fake assignment PDFs to ${dir}`);
+  console.log(`Wrote ${CASES.length} fake assignment emails and ${CLOSE_CASES.length} close-file emails to ${dir}`);
 }

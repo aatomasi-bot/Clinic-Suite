@@ -1,22 +1,27 @@
 # VaPiq intake assistant
 
-Watches the **Medicum** mailbox for patient-assignment PDFs, checks VaPiq, and
-asks you before anything is added.
+Reads coordinator emails in your Yahoo **Inbox**, prepares the work in the
+**Approvals** page, and replies to the coordinator once you've done it. You
+approve every step.
 
-```
-Medicum email (coordinators @medicum.ca, reports@medicum.ca) + PDF
-   → parse PDF with js/medicum-parse.js (same parser as medicum-parser.html)
-   → file number already in VaPiq?  yes → "Already in VaPiq" card — nothing written
-                                    no  → "To review" card + notification
-   → you tap "Add to VaPiq" in approvals/ → patients row + audit_log entry
-```
+| Email from a coordinator | Card in Approvals | After you act | Reply (you tap Send) |
+|---|---|---|---|
+| New patient (PDF, file # not in VaPiq) | patient form, pre-filled | **Add to VaPiq** | "I confirm the receipt of this email…" |
+| Prescription (PDF, file # in VaPiq) | current dose vs prescription | apply it in VaPiq → **Applied** | "…I have added this prescription to the file." |
+| Close file / Fermeture de dossier | patient + status | **Close file in VaPiq** (= Archive) | "…I have closed the file." |
 
-What it will **never** do: send email, delete anything, write to `patients`
-without your approval, or put patient details in a notification.
+Replies greet the coordinator by first name, use their language (French or English),
+are fully editable, and are sent by your Mac within ~2 minutes of you tapping
+**Send**. They go in the same email thread, and the original email is then moved from Inbox to Medicum.
+
+What it will **never** do: send anything you didn't approve, write to
+anyone outside medicum.ca, delete email, change `patients` without your tap, or
+put patient details in a notification.
 
 ## Setup (once)
 
-1. **Database**: in Supabase → SQL Editor, run `supabase/2026-10-20_intake_assistant.sql`.
+1. **Database**: in Supabase → SQL Editor, run `supabase/2026-10-20_intake_assistant.sql`,
+   then `supabase/2026-10-22_coordinator_replies.sql`.
 2. **Install**: in Terminal:
    ```bash
    cd ~/Downloads/Code/Clinic-Suite/assistant && npm install
@@ -31,7 +36,11 @@ without your approval, or put patient details in a notification.
    ```
 5. **iPhone**: in Safari open `https://aatomasi-bot.github.io/Clinic-Suite/approvals/`,
    tap Share → *Add to Home Screen*, open **Approvals** from the Home Screen, then tap 🔔 *Notify me*.
-6. **Run every 10 minutes** in the background:
+6. **Your signature**: create `config.json` (stays on your Mac) with the closing line for replies:
+   ```json
+   { "replies": { "signature": "Your Name, RN" } }
+   ```
+7. **Run every 2 minutes** in the background:
    ```bash
    ./install-launchd.sh
    ```
@@ -39,9 +48,10 @@ without your approval, or put patient details in a notification.
 
 ## Test mode (the default)
 
-`config.example.json` has `"mode": "test"`: the assistant reads the FAKE PDFs in
+`config.example.json` has `"mode": "test"`: the assistant reads the FAKE emails in
 `test-inbox/` (make them with `npm run fake-pdfs`). The cards it creates are marked
-**TEST**, and approving one never writes to `patients`.
+**TEST**: approving or closing never changes VaPiq, and replies are never sent.
+Instead each one is saved as an `.eml` file in `state/outbox-test/` (double-click to open it in Mail).
 
 - `npm run intake:offline`: no network, fake patients from `test/fixtures/`.
 - `npm test`: parser, dose detection, duplicate rule and full pipeline.
@@ -61,9 +71,11 @@ approves it, or after assignments move to an approved mailbox.
    { "mode": "live", "liveConfirmed": true, "imap": { "user": "you@yahoo.com" } }
    ```
 
-Live mode reads the `Medicum` folder for the last 7 days and opens attachments
-without marking emails as read. Each handled email is starred (`\Flagged`) and
-stays in `Medicum`. Which emails count as assignments is set in `rules`
+Live mode reads the `Inbox` for the last 7 days and opens attachments
+without marking emails as read. Each handled email is starred (`\Flagged`). Once
+its reply is sent, it is moved to `Medicum`. Replies go out through Yahoo SMTP with the
+same app password. After the first live reply, check Yahoo's **Sent** folder: if
+the reply isn't there, set `"replies": { "saveToSent": true }` in `config.json`. Which emails count as assignments is set in `rules`
 (sender domains, excluded senders, subject patterns).
 
 ## Dose detection

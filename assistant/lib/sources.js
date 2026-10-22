@@ -1,7 +1,8 @@
 // Where assignment emails come from.
 //   test  → a local folder of FAKE PDFs + .json headers (make-fake-pdfs.js)
 //   live  → the Yahoo mailbox over IMAP (read-only, plus a flag once handled)
-// Both yield: { messageId, from, subject, date, pdfs: [{ name, bytes }], uid? }
+// Both yield: { messageId, from, subject, date, folder, bodyText, pdfs: [{ name, bytes }], uid? }
+// bodyText is a short snippet, used only to detect the language — never stored.
 import fs from 'node:fs';
 import path from 'node:path';
 import { ImapFlow } from 'imapflow';
@@ -16,7 +17,7 @@ export function testFolderSource(dir) {
         const meta = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'));
         const pdfPath = path.join(dir, f.replace(/\.json$/, '.pdf'));
         const pdfs = fs.existsSync(pdfPath) ? [{ name: path.basename(pdfPath), bytes: fs.readFileSync(pdfPath) }] : [];
-        yield { ...meta, pdfs };
+        yield { folder: 'Inbox', bodyText: '', ...meta, pdfs };
       }
     },
     async markHandled() {},
@@ -38,7 +39,15 @@ async function readAll(stream) {
   return Buffer.concat(chunks);
 }
 
-export function imapSource(cfg, { isAssignmentHeaders }) {
+function textPart(node) {
+  if (!node) return null;
+  if (node.part && node.type === 'text/plain' && node.disposition !== 'attachment') return node.part;
+  for (const c of node.childNodes || []) { const p = textPart(c); if (p) return p; }
+  return node.type === 'text/plain' ? (node.part || '1') : null;
+}
+
+// wanted(email) → true for emails worth reading (from classifyEmail on headers)
+export function imapSource(cfg, { wanted }) {
   const password = getSecret(SECRETS.yahooPassword);
   if (!password) throw new Error('No Yahoo app password in Keychain — see assistant/README.md, step "Connect the mailbox".');
   const client = new ImapFlow({
@@ -67,17 +76,26 @@ export function imapSource(cfg, { isAssignmentHeaders }) {
           subject: msg.envelope.subject || '',
           date: msg.envelope.date ? new Date(msg.envelope.date).toISOString() : null,
           parts: pdfParts(msg.bodyStructure),
+          text: textPart(msg.bodyStructure),
         });
       }
       for (const m of metas) {
-        const email = { ...m, pdfs: m.parts.map(p => ({ name: p.name })) };
-        if (!isAssignmentHeaders(email)) { yield { ...email, pdfs: [], skipped: true }; continue; }
+        const email = { ...m, folder: cfg.folder, bodyText: '', pdfs: m.parts.map(p => ({ name: p.name })) };
+        if (!wanted(email)) { yield { ...email, pdfs: [], skipped: true }; continue; }
+        // download() uses BODY.PEEK — reading never marks the email as read
         const pdfs = [];
         for (const p of m.parts) {
-          const { content } = await client.download(String(m.uid), p.part, { uid: true });  // BODY.PEEK — doesn't mark read
+          const { content } = await client.download(String(m.uid), p.part, { uid: true });
           pdfs.push({ name: p.name, bytes: await readAll(content) });
         }
-        yield { ...email, pdfs };
+        let bodyText = '';
+        if (m.text) {
+          try {
+            const { content } = await client.download(String(m.uid), m.text, { uid: true, maxBytes: 4000 });
+            bodyText = (await readAll(content)).toString('utf8').slice(0, 2000);
+          } catch {}
+        }
+        yield { ...email, pdfs, bodyText };
       }
     },
     async markHandled(email) {
