@@ -147,8 +147,14 @@ test('intake end to end (offline): new, prescription, close-file; re-run adds no
   assert.ok(nr[0].documents.assignment && nr[0].documents.enrollment, 'NR99015New.pdf = assignment, Enrollment_Form_Auto_Generated = enrollment');
   assert.match(nr[0].reply_body, /^Hello Julie,/);
   assert.ok(nr[0].pending_id);
-  assert.equal(store.rows.find(r => r.id === nr[0].pending_id).record.special_instructions, 'Signature required!', 'signature line in the coordinator note → note on the card');
-  assert.equal(byFile['99011'].record.special_instructions, '', 'no signature line → no note');
+  // Forms first, coordinator email second → the existing card is updated
+  const nrCard = store.rows.find(r => r.id === nr[0].pending_id).record;
+  assert.equal(nrCard.special_instructions, 'Signature required! | Coordinator: Bone scan schedule October 28th 2026 and need the injection after');
+  assert.equal(nrCard.due_date, '2026-10-29', 'due date from the coordinator email');
+  // Coordinator email first, forms second → the card is created with the email's date
+  assert.equal(byFile['99011'].record.due_date, '2026-11-21');
+  assert.equal(byFile['99011'].record.special_instructions, '', 'no signature line, no note → nothing');
+  assert.ok(byFile['99011'].warnings.some(w => /replaces the form/.test(w)), 'form date differs → said so on the card');
   // Note with no documents → polite request for both, in French
   assert.match(task('new_patient', '99013').reply_body, /je n'ai pas reçu le formulaire d'assignation ni le formulaire d'inscription/);
   // Form only → asks for the enrollment form
@@ -295,4 +301,16 @@ test('scanned assignment form: "for a period of _N_ months" on the chosen dose l
   assert.deepEqual(p('22.5 mg, (3 menths) for a peried of_12_months'), ['22.5', '12', '22.5'], 'OCR misspellings');
   assert.deepEqual(p('X 30.0 mg, (4 months) for a period of months\n45.0 mg, (6 months) for a period of_ months'), ['', '', ''], 'no months → nothing');
   assert.deepEqual(p(EN, ['45 mg']), ['45', '', '22.5'], 'dose disagrees → months not used');
+});
+
+test('coordinator email: due date and the reason in brackets', async () => {
+  const { emailDueDate, readDate } = await import('../lib/emailinfo.js');
+  const d = s => emailDueDate(s, new Date('2026-10-22'));
+  assert.deepEqual(d('…assigned for the following date: October 29th 2026 (Bone scan schedule October 28th 2026 and need the injection after).'), { due: '2026-10-29', note: 'Bone scan schedule October 28th 2026 and need the injection after' });
+  assert.deepEqual(d('…assigned for the following date:  November 2 2026'), { due: '2026-11-02', note: '' });
+  assert.deepEqual(d('…pour la date suivante : 21 septembre 2026.'), { due: '2026-09-21', note: '' });
+  assert.deepEqual(d('…pour la date suivante : 1er octobre 2026 (Casodex débuté le 15 septembre)'), { due: '2026-10-01', note: 'Casodex débuté le 15 septembre' });
+  assert.deepEqual(d('…assigned for the following date: ASAP'), { due: '', note: '' });
+  assert.equal(readDate('February 30 2026'), '', 'impossible dates are ignored');
+  assert.equal(readDate('Jan 5', new Date('2026-12-20')), '2027-01-05', 'no year → next one when long past');
 });

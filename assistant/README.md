@@ -95,6 +95,14 @@ in ("22.5 mg, (3 months) for a period of _18_ months"): total doses = months ÷ 
 dose's months (7.5→1, 22.5→3, 30→4, 45→6), unless "Number of injections" is filled
 in. If the scan and the enrollment form disagree on the dose, the card warns you.
 
+**From the coordinator's email** ("…assigned for the following date: October 29th 2026
+(Bone scan … need the injection after)" / "…pour la date suivante : 21 septembre 2026"):
+the **due date** comes from that sentence (it wins over the form; the card says so when
+they differ) and the reason in brackets goes into **Special Instructions** as
+"Coordinator: …". "Please have the patient sign the enrollment form" adds
+"Signature required!". When that email arrives after the forms, the waiting card is
+updated (never a patient already added to VaPiq).
+
 ## Dubbi — ask by typing or voice
 
 Tap the round button in the Dubbi app and ask: "What's new?", "Anything overdue?",

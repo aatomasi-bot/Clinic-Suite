@@ -123,14 +123,14 @@ async function makeEnrollment(file, name) {
 // Paired emails: the coordinator's note and the reports@ fax for the SAME patient.
 export const PAIR_CASES = [
   // Coordinator note (no PDF) + reports@ fax with form AND enrollment → complete
-  { id: 'fake-31-pair-coord', file: '99011', from: 'Julie Exemple <julie.exemple@medicum.ca>', subject: 'New patient AB 99011', body: 'Hello, new patient assigned, documents to follow.', pdfs: [] },
+  { id: 'fake-31-pair-coord', file: '99011', from: 'Julie Exemple <julie.exemple@medicum.ca>', subject: 'New patient AB 99011', body: 'Hello, new patient assigned, documents to follow.\nMerci de confirmer que vous avez bien reçu les documents du patient et que celui-ci figure dans votre portail pour la date suivante : 21 novembre 2026.', pdfs: [] },
   { id: 'fake-32-pair-fax', file: '99011', from: 'Medicum Reports <reports@medicum.ca>', subject: 'fax - AB #99011', body: '',
     pdfs: [{ kind: 'form', name: 'Alice Paire', dose: '22.5' }, { kind: 'enrollment', name: 'Alice Paire' }] },
   // Coordinator note only, no documents at all → ask for both
   // Medicum's real pattern: no-reply@ "New Appointment" with the forms FIRST, then the coordinator's note
   { id: 'fake-34-noreply-docs', file: '99015', from: 'Medicum <no-reply@medicum.ca>', subject: 'New Appointment', body: '',
     pdfs: [{ kind: 'form', name: 'Nora Rendezvous', dose: '45', fname: 'NR99015New.pdf' }, { kind: 'enrollment', name: 'Nora Rendezvous', fname: 'Enrollment_Form_Auto_Generated_99015.pdf' }] },
-  { id: 'fake-35-noreply-coord', file: '99015', from: 'Julie Exemple <julie.exemple@medicum.ca>', subject: 'New patient NR 99015', body: 'Hello, new patient.\n*** Please have the patient sign the enrollment form at your visit and return to Medicum reports***', pdfs: [] },
+  { id: 'fake-35-noreply-coord', file: '99015', from: 'Julie Exemple <julie.exemple@medicum.ca>', subject: 'New patient NR 99015', body: 'Hello, new patient.\n*** Please have the patient sign the enrollment form at your visit and return to Medicum reports***\nKindly confirm that you have received the patient’s documents and that the patient appears in your portal assigned for the following date: October 29th 2026 (Bone scan schedule October 28th 2026 and need the injection after).', pdfs: [] },
   { id: 'fake-33-notice-only', file: '99013', from: 'Sophie Fictive <sophie.fictive@medicum.ca>', subject: 'Nouveau patient EF 99013', body: 'Bonjour, voici un nouveau patient.', pdfs: [] },
 ];
 

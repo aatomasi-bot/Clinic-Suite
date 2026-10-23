@@ -10,6 +10,22 @@ import { getSecret, setSecret, SECRETS } from './keychain.js';
 
 export const HEARTBEAT_ID = '00000000-0000-0000-0000-00000000beef';
 
+// { due, notes } → the card fields to change. The email's date wins over the
+// form's; notes are added to Special Instructions once.
+export function applyCardPatch(row, { due = '', notes = '' } = {}) {
+  const record = { ...row.record };
+  let missing = row.missing_fields || [], warnings = row.warnings || [];
+  if (due && record.due_date !== due) {
+    if (record.due_date && !missing.includes('Due Date')) warnings = [...warnings, `Due date from the coordinator's email (${due}) replaces the form's (${record.due_date}).`];
+    record.due_date = due;
+    missing = missing.filter(f => f !== 'Due Date');
+  }
+  const cur = String(record.special_instructions || '');
+  const add = String(notes || '').split(' | ').filter(n => n && !cur.includes(n));
+  if (add.length) record.special_instructions = [cur, ...add].filter(Boolean).join(' | ');
+  return { record, missing_fields: missing, warnings };
+}
+
 export async function supabaseStore(cfg) {
   const sb = createClient(cfg.url, cfg.publishableKey, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
@@ -82,12 +98,11 @@ export async function supabaseStore(cfg) {
       const rows = must(await sb.from('email_tasks').update({ status: 'sending' }).eq('id', id).eq('status', 'send_approved').select('id'));
       return rows.length === 1;
     },
-    async markSignatureRequired(pendingId, note) {
-      const row = must(await sb.from('pending_patients').select('id,record').eq('id', pendingId).maybeSingle());
-      if (!row) return;
-      const cur = String(row.record.special_instructions || '');
-      if (cur.includes(note)) return;
-      must(await sb.from('pending_patients').update({ record: { ...row.record, special_instructions: [cur, note].filter(Boolean).join(' | ') } }).eq('id', pendingId));
+    // What a later email says, added to a card that is still waiting for you
+    async patchCard(pendingId, patch) {
+      const row = must(await sb.from('pending_patients').select('id,status,record,missing_fields,warnings').eq('id', pendingId).maybeSingle());
+      if (!row || row.status !== 'pending') return;
+      must(await sb.from('pending_patients').update(applyCardPatch(row, patch)).eq('id', pendingId));
     },
     async updateTask(id, fields) {
       must(await sb.from('email_tasks').update(fields).eq('id', id));
@@ -162,10 +177,9 @@ export function offlineStore({ patientsFile, outFile }) {
     async tasksToSend() { return tasks.filter(t => t.status === 'send_approved'); },
     async claimTask(id) { const t = tasks.find(t => t.id === id); if (!t || t.status !== 'send_approved') return false; t.status = 'sending'; save(); return true; },
     async updateTask(id, fields) { Object.assign(tasks.find(t => t.id === id), fields); save(); },
-    async markSignatureRequired(pendingId, note) {
-      const r = rows.find(x => x.id === pendingId); if (!r) return;
-      const cur = String(r.record.special_instructions || '');
-      if (!cur.includes(note)) { r.record.special_instructions = [cur, note].filter(Boolean).join(' | '); save(); }
+    async patchCard(pendingId, patch) {
+      const r = rows.find(x => x.id === pendingId); if (!r || r.status !== 'pending') return;
+      Object.assign(r, applyCardPatch(r, patch)); save();
     },
     async failStuckSending() {},
     async loadPatients() { return patients; },
