@@ -582,6 +582,7 @@ function newCard(item) {
   return `${cardOpen(item, '🩺', 'ic-new')}<div class="ctitle"><div class="kind">New patient</div><b>${esc(title)}</b><div class="meta">${sub}</div></div>${chips(item)}</div>
     ${docsBlock(t)}
     ${warnBox([...(t?.warnings || []), ...(r?.warnings || [])])}
+    ${r && r.record.special_instructions ? `<p class="note" style="margin:8px 0 0">📝 <b>${esc(r.record.special_instructions)}</b></p>` : ''}
     ${r ? `<details class="form"${(r.missing_fields || []).length ? ' open' : ''}><summary>Review details</summary><div class="grid">
       ${field(r, 'patient_name', 'Patient Name', { wide: true, required: true })}
       ${field(r, 'file_number', 'File Number', { required: true })}
@@ -590,6 +591,9 @@ function newCard(item) {
       ${field(r, 'phone1', 'Phone 1', { type: 'tel' })}
       ${field(r, 'phone2', 'Phone 2', { type: 'tel' })}
       ${field(r, 'due_date', 'Due Date', { type: 'date' })}
+      ${field(r, 'total_doses', 'Total Doses', { type: 'number' })}
+      ${field(r, 'doses_remaining', 'Doses Left', { type: 'number' })}
+      ${field(r, 'special_instructions', 'Special Instructions', { wide: true })}
     </div></details>` : `<p class="note">The assignment form hasn't arrived yet — you can ask the coordinator for the documents now.</p>`}
     <div class="acts">
       <button class="btn ghost" data-act="reject">${r ? 'Reject' : 'Dismiss'}</button>

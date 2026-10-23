@@ -4,13 +4,13 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { CASES, CLOSE_CASES, PAIR_CASES, writeFakeInbox } from '../make-fake-pdfs.js';
+import { CASES, CLOSE_CASES, PAIR_CASES, writeFakeInbox, makeForm } from '../make-fake-pdfs.js';
 import { parsePdf } from '../lib/pdf.js';
 import { isAssignment, classifyEmail, subjectFileNumber } from '../lib/classify.js';
 import { documentTypes } from '../lib/doctype.js';
 import { findExisting, sameNameOtherFile } from '../lib/match.js';
 import { buildRecord, toIsoDate } from '../lib/record.js';
-import { runIntake, loadConfig } from '../intake.js';
+import { runIntake, loadConfig, needsSignature } from '../intake.js';
 import { testFolderSource } from '../lib/sources.js';
 import { offlineStore } from '../lib/store.js';
 import { runOutbox } from '../lib/outbox.js';
@@ -147,6 +147,8 @@ test('intake end to end (offline): new, prescription, close-file; re-run adds no
   assert.ok(nr[0].documents.assignment && nr[0].documents.enrollment, 'NR99015New.pdf = assignment, Enrollment_Form_Auto_Generated = enrollment');
   assert.match(nr[0].reply_body, /^Hello Julie,/);
   assert.ok(nr[0].pending_id);
+  assert.equal(store.rows.find(r => r.id === nr[0].pending_id).record.special_instructions, 'Signature required!', 'signature line in the coordinator note → note on the card');
+  assert.equal(byFile['99011'].record.special_instructions, '', 'no signature line → no note');
   // Note with no documents → polite request for both, in French
   assert.match(task('new_patient', '99013').reply_body, /je n'ai pas reçu le formulaire d'assignation ni le formulaire d'inscription/);
   // Form only → asks for the enrollment form
@@ -246,4 +248,39 @@ test('safety net: overdue items, scheduling gaps, morning text (counts only)', a
   const text = morningText(openCounts(snap), g, 4);
   assert.match(text, /to do · ⚠️ 4 overdue · 1 waiting for documents · 2 patients to schedule \(1 past due\) · 1 to confirm · 1 visit today/);
   assert.doesNotMatch(text, /\d{5}/, 'no file numbers in notifications');
+});
+
+test('total doses: number of injections, else months ÷ the dose months, else the default', async () => {
+  const { repeatsFor, parseMedicum } = require('../../js/medicum-parse.js');
+  assert.equal(repeatsFor('22.5', '', '18').total, '6');
+  assert.equal(repeatsFor('45', '', '6').total, '1');
+  assert.equal(repeatsFor('45', '', '12').total, '2');
+  assert.equal(repeatsFor('30', '', '12').total, '3');
+  assert.equal(repeatsFor('7.5', '', '6').total, '6');
+  assert.equal(repeatsFor('30', '', '18').total, '', '18 is not a multiple of 4 → leave the default and warn');
+  assert.match(repeatsFor('30', '', '18').why, /does not divide/);
+  assert.equal(repeatsFor('22.5', '5', '18').total, '5', 'number of injections wins');
+  // Medicum's enrollment form: the label is there, the number usually is not
+  const empty = parseMedicum("1-m (7.5 mg) 3-m (22.5mg) 4-m (30mg) 6-m (45mg) MEDICUM #: 98100 Number of injections/Nombre d'injection a recevoir: Language: English", ['22.5 mg'], 'x.pdf');
+  assert.equal(empty.injections, undefined);
+  const filled = parseMedicum("MEDICUM #: 98100 Number of injections/Nombre d'injection a recevoir: 6 Language: English", [], 'x.pdf');
+  assert.equal(filled.injections, '6');
+  // OCR text: months right after the chosen option
+  assert.equal(parseMedicum('1-m (7.5 mg) [X] 3-m (22.5mg) 18 4-m (30mg) 6-m (45mg)', [], 'x.pdf').months, '18');
+  // Text PDF: months drawn next to the ticked box
+  const pdf = async c => (await parsePdf(await makeForm({ file: '98100', name: 'Mona Mois', mark: 'x', ...c }), 'f.pdf')).result;
+  const a = await pdf({ dose: '22.5', months: '18' });
+  assert.equal(a.dose, '22.5'); assert.equal(a.months, '18'); assert.equal(a.totalDoses, '6');
+  assert.deepEqual([buildRecord(a, { fileNumber: '98100' }).record.total_doses, buildRecord(a, { fileNumber: '98100' }).record.doses_remaining], ['6', '6']);
+  const b = await pdf({ dose: '45', months: '6' });
+  assert.equal(b.totalDoses, '1');
+  const c = await pdf({ dose: '30' });
+  assert.equal(c.totalDoses, '');
+  assert.equal(buildRecord(c, { fileNumber: '98100' }).record.total_doses, '4', 'nothing marked → default');
+});
+
+test('signature line in the email → "Signature required!"', () => {
+  assert.ok(needsSignature('*** Please have the patient sign the enrollment form at your visit and return to Medicum reports***'));
+  assert.ok(needsSignature('Please have the patient sign the enrolment form'));
+  assert.ok(!needsSignature('*** This form is considered a valid prescription with Medicum****'));
 });

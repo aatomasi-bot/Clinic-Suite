@@ -82,6 +82,13 @@ export async function supabaseStore(cfg) {
       const rows = must(await sb.from('email_tasks').update({ status: 'sending' }).eq('id', id).eq('status', 'send_approved').select('id'));
       return rows.length === 1;
     },
+    async markSignatureRequired(pendingId, note) {
+      const row = must(await sb.from('pending_patients').select('id,record').eq('id', pendingId).maybeSingle());
+      if (!row) return;
+      const cur = String(row.record.special_instructions || '');
+      if (cur.includes(note)) return;
+      must(await sb.from('pending_patients').update({ record: { ...row.record, special_instructions: [cur, note].filter(Boolean).join(' | ') } }).eq('id', pendingId));
+    },
     async updateTask(id, fields) {
       must(await sb.from('email_tasks').update(fields).eq('id', id));
     },
@@ -155,6 +162,11 @@ export function offlineStore({ patientsFile, outFile }) {
     async tasksToSend() { return tasks.filter(t => t.status === 'send_approved'); },
     async claimTask(id) { const t = tasks.find(t => t.id === id); if (!t || t.status !== 'send_approved') return false; t.status = 'sending'; save(); return true; },
     async updateTask(id, fields) { Object.assign(tasks.find(t => t.id === id), fields); save(); },
+    async markSignatureRequired(pendingId, note) {
+      const r = rows.find(x => x.id === pendingId); if (!r) return;
+      const cur = String(r.record.special_instructions || '');
+      if (!cur.includes(note)) { r.record.special_instructions = [cur, note].filter(Boolean).join(' | '); save(); }
+    },
     async failStuckSending() {},
     async loadPatients() { return patients; },
     async knownSourceKeys(keys) { return new Set(rows.map(r => r.source_key).filter(k => keys.includes(k))); },
