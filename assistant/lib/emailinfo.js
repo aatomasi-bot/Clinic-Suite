@@ -37,7 +37,8 @@ function valid(y, mo, d) {
   return dt.getFullYear() === y && dt.getMonth() === mo - 1 && dt.getDate() === d ? `${y}-${pad(mo)}-${pad(d)}` : '';
 }
 
-const ASSIGNED = /(?:assigned\s+for\s+the\s+following\s+date|pour\s+la\s+date\s+suivante)\s*:?\s*([^\n(]{4,40})(?:\(([^)\n]{0,300})\)?)?/i;
+// Also "Next injection scheduled for: 9th March 2027" (reports@ prescription copy, Oct 23, 2026)
+const ASSIGNED = /(?:assigned\s+for\s+the\s+following\s+date|pour\s+la\s+date\s+suivante|next\s+injection\s+(?:is\s+)?scheduled\s+(?:for|on)|prochaine\s+injection\s+(?:est\s+)?(?:pr[ée]vue|planifi[ée]e|c[ée]dul[ée]e)\s+(?:le|pour|au))\s*:?\s*([^\n(]{4,40})(?:\(([^)\n]{0,300})\)?)?/i;
 
 // → { due: 'YYYY-MM-DD' | '', note: 'text in brackets' | '' }
 export function emailDueDate(body, emailDate) {
@@ -55,4 +56,31 @@ export const needsSignature = text => SIGNATURE_RX.test(String(text || ''));
 // Special Instructions text from what the emails said
 export function cardNotes({ signature, note }) {
   return [signature ? SIGNATURE_NOTE : '', note ? `Coordinator: ${note}` : ''].filter(Boolean).join(' | ');
+}
+
+// A coordinator writing from reports@medicum.ca signs the email:
+//   "Kavya Shetty / Coordonnatrice administrative des patients/… / kavyas@medicum.ca"
+// → { address: 'kavyas@medicum.ca', firstName: 'Kavya' } (the reply goes to her, CC reports@)
+const SHARED = /^(?:reports|no-?reply|nsd|info|admin|fax|support)@/i;
+export function signedBy(body) {
+  const text = String(body || '').replace(/\r/g, '').split(/\n(?:From|De)\s*:|\n-{2,}\s*Original/i)[0];   // not quoted history
+  const address = (text.match(/\b[a-z0-9._-]+@medicum\.ca\b/gi) || []).map(a => a.toLowerCase()).find(a => !SHARED.test(a));
+  if (!address) return null;
+  const lines = text.split(/\n/).map(l => l.trim()).filter(Boolean);
+  const role = lines.findIndex(l => /coordonnat|coordinat/i.test(l));
+  const nameLine = role > 0 ? lines[role - 1] : '';
+  const first = (nameLine.match(/^([A-ZÀ-Ý][a-zà-ÿ'-]+)(?:\s+[A-ZÀ-Ý][A-Za-zà-ÿ'-]+){0,3}$/) || [])[1] || '';
+  return { address, firstName: first };
+}
+
+// The coordinator's own words: the message up to the sign-off — not the bilingual
+// signature or confidentiality notice, which made English emails look French.
+export function openingText(body) {
+  const text = String(body || '').replace(/\r/g, '').split(/\n(?:From|De)\s*:|\n-{2,}\s*Original/i)[0];
+  const out = [];
+  for (const line of text.split(/\n/)) {
+    if (/^\s*(thank|thanks|merci|regards|best|cordialement|salutations|have a (great|good|nice)|bonne (journ|fin))/i.test(line)) break;
+    out.push(line);
+  }
+  return out.join('\n').slice(0, 800);
 }

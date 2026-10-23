@@ -87,6 +87,19 @@ export async function supabaseStore(cfg) {
         .gte('created_at', since).order('created_at', { ascending: false }).limit(1));
       return rows[0] || null;
     },
+    // Open new-patient items of the last N days (to look for their other emails)
+    async openNewPatientItems(days) {
+      const since = new Date(Date.now() - days * 864e5).toISOString();
+      return must(await sb.from('email_tasks').select('id,group_key,pending_id,documents,status').eq('kind', 'new_patient')
+        .in('status', ['todo', 'waiting_docs', 'reply_ready']).not('group_key', 'is', null).gte('created_at', since));
+    },
+    async getCard(id) {
+      return must(await sb.from('pending_patients').select('id,status,attachment_name').eq('id', id).maybeSingle());
+    },
+    // Rebuild a card that is still waiting (never one you already decided on)
+    async replaceCard(id, fields) {
+      must(await sb.from('pending_patients').update(fields).eq('id', id).eq('status', 'pending'));
+    },
     async insertTask(row) {
       return must(await sb.from('email_tasks').insert(row).select('id').single()).id;
     },
@@ -173,6 +186,12 @@ export function offlineStore({ patientsFile, outFile }) {
       const since = Date.now() - days * 864e5;
       return tasks.filter(t => t.kind === 'new_patient' && t.group_key === k && Date.parse(t.created_at) >= since).at(-1) || null;
     },
+    async openNewPatientItems(days) {
+      const since = Date.now() - days * 864e5;
+      return tasks.filter(t => t.kind === 'new_patient' && t.group_key && ['todo', 'waiting_docs', 'reply_ready'].includes(t.status) && Date.parse(t.created_at) >= since);
+    },
+    async getCard(id) { return rows.find(r => r.id === id) || null; },
+    async replaceCard(id, fields) { const r = rows.find(x => x.id === id); if (r && r.status === 'pending') { Object.assign(r, fields); save(); } },
     async insertTask(row) { const id = `task-${tasks.length + 1}`; tasks.push({ id, created_at: new Date().toISOString(), ...row }); save(); return id; },
     async tasksToSend() { return tasks.filter(t => t.status === 'send_approved'); },
     async claimTask(id) { const t = tasks.find(t => t.id === id); if (!t || t.status !== 'send_approved') return false; t.status = 'sending'; save(); return true; },

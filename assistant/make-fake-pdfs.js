@@ -131,6 +131,19 @@ export const PAIR_CASES = [
   { id: 'fake-34-noreply-docs', file: '99015', from: 'Medicum <no-reply@medicum.ca>', subject: 'New Appointment', body: '',
     pdfs: [{ kind: 'form', name: 'Nora Rendezvous', dose: '45', fname: 'NR99015New.pdf' }, { kind: 'enrollment', name: 'Nora Rendezvous', fname: 'Enrollment_Form_Auto_Generated_99015.pdf' }] },
   { id: 'fake-35-noreply-coord', file: '99015', from: 'Julie Exemple <julie.exemple@medicum.ca>', subject: 'New patient NR 99015', body: 'Hello, new patient.\n*** Please have the patient sign the enrollment form at your visit and return to Medicum reports***\nKindly confirm that you have received the patient’s documents and that the patient appears in your portal assigned for the following date: October 29th 2026 (Bone scan schedule October 28th 2026 and need the injection after).', pdfs: [] },
+  // A coordinator (Kavya) writing from reports@ with only a FAX copy of the prescription —
+  // which even has patient-like text, and must never be read. The forms came from
+  // no-reply@ and that email is already filed in Medicum: the assistant must find it.
+  { id: 'fake-41-kavya-fax', file: '99031', from: 'Medicum Reports <reports@medicum.ca>', subject: 'fax - RA #99031',
+    body: 'Hello Abdul,\nPlease find attached a copy of the prescription for the patient: Rene Testabel #99031.\nNext injection scheduled for: 9th March 2027\nHave a great day\nKavya Fictive\nCoordonnatrice administrative des patients/Administrative Patient Coordinator.\nkavyaf@medicum.ca',
+    pdfs: [{ kind: 'form', name: 'Wrong Fax Person', dose: '7.5', file: '20261023', fname: 'FAX_20261023_1792782821_345.pdf' }] },
+  { id: 'fake-42-kavya-noreply', file: '99031', from: 'Medicum <no-reply@medicum.ca>', subject: 'New Appointment', body: '', filed: true,
+    pdfs: [{ kind: 'form', name: 'Rene Testabel', dose: '22.5', fname: 'RA99031.pdf' }, { kind: 'form', name: 'Rene Testabel', dose: '22.5', fname: 'Enrollment_Form_Auto_Generated_30182.pdf' }] },
+  // Card made from the assignment form first, then the enrollment form arrives → card rebuilt from it
+  { id: 'fake-43-rebuild-coord', file: '99032', from: 'Julie Exemple <julie.exemple@medicum.ca>', subject: 'New patient RB 99032', body: 'Hello, new patient.',
+    pdfs: [{ kind: 'form', name: 'From Assignment', dose: '45', fname: 'RB99032.pdf' }] },
+  { id: 'fake-44-rebuild-noreply', file: '99032', from: 'Medicum <no-reply@medicum.ca>', subject: 'New Appointment', body: '',
+    pdfs: [{ kind: 'form', name: 'From Enrollment', dose: '45', fname: 'Enrollment_Form_Auto_Generated_30199.pdf' }] },
   { id: 'fake-33-notice-only', file: '99013', from: 'Sophie Fictive <sophie.fictive@medicum.ca>', subject: 'Nouveau patient EF 99013', body: 'Bonjour, voici un nouveau patient.', pdfs: [] },
 ];
 
@@ -146,15 +159,15 @@ export async function writeFakeInbox(dir = outDir) {
   for (const c of PAIR_CASES) {
     const names = [];
     for (const [i, d] of c.pdfs.entries()) {
-      const fname = d.fname ? `${c.id}-${d.fname}` : `${c.id}-${i + 1}.pdf`;
+      const fname = d.fname || `${c.id}-${i + 1}.pdf`;   // real attachment names (they decide the document type)
       const bytes = d.kind === 'enrollment' ? await makeEnrollment(c.file, d.name)
-        : await makeForm({ file: c.file, name: d.name, dose: d.dose, mark: 'x' });
+        : await makeForm({ file: d.file || c.file, name: d.name, dose: d.dose, mark: 'x' });
       fs.writeFileSync(path.join(dir, fname), bytes);
       names.push(fname);
     }
     fs.writeFileSync(path.join(dir, `${c.id}.json`), JSON.stringify({
       messageId: `<${c.id}@fake.local>`, from: c.from, subject: c.subject, bodyText: c.body,
-      date: '2026-10-22T14:00:00Z', attachments: names,
+      date: '2026-10-22T14:00:00Z', attachments: names, ...(c.filed ? { filed: true } : {}),
     }, null, 2));
   }
   for (const c of CLOSE_CASES) {
