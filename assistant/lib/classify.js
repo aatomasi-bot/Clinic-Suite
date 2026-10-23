@@ -5,10 +5,16 @@
 //                 new prescription when the file number already exists in VaPiq)
 //   null        — everything else (replies, on-hold, transfers, updates… left for you)
 // Always: sender's domain must be allowed and the sender not excluded.
+// no-reply@medicum.ca ("New Appointment" + the forms) is read, never replied to.
 
 export function senderAddress(from) {
   const m = String(from || '').match(/<([^>]+)>/);
   return (m ? m[1] : String(from || '')).trim().toLowerCase();
+}
+
+// May this address receive a reply? (read-only senders like no-reply@ may not)
+export function replyAllowed(addr, rules) {
+  return senderAllowed(addr, rules) && !(rules.noReplySenders || []).map(s => s.toLowerCase()).includes(senderAddress(addr));
 }
 
 export function senderAllowed(from, rules) {
@@ -23,7 +29,11 @@ const any = (list, s) => (list || []).some(rx => new RegExp(rx, 'i').test(s));
 export function classifyEmail(email, rules) {
   if (!senderAllowed(email.from, rules)) return { kind: null, why: 'sender' };
   const subject = String(email.subject || '');
-  if (/^\s*(re|tr|fw|fwd)\s*:/i.test(subject)) return { kind: null, why: 'reply/forward' };
+  if (/^\s*(re|tr|fw|fwd)\s*:/i.test(subject)) {
+    // A reply in a new-patient thread that carries the documents ("Re: New patient XX 12345" + PDF) joins that patient's item
+    if (email.pdfs && email.pdfs.length && isNewPatientSubject(subject, rules)) return { kind: 'assignment' };
+    return { kind: null, why: 'reply/forward' };
+  }
   if (any(rules.closeSubject, subject)) return { kind: 'close_file' };
   // "Enrollment signed by patient - SR 27740" + PDF → completes that patient's documents
   if (any(rules.enrollmentSubject, subject) && email.pdfs && email.pdfs.length) return { kind: 'enrollment_doc' };

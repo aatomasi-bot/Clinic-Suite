@@ -7,6 +7,7 @@ import { createRequire } from 'node:module';
 import { CASES, CLOSE_CASES, PAIR_CASES, writeFakeInbox } from '../make-fake-pdfs.js';
 import { parsePdf } from '../lib/pdf.js';
 import { isAssignment, classifyEmail, subjectFileNumber } from '../lib/classify.js';
+import { documentTypes } from '../lib/doctype.js';
 import { findExisting, sameNameOtherFile } from '../lib/match.js';
 import { buildRecord, toIsoDate } from '../lib/record.js';
 import { runIntake, loadConfig } from '../intake.js';
@@ -49,7 +50,11 @@ test('classify: assignments, prescriptions and close-file requests', () => {
   assert.equal(k('Sophie <sophiec@medicum.ca>', 'Fermeture de dossier M.S # 13328', []), 'close_file');
   assert.equal(k('Amelia <ameliag@medicum.ca>', 'Close File - KD 32542', []), 'close_file');
   assert.equal(k('x <x@gmail.com>', 'Close file 1234', []), null, 'other domains never');
-  assert.equal(k('Medicum <no-reply@medicum.ca>', 'New Appointment'), null);
+  assert.equal(k('Medicum <no-reply@medicum.ca>', 'New Appointment'), 'assignment', 'no-reply@ New Appointment carries the forms');
+  assert.equal(k('Medicum <no-reply@medicum.ca>', 'New Appointment', []), 'new_patient_notice');
+  assert.equal(k('Giulia <giuliar@medicum.ca>', 'Re: New patient JS 35290'), 'assignment', 'reply carrying the documents joins the item');
+  assert.equal(k('Giulia <giuliar@medicum.ca>', 'Re: New patient JS 35290', []), null);
+  assert.equal(k('x <nsd@medicum.ca>', 'New Appointment'), null, 'monthly list sender stays excluded');
   assert.equal(k('a <a@medicum.ca>', 'Re: Fermeture de dossier S.S-G # 13623', []), null, 'replies are not new requests');
   assert.equal(k('a <a@medicum.ca>', 'File on Hold - MK 34451', []), null);
   assert.equal(k('a <a@medicum.ca>', 'Temporary Transfer - AG 35251', []), null);
@@ -60,6 +65,17 @@ test('classify: assignments, prescriptions and close-file requests', () => {
   assert.ok(isAssignment({ from: 'Giulia <giuliar@medicum.ca>', subject: 'New Patient JGC 35290', pdfs }, rules).ok);
   assert.equal(subjectFileNumber('Patient\'s RC 23226 and AC 14092'), '14092');
   assert.equal(subjectFileNumber('fax - SS #33816'), '33816');
+});
+
+test('document types: Medicum file names', () => {
+  const t = (name, text = '', scanned = !text) => documentTypes({ name, text, scanned });
+  assert.deepEqual(t('JS12345New.pdf'), ['assignment']);
+  assert.deepEqual(t('DP 12345 New.pdf'), ['assignment']);
+  assert.deepEqual(t('KS12345NewReopen.pdf'), ['assignment']);
+  assert.deepEqual(t('RM12345NewCPP.jpg'), ['assignment']);
+  assert.deepEqual(t('Enrollment_Form_Auto_Generated_12345.pdf', 'PATIENT NAME / NOM DU PATIENT ... ENROLLMENT'), ['enrollment'], 'named enrollment form is only the enrollment form');
+  assert.deepEqual(t('RX-PC12345.pdf'), []);
+  assert.deepEqual(t('Nurse_Report_123456.pdf'), []);
 });
 
 test('reply drafts: coordinator name, language, file reference, gender-neutral', () => {
@@ -123,6 +139,14 @@ test('intake end to end (offline): new, prescription, close-file; re-run adds no
   assert.ok(pair[0].pending_id, 'card pre-filled from the fax');
   assert.match(pair[0].reply_body, /along with the documents \(assignment form and enrollment form\)/);
   assert.deepEqual(pair[0].warnings, []);
+  // no-reply@ "New Appointment" first, coordinator note second → ONE item, reply to the coordinator (never no-reply@)
+  const nr = store.tasks.filter(t => t.kind === 'new_patient' && t.group_key === '99015');
+  assert.equal(nr.length, 1);
+  assert.equal(nr[0].to_address, 'julie.exemple@medicum.ca');
+  assert.deepEqual(nr[0].cc_addresses, ['reports@medicum.ca']);
+  assert.ok(nr[0].documents.assignment && nr[0].documents.enrollment, 'NR99015New.pdf = assignment, Enrollment_Form_Auto_Generated = enrollment');
+  assert.match(nr[0].reply_body, /^Hello Julie,/);
+  assert.ok(nr[0].pending_id);
   // Note with no documents → polite request for both, in French
   assert.match(task('new_patient', '99013').reply_body, /je n'ai pas reçu le formulaire d'assignation ni le formulaire d'inscription/);
   // Form only → asks for the enrollment form
@@ -152,6 +176,7 @@ test('outbox: only approved replies go, once, test replies are saved not sent, s
   const ok = await store.insertTask({ ...base, status: 'send_approved', to_address: 'julie.exemple@medicum.ca', reply_body: 'Hello Julie' });
   const draft = await store.insertTask({ ...base, status: 'reply_ready', to_address: 'julie.exemple@medicum.ca', reply_body: 'not approved' });
   const stranger = await store.insertTask({ ...base, status: 'send_approved', to_address: 'someone@gmail.com', reply_body: 'x' });
+  const noreply = await store.insertTask({ ...base, status: 'send_approved', to_address: 'no-reply@medicum.ca', reply_body: 'x' });
   const real = await store.insertTask({ ...base, is_test: false, status: 'send_approved', to_address: 'julie.exemple@medicum.ca', reply_body: 'real' });
   const tm = testMailer(path.join(tmp, 'outbox-test'));
   const live = { send: async () => { throw new Error('live mailer must not be used in test mode'); } };
@@ -160,6 +185,7 @@ test('outbox: only approved replies go, once, test replies are saved not sent, s
   assert.equal(st(ok), 'sent');
   assert.equal(st(draft), 'reply_ready');
   assert.equal(st(stranger), 'failed');
+  assert.equal(st(noreply), 'failed', 'never reply to no-reply@');
   assert.equal(st(real), 'send_approved', 'real reply waits for live mode');
   assert.equal(c.sent, 1);
   const eml = fs.readFileSync(path.join(tmp, 'outbox-test', `${ok}.eml`), 'utf8');

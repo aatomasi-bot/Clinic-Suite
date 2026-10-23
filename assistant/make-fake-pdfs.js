@@ -125,6 +125,10 @@ export const PAIR_CASES = [
   { id: 'fake-32-pair-fax', file: '99011', from: 'Medicum Reports <reports@medicum.ca>', subject: 'fax - AB #99011', body: '',
     pdfs: [{ kind: 'form', name: 'Alice Paire', dose: '22.5' }, { kind: 'enrollment', name: 'Alice Paire' }] },
   // Coordinator note only, no documents at all → ask for both
+  // Medicum's real pattern: no-reply@ "New Appointment" with the forms FIRST, then the coordinator's note
+  { id: 'fake-34-noreply-docs', file: '99015', from: 'Medicum <no-reply@medicum.ca>', subject: 'New Appointment', body: '',
+    pdfs: [{ kind: 'form', name: 'Nora Rendezvous', dose: '45', fname: 'NR99015New.pdf' }, { kind: 'enrollment', name: 'Nora Rendezvous', fname: 'Enrollment_Form_Auto_Generated_99015.pdf' }] },
+  { id: 'fake-35-noreply-coord', file: '99015', from: 'Julie Exemple <julie.exemple@medicum.ca>', subject: 'New patient NR 99015', body: 'Hello, new patient.', pdfs: [] },
   { id: 'fake-33-notice-only', file: '99013', from: 'Sophie Fictive <sophie.fictive@medicum.ca>', subject: 'Nouveau patient EF 99013', body: 'Bonjour, voici un nouveau patient.', pdfs: [] },
 ];
 
@@ -140,7 +144,7 @@ export async function writeFakeInbox(dir = outDir) {
   for (const c of PAIR_CASES) {
     const names = [];
     for (const [i, d] of c.pdfs.entries()) {
-      const fname = `${c.id}-${i + 1}.pdf`;
+      const fname = d.fname ? `${c.id}-${d.fname}` : `${c.id}-${i + 1}.pdf`;
       const bytes = d.kind === 'enrollment' ? await makeEnrollment(c.file, d.name)
         : await makeForm({ file: c.file, name: d.name, dose: d.dose, mark: 'x' });
       fs.writeFileSync(path.join(dir, fname), bytes);
