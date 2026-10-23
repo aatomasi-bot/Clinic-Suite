@@ -8435,15 +8435,9 @@ async function loadInvoicesFromDB() {
       from += PAGE;
     }
     _invoiceCache = {};
-    allRows.forEach(row => {
-      _invoiceCache[row.month_key] = {
-        days:           row.days           || [],
-        invoice_number: row.invoice_number || autoInvoiceNumber(),
-        ignored_dates:  row.ignored_dates  || [],
-        finalized:      row.finalized      || false,
-        db_id:          row.id,
-      };
-    });
+    allRows.forEach(row => { _invoiceCache[row.month_key] = _invoiceFromRow(row); });
+    // Changes made here that haven't reached Supabase yet stay on screen
+    _invOps().forEach(o => _applyInvoiceOp(loadInvoiceData(o.key), o.op));
   } catch(e) {
     console.warn('Invoice DB load failed — using local cache:', e.message);
     // Migration: try to load from localStorage as fallback
@@ -8462,10 +8456,7 @@ async function loadInvoicesFromDB() {
 function ignoreDate(date) {
   const key  = invoiceStorageKey();
   const data = loadInvoiceData(key);
-  if (!data.ignored_dates.includes(date)) {
-    data.ignored_dates.push(date);
-    saveInvoiceData(key, data);
-  }
+  if (!data.ignored_dates.includes(date)) changeInvoice(key, { type: 'ignore', dates: [date] });
   renderInvoiceView();
 }
 
@@ -8476,8 +8467,7 @@ function ignoreAllOld() {
   if (!confirm(`Ignore ${allUnbilled.length} older unbilled dates? They won't appear again.`)) return;
   const key  = invoiceStorageKey();
   const data = loadInvoiceData(key);
-  allUnbilled.forEach(d => { if (!data.ignored_dates.includes(d)) data.ignored_dates.push(d); });
-  saveInvoiceData(key, data);
+  changeInvoice(key, { type: 'ignore', dates: allUnbilled });
   toast(`${allUnbilled.length} older dates dismissed`, 'success');
   renderInvoiceView();
 }
@@ -8487,43 +8477,87 @@ function finalizeInvoice() {
   const data = loadInvoiceData(key);
   if (!data.days.length) { toast('No days added yet — nothing to finalize', 'warning'); return; }
   if (!confirm('Mark this month\'s invoice as finalized?\n\nThe invoice will be locked and a new one will start next month.')) return;
-  data.finalized = true;
-  saveInvoiceData(key, data);
+  changeInvoice(key, { type: 'finalize' });
   toast('✓ Invoice finalized — export it now', 'success');
   renderInvoiceView();
 }
 
-function saveInvoiceData(key, data) {
-  // Update in-memory cache immediately (sync)
-  _invoiceCache[key] = data;
-  // Persist to Supabase asynchronously (cross-device sync)
-  _saveInvoiceToDB(key, data);
-}
-
-async function _saveInvoiceToDB(key, data) {
-  if (!_sb) return;
-  try {
-    const payload = {
-      month_key:      key,
-      invoice_number: data.invoice_number || '',
-      days:           data.days           || [],
-      ignored_dates:  data.ignored_dates  || [],
-      finalized:      data.finalized      || false,
-      updated_at:     new Date().toISOString(),
-    };
-    // Upsert: insert or update based on month_key
-    const { error } = await _sb.from('invoices')
-      .upsert(payload, { onConflict: 'month_key' });
-    if (error) throw error;
-    // Update local db_id if newly created
-    const { data: row } = await _sb.from('invoices')
-      .select('id').eq('month_key', key).single();
-    if (row && _invoiceCache[key]) _invoiceCache[key].db_id = row.id;
-  } catch(e) {
-    console.error('Invoice sync to DB failed:', e.message);
-    // Fallback: keep in localStorage so data isn't lost
-    try { localStorage.setItem(key, JSON.stringify(data)); } catch(e2){}
+// ── Invoice changes (cross-device safe) ──────────────────────────────────
+// A month used to be saved as one block from this device's copy, so a device
+// with an older copy could erase what the other device had just added. Now
+// each change is a small operation (add a day, remove a day, CPP on/off, …)
+// applied to the copy currently in Supabase right before saving, with a check
+// that nobody saved in between. Offline, operations wait here and are retried.
+function _applyInvoiceOp(data, op) {
+  data.days = data.days || []; data.ignored_dates = data.ignored_dates || [];
+  switch (op.type) {
+    case 'setDay':
+      data.days = data.days.filter(d => d.date !== op.day.date).concat([op.day]).sort((a, b) => a.date.localeCompare(b.date)); break;
+    case 'removeDay': data.days = data.days.filter(d => d.date !== op.date); break;
+    case 'setCpp': {
+      const day = data.days.find(d => d.date === op.date);
+      const p = day && day.patients.find(x => String(x.file) === String(op.file));
+      if (p) p.cpp = op.cpp; break;
+    }
+    case 'ignore': op.dates.forEach(d => { if (!data.ignored_dates.includes(d)) data.ignored_dates.push(d); }); break;
+    case 'finalize': data.finalized = true; break;
+    case 'number': data.invoice_number = op.value; break;
   }
+  return data;
+}
+const _invOps = () => _lsGet('_inv_ops', '[]').slice();
+function _setInvOps(ops) { try { localStorage.setItem('_inv_ops', JSON.stringify(ops)); } catch(e) {} }
+let _invLocalTs = 0, _invSyncWarned = false, _invFlushing = null;
+
+function changeInvoice(key, op) {
+  _applyInvoiceOp(loadInvoiceData(key), op);   // on screen right away
+  _setInvOps([..._invOps(), { id: Date.now() + '-' + Math.random().toString(36).slice(2, 8), key, op }]);
+  _flushInvoiceOps();
+}
+function _flushInvoiceOps() {
+  if (!_invFlushing) _invFlushing = _doFlushInvoiceOps().finally(() => { _invFlushing = null; });
+  return _invFlushing;
+}
+async function _doFlushInvoiceOps() {
+  if (!_sb) return;
+  while (_invOps().length) {
+    try { await _saveInvoiceMonth(_invOps()[0].key); }
+    catch (e) {
+      console.warn('Invoice sync:', e.message);
+      if (!_invSyncWarned) { _invSyncWarned = true; toast('Invoice saved on this device — it will sync when the connection is back', 'warning', '🧾'); }
+      return;
+    }
+  }
+  _invSyncWarned = false;
+}
+const _invoiceFromRow = row => ({ days: row.days || [], invoice_number: row.invoice_number || autoInvoiceNumber(),
+  ignored_dates: row.ignored_dates || [], finalized: row.finalized || false, db_id: row.id });
+async function _saveInvoiceMonth(key) {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const ops = _invOps().filter(o => o.key === key);
+    if (!ops.length) return;
+    const { data: row, error } = await _sb.from('invoices').select('*').eq('month_key', key).maybeSingle();
+    if (error) throw error;
+    const base = row ? _invoiceFromRow(row)
+      : { days: [], invoice_number: (_invoiceCache[key] && _invoiceCache[key].invoice_number) || autoInvoiceNumber(), ignored_dates: [], finalized: false };
+    const merged = ops.reduce((d, o) => _applyInvoiceOp(d, o.op), JSON.parse(JSON.stringify(base)));
+    const payload = { month_key: key, invoice_number: merged.invoice_number || '', days: merged.days, ignored_dates: merged.ignored_dates,
+                      finalized: !!merged.finalized, updated_at: new Date().toISOString() };
+    _invLocalTs = Date.now();
+    const res = row
+      ? await _sb.from('invoices').update(payload).eq('month_key', key).eq('updated_at', row.updated_at).select('id')
+      : await _sb.from('invoices').insert(payload).select('id');
+    if (res.error) { if (!row) continue; throw res.error; }   // other device created the month first → merge into it
+    if (!res.data || !res.data.length) continue;               // saved by the other device in between → merge again
+    const done = new Set(ops.map(o => o.id));
+    const left = _invOps().filter(o => !done.has(o.id));
+    _setInvOps(left);
+    _invoiceCache[key] = Object.assign(merged, { db_id: res.data[0].id });
+    left.filter(o => o.key === key).forEach(o => _applyInvoiceOp(_invoiceCache[key], o.op));   // edits made meanwhile
+    if (typeof currentView !== 'undefined' && currentView === 'invoice') renderInvoiceView();
+    return;
+  }
+  throw new Error('the invoice kept changing — will retry');
 }
 
 function autoInvoiceNumber() {
@@ -8875,7 +8909,7 @@ function promptChangeInvoiceNum() {
   const key  = invoiceStorageKey();
   const data = loadInvoiceData(key);
   const val  = prompt('Enter invoice number:', data.invoice_number);
-  if (val) { data.invoice_number = val.trim(); saveInvoiceData(key, data); renderInvoiceView(); }
+  if (val) { changeInvoice(key, { type: 'number', value: val.trim() }); renderInvoiceView(); }
 }
 
 // Tracks manually selected patients in the add-day modal
@@ -9056,11 +9090,8 @@ function saveDayToInvoice() {
   if (!pats.length) { toast('Select at least one patient to add', 'warning'); return; }
   const key  = invoiceStorageKey();
   const data = loadInvoiceData(key);
-  // Remove existing entry for this date if any
-  data.days = data.days.filter(d => d.date !== date);
-  data.days.push({ date, raw_km:rawKm, net_km:netKm, raw_time:rawMin, net_time:netMin, patients:pats });
-  data.days.sort((a,b) => a.date.localeCompare(b.date));
-  saveInvoiceData(key, data);
+  // Replaces this date's entry if any — on the latest saved month, not this device's copy
+  changeInvoice(key, { type: 'setDay', day: { date, raw_km:rawKm, net_km:netKm, raw_time:rawMin, net_time:netMin, patients:pats } });
   closeModal('addDayModal');
   toast(`✓ ${date} added to invoice — ${pats.length} patients`, 'success');
   renderInvoiceView();
@@ -9070,8 +9101,8 @@ function removeDayFromInvoice(idx) {
   if (!confirm('Remove this day from the invoice?')) return;
   const key  = invoiceStorageKey();
   const data = loadInvoiceData(key);
-  data.days.splice(idx, 1);
-  saveInvoiceData(key, data);
+  const day = data.days[idx]; if (!day) return;
+  changeInvoice(key, { type: 'removeDay', date: day.date });
   renderInvoiceView();
 }
 
@@ -9085,8 +9116,7 @@ function toggleInvoiceCpp(dayIdx, patIdx) {
   if (!day || !day.patients[patIdx]) return;
   const p    = day.patients[patIdx];
   const was  = !!p.cpp;
-  p.cpp = !was;
-  saveInvoiceData(key, data);
+  changeInvoice(key, { type: 'setCpp', date: day.date, file: p.file, cpp: !was });
   const change = was ? '-$25.00 CPP removed' : '+$25.00 CPP added';
   toast(`🩺 ${p.initials} #${p.file} — ${change}`, was ? 'warning' : 'success');
   renderInvoiceView();
@@ -10355,6 +10385,7 @@ async function doLogin() {
     toast('Welcome back!', 'success', '👋');
     _verifyRLS(); // background RLS health check
     _initRealtime(); // start real-time patient sync
+    _flushInvoiceOps(); // invoice changes made offline on this device
   } catch(e) {
     _loginAttempts++;
     console.warn('[doLogin] Auth error (attempt', _loginAttempts, ')');
@@ -10522,7 +10553,7 @@ async function _verifyRLS() {
 // _lastLocalUpdateTs declared early above
 
 let _rtChannel = null, _rtRetry = null, _rtStatus = '';
-let _noteRenderDebounce = null;
+let _noteRenderDebounce = null, _invRtDebounce = null, _injRtDebounce = null;
 function _initRealtime() {
   if (!_sb || !_sb.channel) return;
   try {
@@ -10556,6 +10587,22 @@ function _initRealtime() {
           _noteRenderDebounce = setTimeout(() => { if (currentView === 'patients') renderView(); }, 400);
         }
       )
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'invoices' },
+        () => {
+          if (Date.now() - _invLocalTs < 3000) return;   // our own save
+          clearTimeout(_invRtDebounce);
+          _invRtDebounce = setTimeout(() => loadInvoicesFromDB().then(() => { if (currentView === 'invoice') renderInvoiceView(); }), 600);
+        }
+      )
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'injections' },
+        () => {
+          if (Date.now() - _lastLocalUpdateTs < 3000) return;
+          clearTimeout(_injRtDebounce);
+          _injRtDebounce = setTimeout(() => loadInjectionHistoryFromDB().then(() => renderView()), 800);
+        }
+      )
       .subscribe((status) => {
         _rtStatus = status;
         // iOS drops sockets in the background; reconnect instead of staying silent
@@ -10564,7 +10611,7 @@ function _initRealtime() {
           _rtRetry = setTimeout(() => { if (document.visibilityState === 'visible') _initRealtime(); }, 5000);
         }
       });
-    console.info('[VaPiq] Real-time sync active (patients + quick notes)');
+    console.info('[VaPiq] Real-time sync active (patients, quick notes, invoices, injections)');
   } catch(e) {
     console.warn('[VaPiq] Real-time unavailable:', e.message);
   }
@@ -10579,14 +10626,36 @@ async function _resyncNow() {
   const { data: { session } } = await _sb.auth.getSession();
   if (!session) return;
   _resyncing = true;
+  const dot = document.getElementById('syncDot');
   try {
+    // A stored sign-in can be dead (e.g. signed out everywhere from another
+    // device): then every load failed silently and old data stayed on screen.
+    const { data: u, error: ue } = await _sb.auth.getUser();
+    if (ue || !u || !u.user) {
+      if (navigator.onLine && (ue && (ue.status === 401 || ue.status === 403 || /session|jwt|token/i.test(ue.message || '')))) _signInExpired();
+      else if (dot) { dot.className = 'sync-dot error'; dot.title = 'Could not reach the server — showing saved data'; }
+      return;
+    }
     await _flushDirtyNotes();
-    await loadQuickNotesFromDB();
+    await _flushInvoiceOps();
+    await Promise.all([loadQuickNotesFromDB(), loadInvoicesFromDB(), loadInjectionHistoryFromDB()]);
     await loadPatients({ silent: true });
+    if (currentView === 'invoice') renderInvoiceView();
     if (_rtStatus !== 'SUBSCRIBED') _initRealtime();
     _lastSyncTs = Date.now();
+    if (dot) { dot.className = 'sync-dot connected'; dot.title = 'Up to date · ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
+  } catch (e) {
+    console.warn('[VaPiq] resync:', e.message);
+    if (dot) { dot.className = 'sync-dot error'; dot.title = 'Sync problem — ' + e.message; }
   } finally { _resyncing = false; }
 }
+function _signInExpired() {
+  toast('Your sign-in on this device has expired — please sign in again to see the latest changes', 'error', '🔒');
+  try { _sb.auth.signOut({ scope: 'local' }); } catch (e) {}
+  showLoginScreen();
+}
+// Safety net if the live connection is down: catch up every 2 minutes while open
+setInterval(() => { if (document.visibilityState === 'visible' && Date.now() - _lastSyncTs > 120000) _resyncNow(); }, 30000);
 function _maybeResync() {
   if (document.visibilityState !== 'visible') return;
   if (Date.now() - _lastSyncTs < 10000) return;   // just synced
@@ -10609,13 +10678,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Check for existing session (persisted from last login)
   const { data: { session } } = await _sb.auth.getSession();
   if (session) {
-    // Already logged in — load invoice data then patients
+    // Already logged in — but a stored sign-in can be dead (signed out everywhere
+    // from another device): say so instead of quietly showing old data
+    const { error: ue } = await _sb.auth.getUser();
+    if (ue && navigator.onLine && (ue.status === 401 || ue.status === 403 || /session|jwt|token/i.test(ue.message || ''))) { _signInExpired(); return; }
+    // Load invoice data then patients
     hideLoginScreen();
     await loadInvoicesFromDB();
     await loadQuickNotesFromDB();
     await loadPatients();
     await loadInjectionHistoryFromDB();
     _initRealtime();       // live sync was previously only started after typing the password
+    _flushInvoiceOps();
     _lastSyncTs = Date.now();
   } else {
     // Not logged in — show login screen
@@ -10986,7 +11060,7 @@ window.setTheme = setTheme;
   window.promptChangeInvoiceNum = promptChangeInvoiceNum;
   // Check for unbilled days whenever patients load
   const origLoad = loadPatients;
-  loadPatients = async function() { await origLoad(); if(currentView==='invoice') renderInvoiceView(); else { const b=document.getElementById('badge-invoice'); const ubd=getUnbilledDates();if(b&&ubd.length>0){b.classList.remove('hidden');b.textContent=String(ubd.length);}else if(b)b.classList.add('hidden');} };
+  loadPatients = async function(opts) { await origLoad(opts); if(currentView==='invoice') renderInvoiceView(); else { const b=document.getElementById('badge-invoice'); const ubd=getUnbilledDates();if(b&&ubd.length>0){b.classList.remove('hidden');b.textContent=String(ubd.length);}else if(b)b.classList.add('hidden');} };
   window.openDedupeModal = openDedupeModal;
   window.mergeAllDuplicates = mergeAllDuplicates;
 
