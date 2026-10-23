@@ -59,7 +59,7 @@ export async function supabaseStore(cfg) {
     },
     // Has this email already been read? (joined into an item, or a card of its own)
     async knownMessage(messageId) {
-      const a = must(await sb.from('email_tasks').select('id').contains('related_emails', [{ message_id: messageId }]).limit(1));
+      const a = must(await sb.from('email_tasks').select('id').contains('related_emails', JSON.stringify([{ message_id: messageId }])).limit(1));
       if (a.length) return true;
       const b = must(await sb.from('email_tasks').select('id').eq('email_message_id', messageId).limit(1));
       return b.length > 0;
