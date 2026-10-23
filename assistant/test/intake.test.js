@@ -284,3 +284,15 @@ test('signature line in the email → "Signature required!"', () => {
   assert.ok(needsSignature('Please have the patient sign the enrolment form'));
   assert.ok(!needsSignature('*** This form is considered a valid prescription with Medicum****'));
 });
+
+test('scanned assignment form: "for a period of _N_ months" on the chosen dose line', () => {
+  const { parseMedicum } = require('../../js/medicum-parse.js');
+  const p = (t, bold = []) => { const r = parseMedicum(t, bold, 'scan.pdf'); return [r.dose, r.months || '', r.periodDose || '']; };
+  const EN = ['7.5 mg, (1 month) for a period of_ months', '22.5 mg, (3 months) for a period of_18_months', '30.0 mg, (4 months) for a period of_ _months Date: 2026/10/21', '45.0 mg, (6 months) for a period of_ months'].join('\n');
+  assert.deepEqual(p(EN), ['22.5', '18', '22.5']);
+  assert.deepEqual(p('7,5 mg, (1 mois) pour une durée de mois\nX 45,0 mg, (6 mois) pour une durée de_|2_mois 2026/01/15'), ['45', '12', '45'], '| read as 1');
+  assert.deepEqual(p('22,5 mg, (3 mois) pour une durée de_ mois\n45,0 mg, (6 mois) pour une durée de _ 6_mois'), ['45', '6', '45']);
+  assert.deepEqual(p('22.5 mg, (3 menths) for a peried of_12_months'), ['22.5', '12', '22.5'], 'OCR misspellings');
+  assert.deepEqual(p('X 30.0 mg, (4 months) for a period of months\n45.0 mg, (6 months) for a period of_ months'), ['', '', ''], 'no months → nothing');
+  assert.deepEqual(p(EN, ['45 mg']), ['45', '', '22.5'], 'dose disagrees → months not used');
+});

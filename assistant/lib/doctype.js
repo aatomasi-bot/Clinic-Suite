@@ -8,12 +8,15 @@ const ASSIGNMENT_TEXT = /MEDICUM\s*#|PATIENT\s+NAME\s*\/\s*NOM\s+DU\s+PATIENT|NO
 const ENROLLMENT_TEXT = /ENROL+(?:MENT)?\b|INSCRIPTION|CONSENT(?:EMENT)?\b|ADH[ÉE]SION|PROGRAMME?\s+(?:DE\s+SOUTIEN|SUPPORT)|PATIENT\s+SUPPORT\s+PROGRAM/i;
 // "JS12345New.pdf", "DP 12345 New.pdf", "KS12345NewReopen.pdf", "RM12345NewCPP.jpg" — Medicum's assignment form
 const ASSIGNMENT_NAME = /assign|demande|request|referral|r[ée]f[ée]rence|nouveau|new.?patient|\d{4,6}\s*_?new/i;
+const MEDICUM_ASSIGNMENT_NAME = /\d{4,6}\s*_?new/i;
 const ENROLLMENT_NAME = /enrol|inscri|consent|adh[ée]sion/i;
 
 export function documentTypes({ text = '', scanned = false, name = '' }) {
   // A file named as the enrollment form IS the enrollment form, even though its
   // text has the patient fields ("Enrollment_Form_Auto_Generated_12345.pdf")
   if (ENROLLMENT_NAME.test(name)) return ['enrollment'];
+  // "JS12345New.pdf" is Medicum's assignment form even though its text has a consent section
+  if (MEDICUM_ASSIGNMENT_NAME.test(name)) return ['assignment'];
   const t = new Set();
   if (!scanned && text) {
     if (ASSIGNMENT_TEXT.test(text)) t.add('assignment');
