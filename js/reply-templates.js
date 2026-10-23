@@ -50,7 +50,8 @@ function subjectReference(subject) {
 }
 
 // "JGC 35290" → "#35290 (JGC)", "32604" → "#32604"
-const fmtRef = ref => ref ? ref.replace(/^(.*?)\s*(\d{4,6})$/, (m, a, d) => a ? `#${d} (${a})` : `#${d}`) : '';
+// File number only — no patient initials next to it (Oct 23, 2026)
+const fmtRef = ref => { const d = String(ref || '').match(/\d{4,6}(?!.*\d{4,6})/); return d ? `#${d[0]}` : (ref ? `#${String(ref).trim()}` : ''); };
 
 const T = {
   en: {

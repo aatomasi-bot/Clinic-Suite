@@ -90,7 +90,7 @@ test('reply drafts: coordinator name, language, file reference, gender-neutral',
   const en = draftReply({ kind: 'close_file', lang: 'en', coordinatorName: 'Annie', subjectRef: '32604', signature: 'Sig' });
   assert.equal(en, 'Hello Annie,\n\nI have closed the file #32604.\n\nThank you!\n\nSig');
   const fr = draftReply({ kind: 'new_patient', lang: 'fr', coordinatorName: '', subjectRef: 'JGC 35290' });
-  assert.match(fr, /^Bonjour,\n\nJe confirme la réception de ce courriel pour le dossier #35290 \(JGC\)/);
+  assert.match(fr, /^Bonjour,\n\nJe confirme la réception de ce courriel pour le dossier #35290\. /, "no patient initials next to the file number");
   for (const kind of ['new_patient', 'prescription', 'close_file']) for (const lang of ['en', 'fr']) {
     assert.doesNotMatch(draftReply({ kind, lang, coordinatorName: 'A', subjectRef: '1234' }), /\b(his|her|il|elle)\b/i);
   }
