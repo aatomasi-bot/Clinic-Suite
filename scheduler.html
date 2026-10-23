@@ -2013,6 +2013,21 @@ function loopSort(list,keyFn){
   return [...located,...unknown].map(x=>x.p);
 }
 
+// Cartierville (H4J, next to home) — confirmed Oct 23, 2026:
+// FIRST on Thursday (and Friday, where circBKey already starts with it),
+// LAST on Mon/Tue/Wed/Saturday — on the way home at the end of the loop.
+// Same-address order is kept; only Cartierville stops move.
+const CARTIERVILLE=new Set(['H4J']);
+function isCartierville(p){
+  const m=(p.address||p['Address']||'').toUpperCase().match(/([A-Z]\d[A-Z])\s*\d[A-Z]\d/);
+  return !!m&&CARTIERVILLE.has(m[1]);
+}
+function placeCartierville(list,dow){
+  if(dow===5) return list;
+  const c=list.filter(isCartierville), rest=list.filter(p=>!isCartierville(p));
+  return dow===4?[...c,...rest]:[...rest,...c];
+}
+
 // ════════════════════════════════════════════════════════════
 // SAME-ADDRESS HELPERS
 // baseAddress: strips apt/unit suffix so two patients in the
@@ -2184,7 +2199,7 @@ function runPlanner(pats,fromDate){
     const isSat=sl.dow===6; const isFri=sl.dow===5;
     // Friday: Laval horseshoe (circBKey). Mon–Thu + Saturday: counter-clockwise loop from home.
     if(isFri) sl.patients.sort((a,b)=>circBKey(a._cl)-circBKey(b._cl));
-    else sl.patients=loopSort(sl.patients,p=>weekdayKey(p._cl));
+    else sl.patients=placeCartierville(loopSort(sl.patients,p=>weekdayKey(p._cl)),sl.dow);
     // Group same-address patients consecutively (different apts = 15-min apart)
     sl.patients=groupByAddress(sl.patients);
     applyDeguireLastRule(sl.patients);  // 325 Deguire always last
@@ -2466,7 +2481,7 @@ function resortDay(dayIdx){
   // Friday: Laval horseshoe. Mon–Thu + Saturday: counter-clockwise loop from home.
   const sorted=isFri
     ? active.slice().sort((a,b)=>circBKey(optClassify(a))-circBKey(optClassify(b)))
-    : loopSort(active,p=>weekdayKey(optClassify(p)));
+    : placeCartierville(loopSort(active,p=>weekdayKey(optClassify(p))),dow);
   days[dayIdx].active=groupByAddress(sorted);
   applyDeguireLastRule(days[dayIdx].active);
   renderGrid();
