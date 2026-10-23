@@ -95,7 +95,24 @@ in ("22.5 mg, (3 months) for a period of _18_ months"): total doses = months ÷ 
 dose's months (7.5→1, 22.5→3, 30→4, 45→6), unless "Number of injections" is filled
 in. If the scan and the enrollment form disagree on the dose, the card warns you.
 
-**From the coordinator's email** ("…assigned for the following date: October 29th 2026
+**Where the card's data comes from** (best first): `Enrollment_Form_Auto_Generated_….pdf`
+(text, every field), then the assignment form (`RA35037.pdf`, `JS35335New.pdf` — initials +
+file number), read by text recognition when scanned. **FAX_…, fax-sip…, RX…, Nurse_Report…**
+files are copies and are never read for patient data. If a card was made from a weaker
+source and a better form arrives, the waiting card is rebuilt.
+
+**Related emails.** One patient's documents usually come in separate emails (coordinator
+note, no-reply@ "New Appointment" with the forms, reports@ copies). Whenever an item is
+missing a form, the assistant searches the Inbox **and the Medicum folder** (last 10 days)
+for emails with that file number in the subject or an attachment name, and reads them.
+
+**Coordinator writing from reports@.** When a reports@ email is signed by a coordinator
+(name above "Coordonnatrice…/Coordinator", address `name@medicum.ca`), the reply goes to
+her, with reports@ in copy. The reply's language follows her message, not the bilingual
+signature or disclaimer.
+
+**From the coordinator's email** ("…assigned for the following date: October 29th 2026" or "Next injection scheduled for: 9th March 2027"
+(
 (Bone scan … need the injection after)" / "…pour la date suivante : 21 septembre 2026"):
 the **due date** comes from that sentence (it wins over the form; the card says so when
 they differ) and the reason in brackets goes into **Special Instructions** as

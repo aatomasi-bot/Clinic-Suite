@@ -448,7 +448,7 @@ function parse(text, bold, fname){
   // one has the months filled in — "22.5 mg, (3 months) for a period of_18_months",
   // "45,0 mg, (6 mois) pour une durée de _ 6_mois". Scans misread 1 as | or l.
   if(!r.months){
-    const PERIOD_RX=/(7[.,]5|22[.,]5|30(?:[.,]0)?|45(?:[.,]0)?)\s*mg\s*,?\s*\(\s*\d\s*m[a-z]*\s*\)\s*(?:for\s+a\s+p[a-z]{3,6}d?\s+o[fl1]|pour\s+une\s+dur[ée]e\s+de)((?:[^a-zA-Z\n]|[lIoO|]){0,12}?)\s*(?:m[aeo]n[a-z]{0,3}|mois)/gi;
+    const PERIOD_RX=/(7[.,]5|22[.,]5|30(?:[.,]0)?|45(?:[.,]0)?)\s*mg\s*,?\s*\(\s*\d\s*m[a-z]*\s*\)\s*(?:for\s+a\s+p[a-z]{3,6}d?\s+o[fl1]|pour\s+une\s+dur[ée]e\s+de)((?:[^a-zA-Z\n]|[lIoO|]){0,12}?)\s*(?:m[aeo]n[a-z]{0,3}|mo[il1]s)/gi;
     const found={};let pm;
     while((pm=PERIOD_RX.exec(text))){
       const n=pm[2].replace(/[|lI!]/g,'1').replace(/[oO]/g,'0').replace(/\D/g,'');

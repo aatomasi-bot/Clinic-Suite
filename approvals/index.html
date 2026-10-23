@@ -531,7 +531,7 @@ function from(t) {
   const name = (t?.email_from || '').replace(/<.*>/, '').trim() || t?.to_address || '';
   return `${esc(name)}${n > 1 ? ` · ${n} emails` : ''}`;
 }
-const fileRef = (fn, ref) => `#${esc(String(fn || '—').trim())}${ref && !/^\d+$/.test(ref) ? ` (${esc(ref.replace(/\s*\d{4,6}$/, ''))})` : ''}`;
+const fileRef = fn => `#${esc(String(fn || '—').trim())}`;   // file number only — no patient initials
 function chips(item) {
   const x = item.t || item.r;
   return `<div class="chips">${x?.is_test ? '<span class="chip test">TEST</span>' : ''}${item.late ? `<span class="chip late">${esc(item.late)}</span>` : `<span class="chip">${ago(x?.created_at)}</span>`}</div>`;

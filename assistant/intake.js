@@ -16,11 +16,11 @@ import crypto from 'node:crypto';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { classifyEmail, subjectFileNumber, senderAddress, isNewPatientSubject } from './lib/classify.js';
-import { documentTypes, summarizeDocuments } from './lib/doctype.js';
+import { documentTypes, summarizeDocuments, isCopyDocument } from './lib/doctype.js';
 import { findExisting, sameNameOtherFile, patientStatus, normFile } from './lib/match.js';
 import { buildRecord, toIsoDate } from './lib/record.js';
 import { parsePdf, parseScan, repeatsFor } from './lib/pdf.js';
-import { needsSignature, emailDueDate, cardNotes } from './lib/emailinfo.js';
+import { needsSignature, emailDueDate, cardNotes, signedBy, openingText } from './lib/emailinfo.js';
 import { testFolderSource, imapSource } from './lib/sources.js';
 import { supabaseStore, offlineStore } from './lib/store.js';
 import { summaryText, macNotification, pushToPhones } from './lib/notify.js';
@@ -43,6 +43,16 @@ export function loadConfig(file = path.join(here, 'config.json')) {
 }
 
 const sha = s => crypto.createHash('sha256').update(s).digest('hex');
+
+// Which source fills the new-patient card (confirmed Oct 23, 2026):
+//   3 Enrollment_Form_Auto_Generated (text PDF, every field)
+//   2 the assignment form ("RA35037.pdf", "JS35335New.pdf"), text or scan
+//   1 any other readable form · 0 nothing usable. FAX/RX copies are never read.
+const ENROLLMENT_FORM = /enrol+ment[\s_-]*form/i;
+const hasData = f => !!(f && f.parsed && (f.parsed.name || f.parsed.file));
+const formRank = f => !hasData(f) ? 0 : ENROLLMENT_FORM.test(f.pdf.name) ? 3 : f.types.includes('assignment') ? 2 : 1;
+const nameRank = n => ENROLLMENT_FORM.test(n || '') ? 3 : isCopyDocument(n) ? 0 : documentTypes({ name: n || '', scanned: true }).includes('assignment') ? 2 : 1;
+const stateFile = path.join(path.dirname(fileURLToPath(import.meta.url)), 'state', 'related-search.json');   // when each item was last searched
 // Kept on the patient's item, for a card created by a later email
 const remember = said => ({ ...(said.signature ? { signature_required: true } : {}), ...(said.due ? { email_due: said.due, email_note: said.note || '' } : {}) });
 
@@ -56,18 +66,19 @@ function existingSummary(p) {
 const emailRef = e => ({ from: e.from, subject: e.subject, date: e.date, message_id: e.messageId, folder: e.folder || null });
 
 // Core pipeline — exported for tests.
-export async function runIntake({ source, store, rules, replies = {}, isTest, log = console.log }) {
+export async function runIntake({ source, store, rules, replies = {}, isTest, log = console.log, relatedStateFile = stateFile }) {
   const patients = await store.loadPatients();
   const counts = { emails: 0, skipped: 0, queued: 0, exists: 0, needsReview: 0, already: 0, prescriptions: 0, closes: 0 };
 
-  for await (const email of source.emails()) {
+  const touched = new Set();   // file numbers of new-patient items seen this run
+  const handle = async email => {
     counts.emails++;
     const { kind } = email.skipped ? { kind: null } : classifyEmail(email, rules);
-    if (!kind) { counts.skipped++; continue; }
+    if (!kind) { counts.skipped++; return; }
 
     const subjectFile = subjectFileNumber(email.subject);
     // What every reply needs — the draft is ready on the card when you get to it.
-    const lang = detectLanguage(`${email.subject} ${email.bodyText || ''}`);
+    const lang = detectLanguage(`${email.subject} ${openingText(email.bodyText)}`);
     const coordinatorName = coordinatorFirstName(email.from);
     const subjectRef = subjectReference(email.subject);
     const replyBase = {
@@ -81,7 +92,7 @@ export async function runIntake({ source, store, rules, replies = {}, isTest, lo
     // ── Close file ───────────────────────────────────────────────────────
     if (kind === 'close_file') {
       const key = sha(`${email.messageId}|close_file`);
-      if ((await store.knownTaskKeys([key])).size) { counts.already++; continue; }
+      if ((await store.knownTaskKeys([key])).size) { counts.already++; return; }
       const existing = findExisting(subjectFile, patients);
       const warnings = [];
       if (!subjectFile) warnings.push('No file number in the subject — find the patient yourself.');
@@ -94,7 +105,7 @@ export async function runIntake({ source, store, rules, replies = {}, isTest, lo
       counts.closes++;
       log(`  close   card ${id}${warnings.length ? ` (${warnings.length} warning${warnings.length > 1 ? 's' : ''})` : ''}`);
       await source.markHandled(email);
-      continue;
+      return;
     }
 
     // ── New patient (coordinator email ± reports@ fax) or prescription ────
@@ -102,7 +113,7 @@ export async function runIntake({ source, store, rules, replies = {}, isTest, lo
     // patient are joined by file number into ONE new-patient item: one card,
     // one reply (to the coordinator, CC reports@) that confirms the documents
     // or politely asks for what's missing.
-    if (await store.knownMessage(email.messageId)) { counts.already++; continue; }
+    if (await store.knownMessage(email.messageId)) { counts.already++; return; }
     const sender = senderAddress(email.from);
     // What the coordinator's email says: signature needed, due date (+ the reason in brackets)
     const said = { signature: needsSignature(email.bodyText), ...emailDueDate(email.bodyText, email.date) };
@@ -110,10 +121,15 @@ export async function runIntake({ source, store, rules, replies = {}, isTest, lo
     const fromReports = sender === (replies.reportsAddress || 'reports@medicum.ca');
     const noReply = (rules.noReplySenders || []).map(s => s.toLowerCase()).includes(sender);   // no-reply@ "New Appointment"
     const fromDocs = fromReports || noReply;
+    // Coordinator writing from reports@ and signing it → reply to her (CC reports@)
+    const signer = fromReports ? signedBy(email.bodyText) : null;
+    const coordAddress = signer ? signer.address : sender, coordName = signer ? (signer.firstName || null) : (coordinatorName || null);
 
     // Read every PDF: document type + parsed form fields
     const files = [], parsedForms = [];
     for (const pdf of email.pdfs) {
+      // FAX_…, fax-sip…, RX…, Nurse_Report…: copies, never a source of patient data
+      if (isCopyDocument(pdf.name)) { files.push({ name: pdf.name, types: ['copy'], from: senderAddress(email.from) }); continue; }
       const key = sha(`${email.messageId}|${pdf.name}`);
       const warnings = [];
       let out = { scanned: true, text: '', result: null };
@@ -131,12 +147,10 @@ export async function runIntake({ source, store, rules, replies = {}, isTest, lo
     // "Enrollment_Form_Auto_Generated_12345.pdf" first — a text PDF with every field
     // (the assignment form is usually a scan) — then a parsed assignment form, any
     // parsed PDF, or the first PDF.
-    const ENROLLMENT_FORM = /enrol+ment[\s_-]*form/i;
-    const hasData = f => f.parsed && (f.parsed.name || f.parsed.file);
-    const form = parsedForms.find(f => hasData(f) && ENROLLMENT_FORM.test(f.pdf.name))
-      || parsedForms.find(f => f.parsed && f.types.includes('assignment')) || parsedForms.find(f => f.parsed) || parsedForms[0] || null;
+    const form = parsedForms.slice().sort((x, y) => formRank(y) - formRank(x))[0] || null;
     const noReplyAddr = a => (rules.noReplySenders || []).map(s => s.toLowerCase()).includes(String(a || '').toLowerCase());
-    const groupKey = normFile(subjectFile || form?.parsed?.file || '') || null;
+    const groupKey = normFile(subjectFile || (formRank(form) >= 2 ? form.parsed.file : '') || '') || null;
+    if (groupKey) touched.add(groupKey);
     const existing = findExisting(groupKey, patients);
     const group = groupKey ? await store.findGroupTask(groupKey, 14) : null;
 
@@ -144,12 +158,14 @@ export async function runIntake({ source, store, rules, replies = {}, isTest, lo
     if (kind === 'enrollment_doc' && !group) {
       counts.skipped++;
       log(`  skip    enrollment email for #${groupKey || '?'} — no open new-patient item (left in your inbox)`);
-      continue;
+      return;
     }
 
     // Already a VaPiq patient and not part of a recent new-patient item → prescription to apply
     if (existing && !group && kind === 'assignment' && !isNewPatientSubject(email.subject, rules)) {
-      for (const f of parsedForms) {
+      const rxForms = parsedForms.length ? parsedForms
+        : [{ key: sha(`${email.messageId}|prescription`), pdf: { name: files[0] ? files[0].name : '' }, parsed: null, warnings: [] }];
+      for (const f of rxForms) {
         const id = await store.insertTask({ ...replyBase, kind: 'prescription', status: 'todo', source_key: f.key,
           file_number: groupKey, group_key: groupKey, existing_patient: existingSummary(existing),
           related_emails: [emailRef(email)],
@@ -160,13 +176,15 @@ export async function runIntake({ source, store, rules, replies = {}, isTest, lo
         log(`  rx      card ${id}`);
       }
       await source.markHandled(email);
-      continue;
+      return;
     }
 
     // Pre-filled new-patient card from the best form (once per patient)
     let pendingId = group?.pending_id || null;
     const cardWarnings = form ? [...form.warnings] : [];
-    if (!pendingId && form && !existing) {
+    const current = pendingId && form && !existing ? await store.getCard(pendingId) : null;
+    const better = current && current.status === 'pending' && formRank(form) > nameRank(current.attachment_name);
+    if (((!pendingId && form) || better) && !existing) {
       let fileNumber = form.parsed?.file || '';
       if (!fileNumber && subjectFile) { fileNumber = subjectFile; cardWarnings.push('File # taken from the email subject (not found in the PDF).'); }
       else if (fileNumber && subjectFile && normFile(fileNumber) !== normFile(subjectFile)) cardWarnings.push(`File # in the PDF (${fileNumber}) differs from the email subject (${subjectFile}).`);
@@ -189,13 +207,19 @@ export async function runIntake({ source, store, rules, replies = {}, isTest, lo
       const { record, missing } = buildRecord(form.parsed, { fileNumber, dueDate: due, specialInstructions: cardNotes({ signature, note }) });
       if (form.parsed && !form.parsed.totalDoses && form.parsed.totalWhy) cardWarnings.push(form.parsed.totalWhy);
       for (const p of sameNameOtherFile(record.patient_name, fileNumber, patients)) cardWarnings.push(`Same name as existing patient #${p.file_number} (${patientStatus(p)}) — possible duplicate.`);
-      pendingId = await store.insertPending({
-        status: 'pending', is_test: !!isTest, source_key: form.key,
+      const card = {
         email_from: email.from, email_subject: email.subject, email_date: email.date,
         attachment_name: form.pdf.name, subject_file_number: subjectFile || null,
         record, missing_fields: missing, warnings: cardWarnings, existing_patient: null,
-      });
-      await store.audit('ASSISTANT_QUEUED', fileNumber, { pending_id: pendingId, test: !!isTest });
+      };
+      if (better) {
+        // A better source arrived (e.g. the enrollment form after a scan): rebuild the waiting card
+        await store.replaceCard(pendingId, card);
+        log(`  rebuilt card ${pendingId} from ${form.pdf.name.replace(/\d/g, '#')}`);
+      } else {
+        pendingId = await store.insertPending({ status: 'pending', is_test: !!isTest, source_key: form.key, ...card });
+      }
+      await store.audit(better ? 'ASSISTANT_CARD_REBUILT' : 'ASSISTANT_QUEUED', fileNumber, { pending_id: pendingId, test: !!isTest });
       if (!form.parsed || missing.includes('Patient Name') || missing.includes('File Number')) counts.needsReview++; else counts.queued++;
       log(`  pending card ${pendingId}${cardWarnings.length ? ` (${cardWarnings.length} warning${cardWarnings.length > 1 ? 's' : ''})` : ''}`);
     }
@@ -214,8 +238,8 @@ export async function runIntake({ source, store, rules, replies = {}, isTest, lo
         if (pendingId) await store.patchCard(pendingId, { due: said.due, notes: cardNotes({ signature: said.signature, note: said.note }) });
       }
       // Reply goes to the coordinator, in the coordinator's thread
-      if (!fromDocs && (group.to_address === reports || noReplyAddr(group.to_address))) {
-        Object.assign(fields, { to_address: senderAddress(email.from), to_name: coordinatorName || null,
+      if ((!fromDocs || signer) && (group.to_address === reports || noReplyAddr(group.to_address))) {
+        Object.assign(fields, { to_address: coordAddress, to_name: coordName,
           email_message_id: email.messageId, email_folder: email.folder || null, email_from: email.from,
           email_subject: email.subject, email_date: email.date, lang, subject_ref: subjectRef || group.subject_ref });
       }
@@ -235,20 +259,56 @@ export async function runIntake({ source, store, rules, replies = {}, isTest, lo
       if (existing) warnings.push(`File #${existing.file_number} is already in VaPiq as ${existing.patient_name} (${patientStatus(existing)}).`);
       if (!email.pdfs.length) warnings.push('No documents attached — the documents email (no-reply@ or reports@medicum.ca) usually follows.');
       // Documents arrived first from no-reply@: address the reply to reports@ until the coordinator's email joins
-      const to = noReply ? reports : sender;
+      const to = noReply ? reports : coordAddress;
       const id = await store.insertTask({ ...replyBase, kind: 'new_patient', status: 'todo',
         source_key: sha(`${email.messageId}|new_patient`), pending_id: pendingId, group_key: groupKey,
         details: { signature: replies.signature || '', ...remember(said) },
-        file_number: groupKey, cc_addresses: to === reports ? [] : [reports], to_address: to, to_name: noReply ? null : replyBase.to_name,
+        file_number: groupKey, cc_addresses: to === reports ? [] : [reports], to_address: to, to_name: noReply ? null : coordName,
         existing_patient: existingSummary(existing), related_emails: [emailRef(email)], documents: docs, warnings,
-        reply_body: replies.enabled === false ? null : draftReply({ kind: 'new_patient', lang, coordinatorName: noReply ? '' : coordinatorName, fileNumber: groupKey,
+        reply_body: replies.enabled === false ? null : draftReply({ kind: 'new_patient', lang, coordinatorName: noReply ? '' : (coordName || ''), fileNumber: groupKey,
           subjectRef, signature: replies.signature || '', docs }) });
       log(`  new     patient item ${id}${missingDocs(docs).length ? ` (missing: ${missingDocs(docs).join(', ')})` : ''}`);
     }
     await source.markHandled(email);
+  };
+  for await (const email of source.emails()) await handle(email);
+
+  // Medicum sends one patient's documents in separate emails (coordinator note,
+  // no-reply@ "New Appointment" with the forms, reports@ copies). When an item is
+  // still missing a form, look for the other emails with the same file number —
+  // in the Inbox and the Medicum folder — and read them too (Oct 23, 2026).
+  if (source.findRelated) {
+    for (const key of await relatedToLookFor(store, touched, relatedStateFile)) {
+      const known = id => store.knownMessage(id);
+      for await (const email of source.findRelated(key, { known })) await handle(email);
+    }
   }
   return counts;
 }
+
+// Items worth a search: touched this run, or open and incomplete (at most every 30 min each).
+async function relatedToLookFor(store, touched, file) {
+  let last = {}; try { last = JSON.parse(fs.readFileSync(file, 'utf8')); } catch {}
+  const now = Date.now(), keys = new Set(touched);
+  for (const t of await store.openNewPatientItems(14)) {
+    const incomplete = !t.pending_id || missingDocs(t.documents || {}).length;
+    if (incomplete && now - (last[t.group_key] || 0) > 30 * 6e4) keys.add(t.group_key);
+  }
+  const out = [];
+  for (const k of keys) {
+    const t = await store.findGroupTask(k, 14);
+    if (!t || !['todo', 'waiting_docs', 'reply_ready'].includes(t.status)) continue;
+    if (t.pending_id && !missingDocs(t.documents || {}).length && !(await weakCard(store, t.pending_id))) continue;
+    out.push(k); last[k] = now;
+  }
+  try { fs.writeFileSync(file, JSON.stringify(last)); } catch {}
+  return out;
+}
+async function weakCard(store, pendingId) {
+  const c = await store.getCard(pendingId);
+  return !!c && c.status === 'pending' && nameRank(c.attachment_name) < 3;
+}
+
 
 async function main() {
   const offline = process.argv.includes('--offline');

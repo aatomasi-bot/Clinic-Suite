@@ -74,8 +74,11 @@ test('document types: Medicum file names', () => {
   assert.deepEqual(t('KS12345NewReopen.pdf'), ['assignment']);
   assert.deepEqual(t('RM12345NewCPP.jpg'), ['assignment']);
   assert.deepEqual(t('Enrollment_Form_Auto_Generated_12345.pdf', 'PATIENT NAME / NOM DU PATIENT ... ENROLLMENT'), ['enrollment'], 'named enrollment form is only the enrollment form');
-  assert.deepEqual(t('RX-PC12345.pdf'), []);
-  assert.deepEqual(t('Nurse_Report_123456.pdf'), []);
+  assert.deepEqual(t('RX-PC12345.pdf'), ['copy'], 'prescription copy — never parsed');
+  assert.deepEqual(t('Nurse_Report_123456.pdf'), ['copy']);
+  assert.deepEqual(t('FAX_20261023_1792782821_345.pdf', 'PATIENT NAME / NOM DU PATIENT MEDICUM #: 20261023'), ['copy'], 'fax copy even with patient text');
+  assert.deepEqual(t('RA35037.pdf'), ['assignment']);
+  assert.deepEqual(t('scan0001.pdf'), []);
 });
 
 test('reply drafts: coordinator name, language, file reference, gender-neutral', () => {
@@ -87,7 +90,7 @@ test('reply drafts: coordinator name, language, file reference, gender-neutral',
   const en = draftReply({ kind: 'close_file', lang: 'en', coordinatorName: 'Annie', subjectRef: '32604', signature: 'Sig' });
   assert.equal(en, 'Hello Annie,\n\nI have closed the file #32604.\n\nThank you!\n\nSig');
   const fr = draftReply({ kind: 'new_patient', lang: 'fr', coordinatorName: '', subjectRef: 'JGC 35290' });
-  assert.match(fr, /^Bonjour,\n\nJe confirme la réception de ce courriel pour le dossier #35290 \(JGC\)/);
+  assert.match(fr, /^Bonjour,\n\nJe confirme la réception de ce courriel pour le dossier #35290\. /, "no patient initials next to the file number");
   for (const kind of ['new_patient', 'prescription', 'close_file']) for (const lang of ['en', 'fr']) {
     assert.doesNotMatch(draftReply({ kind, lang, coordinatorName: 'A', subjectRef: '1234' }), /\b(his|her|il|elle)\b/i);
   }
@@ -111,7 +114,8 @@ test('record: VaPiq defaults, missing fields flagged, dose never defaulted', () 
 test('intake end to end (offline): new, prescription, close-file; re-run adds nothing', async () => {
   const outFile = path.join(tmp, 'pending.json');
   const store = offlineStore({ patientsFile: fixtures, outFile });
-  const counts = await runIntake({ source: testFolderSource(inbox), store, rules, replies: { signature: 'Sig' }, isTest: true, log: () => {} });
+  const relatedStateFile = path.join(tmp, 'related.json');
+  const counts = await runIntake({ source: testFolderSource(inbox), store, rules, replies: { signature: 'Sig' }, isTest: true, log: () => {}, relatedStateFile });
   assert.equal(counts.emails, CASES.length + CLOSE_CASES.length + PAIR_CASES.length);
   assert.equal(counts.prescriptions, 1);
   assert.equal(counts.closes, 3);
@@ -155,6 +159,25 @@ test('intake end to end (offline): new, prescription, close-file; re-run adds no
   assert.equal(byFile['99011'].record.due_date, '2026-11-21');
   assert.equal(byFile['99011'].record.special_instructions, '', 'no signature line, no note → nothing');
   assert.ok(byFile['99011'].warnings.some(w => /replaces the form/.test(w)), 'form date differs → said so on the card');
+  // Kavya (reports@, FAX copy only) + the filed no-reply@ email found by file number
+  const kav = store.tasks.filter(t => t.kind === 'new_patient' && t.group_key === '99031');
+  assert.equal(kav.length, 1, 'one item');
+  assert.equal(kav[0].to_address, 'kavyaf@medicum.ca', 'reply to the coordinator who signed');
+  assert.equal(kav[0].to_name, 'Kavya');
+  assert.deepEqual(kav[0].cc_addresses, ['reports@medicum.ca']);
+  assert.match(kav[0].reply_body, /^Hello Kavya,/);
+  assert.ok(kav[0].documents.assignment && kav[0].documents.enrollment);
+  assert.ok(kav[0].documents.files.some(f => f.name.startsWith('FAX_') && f.types[0] === 'copy'));
+  const kc = store.rows.find(r => r.id === kav[0].pending_id);
+  assert.equal(kc.attachment_name, 'Enrollment_Form_Auto_Generated_30182.pdf', 'card from the enrollment form');
+  assert.equal(kc.record.patient_name, 'Rene Testabel');
+  assert.equal(kc.record.file_number, '99031', 'never the fax number');
+  assert.equal(kc.record.due_date, '2027-03-09', '"Next injection scheduled for" → due date');
+  assert.ok(!store.rows.some(r => r.record.patient_name === 'Wrong Fax Person'), 'FAX never read');
+  // Weaker card rebuilt when the enrollment form arrives
+  const rb = store.tasks.find(t => t.kind === 'new_patient' && t.group_key === '99032');
+  assert.equal(store.rows.find(r => r.id === rb.pending_id).record.patient_name, 'From Enrollment');
+  assert.equal(store.rows.filter(r => r.record.file_number === '99032').length, 1, 'rebuilt, not duplicated');
   // Note with no documents → polite request for both, in French
   assert.match(task('new_patient', '99013').reply_body, /je n'ai pas reçu le formulaire d'assignation ni le formulaire d'inscription/);
   // Form only → asks for the enrollment form
@@ -173,8 +196,8 @@ test('intake end to end (offline): new, prescription, close-file; re-run adds no
   assert.equal(task('close_file', '98002').lang, 'fr');
 
   const before = { rows: store.rows.length, tasks: store.tasks.length };
-  const again = await runIntake({ source: testFolderSource(inbox), store, rules, isTest: true, log: () => {} });
-  assert.equal(again.already, CASES.length + CLOSE_CASES.length + PAIR_CASES.length);
+  const again = await runIntake({ source: testFolderSource(inbox), store, rules, isTest: true, log: () => {}, relatedStateFile });
+  assert.equal(again.already, CASES.length + CLOSE_CASES.length + PAIR_CASES.filter(c => !c.filed).length);
   assert.deepEqual({ rows: store.rows.length, tasks: store.tasks.length }, before);
 });
 
