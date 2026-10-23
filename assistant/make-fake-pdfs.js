@@ -31,7 +31,7 @@ export const CASES = [
   { id: 'fake-10-checkbox17', file: '99010', name: 'Nina Cocher',         dose: '22.5', mark: 'acroform', trickyNames: true },
 ];
 
-async function makeForm(c) {
+export async function makeForm(c) {
   const doc = await PDFDocument.create();
   const page = doc.addPage([612, 792]);
   const reg = await doc.embedFont(StandardFonts.Helvetica);
@@ -71,6 +71,8 @@ async function makeForm(c) {
     const text = `${lbl} (${mg})`;
     const font = c.mark === 'bold' && selected ? bold : reg;
     page.drawText(text, { x, y, size: 10, font });
+    // Months written next to the ticked dose ("3-m (22.5mg) 18")
+    if (selected && c.months) page.drawText(String(c.months), { x: x + font.widthOfTextAtSize(text, 10) + 8, y, size: 10, font: bold });
     const bx = x - 14, by = y - 1;
     if (c.mark === 'acroform') {
       // Field names deliberately contain digits that the old name-regex misread
@@ -128,7 +130,7 @@ export const PAIR_CASES = [
   // Medicum's real pattern: no-reply@ "New Appointment" with the forms FIRST, then the coordinator's note
   { id: 'fake-34-noreply-docs', file: '99015', from: 'Medicum <no-reply@medicum.ca>', subject: 'New Appointment', body: '',
     pdfs: [{ kind: 'form', name: 'Nora Rendezvous', dose: '45', fname: 'NR99015New.pdf' }, { kind: 'enrollment', name: 'Nora Rendezvous', fname: 'Enrollment_Form_Auto_Generated_99015.pdf' }] },
-  { id: 'fake-35-noreply-coord', file: '99015', from: 'Julie Exemple <julie.exemple@medicum.ca>', subject: 'New patient NR 99015', body: 'Hello, new patient.', pdfs: [] },
+  { id: 'fake-35-noreply-coord', file: '99015', from: 'Julie Exemple <julie.exemple@medicum.ca>', subject: 'New patient NR 99015', body: 'Hello, new patient.\n*** Please have the patient sign the enrollment form at your visit and return to Medicum reports***', pdfs: [] },
   { id: 'fake-33-notice-only', file: '99013', from: 'Sophie Fictive <sophie.fictive@medicum.ca>', subject: 'Nouveau patient EF 99013', body: 'Bonjour, voici un nouveau patient.', pdfs: [] },
 ];
 

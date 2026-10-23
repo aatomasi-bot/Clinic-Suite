@@ -40,6 +40,7 @@ check the console line `[DOSE] … — <reason>`.
 - Coordinator + reports@ pairing, document checks, CC reports@, ask for missing documents
 - Safety net: overdue alerts, 7:00 AM summary, journey tracker, Mac health check
 - Dubbi redesign + on-phone assistant (fixed rules, no AI service; mic opt-in)
+- Oct 23: free on-phone actions with confirmation (close, send, applied, ask for docs, add). Paid AI (Claude API) declined — no cost.
 - Later, only with privacy officer approval: AI understanding, "Hey Dubbi", "Hey Siri, Dubbi"
 
 ## Still open

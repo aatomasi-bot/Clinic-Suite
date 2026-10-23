@@ -95,8 +95,8 @@ export function imapSource(cfg, { wanted }) {
         let bodyText = '';
         if (m.text) {
           try {
-            const { content } = await client.download(String(m.uid), m.text, { uid: true, maxBytes: 4000 });
-            bodyText = (await readAll(content)).toString('utf8').slice(0, 2000);
+            const { content } = await client.download(String(m.uid), m.text, { uid: true, maxBytes: 16000 });
+            bodyText = (await readAll(content)).toString('utf8').slice(0, 8000);
           } catch {}
         }
         yield { ...email, pdfs, bodyText };

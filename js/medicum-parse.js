@@ -215,10 +215,44 @@ function _detectDose(items, annots, shapes) {
   return { value: lead.value, reason: lead.reason };
 }
 
+// Months written next to the chosen option on the same row ("3-m (22.5mg) 18"):
+// a 1–2 digit number after the option, before the next option. '' if none.
+function _monthsNextTo(items, value) {
+  const opts = _findOptions(items);
+  const o = opts && opts.find(p => p.value === value);
+  if (!o) return '';
+  const next = opts.filter(p => p !== o && Math.abs(p.item.y - o.item.y) < 4 && p.x0 > o.x1).sort((a, b) => a.x0 - b.x0)[0];
+  const limit = next ? next.x0 - 2 : o.x1 + 90;
+  // inside the option's own text item, after "(22.5mg)"
+  const own = o.item.str, cw = own.length ? o.item.width / own.length : 0;
+  const tail = own.slice(Math.round((o.x1 - o.item.x) / (cw || 1)));
+  const inOwn = tail.match(/^\s*\)?\s*[x×:]?\s*(\d{1,2})\b(?!\s*-?\s*m\b|\s*[.,]\d|\s*mg)/i);
+  if (inOwn) return inOwn[1];
+  const near = items.filter(it => it !== o.item && Math.abs(it.y - o.item.y) < 4 && it.x >= o.x1 - 1 && it.x < limit)
+    .sort((a, b) => a.x - b.x).map(it => it.str.trim()).join(' ');
+  const m = near.match(/^\)?\s*[x×:]?\s*(\d{1,2})\s*(?:m|mois|months?)?\b(?!\s*-?\s*m\b\s*\()/i);
+  return m ? m[1] : '';
+}
+
+// Total doses (repeats) — confirmed Oct 23, 2026:
+//   "Number of injections" filled on the form → that number;
+//   else months marked next to the dose ÷ the dose's months
+//   (7.5 mg = 1 month, 22.5 mg = 3, 30 mg = 4, 45 mg = 6): 22.5 mg + 18 → 6.
+//   Nothing usable → '' (the caller keeps its default).
+function repeatsFor(dose, injections, months) {
+  const n = parseInt(injections, 10);
+  if (n >= 1 && n <= 60) return { total: String(n), why: 'number of injections on the form' };
+  const per = parseInt(DOSE_MONTHS[dose], 10), mo = parseInt(months, 10);
+  if (!per || !(mo >= 1 && mo <= 72)) return { total: '', why: '' };
+  if (mo % per) return { total: '', why: `${mo} months does not divide by ${per} (${dose} mg) — check the total doses` };
+  return { total: String(mo / per), why: `${mo} months ÷ ${per} (${dose} mg)` };
+}
+
 async function extractMedicumText(pdf, opts){
     const OPS = (opts && opts.OPS) || (root.pdfjsLib && root.pdfjsLib.OPS) || null;
     let txt='';
     let dose={ value:'', reason:'dose options not found' };
+    let months='';
 
     for(let i=1;i<=pdf.numPages;i++){
       const pg=await pdf.getPage(i);
@@ -239,12 +273,13 @@ async function extractMedicumText(pdf, opts){
       // Only the first page that has a dose row decides
       if(!dose.value && dose.reason==='dose options not found'){
         dose=_detectDose(items, annots, _shapes(opList, OPS));
+        if(dose.value) months=_monthsNextTo(items, dose.value);
       }
     }
     // parseMedicum() reads the dose from `bold`; give it exactly the detected
     // dose (or nothing, so its text fallbacks run).
     const bold=dose.value?[dose.value+' mg']:[];
-    return {txt,bold,dose};
+    return {txt,bold,dose,months};
 }
 
 // ── Address helpers ─────────────────────────────────────────────────────
@@ -406,6 +441,16 @@ function parse(text, bold, fname){
     }
   }
 
+  // Number of injections ("Number of injections/Nombre d'injection a recevoir: 6")
+  const injM=text.match(/Number\s+of\s+injections?\s*\/?\s*(?:Nombre\s+d['’]\s*injections?\s*(?:[aà]\s*recevoir)?)?\s*:?\s*[x×]?\s*(\d{1,2})\b(?!\s*[\/.-]\d)/i);
+  if(injM) r.injections=injM[1];
+  // Months after the chosen option in OCR text ("3-m (22.5mg) 18 4-m (30mg)")
+  if(r.dose && !r.months){
+    const mo=DOSE_MONTHS[r.dose], dv=r.dose.replace('.','[.,]');
+    const mm=text.match(new RegExp(mo+'\\s*-?\\s*m(?:ois)?\\s*\\(?\\s*'+dv+'\\s*mg\\s*\\)?\\s*[x×:]?\\s*(\\d{1,2})\\b(?!\\s*-?\\s*m\\b|\\s*[.,]\\d|\\s*mg)','i'));
+    if(mm) r.months=mm[1];
+  }
+
   // ── 4. ADDRESS ─────────────────────────────────────────────
   // Table row: "ADDRESS/ADRESSE | 1 Boulevard De Maisonneuve Ouest Appartement 703"
   // OCR:       "ADDRESS/ADRESSE 1 Boulevard De Maisonneuve Ouest Appartement 703"
@@ -513,10 +558,13 @@ function parseMedicumPdf(ex, fname){
   const r=parse(ex.txt, ex.bold, fname);
   if(ex.dose && ex.dose.reason!=='dose options not found') r.dose=ex.dose.value;
   r.doseReason=ex.dose?ex.dose.reason:'';
+  if(ex.months && r.dose===ex.dose.value) r.months=ex.months;
+  const rp=repeatsFor(r.dose, r.injections, r.months);
+  r.totalDoses=rp.total; r.totalWhy=rp.why;
   return r;
 }
 
-const api = { extractMedicumText, parseMedicum: parse, parseMedicumPdf, formatAddress, formatUnit, splitUnit };
+const api = { extractMedicumText, parseMedicum: parse, parseMedicumPdf, formatAddress, formatUnit, splitUnit, repeatsFor };
 if (typeof module === 'object' && module.exports) module.exports = api;
 else Object.assign(root, api);
 })(typeof self !== 'undefined' ? self : this);

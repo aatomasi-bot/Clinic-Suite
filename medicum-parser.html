@@ -115,6 +115,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
             <option value="30">30 mg</option>
             <option value="45">45 mg</option>
           </select></div>
+        <div class="fld"><label>Total doses</label>
+          <input id="ftot" type="number" min="1" max="60" inputmode="numeric" placeholder="from the form" oninput="build()"></div>
       </div>
       <div class="fld"><label>Street</label>
         <input id="fst" type="text" placeholder="290 54e Avenue" oninput="build()"></div>
@@ -350,6 +352,10 @@ function fill(r){
     if(_fnLbl){_fnLbl.textContent='❗ Patient Name — type manually';_fnLbl.style.color='var(--re)';}
     if(_fnInp){_fnInp.style.borderColor='var(--re)';setTimeout(()=>_fnInp.focus(),450);}
   }set('ff',r.file);set('fd',r.dose);
+  // Total doses: "Number of injections", else months next to the dose ÷ the dose's months (22.5 mg + 18 → 6)
+  const rp=r.totalDoses!==undefined?{total:r.totalDoses,why:r.totalWhy}:repeatsFor(r.dose,r.injections,r.months);
+  set('ftot',rp.total);
+  if(rp.why&&!rp.total)toast('⚠️ '+rp.why);
   set('fst',r.street);set('fci',r.city);set('fpr',r.prov||'QC');
   set('fpo',r.postal);set('fa',r.apt);set('fp1',r.ph1);set('fp2',r.ph2);
   set('fdt',r.date);
@@ -362,7 +368,8 @@ function fill(r){
 // ── Build output
 function build(){
   const v=id=>(document.getElementById(id)?.value||'').trim();
-  const name=v('fn'),file=v('ff'),dose=v('fd')?v('fd')+' mg':'';
+  // "22.5 mg x6" — VaPiq reads the x-number as Total Doses
+  const name=v('fn'),file=v('ff'),dose=v('fd')?v('fd')+' mg'+(v('ftot')?' x'+v('ftot'):''):'';
   // street, city, prov, postal, unit — unit keeps its label (Apt. 3 / Unit C)
   const addr=formatAddress({street:v('fst'),city:v('fci'),prov:v('fpr'),postal:v('fpo'),apt:v('fa')});
   const ph1=v('fp1'),ph2=v('fp2'),dt=v('fdt');
@@ -440,7 +447,7 @@ function reset(){
   document.getElementById('card').style.display='none';
   document.getElementById('dz').classList.remove('done');
   document.getElementById('fi').value='';
-  ['fn','ff','fst','fci','fpr','fpo','fa','fp1','fp2','fdt'].forEach(id=>{
+  ['fn','ff','ftot','fst','fci','fpr','fpo','fa','fp1','fp2','fdt'].forEach(id=>{
     const el=document.getElementById(id);
     if(el){el.value='';el.classList.remove('ok','miss');}
   });

@@ -43,6 +43,12 @@ export function loadConfig(file = path.join(here, 'config.json')) {
 
 const sha = s => crypto.createHash('sha256').update(s).digest('hex');
 
+// "*** Please have the patient sign the enrollment form at your visit and return
+// to Medicum reports***" → the new patient's card gets this note (Oct 23, 2026)
+export const SIGNATURE_NOTE = 'Signature required!';
+const SIGNATURE_RX = /have\s+the\s+patient\s+sign\s+the\s+enrol+ment\s+form|faire\s+signer\s+(?:le\s+)?formulaire\s+d['’]\s*(?:inscription|adh[ée]sion)/i;
+export const needsSignature = text => SIGNATURE_RX.test(String(text || ''));
+
 function existingSummary(p) {
   return p ? { id: p.id, file_number: p.file_number, patient_name: p.patient_name, status: patientStatus(p),
                dose_prescribed: p.dose_prescribed ?? null, doses_remaining: p.doses_remaining ?? null } : null;
@@ -99,6 +105,7 @@ export async function runIntake({ source, store, rules, replies = {}, isTest, lo
     // or politely asks for what's missing.
     if (await store.knownMessage(email.messageId)) { counts.already++; continue; }
     const sender = senderAddress(email.from);
+    const signNow = needsSignature(email.bodyText);
     const fromReports = sender === (replies.reportsAddress || 'reports@medicum.ca');
     const noReply = (rules.noReplySenders || []).map(s => s.toLowerCase()).includes(sender);   // no-reply@ "New Appointment"
     const fromDocs = fromReports || noReply;
@@ -162,7 +169,9 @@ export async function runIntake({ source, store, rules, replies = {}, isTest, lo
       let fileNumber = form.parsed?.file || '';
       if (!fileNumber && subjectFile) { fileNumber = subjectFile; cardWarnings.push('File # taken from the email subject (not found in the PDF).'); }
       else if (fileNumber && subjectFile && normFile(fileNumber) !== normFile(subjectFile)) cardWarnings.push(`File # in the PDF (${fileNumber}) differs from the email subject (${subjectFile}).`);
-      const { record, missing } = buildRecord(form.parsed, { fileNumber });
+      const signature = signNow || !!(group && group.details && group.details.signature_required);
+      const { record, missing } = buildRecord(form.parsed, { fileNumber, specialInstructions: signature ? SIGNATURE_NOTE : '' });
+      if (form.parsed && !form.parsed.totalDoses && form.parsed.totalWhy) cardWarnings.push(form.parsed.totalWhy);
       for (const p of sameNameOtherFile(record.patient_name, fileNumber, patients)) cardWarnings.push(`Same name as existing patient #${p.file_number} (${patientStatus(p)}) — possible duplicate.`);
       pendingId = await store.insertPending({
         status: 'pending', is_test: !!isTest, source_key: form.key,
@@ -184,6 +193,10 @@ export async function runIntake({ source, store, rules, replies = {}, isTest, lo
       const NO_DOCS = /^No documents attached/;
       const warnings = (group.warnings || []).filter(w => !(allFiles.length && NO_DOCS.test(w)));
       const fields = { related_emails: related, documents: docs, pending_id: pendingId, warnings };
+      if (signNow) {
+        fields.details = { ...(group.details || {}), signature_required: true };
+        if (pendingId) await store.markSignatureRequired(pendingId, SIGNATURE_NOTE);
+      }
       // Reply goes to the coordinator, in the coordinator's thread
       if (!fromDocs && (group.to_address === reports || noReplyAddr(group.to_address))) {
         Object.assign(fields, { to_address: senderAddress(email.from), to_name: coordinatorName || null,
@@ -209,7 +222,7 @@ export async function runIntake({ source, store, rules, replies = {}, isTest, lo
       const to = noReply ? reports : sender;
       const id = await store.insertTask({ ...replyBase, kind: 'new_patient', status: 'todo',
         source_key: sha(`${email.messageId}|new_patient`), pending_id: pendingId, group_key: groupKey,
-        details: { signature: replies.signature || '' },
+        details: { signature: replies.signature || '', ...(signNow ? { signature_required: true } : {}) },
         file_number: groupKey, cc_addresses: to === reports ? [] : [reports], to_address: to, to_name: noReply ? null : replyBase.to_name,
         existing_patient: existingSummary(existing), related_emails: [emailRef(email)], documents: docs, warnings,
         reply_body: replies.enabled === false ? null : draftReply({ kind: 'new_patient', lang, coordinatorName: noReply ? '' : coordinatorName, fileNumber: groupKey,

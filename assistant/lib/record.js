@@ -24,7 +24,9 @@ export function toIsoDate(s) {
 // Same as medicum-parser.html: "street, city, prov, postal, Apt. 3" / "…, Unit C"
 export const formatAddress = r => sharedFormatAddress(r);
 
-export function buildRecord(parsed, { fileNumber } = {}) {
+// Default total doses when the form gives nothing (VaPiq's default).
+const DEFAULT_TOTAL = '4';
+export function buildRecord(parsed, { fileNumber, specialInstructions = '' } = {}) {
   const r = parsed || {};
   const missing = [];
   const due = toIsoDate(r.date);
@@ -42,15 +44,15 @@ export function buildRecord(parsed, { fileNumber } = {}) {
     phone1:                   r.ph1 || '',
     phone2:                   r.ph2 || '',
     dose_prescribed:          r.dose || '',          // blank until confirmed (VaPiq default 22.5 is not assumed)
-    total_doses:              '4',
-    doses_remaining:          '4',
+    total_doses:              r.totalDoses || DEFAULT_TOTAL,   // from the form (js/medicum-parse.js repeatsFor)
+    doses_remaining:          r.totalDoses || DEFAULT_TOTAL,   // new patient: nothing given yet
     injection_site:           '',
     previous_injection_site:  '',
     due_date:                 due || todayStr(),
     appointment_date_time:    null,
     previous_injection_dates: '',
     assignment_type:          'Permanent',
-    special_instructions:     '',
+    special_instructions:     specialInstructions,
     adverse_effects_comments: '',
     file_status:              'Active',
     injection_administered:   false,
