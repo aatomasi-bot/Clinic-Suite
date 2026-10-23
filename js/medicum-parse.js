@@ -444,6 +444,23 @@ function parse(text, bold, fname){
   // Number of injections ("Number of injections/Nombre d'injection a recevoir: 6")
   const injM=text.match(/Number\s+of\s+injections?\s*\/?\s*(?:Nombre\s+d['’]\s*injections?\s*(?:[aà]\s*recevoir)?)?\s*:?\s*[x×]?\s*(\d{1,2})\b(?!\s*[\/.-]\d)/i);
   if(injM) r.injections=injM[1];
+  // Medicum's assignment form (usually scanned): one line per dose, the chosen
+  // one has the months filled in — "22.5 mg, (3 months) for a period of_18_months",
+  // "45,0 mg, (6 mois) pour une durée de _ 6_mois". Scans misread 1 as | or l.
+  if(!r.months){
+    const PERIOD_RX=/(7[.,]5|22[.,]5|30(?:[.,]0)?|45(?:[.,]0)?)\s*mg\s*,?\s*\(\s*\d\s*m[a-z]*\s*\)\s*(?:for\s+a\s+p[a-z]{3,6}d?\s+o[fl1]|pour\s+une\s+dur[ée]e\s+de)((?:[^a-zA-Z\n]|[lIoO|]){0,12}?)\s*(?:m[aeo]n[a-z]{0,3}|mois)/gi;
+    const found={};let pm;
+    while((pm=PERIOD_RX.exec(text))){
+      const n=pm[2].replace(/[|lI!]/g,'1').replace(/[oO]/g,'0').replace(/\D/g,'');
+      if(n&&n.length<=2&&+n>0)found[_normDose(pm[1]).replace(/\.0$/,'')]=n;
+    }
+    const doses=Object.keys(found);
+    if(doses.length===1){
+      r.periodDose=doses[0];
+      if(!r.dose)r.dose=doses[0];
+      if(r.dose===doses[0])r.months=found[doses[0]];
+    }
+  }
   // Months after the chosen option in OCR text ("3-m (22.5mg) 18 4-m (30mg)")
   if(r.dose && !r.months){
     const mo=DOSE_MONTHS[r.dose], dv=r.dose.replace('.','[.,]');

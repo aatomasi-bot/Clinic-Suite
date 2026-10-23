@@ -19,7 +19,7 @@ import { classifyEmail, subjectFileNumber, senderAddress, isNewPatientSubject } 
 import { documentTypes, summarizeDocuments } from './lib/doctype.js';
 import { findExisting, sameNameOtherFile, patientStatus, normFile } from './lib/match.js';
 import { buildRecord } from './lib/record.js';
-import { parsePdf } from './lib/pdf.js';
+import { parsePdf, parseScan, repeatsFor } from './lib/pdf.js';
 import { testFolderSource, imapSource } from './lib/sources.js';
 import { supabaseStore, offlineStore } from './lib/store.js';
 import { summaryText, macNotification, pushToPhones } from './lib/notify.js';
@@ -116,12 +116,12 @@ export async function runIntake({ source, store, rules, replies = {}, isTest, lo
       const key = sha(`${email.messageId}|${pdf.name}`);
       const warnings = [];
       let out = { scanned: true, text: '', result: null };
-      if (/\.(jpe?g|png|heic|tiff?)$/i.test(pdf.name)) warnings.push(`${pdf.name} is a picture — open it in the email to read it.`);
+      if (/\.(jpe?g|png|heic|tiff?)$/i.test(pdf.name)) out = parseScan(pdf.bytes, pdf.name);
       else try { out = await parsePdf(pdf.bytes, pdf.name); } catch (e) { warnings.push(`Could not read ${pdf.name} (${e.message}) — open it in the email.`); }
-      let types = documentTypes({ text: out.text, scanned: out.scanned, name: pdf.name });
+      let types = documentTypes({ text: out.text, scanned: out.scanned && !out.ocr, name: pdf.name });
       if (kind === 'enrollment_doc' && !types.length) types = ['enrollment'];   // the subject says what it is
       files.push({ name: pdf.name, types, from: senderAddress(email.from) });
-      if (out.scanned && !/\.(jpe?g|png|heic|tiff?)$/i.test(pdf.name) && !warnings.length) warnings.push(`${pdf.name}: scanned/faxed PDF — open it in the Medicum Parser (OCR) to read the fields.`);
+      if (out.scanned && !out.ocr && !warnings.length) warnings.push(`${pdf.name}: scanned/faxed PDF — open it in the Medicum Parser (OCR) to read the fields.`);
       const r = out.result;
       if (r && !r.dose && (types.includes('assignment') || /enrol+ment[\s_-]*form/i.test(pdf.name))) warnings.push(`Dose not clearly marked on the form (${r.doseReason || 'unknown'}) — check the PDF.`);
       parsedForms.push({ key, pdf, parsed: r, types, warnings, scanned: out.scanned });
@@ -169,6 +169,16 @@ export async function runIntake({ source, store, rules, replies = {}, isTest, lo
       let fileNumber = form.parsed?.file || '';
       if (!fileNumber && subjectFile) { fileNumber = subjectFile; cardWarnings.push('File # taken from the email subject (not found in the PDF).'); }
       else if (fileNumber && subjectFile && normFile(fileNumber) !== normFile(subjectFile)) cardWarnings.push(`File # in the PDF (${fileNumber}) differs from the email subject (${subjectFile}).`);
+      // Months from the (scanned) assignment form → total doses on the card made from the enrollment form
+      const period = parsedForms.map(f => f.parsed).find(p => p && p.months && p !== form.parsed);
+      if (form.parsed && !form.parsed.totalDoses && period) {
+        if (form.parsed.dose && period.periodDose && form.parsed.dose !== period.periodDose)
+          cardWarnings.push(`The assignment form marks ${period.periodDose} mg but the enrollment form says ${form.parsed.dose} mg — check the dose and total doses.`);
+        else {
+          const rp = repeatsFor(form.parsed.dose || period.periodDose, form.parsed.injections, period.months);
+          Object.assign(form.parsed, { totalDoses: rp.total, totalWhy: rp.why });
+        }
+      }
       const signature = signNow || !!(group && group.details && group.details.signature_required);
       const { record, missing } = buildRecord(form.parsed, { fileNumber, specialInstructions: signature ? SIGNATURE_NOTE : '' });
       if (form.parsed && !form.parsed.totalDoses && form.parsed.totalWhy) cardWarnings.push(form.parsed.totalWhy);

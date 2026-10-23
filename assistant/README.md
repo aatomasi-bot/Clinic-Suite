@@ -85,8 +85,15 @@ The selected dose is found by **position on the page**. The parser locates the f
 options, then looks for a ticked checkbox, an X/✓, a filled box, an underline or a
 bold option that singles out exactly one of them. If nothing does, or the marks
 disagree, the dose is left **blank** and the card asks you to check the PDF. It
-never guesses. Scanned/faxed PDFs have no text layer; their card says to open the
-PDF in the Medicum Parser (OCR).
+never guesses.
+
+**Scanned forms** are read by your Mac's built-in text recognition (Vision, the
+Live Text engine — on this Mac only, nothing is sent anywhere). The helper
+(`ocr/ocr.swift`) is compiled automatically the first time (needs the Xcode Command
+Line Tools). On Medicum's assignment form the chosen dose line has the months filled
+in ("22.5 mg, (3 months) for a period of _18_ months"): total doses = months ÷ the
+dose's months (7.5→1, 22.5→3, 30→4, 45→6), unless "Number of injections" is filled
+in. If the scan and the enrollment form disagree on the dose, the card warns you.
 
 ## Dubbi — ask by typing or voice
 

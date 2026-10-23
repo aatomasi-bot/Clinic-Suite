@@ -26,6 +26,9 @@ export function testFolderSource(dir) {
   };
 }
 
+// Download each part in one piece (chunked downloads sometimes stopped after
+// the first 64 KB chunk — 47,892 bytes — and big PDFs became unreadable).
+const WHOLE = 64 * 1024 * 1024;
 const IMAGE = /\.(jpe?g|png|heic|tiff?)$/i;
 function pdfParts(node, out = []) {
   if (!node) return out;
@@ -89,13 +92,13 @@ export function imapSource(cfg, { wanted }) {
         // download() uses BODY.PEEK — reading never marks the email as read
         const pdfs = [];
         for (const p of m.parts) {
-          const { content } = await client.download(String(m.uid), p.part, { uid: true });
+          const { content } = await client.download(String(m.uid), p.part, { uid: true, chunkSize: WHOLE });
           pdfs.push({ name: p.name, bytes: await readAll(content) });
         }
         let bodyText = '';
         if (m.text) {
           try {
-            const { content } = await client.download(String(m.uid), m.text, { uid: true, maxBytes: 16000 });
+            const { content } = await client.download(String(m.uid), m.text, { uid: true, maxBytes: 16000, chunkSize: WHOLE });
             bodyText = (await readAll(content)).toString('utf8').slice(0, 8000);
           } catch {}
         }
