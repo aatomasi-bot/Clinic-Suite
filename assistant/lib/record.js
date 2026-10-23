@@ -26,10 +26,11 @@ export const formatAddress = r => sharedFormatAddress(r);
 
 // Default total doses when the form gives nothing (VaPiq's default).
 const DEFAULT_TOTAL = '4';
-export function buildRecord(parsed, { fileNumber, specialInstructions = '' } = {}) {
+// dueDate: the date from the coordinator's email — it wins over the form (Oct 23, 2026)
+export function buildRecord(parsed, { fileNumber, specialInstructions = '', dueDate = '' } = {}) {
   const r = parsed || {};
   const missing = [];
-  const due = toIsoDate(r.date);
+  const due = dueDate || toIsoDate(r.date);
   const address = formatAddress(r);
   if (!r.name) missing.push('Patient Name');
   if (!fileNumber) missing.push('File Number');

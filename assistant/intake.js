@@ -18,8 +18,9 @@ import { fileURLToPath } from 'node:url';
 import { classifyEmail, subjectFileNumber, senderAddress, isNewPatientSubject } from './lib/classify.js';
 import { documentTypes, summarizeDocuments } from './lib/doctype.js';
 import { findExisting, sameNameOtherFile, patientStatus, normFile } from './lib/match.js';
-import { buildRecord } from './lib/record.js';
+import { buildRecord, toIsoDate } from './lib/record.js';
 import { parsePdf, parseScan, repeatsFor } from './lib/pdf.js';
+import { needsSignature, emailDueDate, cardNotes } from './lib/emailinfo.js';
 import { testFolderSource, imapSource } from './lib/sources.js';
 import { supabaseStore, offlineStore } from './lib/store.js';
 import { summaryText, macNotification, pushToPhones } from './lib/notify.js';
@@ -42,12 +43,10 @@ export function loadConfig(file = path.join(here, 'config.json')) {
 }
 
 const sha = s => crypto.createHash('sha256').update(s).digest('hex');
+// Kept on the patient's item, for a card created by a later email
+const remember = said => ({ ...(said.signature ? { signature_required: true } : {}), ...(said.due ? { email_due: said.due, email_note: said.note || '' } : {}) });
 
-// "*** Please have the patient sign the enrollment form at your visit and return
-// to Medicum reports***" → the new patient's card gets this note (Oct 23, 2026)
-export const SIGNATURE_NOTE = 'Signature required!';
-const SIGNATURE_RX = /have\s+the\s+patient\s+sign\s+the\s+enrol+ment\s+form|faire\s+signer\s+(?:le\s+)?formulaire\s+d['’]\s*(?:inscription|adh[ée]sion)/i;
-export const needsSignature = text => SIGNATURE_RX.test(String(text || ''));
+export { needsSignature } from './lib/emailinfo.js';
 
 function existingSummary(p) {
   return p ? { id: p.id, file_number: p.file_number, patient_name: p.patient_name, status: patientStatus(p),
@@ -105,7 +104,9 @@ export async function runIntake({ source, store, rules, replies = {}, isTest, lo
     // or politely asks for what's missing.
     if (await store.knownMessage(email.messageId)) { counts.already++; continue; }
     const sender = senderAddress(email.from);
-    const signNow = needsSignature(email.bodyText);
+    // What the coordinator's email says: signature needed, due date (+ the reason in brackets)
+    const said = { signature: needsSignature(email.bodyText), ...emailDueDate(email.bodyText, email.date) };
+    const saysSomething = said.signature || said.due;
     const fromReports = sender === (replies.reportsAddress || 'reports@medicum.ca');
     const noReply = (rules.noReplySenders || []).map(s => s.toLowerCase()).includes(sender);   // no-reply@ "New Appointment"
     const fromDocs = fromReports || noReply;
@@ -179,8 +180,13 @@ export async function runIntake({ source, store, rules, replies = {}, isTest, lo
           Object.assign(form.parsed, { totalDoses: rp.total, totalWhy: rp.why });
         }
       }
-      const signature = signNow || !!(group && group.details && group.details.signature_required);
-      const { record, missing } = buildRecord(form.parsed, { fileNumber, specialInstructions: signature ? SIGNATURE_NOTE : '' });
+      const earlier = (group && group.details) || {};
+      const signature = said.signature || !!earlier.signature_required;
+      const due = said.due || earlier.email_due || '';
+      const note = said.due ? said.note : (earlier.email_note || '');
+      const formDue = form.parsed && toIsoDate(form.parsed.date);
+      if (due && formDue && formDue !== due) cardWarnings.push(`Due date from the coordinator's email (${due}) replaces the form's (${formDue}).`);
+      const { record, missing } = buildRecord(form.parsed, { fileNumber, dueDate: due, specialInstructions: cardNotes({ signature, note }) });
       if (form.parsed && !form.parsed.totalDoses && form.parsed.totalWhy) cardWarnings.push(form.parsed.totalWhy);
       for (const p of sameNameOtherFile(record.patient_name, fileNumber, patients)) cardWarnings.push(`Same name as existing patient #${p.file_number} (${patientStatus(p)}) — possible duplicate.`);
       pendingId = await store.insertPending({
@@ -203,9 +209,9 @@ export async function runIntake({ source, store, rules, replies = {}, isTest, lo
       const NO_DOCS = /^No documents attached/;
       const warnings = (group.warnings || []).filter(w => !(allFiles.length && NO_DOCS.test(w)));
       const fields = { related_emails: related, documents: docs, pending_id: pendingId, warnings };
-      if (signNow) {
-        fields.details = { ...(group.details || {}), signature_required: true };
-        if (pendingId) await store.markSignatureRequired(pendingId, SIGNATURE_NOTE);
+      if (saysSomething) {
+        fields.details = { ...(group.details || {}), ...remember(said) };
+        if (pendingId) await store.patchCard(pendingId, { due: said.due, notes: cardNotes({ signature: said.signature, note: said.note }) });
       }
       // Reply goes to the coordinator, in the coordinator's thread
       if (!fromDocs && (group.to_address === reports || noReplyAddr(group.to_address))) {
@@ -232,7 +238,7 @@ export async function runIntake({ source, store, rules, replies = {}, isTest, lo
       const to = noReply ? reports : sender;
       const id = await store.insertTask({ ...replyBase, kind: 'new_patient', status: 'todo',
         source_key: sha(`${email.messageId}|new_patient`), pending_id: pendingId, group_key: groupKey,
-        details: { signature: replies.signature || '', ...(signNow ? { signature_required: true } : {}) },
+        details: { signature: replies.signature || '', ...remember(said) },
         file_number: groupKey, cc_addresses: to === reports ? [] : [reports], to_address: to, to_name: noReply ? null : replyBase.to_name,
         existing_patient: existingSummary(existing), related_emails: [emailRef(email)], documents: docs, warnings,
         reply_body: replies.enabled === false ? null : draftReply({ kind: 'new_patient', lang, coordinatorName: noReply ? '' : coordinatorName, fileNumber: groupKey,
