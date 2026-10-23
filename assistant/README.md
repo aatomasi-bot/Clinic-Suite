@@ -77,7 +77,7 @@ without marking emails as read. Each handled email is starred (`\Flagged`). Once
 its reply is sent, it is moved to `Medicum`. Replies go out through Yahoo SMTP with the
 same app password. After the first live reply, check Yahoo's **Sent** folder: if
 the reply isn't there, set `"replies": { "saveToSent": true }` in `config.json`. Which emails count as assignments is set in `rules`
-(sender domains, excluded senders, subject patterns).
+(sender domains, excluded senders, subject patterns). Medicum sends the forms from **no-reply@medicum.ca** ("New Appointment"): those emails are read and paired with the coordinator's note, never replied to. The patient card is filled from **Enrollment_Form_Auto_Generated_#####.pdf** first (a text PDF with every field; the assignment form is usually a scan).
 
 ## Dose detection
 

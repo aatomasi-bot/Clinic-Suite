@@ -26,10 +26,13 @@ export function testFolderSource(dir) {
   };
 }
 
+const IMAGE = /\.(jpe?g|png|heic|tiff?)$/i;
 function pdfParts(node, out = []) {
   if (!node) return out;
   const name = node.dispositionParameters?.filename || node.parameters?.name || '';
   if (node.part && (node.type === 'application/pdf' || /\.pdf$/i.test(name))) out.push({ part: node.part, name: name || `attachment-${node.part}.pdf` });
+  // A photo/scan of the form ("RM12345NewCPP.jpg") counts as a document too (typed by its name)
+  else if (node.part && name && /^image\//i.test(node.type) && IMAGE.test(name)) out.push({ part: node.part, name });
   (node.childNodes || []).forEach(c => pdfParts(c, out));
   return out;
 }

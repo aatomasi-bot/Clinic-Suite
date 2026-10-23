@@ -16,10 +16,10 @@
       "medicum.ca"
     ],
     "excludeSenders": [
-      "no-reply@medicum.ca",
       "nsd@medicum.ca"
     ],
     "includeSubject": [
+      "new\\s*appointment",
       "new\\s*patient",
       "nouve(?:au|lle)\\s*patient",
       "\\bpatient\\b",
@@ -44,13 +44,17 @@
     ],
     "newPatientSubject": [
       "new\\s*patient",
-      "nouve(?:au|lle)\\s*patient"
+      "nouve(?:au|lle)\\s*patient",
+      "new\\s*appointment"
     ],
     "enrollmentSubject": [
       "enrol",
       "inscription",
       "consentement",
       "consent\\b"
+    ],
+    "noReplySenders": [
+      "no-reply@medicum.ca"
     ]
   },
   "supabase": {
