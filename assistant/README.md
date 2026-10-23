@@ -96,7 +96,10 @@ send", "Missing documents", a file number, or "Find <name>" (English or French).
 
 - **Everything runs on your phone.** No AI service is used and nothing is sent
   anywhere new: Dubbi follows fixed rules over the same data the page already shows.
-- **It never acts.** It answers and opens the right card; you do the action there.
+- **It never acts on its own.** Say or type "close file 32604", "send the reply for 35290",
+  "prescription applied 30001", "ask for the documents for 34734" or "add 34734": Dubbi
+  says what it will do and waits for **Confirm** (or "yes"). Then it presses that card's
+  own button, so every check the card does still applies.
 - Answers are read aloud with the iPhone's own voices (on the phone).
 - The **microphone is off by default** (Dubbi → ⚙︎). Speech goes through Apple's
   dictation, like the keyboard mic, so turn it on only once your privacy officer

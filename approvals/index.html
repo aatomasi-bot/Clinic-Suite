@@ -240,6 +240,8 @@ nav.tabbar .in{display:flex;width:100%;max-width:520px}
 .msg.me{align-self:flex-end;background:var(--teal);color:#fff;border-bottom-right-radius:6px}
 .msg.bot{align-self:flex-start;background:var(--card);border:1px solid var(--line);border-bottom-left-radius:6px}
 .msg.sys{align-self:center;background:none;color:var(--ink-3);font-size:13px;padding:2px}
+.prop{align-self:stretch;background:var(--card);border:1.5px solid var(--teal);border-radius:16px;padding:12px;animation:rise .25s both}
+.prop p{margin:0 0 10px;font-size:14.5px}
 .card.flash{animation:flash 1.6s ease-out}
 @keyframes flash{0%,30%{box-shadow:0 0 0 3px var(--teal-2)}100%{box-shadow:0 0 0 0 transparent}}
 .suggest{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
@@ -761,9 +763,11 @@ async function approve(item, card, btn) {
 function openDetails(card, msg) { const d = card.querySelector('details.form'); if (d) d.open = true; toast(msg); }
 
 // Close file = VaPiq's Archive (archivePatient in index.html)
+let dubbiConfirmed = false;   // set when you confirmed the same action in Dubbi's chat
 async function closeFile(t) {
   const e = t.existing_patient, fn = String(e.file_number || '').trim();
-  if (!confirm(`Close file #${fn} (${e.patient_name}) in VaPiq?\n\nThis archives the patient, like the Archive button in VaPiq.`)) return false;
+  const ok = dubbiConfirmed; dubbiConfirmed = false;
+  if (!ok && !confirm(`Close file #${fn} (${e.patient_name}) in VaPiq?\n\nThis archives the patient, like the Archive button in VaPiq.`)) return false;
   if (t.is_test) { toast('Test card — VaPiq not changed. Reply is ready.'); return true; }
   const { data, error } = await sb.from('patients').update({ archived: true }).eq('id', e.id).select('id,file_number');
   if (error) throw error;
@@ -855,15 +859,16 @@ setInterval(() => { if (!document.hidden && user && !typing()) load(); }, 60000)
 
 // ── Dubbi: talk or type ─────────────────────────────────────────────────
 // Dubbi runs entirely on this phone: no AI service, nothing sent anywhere new.
-// It understands a fixed set of requests (English or French), answers from the
-// same data this page shows, and opens the right card — you still do every
-// action yourself on the card. Answers are read aloud by the phone's own voices.
+// It understands a fixed set of requests (English or French) and answers from
+// the same data this page shows. For actions ("close file 32604") it proposes;
+// when you confirm, it presses that card's own button, so every check the card
+// does still applies. Answers are read aloud by the phone's own voices.
 // The microphone uses Apple's dictation, so it stays off until you turn it on in ⚙︎.
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 const PREF = (() => { try { return JSON.parse(localStorage.getItem('dubbi_prefs') || '{}'); } catch { return {}; } })();
 const pref = (k, d) => PREF[k] ?? d;
 const savePref = (k, v) => { PREF[k] = v; try { localStorage.setItem('dubbi_prefs', JSON.stringify(PREF)); } catch {} };
-const D = { rec: null, open: false, lang: pref('lang', 'auto'), fr: false };
+const D = { rec: null, open: false, lang: pref('lang', 'auto'), fr: false, pending: null };
 const micOn = () => !!SR && pref('mic', false);
 
 function openSheet() {
@@ -899,10 +904,87 @@ async function ask(text) {
   document.querySelectorAll('#chat .suggest').forEach(n => n.remove());
   D.fr = D.lang === 'fr' || (D.lang === 'auto' && /[éèêàçùô]|\b(bonjour|salut|quoi|qui|des|les|dossier|retards?|planifi\w*|rendez|cherche|trouve|aide|aujourd'hui|documents? manquants?)\b/i.test(text));
   bubble(text, 'me'); $('askInput').value = '';
+  if (D.pending && YES.test(plain(text))) return runProposal(D.pending);
+  if (D.pending && NO.test(plain(text))) return cancelProposal();
   let out;
   try { out = await answer(text); } catch (e) { out = { say: D.fr ? 'Je n’arrive pas à lire vos données. Vérifiez la connexion.' : 'I couldn’t read your data. Check your connection.' }; }
   bubble(out.say, 'bot'); speak(out.say);
   buttons(out.go || []);
+  if (out.propose) proposeCard(out.propose);
+}
+
+// ── Actions: Dubbi proposes, you confirm, the card's own button does it ──
+const YES = /^\s*(yes|yeah|yep|sure|ok(ay)?|confirm(ed)?|do it|go ahead|send it|oui|ouais|d'accord|vas-?y|confirme|envoie)\b[\s.!]*$/;
+const NO = /^\s*(no|nope|cancel|stop|don'?t|non|annule|laisse tomber)\b/;
+function proposeCard(p) {
+  D.pending = p;
+  document.querySelectorAll('#chat .prop').forEach(n => n.remove());
+  const c = document.createElement('div'); c.className = 'prop';
+  c.innerHTML = `<p>${esc(p.describe)}</p><div class="acts" style="margin-top:0"><button class="btn ghost" type="button" data-x="no">${L('Cancel', 'Annuler')}</button><button class="btn pri" type="button" data-x="yes">${L('Confirm', 'Confirmer')}</button></div>`;
+  c.addEventListener('click', e => { const x = e.target.closest('[data-x]'); if (!x) return; c.remove(); x.dataset.x === 'yes' ? runProposal(p) : cancelProposal(); });
+  $('chat').appendChild(c); $('chat').scrollTop = $('chat').scrollHeight;
+}
+function cancelProposal() {
+  D.pending = null; document.querySelectorAll('#chat .prop').forEach(n => n.remove());
+  const m = L('Okay, I didn’t do it.', 'D’accord, je n’ai rien fait.'); bubble(m, 'bot'); speak(m);
+}
+function runProposal(p) {
+  D.pending = null; document.querySelectorAll('#chat .prop').forEach(n => n.remove());
+  tab = 'today'; render();
+  const el = document.querySelector(p.item.t ? `[data-t="${CSS.escape(p.item.t.id)}"]` : `[data-r="${CSS.escape(p.item.r.id)}"]`);
+  const btn = el && el.querySelector(`button[data-act="${p.act}"]`);
+  if (!btn || btn.disabled) { const m = L('That item changed in the meantime — nothing was done. Check it in your list.', 'Cet élément a changé — rien n’a été fait. Vérifiez-le dans votre liste.'); bubble(m, 'sys'); speak(m); return; }
+  const m = L('Done — check the card.', 'C’est fait — vérifiez la carte.'); bubble(m, 'bot'); speak(m);
+  closeSheet();
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  if (p.act === 'close-file') dubbiConfirmed = true;
+  btn.click();   // the same code as tapping the button yourself
+}
+// What can be done to which kind of item (the card's button = act)
+const ACTIONS = [
+  { re: /\b(ask|request|demande\w*|redemande\w*)\b.*\b(docs?|documents?|forms?|formulaires?)\b/, views: ['new', 'waiting'],
+    act: i => i.view === 'waiting' ? 'ask-again' : 'ask',
+    ok: i => i.view === 'waiting' || (i.t && docsMissing(i.t) && !unknownDocs(i.t).length),
+    why: () => L('both documents are already here, or a scanned fax still needs ticking on the card', 'les deux documents sont là, ou une télécopie numérisée doit être cochée sur la carte'),
+    say: i => L(`Prepare the request for the missing documents for file #${fileOf(i)}. You review it, then tap Send.`, `Préparer la demande des documents manquants pour le dossier #${fileOf(i)}. Vous la relisez, puis touchez Envoyer.`) },
+  { re: /\b(got|received|recu)\b.*\b(docs?|documents?|forms?|formulaires?)\b/, views: ['waiting'], act: () => 'docs-in',
+    say: i => L(`Mark the documents for file #${fileOf(i)} as received and put it back in your list.`, `Marquer les documents du dossier #${fileOf(i)} comme reçus.`) },
+  { re: /\b(send|envoie|envoyer|envoyez)\b/, views: ['reply'], act: () => 'send',
+    say: i => L(`Send the reply for file #${fileOf(i)} to ${i.t.to_name || i.t.to_address}${(i.t.cc_addresses || []).length ? ', copy to ' + i.t.cc_addresses.join(', ') : ''}. Your Mac sends it within about 2 minutes.`,
+      `Envoyer la réponse du dossier #${fileOf(i)} à ${i.t.to_name || i.t.to_address}${(i.t.cc_addresses || []).length ? ', copie à ' + i.t.cc_addresses.join(', ') : ''}. Votre Mac l’envoie d’ici 2 minutes.`) },
+  { re: /\b(close|ferme[rz]?|fermeture)\b/, views: ['close'],
+    act: i => i.t.existing_patient && i.t.existing_patient.status !== 'Archived' ? 'close-file' : 'reply-anyway',
+    say: i => i.t.existing_patient && i.t.existing_patient.status !== 'Archived'
+      ? L(`Close file #${fileOf(i)} (${i.t.existing_patient.patient_name}) in VaPiq — it will be archived — and prepare the reply.`, `Fermer le dossier #${fileOf(i)} (${i.t.existing_patient.patient_name}) dans VaPiq — il sera archivé — et préparer la réponse.`)
+      : L(`File #${fileOf(i)} is already closed or not in VaPiq. Prepare the reply anyway.`, `Le dossier #${fileOf(i)} est déjà fermé ou absent de VaPiq. Préparer la réponse quand même.`) },
+  { re: /\b(appl(y|ied)|appliqu\w*)\b/, views: ['rx'], act: () => 'applied',
+    say: i => L(`Mark the prescription for file #${fileOf(i)} as applied and prepare the reply.`, `Marquer l’ordonnance du dossier #${fileOf(i)} comme appliquée et préparer la réponse.`) },
+  { re: /\b(add|ajoute\w*)\b/, views: ['new'], act: () => 'approve',
+    ok: i => i.r && i.r.status === 'pending' && !addProblems(i).length,
+    why: i => !(i.r && i.r.status === 'pending') ? L('there is no form waiting for it', 'aucun formulaire n’attend') : L(`the card is missing ${addProblems(i).join(', ')}`, `il manque ${addProblems(i).join(', ')} sur la carte`),
+    say: i => L(`Add ${i.r.record.patient_name}, file #${fileOf(i)}, due ${dayLabel(i.r.record.due_date)}, to VaPiq.`, `Ajouter ${i.r.record.patient_name}, dossier #${fileOf(i)}, dû le ${dayLabel(i.r.record.due_date)}, à VaPiq.`) },
+];
+function addProblems(i) {
+  const rec = (i.r && i.r.record) || {}, out = [];
+  if (!rec.patient_name) out.push(L('the name', 'le nom'));
+  if (!String(rec.file_number || '').trim()) out.push(L('the file number', 'le numéro de dossier'));
+  if (!DOSES.includes(String(rec.dose_prescribed))) out.push(L('the dose', 'la dose'));
+  if (!rec.due_date) out.push(L('the due date', 'la date d’échéance'));
+  return out;
+}
+const QUESTION = /^(how|which|what|any|list|show|who|combien|quels?|quelles?|est-ce|y a-t-il)\b|\?\s*$/;
+function actionFor(q, num, items) {
+  if (QUESTION.test(q)) return null;
+  const A = ACTIONS.find(a => a.re.test(q));
+  if (!A) return null;
+  const cands = items.filter(i => A.views.includes(i.view) && (!num || normFile(fileOf(i)) === normFile(num)));
+  if (!cands.length) return { say: num ? L(`There’s nothing like that open for file #${num}.`, `Rien de tel n’est ouvert pour le dossier #${num}.`) : L('There’s nothing like that open right now.', 'Rien de tel n’est ouvert pour le moment.') };
+  if (cands.length > 1) return { say: L('Which file? ', 'Quel dossier? ') + cands.slice(0, 6).map(i => '#' + fileOf(i)).join(', ') + '.',
+    go: cands.slice(0, 6).map(i => [`#${fileOf(i)}`, () => ask(`${q.replace(/\b\d{4,6}\b/g, '').trim()} ${fileOf(i)}`)]) };
+  const i = cands[0];
+  if (A.ok && !A.ok(i)) return { say: L(`I can’t do that for file #${fileOf(i)}: `, `Impossible pour le dossier #${fileOf(i)} : `) + A.why(i) + '.', go: [showBtn(i)] };
+  const describe = A.say(i);
+  return { say: describe + L(' Confirm?', ' Je confirme?'), propose: { item: i, act: A.act(i), describe } };
 }
 
 // ── Understanding (fixed rules, no AI) ──────────────────────────────────
@@ -950,10 +1032,12 @@ async function answer(text) {
   const q = plain(text);
   const items = todoItems(), today = ymd(new Date());
   const num = (q.match(/\b\d{4,6}\b/) || [])[0];
+  const action = actionFor(q, num, items);
+  if (action) return action;
 
   if (/\b(help|aide|what can you|que (peux|pouvez)|commands?)\b/.test(q))
-    return { say: L('Ask me what’s new, what’s overdue, who needs an appointment, who to confirm, today’s visits, replies to send, missing documents, or a file number or patient name. I open the card; you do the action.',
-      'Demandez-moi : quoi de neuf, les retards, qui planifier, qui confirmer, les visites d’aujourd’hui, les réponses à envoyer, les documents manquants, ou un numéro de dossier ou un nom. J’ouvre la carte; vous faites l’action.') };
+    return { say: L('Ask me what’s new, what’s overdue, who needs an appointment, who to confirm, today’s visits, replies to send, missing documents, or a file number or name. I can also do things after you confirm: “close file 32604”, “send the reply for 35290”, “prescription applied 30001”, “ask for the documents for 34734”, “add 34734”.',
+      'Demandez-moi : quoi de neuf, les retards, qui planifier, qui confirmer, les visites d’aujourd’hui, les réponses à envoyer, les documents manquants, ou un numéro de dossier ou un nom. Je peux aussi agir après votre confirmation : « ferme le dossier 32604 », « envoie la réponse 35290 », « ordonnance appliquée 30001 », « demande les documents 34734 », « ajoute 34734 ».') };
 
   if (/(new )?assign|nouvel\w* assign|check (my )?(e-?mails?|mail|inbox)|look for|cherche les|verifie|refresh|actualis|courriels?/.test(q) && !num) {
     await load();
@@ -1075,7 +1159,7 @@ function showSettings() {
     <div class="setrow"><div>Speak answers aloud<small>Uses your iPhone’s own voices, on the phone.</small></div><input type="checkbox" class="sw" data-p="speak" ${pref('speak', true) ? 'checked' : ''}></div>
     <div class="setrow"><div>Language<small>Auto follows the language you use.</small></div><div class="seg" data-p="lang">${['auto', 'en', 'fr'].map(l => `<button type="button" data-v="${l}" class="${D.lang === l ? 'on' : ''}">${l.toUpperCase()}</button>`).join('')}</div></div>
     <div class="setrow"><div>Microphone<small>${SR ? 'Off by default. Speech goes through Apple’s dictation (like the keyboard’s mic). Turn on only once your privacy officer agrees.' : 'Not available in this browser.'}</small></div><input type="checkbox" class="sw" data-p="mic" ${micOn() ? 'checked' : ''} ${SR ? '' : 'disabled'}></div>
-    <p class="note">🔒 Dubbi works only on this phone. No AI service is used and nothing is sent anywhere new. It shows and reads; you do every action on the card.</p>
+    <p class="note">🔒 Dubbi works only on this phone. No AI service is used and nothing is sent anywhere new. It never acts on its own: it proposes, you confirm.</p>
     <button class="btn ghost" type="button" id="backChat" style="width:100%;margin-top:8px">Back to Dubbi</button>`;
 }
 $('settings').addEventListener('click', e => {

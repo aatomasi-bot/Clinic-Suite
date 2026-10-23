@@ -9,3 +9,4 @@ assistant/test-inbox/
 
 # Local Claude preview settings
 .claude/
+supabase/.temp/
