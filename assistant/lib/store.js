@@ -26,15 +26,40 @@ export function applyCardPatch(row, { due = '', notes = '' } = {}) {
   return { record, missing_fields: missing, warnings };
 }
 
+// A lock directory in state/ shared by every assistant job (stale after 60 s).
+const AUTH_LOCK = path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'state', 'auth.lock');
+async function withAuthLock(fn) {
+  fs.mkdirSync(path.dirname(AUTH_LOCK), { recursive: true });
+  for (let i = 0; ; i++) {
+    try { fs.mkdirSync(AUTH_LOCK); break; }
+    catch (e) {
+      if (e.code !== 'EEXIST') throw e;
+      try { if (Date.now() - fs.statSync(AUTH_LOCK).mtimeMs > 60e3) { fs.rmSync(AUTH_LOCK, { recursive: true, force: true }); continue; } } catch {}
+      if (i > 150) throw new Error('sign-in is busy — will try again');
+      await new Promise(r => setTimeout(r, 200));
+    }
+  }
+  try { return await fn(); } finally { fs.rmSync(AUTH_LOCK, { recursive: true, force: true }); }
+}
+
 export async function supabaseStore(cfg) {
   const sb = createClient(cfg.url, cfg.publishableKey, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });
-  const refresh = getSecret(SECRETS.supabaseSession);
-  if (!refresh) throw new Error('Not signed in — run `npm run login` in the assistant folder first.');
-  const { data, error } = await sb.auth.refreshSession({ refresh_token: refresh });
-  if (error || !data.session) throw new Error('Supabase sign-in expired — run `npm run login` again. (' + (error?.message || 'no session') + ')');
-  setSecret(SECRETS.supabaseSession, data.session.refresh_token);   // tokens rotate on every refresh
+  // The refresh key changes on every use; two jobs using it at once could
+  // invalidate each other, so only one refreshes at a time.
+  const { data, error } = await withAuthLock(async () => {
+    const refresh = getSecret(SECRETS.supabaseSession);
+    if (!refresh) throw new Error('Not signed in — run `npm run login` in the assistant folder first.');
+    const res = await sb.auth.refreshSession({ refresh_token: refresh });
+    if (res.data && res.data.session) setSecret(SECRETS.supabaseSession, res.data.session.refresh_token);
+    return res;
+  });
+  if (error || !data.session) {
+    const msg = error?.message || 'no session';
+    if (/fetch failed|network|ENOTFOUND|ECONN|timed? ?out/i.test(msg)) throw new Error('No internet connection — will try again (' + msg + ')');
+    throw new Error('Supabase sign-in expired — run `npm run login` again. (' + msg + ')');
+  }
   const userEmail = data.session.user.email;
 
   const must = ({ data, error }) => { if (error) throw new Error(error.message); return data; };

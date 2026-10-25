@@ -79,6 +79,9 @@ export function imapSource(cfg, { wanted }) {
     auth: { user: cfg.user, pass: password },
     logger: false,
   });
+  // Yahoo sometimes drops the connection ("Socket timeout"); without a listener
+  // that error crashed the whole run
+  client.on('error', e => console.warn('  mail connection:', e.message));
   let connected = false;
   const open = async folder => {
     if (!connected) { await client.connect(); connected = true; }

@@ -59,6 +59,7 @@ export function liveMailer(imapCfg, replyCfg) {
   const imapClient = async () => {
     if (!imap) {
       imap = new ImapFlow({ host: imapCfg.host, port: imapCfg.port, secure: true, auth: { user: imapCfg.user, pass }, logger: false });
+      imap.on('error', e => console.warn('  mail connection:', e.message));
       await imap.connect();
     }
     return imap;
