@@ -8,7 +8,7 @@ const normName = v => String(v ?? '').toLowerCase().normalize('NFD').replace(/[Ì
   .replace(/[^a-z\s-]/g, ' ').replace(/\s+/g, ' ').trim();
 
 export function patientStatus(p) {
-  return p.archived ? 'Archived' : p.pending ? 'Pending' : 'Active';
+  return p.archived ? 'On hold' : p.pending ? 'Pending' : 'Active';   // VaPiq's Archive is the "Hold" tab
 }
 
 // patients: [{ id, file_number, patient_name, archived, pending }]

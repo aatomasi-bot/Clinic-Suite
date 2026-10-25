@@ -99,6 +99,9 @@ export async function makeForm(c) {
 export const CLOSE_CASES = [
   { id: 'fake-21-close-en',     file: '98004', from: 'Julie Exemple <julie.exemple@medicum.ca>', subject: 'Close file 98004', body: 'Hello, please close this file. Thank you' },
   { id: 'fake-22-close-fr',     file: '98002', from: 'Sophie Fictive <sophie.fictive@medicum.ca>', subject: 'Fermeture de dossier T.P # 98002', body: 'Bonjour, merci de fermer le dossier.' },
+  { id: 'fake-24-hold', file: '98004', from: 'Julie Exemple <julie.exemple@medicum.ca>', subject: 'File on Hold - CT 98004', body: 'Hello Abdul,\nPlease be advised that Mr. Testcase 98004 is currently in hospital, and injections have been placed on hold for 3 months.\nPlease do not close file.' },
+  { id: 'fake-25-back', file: '98002', from: 'Julie Exemple <julie.exemple@medicum.ca>', subject: 'Patient is Back - TP 98002', body: 'Please be advised that Mr. Person 98002 is back from Portugal. You can contact them to schedule his injection that was due October 12th 2026.' },
+  { id: 'fake-26-permanent', file: '98004', from: 'Julie Exemple <julie.exemple@medicum.ca>', subject: 'Closing Testcase - CT 98004', body: 'Please be advised that Mr. Testcase 98004 will remain in your portal permanently as his primary nurse is on indefinite leave.' },
   { id: 'fake-23-close-unknown', file: '99999', from: 'Julie Exemple <julie.exemple@medicum.ca>', subject: 'Close File - ZZ 99999', body: '' },
 ];
 
@@ -144,6 +147,9 @@ export const PAIR_CASES = [
     pdfs: [{ kind: 'form', name: 'From Assignment', dose: '45', fname: 'RB99032.pdf' }] },
   { id: 'fake-44-rebuild-noreply', file: '99032', from: 'Medicum <no-reply@medicum.ca>', subject: 'New Appointment', body: '',
     pdfs: [{ kind: 'form', name: 'From Enrollment', dose: '45', fname: 'Enrollment_Form_Auto_Generated_30199.pdf' }] },
+  { id: 'fake-45-temp-transfer', file: '99040', from: 'Julie Exemple <julie.exemple@medicum.ca>', subject: 'Tom Transfer - TT 99040',
+    body: 'Good morning Abdul,\nPlease be advised that Mr. Transfer 99040 has been temporarily transferred to your portal for one injection only.',
+    pdfs: [{ kind: 'form', name: 'Tom Transfer', dose: '22.5', fname: 'TT99040.pdf' }] },
   { id: 'fake-33-notice-only', file: '99013', from: 'Sophie Fictive <sophie.fictive@medicum.ca>', subject: 'Nouveau patient EF 99013', body: 'Bonjour, voici un nouveau patient.', pdfs: [] },
 ];
 

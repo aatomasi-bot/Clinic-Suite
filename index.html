@@ -5,11 +5,11 @@
   <meta http-equiv="X-Content-Type-Options" content="nosniff">
   <meta http-equiv="Content-Security-Policy"
     content="default-src 'self';
-             script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://api.anthropic.com;
+             script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com;
              style-src  'self' 'unsafe-inline' https://fonts.googleapis.com;
              font-src   'self' https://fonts.gstatic.com;
              img-src    'self' data: https:;
-             connect-src 'self' https://*.supabase.co https://api.anthropic.com https://cdnjs.cloudflare.com;">
+             connect-src 'self' https://*.supabase.co https://cdnjs.cloudflare.com;">
   <meta charset="UTF-8">
 <script>
 /* ═══════════════════════════════════════════════════════════
@@ -1791,6 +1791,11 @@ stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
   background: rgba(255,255,255,0.95);
   backdrop-filter: blur(8px);
 }
+/* Add day / Extra visit: stack km+time, the calculation and the button (they were squeezed side by side on phones) */
+#addDayModal .modal-footer { display: block; }
+#addDayModal .modal-footer > div:first-child > div { min-width: 0 !important; }
+#addDayModal .modal-footer > div:first-child { flex-wrap: nowrap !important; }
+
 .btn-primary {
   flex: 1;
   padding: 0.75rem;
@@ -2996,7 +3001,7 @@ a:focus:not(:focus-visible) { outline: none; }
     <button class="tab-btn" data-tab="scheduled">Scheduled <span class="tab-count" id="cnt-scheduled">0</span></button>
     <button class="tab-btn" data-tab="all">All Active <span class="tab-count" id="cnt-all">0</span></button>
     <button class="tab-btn" data-tab="overdue">Overdue <span class="tab-count" id="cnt-overdue">0</span></button>
-    <button class="tab-btn" data-tab="archived">Archived <span class="tab-count" id="cnt-archived">0</span></button>
+    <button class="tab-btn" data-tab="archived">⏸ Hold <span class="tab-count" id="cnt-archived">0</span></button>
     <button class="tab-btn" data-tab="cpp">CPP <span class="tab-count" id="cnt-cpp">0</span></button>
   </div>
 </div>
@@ -3571,32 +3576,6 @@ a:focus:not(:focus-visible) { outline: none; }
 </div>
 
 <!-- CLAUDE API KEY MODAL -->
-<div class="modal-overlay" id="apiKeyModal">
-  <div class="modal">
-    <div class="modal-handle"></div>
-    <div class="modal-header">
-      <div class="modal-title">🤖 Claude AI Settings</div>
-      <button class="modal-close" onclick="closeModal('apiKeyModal')">✕</button>
-    </div>
-    <div class="modal-body">
-      <div style="background:var(--teal-light);border:1px solid #B2DADA;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px;color:var(--teal-dark)">
-        <strong>Optional — Turbocharge PDF extraction with AI.</strong><br>
-        Without a key, smart regex is used. With a Claude API key, extraction is dramatically more accurate for complex/scanned forms.
-      </div>
-      <div class="form-group">
-        <label>Claude API Key</label>
-        <input type="password" id="claudeApiKeyInput" class="form-control" placeholder="sk-ant-api03-…" style="padding:10px 12px;font-family:monospace">
-      </div>
-      <p style="font-size:11px;color:var(--text-2);margin-top:-6px">Key is stored locally in your browser only — never sent anywhere except Anthropic's API.</p>
-    </div>
-    <div class="modal-footer">
-      <button class="btn-danger" onclick="clearApiKey()">Clear Key</button>
-      <button class="btn-primary" onclick="saveApiKey()">Save Key</button>
-    </div>
-  </div>
-</div>
-
-<!-- PATIENT MODAL -->
 <div class="modal-overlay" id="patientModal">
   <div class="modal">
     <div class="modal-handle"></div>
@@ -4228,7 +4207,7 @@ async function loadPatients(opts = {}) {
 //  Table: audit_log (id, user_email, action, patient_file_num, detail, created_at)
 //  Create this table in Supabase with RLS: only auth users can insert, nobody can delete.
 // ══════════════════════════════════════════════════════════════
-async function _auditLog(action, fileNum, detail) {
+async function _auditLog(action, fileNum, detail, opts = {}) {
   try {
     const { data: { user } } = await _sb.auth.getUser();
     if (!user) return;
@@ -4236,7 +4215,7 @@ async function _auditLog(action, fileNum, detail) {
       user_email:       user.email,
       action,
       patient_file_num: String(fileNum || ''),
-      detail:           detail ? JSON.stringify(detail).slice(0, 500) : null,
+      detail:           detail ? (opts.full ? JSON.stringify(detail) : JSON.stringify(detail).slice(0, 500)) : null,
       created_at:       new Date().toISOString()
     });
   } catch(e) {
@@ -4276,9 +4255,10 @@ async function dbUpdate(id, p) {
 
 async function dbDelete(id) {
   try {
+  const { data: snap } = await _sb.from('patients').select('*').eq('id', id).maybeSingle();
   const { error } = await _sb.from('patients').delete().eq('id', id);
   if (error) throw error;
-  await _auditLog('DELETE', id, { id });
+  await _auditLog('DELETE', snap ? snap.file_number : id, { id, deleted: snap || null }, { full: true });   // full copy: can be restored
   } catch(e) {
     console.error('[dbDelete]', e);
     toast('An error occurred — please refresh and try again.', 'error');
@@ -4790,9 +4770,9 @@ function renderCard(p, idx) {
     <div class="card-btn-row">
       <button class="card-btn card-btn--edit js-edit" data-id="${p.id}">✏️ Details & Edit</button>
       ${p['Pending'] || p['Archived'] ?
-        `<button class="card-btn card-btn--move js-move" data-id="${p.id}">⟳ Restore</button>` :
+        `<button class="card-btn card-btn--move js-move" data-id="${p.id}">${p['Archived'] ? '▶ Back from hold' : '⟳ Restore'}</button>` :
         `<button class="card-btn card-btn--pending js-pending" data-id="${p.id}">⏳ Mark Pending</button>`}
-      ${p['Archived'] ? '' : `<button class="card-btn card-btn--archive js-archive" data-id="${p.id}" style="flex:0.7">🗄 Archive</button>`}
+      ${p['Archived'] ? '' : `<button class="card-btn card-btn--archive js-archive" data-id="${p.id}" style="flex:0.7">⏸ Hold</button>`}
     </div>
     <div style="margin-top:8px;text-align:right">
       <button class="card-btn card-btn--edit" style="flex:0;padding:6px 12px;font-size:11px" onclick="openApptModal(${p.id})">
@@ -4881,9 +4861,9 @@ function _handleCardClick(e) {
   const archiveBtn = e.target.closest('.js-archive');
   if (archiveBtn) {
     e.stopPropagation();
-    showConfirm('Archive Patient?',
-      'Patient will be archived. You can restore them anytime.',
-      () => archivePatient(parseInt(archiveBtn.dataset.id)));
+    const reason = prompt('Put this patient on hold — reason?\n(e.g. in hospital, waiting to see the doctor, travelling)', '');
+    if (reason === null) return;   // cancelled
+    archivePatient(parseInt(archiveBtn.dataset.id), reason.trim());
     return;
   }
   const moveBtn = e.target.closest('.js-move');
@@ -4950,7 +4930,7 @@ function renderDashboard() {
     { label:'All Active',value:allActive,  color:'#3D9A6B', tab:'all' },
     { label:'Overdue',   value:overdue,   color:'#E9A23A', tab:'overdue' },
     { label:'Pending',   value:pending,   color:'#6B5EA8', tab:'pending' },
-    { label:'Archived',  value:archived,  color:'#8FA5B5', tab:'archived' },
+    { label:'On hold',   value:archived,  color:'#8FA5B5', tab:'archived' },
   ].filter(s => s.value > 0);
 
   const total = segments.reduce((s, seg) => s + seg.value, 0) || 1;
@@ -5236,14 +5216,18 @@ async function markPending(id) {
   } catch(e) { toast(e.message, 'error'); } finally { setLoading(false); }
 }
 
-async function archivePatient(id) {
+// "⏸ On hold since 2026-10-25: reason" in Special Instructions (Dubbi writes the same note)
+const HOLD_NOTE_RE = /\s*(?:\|\s*)?⏸ On hold since [^|]*/g;
+function _withoutHoldNote(si) { return String(si || '').replace(HOLD_NOTE_RE, '').replace(/^\s*\|\s*/, '').trim(); }
+async function archivePatient(id, reason) {
   const p = patients.find(p => p.id === id);
   if (!p) return;
   p['Archived'] = true;
+  p['Special Instructions'] = [`⏸ On hold since ${todayStr()}: ${reason || 'no reason given'}`, _withoutHoldNote(p['Special Instructions'])].filter(Boolean).join(' | ');
   setLoading(true);
   try {
     await dbUpdate(id, p);
-    toast('Patient archived', '', '🗄');
+    toast('Patient on hold', '', '⏸');
     await loadPatients();
   } catch(e) { toast(e.message, 'error'); } finally { setLoading(false); }
 }
@@ -5251,12 +5235,14 @@ async function archivePatient(id) {
 async function restorePatient(id) {
   const p = patients.find(p => p.id === id);
   if (!p) return;
+  const wasOnHold = !!p['Archived'];
   p['Pending'] = false;
   p['Archived'] = false;
+  if (wasOnHold) p['Special Instructions'] = _withoutHoldNote(p['Special Instructions']);
   setLoading(true);
   try {
     await dbUpdate(id, p);
-    toast('Patient restored to Active', 'success', '✓');
+    toast(wasOnHold ? 'Back from hold — active again' : 'Patient restored to Active', 'success', '✓');
     await loadPatients();
   } catch(e) { toast(e.message, 'error'); } finally { setLoading(false); }
 }
@@ -6699,70 +6685,7 @@ async function extractPDFText(file) {
   }
 }
 
-// ── Claude AI extraction (requires API key in settings) ──
-async function extractWithClaude(fullText, apiKey) {
-  try {
-  const prompt = `You are a medical document parser specialized in patient enrollment forms.
-
-Extract the following fields from this PDF text and return ONLY a valid JSON object — no prose, no markdown, no explanation.
-
-Required JSON structure:
-{
-  "patient_name": "",
-  "file_number": "",
-  "dose": "",
-  "address": "",
-  "phone_1": "",
-  "phone_2": "",
-  "date_of_injection": "",
-  "missing_fields": []
-}
-
-Extraction Rules:
-- patient_name: Full name from fields labeled "PATIENT NAME", "NOM DU PATIENT", or similar. Title-case the result.
-- file_number: From "FILE NUMBER", "PATIENT ID", "MEDICUM #", or any visible file reference. Prefer actual patient file number over pharmacy/clinic numbers.
-- dose: Must be exactly one of: "7.5", "22.5", "30", or "45" (numbers only, no units). Look for selected/checked checkboxes or circled values next to "mg", "1 month", "3 month", "4 month", "6 month".
-- address: Combine street + city + province/state + postal code into one clean string. Include the postal code ONCE only — do not repeat it if it already appears as part of the city/province line.
-- phone_1: Primary patient phone (labeled TELEPHONE, PHONE, TEL, HOME). Preserve original formatting (dashes, spaces, brackets).
-- phone_2: Secondary/alternate contact number if available. If none, use "".
-- date_of_injection: From "LAST INJECTION", "DATE OF INJECTION", or "INJECTION DUE DATE". Format as YYYY-MM-DD.
-- missing_fields: Array of field names that could not be found or were ambiguous.
-
-Critical:
-- IGNORE doctor, pharmacy, clinic, and fax numbers
-- IGNORE numbers preceded by "FAX", "TELECOPIEUR", "DR.", "MD", "PHARMACY", "CLINIC"
-- If a field is genuinely missing, use "" and add its name to missing_fields
-- Handle OCR artifacts like broken words, random spaces, and encoding issues
-
-PDF Text:
-${fullText.substring(0, 8000)}`;
-
-  const resp = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01'
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 1000,
-      messages: [{ role: 'user', content: prompt }]
-    })
-  });
-  if (!resp.ok) throw new Error(`Claude API ${resp.status}: ${await resp.text()}`);
-  const data = await resp.json();
-  const raw  = data.content?.[0]?.text || '';
-  const clean = raw.replace(/```json|```/g, '').trim();
-  return JSON.parse(clean);
-  } catch(e) {
-    console.error('[extractWithClaude]', e);
-    
-    throw e;
-  }
-}
-
-// ── Enhanced regex extraction (fallback) ──
+// ── PDF field extraction (on this device, no external service) ──
 function extractWithRegex(textData, filename) {
   const text      = typeof textData === 'string' ? textData : textData.text;
   const boldItems = typeof textData === 'string' ? [] : (textData.boldItems || []);
@@ -7079,9 +7002,8 @@ async function importPDFBatch(files) {
     setLoading(true, `Processing PDF ${i+1} of ${files.length}…`);
     try {
       await ensurePDFJS();
-      const fullText = await extractPDFText(files[i]);
-      const apiKey   = localStorage.getItem('claude_api_key');
-      const extracted = apiKey ? await extractWithClaude(textData.text, apiKey) : extractWithRegex(textData, files[i].name);
+      const textData  = await extractPDFText(files[i]);
+      const extracted = extractWithRegex(textData, files[i].name);
       results.push({ file: files[i].name, data: extracted, ok: true });
     } catch(e) {
       results.push({ file: files[i].name, error: e.message, ok: false });
@@ -10712,38 +10634,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     e.target.value='';
   });
 
-  // API key management
-  function saveApiKey() {
-    const k = document.getElementById('claudeApiKeyInput').value.trim();
-    if (!k) { toast('Enter a key first', 'warning'); return; }
-    localStorage.setItem('claude_api_key', k);
-    // Claude API no longer used — remove any stored key
-  localStorage.removeItem('claude_api_key');
-  // updateApiKeyStatus(); — API key UI removed
-    closeModal('apiKeyModal');
-    toast('Claude API key saved', 'success', '🤖');
-  }
-  function clearApiKey() {
-    localStorage.removeItem('claude_api_key');
-    document.getElementById('claudeApiKeyInput').value = '';
-    updateApiKeyStatus();
-    closeModal('apiKeyModal');
-    toast('API key cleared', '', '🗑');
-  }
-  function updateApiKeyStatus() {
-    const el = document.getElementById('aiKeyStatus');
-    if (!el) return;
-    const k = localStorage.getItem('claude_api_key');
-    el.textContent = k ? '✓ Active' : 'Not set';
-    el.style.color = k ? 'var(--green)' : 'var(--text-3)';
-  }
-  window.saveApiKey = saveApiKey;
-  window.clearApiKey = clearApiKey;
-  updateApiKeyStatus();
-  // Pre-fill API key input if already set
-  document.getElementById('apiKeyModal').addEventListener('click', e => { if(e.target===e.currentTarget) closeModal('apiKeyModal'); });
-  const existingKey = localStorage.getItem('claude_api_key');
-  if (existingKey) document.getElementById('claudeApiKeyInput').value = existingKey;
+  try { localStorage.removeItem('claude_api_key'); } catch (e) {}   // the old AI import was removed (Oct 25, 2026)
   document.getElementById('exportCSVBtn').addEventListener('click', () => { closeMenuDrawer(); exportCSV(); });
   document.getElementById('exportJSONBtn').addEventListener('click', () => { closeMenuDrawer(); exportJSON(); });
 
