@@ -336,6 +336,9 @@ en:{share:'Share', emptyTitle:'Scan, fill & sign', emptySub:'Open the vendor’s
   enterText:'Enter text', ok:'OK', save:'Save', edit:'Edit', copy:'Copy', smaller:'Smaller', bigger:'Bigger', thinner:'Thinner stroke', thicker:'Thicker stroke', size:'Size', stroke:'Stroke',
   addOrReplace:'You already have a document open', addOrReplaceMsg:'Add the new pages to it, or start a new document?', addToDoc:'Add pages', replaceDoc:'New document',
   closeConfirm:'Close this document?', closeConfirmMsg:'Unsaved changes are lost. Share or download it first if you need it.', close:'Close',
+  batchShare:'Share several documents…', batchTitle:'Share several documents', batchHint:'Tick the signed documents to send together. Today’s are ticked.',
+  batchPrepare:'Prepare {n} documents', batchShareN:'Share {n} documents', batchDownload:'Download all', batchNone:'Tick at least one document.',
+  batchBuilding:'Preparing {i} of {n}…', batchReady:'{n} PDFs ready', openNow:'Open now', batchEmpty:'No recent documents yet. Close a signed document (keep it) and it appears here.',
   shareTitle:'Share or save', fileName:'File name', preparing:'Preparing PDF…', shareNow:'Share…', download:'Download', preview:'Preview',
   shareHint:'Share once to your vendor, then again to the patient. Signatures and text are permanently burned into the PDF.',
   finish:'Finish & close document', shareFail:'Sharing isn’t available here — the PDF was downloaded instead.',
@@ -372,6 +375,9 @@ fr:{share:'Partager', emptyTitle:'Numériser, remplir et signer', emptySub:'Ouvr
   enterText:'Saisir le texte', ok:'OK', save:'Enregistrer', edit:'Modifier', copy:'Copier', smaller:'Plus petit', bigger:'Plus grand', thinner:'Trait plus fin', thicker:'Trait plus épais', size:'Taille', stroke:'Trait',
   addOrReplace:'Un document est déjà ouvert', addOrReplaceMsg:'Ajouter les nouvelles pages à ce document, ou commencer un nouveau document ?', addToDoc:'Ajouter les pages', replaceDoc:'Nouveau document',
   closeConfirm:'Fermer ce document ?', closeConfirmMsg:'Les modifications seront perdues. Partagez-le ou téléchargez-le d’abord au besoin.', close:'Fermer',
+  batchShare:'Partager plusieurs documents…', batchTitle:'Partager plusieurs documents', batchHint:'Cochez les documents signés à envoyer ensemble. Ceux d’aujourd’hui sont cochés.',
+  batchPrepare:'Préparer {n} documents', batchShareN:'Partager {n} documents', batchDownload:'Tout télécharger', batchNone:'Cochez au moins un document.',
+  batchBuilding:'Préparation {i} de {n}…', batchReady:'{n} PDF prêts', openNow:'Ouvert', batchEmpty:'Aucun document récent. Fermez un document signé (en le gardant) et il apparaîtra ici.',
   shareTitle:'Partager ou enregistrer', fileName:'Nom du fichier', preparing:'Préparation du PDF…', shareNow:'Partager…', download:'Télécharger', preview:'Aperçu',
   shareHint:'Partagez une fois au fournisseur, puis une autre fois au patient. Les signatures et le texte sont intégrés de façon permanente au PDF.',
   finish:'Terminer et fermer le document', shareFail:'Le partage n’est pas disponible ici — le PDF a été téléchargé.',
@@ -1107,6 +1113,7 @@ function recentSheet(){
   sheet(t('recent'), async (b, close)=>{
     const list = await getRecent();
     b.append(h('p',{style:'margin:0 2px 12px;color:var(--text-2);font-size:13px;line-height:1.45'}, t('recentEmpty')));
+    if(list.length) b.append(h('button',{class:'btn pri wide', style:'margin:0 0 12px', onclick:()=>{ close(); batchShareSheet(); }}, t('batchShare')));
     const box = h('div',{class:'list'});
     for(const r of list){
       const when = new Date(r.savedAt).toLocaleString(LANG==='fr'?'fr-CA':'en-CA', {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'});
@@ -1531,6 +1538,64 @@ async function buildPdf(){
   out.setTitle(S.name || 'Document'); out.setProducer('VaPiq Sign'); out.setCreator('VaPiq Sign');
   return out.save();
 }
+/* Share several signed documents at once (Oct 25, 2026): each recent document keeps
+   its own copy of the original PDF, so its signed PDF can be rebuilt without opening it.
+   Single-document sharing (shareSheet) is unchanged. */
+async function buildPdfFor(project){
+  const keep = S; S = Object.assign(blankProject(), project);
+  try { return await buildPdf(); } finally { S = keep; }
+}
+function batchShareSheet(){
+  select(null); disarm();
+  sheet(t('batchTitle'), async (b, close)=>{
+    const recent = await getRecent();
+    const docs = [];
+    if(S.pages.length) docs.push({id:S.rid||'current', name:S.name||t('untitled'), savedAt:Date.now(), pages:S.pages.length, project:S, open:true});
+    for(const r of recent) if(!docs.some(d=>d.id===r.id)) docs.push(r);
+    if(!docs.length){ b.append(h('p',{style:'margin:0 2px;color:var(--text-2);font-size:14px;line-height:1.45'}, t('batchEmpty'))); return; }
+    const today = new Date().toDateString();
+    const picked = new Set(docs.filter(d=>d.open || new Date(d.savedAt).toDateString()===today).map(d=>d.id));
+    let files = null;   // built PDFs (File objects), reset whenever the ticks change
+    const status = h('p',{style:'margin:10px 2px; color:var(--text-2); font-size:13px'});
+    const goB = h('button',{class:'btn pri wide'}), dlB = h('button',{class:'btn wide', style:'margin-top:8px', disabled:true}, t('batchDownload'));
+    const refresh = ()=>{ files = null; dlB.disabled = true; status.textContent = '';
+      goB.textContent = t('batchPrepare').replace('{n}', picked.size); goB.disabled = !picked.size; };
+    const box = h('div',{class:'list'});
+    for(const d of docs){
+      const when = new Date(d.savedAt).toLocaleString(LANG==='fr'?'fr-CA':'en-CA', {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'});
+      const cb = h('input',{type:'checkbox', style:'width:22px;height:22px;accent-color:var(--accent,#2D8C8A);flex:none'});
+      cb.checked = picked.has(d.id);
+      cb.addEventListener('change', ()=>{ cb.checked ? picked.add(d.id) : picked.delete(d.id); refresh(); });
+      box.append(h('label',{class:'li', style:'cursor:pointer'}, cb,
+        h('span',{class:'grow'}, h('b',{}, d.name), h('small',{}, `${d.pages} ${d.pages>1?t('pages'):t('page')} · ${d.open ? t('openNow') : t('savedOn')+' '+when}`))));
+    }
+    b.append(h('p',{style:'margin:0 2px 12px;color:var(--text-2);font-size:13px;line-height:1.45'}, t('batchHint')), box, status, goB, dlB);
+    refresh();
+    const uniqueName = (n, used)=>{ let base = baseName(n) || 'document', name = base + '.pdf', i = 2;
+      while(used.has(name.toLowerCase())) name = `${base} (${i++}).pdf`; used.add(name.toLowerCase()); return name; };
+    goB.onclick = async()=>{
+      if(!picked.size) return toast(t('batchNone'));
+      if(files){ // second tap: share — runs synchronously inside the tap (iOS needs that)
+        if(navigator.canShare && navigator.canShare({files})) navigator.share({files, title:t('batchTitle')}).catch(e=>{ if(e.name!=='AbortError'){ dlAll(); toast(t('shareFail')); } });
+        else { dlAll(); toast(t('shareFail')); }
+        return;
+      }
+      goB.disabled = true; const chosen = docs.filter(d=>picked.has(d.id)), used = new Set(), out = [];
+      try{
+        for(const [i, d] of chosen.entries()){
+          status.textContent = t('batchBuilding').replace('{i}', i+1).replace('{n}', chosen.length);
+          const bytes = d.open ? await buildPdf() : await buildPdfFor(d.project);
+          out.push(new File([bytes], uniqueName(d.name, used), {type:'application/pdf'}));
+        }
+        files = out; status.textContent = '✓ ' + t('batchReady').replace('{n}', out.length);
+        goB.textContent = t('batchShareN').replace('{n}', out.length); dlB.disabled = false;
+      }catch(e){ console.error(e); status.textContent = t('pdfBuildFail') + ': ' + (e.message||e); }
+      finally{ goB.disabled = false; }
+    };
+    const dlAll = ()=>{ for(const f of files||[]){ const u = URL.createObjectURL(f); const a = h('a',{href:u, download:f.name}); document.body.append(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u), 30000); } };
+    dlB.onclick = dlAll;
+  });
+}
 function shareSheet(){
   if(!S.pages.length) return;
   select(null); disarm();
@@ -1547,6 +1612,7 @@ function shareSheet(){
         `⚠ ${S.items.filter(i=>i.type==='slot').length} ${t('slotsLeft')}`) : '',
       h('p',{style:'margin:12px 2px 6px; color:var(--text-2); font-size:13px; line-height:1.45'}, t('shareHint')),
       h('p',{style:'margin:0 2px 6px; color:var(--text-2); font-size:13px; line-height:1.45'}, t('fixHint')),
+      h('button',{class:'btn wide', style:'margin-top:6px', onclick:()=>{ close(); batchShareSheet(); }}, t('batchShare')),
       h('button',{class:'btn danger wide', style:'margin-top:6px', onclick:()=>{ close(); closeDocument(); }}, t('finish')));
     let bytes = null;
     const file = ()=>{ const n = (baseName(name.value) || 'document') + '.pdf'; return new File([bytes], n, {type:'application/pdf'}); };

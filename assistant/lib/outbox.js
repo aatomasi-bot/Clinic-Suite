@@ -31,7 +31,8 @@ export async function runOutbox({ store, mailer, testMailer, rules, live, moveTo
         counts.sent++;
         continue;
       }
-      const moved = moveToFolder ? await m.moveOriginal(task, moveToFolder).catch(e => { log('  move failed:', e.message); return false; }) : false;
+      // notes to Medicum written in VaPiq have no original email to file
+      const moved = moveToFolder && task.kind !== 'medicum_note' ? await m.moveOriginal(task, moveToFolder).catch(e => { log('  move failed:', e.message); return false; }) : false;
       await store.updateTask(task.id, { status: 'sent', sent_at: new Date().toISOString(), error: null, moved_to_folder: moved ? moveToFolder : null });
       await store.audit('ASSISTANT_REPLY_SENT', task.file_number, { task_id: task.id, kind: task.kind, test: task.is_test });
       log(`  sent    reply ${task.id}${task.is_test ? ' (test — saved, not sent)' : ''}${moved ? ` · moved to ${moveToFolder}` : ''}`);

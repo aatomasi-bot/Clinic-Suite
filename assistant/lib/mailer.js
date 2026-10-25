@@ -23,9 +23,10 @@ function message(task, from) {
     from,
     to: task.to_name ? { name: task.to_name, address: task.to_address } : task.to_address,
     ...(task.cc_addresses && task.cc_addresses.length ? { cc: task.cc_addresses } : {}),
-    subject: replySubject(task.email_subject),
+    // A note you write to Medicum from VaPiq is a new email (no "Re:", not threaded)
+    subject: task.kind === 'medicum_note' ? String(task.email_subject || 'Update') : replySubject(task.email_subject),
     text: task.reply_body,
-    ...(task.email_message_id ? { inReplyTo: task.email_message_id, references: [task.email_message_id] } : {}),
+    ...(task.email_message_id && task.kind !== 'medicum_note' ? { inReplyTo: task.email_message_id, references: [task.email_message_id] } : {}),
   };
 }
 
