@@ -859,70 +859,6 @@ input, select, textarea { font: inherit; }
   gap: 0.5rem;
 }
 
-/* ── Pin toggle button in search bar ───────────────────────── */
-.pin-toggle-btn {
-  position: relative; flex-shrink: 0;
-  background: rgba(233,162,58,.12); border: 1.5px solid rgba(233,162,58,.4);
-  border-radius: 20px; padding: 6px 10px; cursor: pointer; font-size: 14px;
-  transition: background .15s; color: var(--text);
-}
-.pin-toggle-btn:hover { background: rgba(233,162,58,.25); }
-.pin-toggle-count {
-  position: absolute; top: -4px; right: -4px;
-  background: var(--red); color: #fff; border-radius: 10px;
-  font-size: 9px; font-weight: 800; padding: 1px 5px; min-width: 16px;
-  text-align: center; line-height: 14px;
-}
-
-/* ── Pin floating panel ─────────────────────────────────────── */
-.pin-panel {
-  position: absolute; top: 100%; right: 8px; z-index: 500;
-  width: min(320px, calc(100vw - 24px));
-  background: var(--card); border: 1.5px solid var(--border);
-  border-radius: 14px; box-shadow: 0 12px 36px rgba(0,0,0,.2);
-  overflow: hidden; animation: slideDown .15s ease;
-}
-@keyframes slideDown { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
-.pin-panel-head {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 14px; border-bottom: 1px solid var(--border);
-  font-size: 12px; font-weight: 700; color: var(--text);
-}
-.pin-panel-empty { padding: 20px 14px; text-align: center; color: var(--text-3); font-size: 12px; }
-.pin-row {
-  display: flex; align-items: center; gap: 10px;
-  padding: 11px 14px; border-bottom: 1px solid var(--border);
-  cursor: pointer; transition: background .12s;
-}
-.pin-row:last-child { border-bottom: none; }
-.pin-row:hover { background: var(--bg); }
-.pin-row-avatar {
-  width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
-  background: linear-gradient(135deg,var(--teal),var(--teal-dark));
-  display: flex; align-items: center; justify-content: center;
-  font-size: 11px; font-weight: 800; color: #fff;
-}
-.pin-row-name { font-size: 13px; font-weight: 600; flex: 1; min-width: 0; }
-.pin-row-file { font-size: 11px; color: var(--teal-dark); }
-.pin-row-declined { font-size: 10px; color: var(--amber); font-weight: 700; }
-.pin-row-x {
-  width: 22px; height: 22px; border-radius: 50%; border: none;
-  background: rgba(0,0,0,.07); cursor: pointer; font-size: 10px;
-  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-  transition: background .12s; color: var(--text-3);
-}
-.pin-row-x:hover { background: rgba(192,57,43,.2); color: var(--red); }
-
-/* ── Pin button on patient card ────────────────────────────── */
-.pin-btn {
-  width: 2rem; height: 2rem; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 0.85rem; border: 1.5px solid var(--border);
-  background: var(--card); cursor: pointer; flex-shrink: 0;
-  transition: all .18s; color: var(--text-3); padding: 0;
-}
-.pin-btn.pinned { background: rgba(233,162,58,.15); border-color: var(--amber); color: var(--amber); transform: rotate(-30deg); }
-.pin-btn:hover { border-color: var(--amber); color: var(--amber); }
 
 /* ── Reminders — two group layout ──────────────────────────── */
 .rem-group-title {
@@ -2213,8 +2149,6 @@ stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
   body.view-reminders #invoiceView,
   body.view-reminders #reportView  { display: none !important; }
   body.view-reminders #reminderView { display: block !important; }
-  /* Pin panel: on desktop anchor to search bar */
-  .pin-panel { position: absolute; right: 12px; top: calc(100% + 2px); }
   #searchArea { position: relative; }
 
 } /* end @media 960px */
@@ -3056,18 +2990,6 @@ a:focus:not(:focus-visible) { outline: none; }
       <button class="search-clear" id="clearSearch">✕</button>
     </div>
     <button class="search-bar__refresh" id="refreshBtn" title="Refresh">⟳</button>
-    <!-- Pin panel toggle button -->
-    <button class="pin-toggle-btn" id="pinToggleBtn" onclick="togglePinPanel()" title="Pinned patients">
-      📌<span class="pin-toggle-count hidden" id="pinBadgeCount">0</span>
-    </button>
-  </div>
-  <!-- Pin floating panel — opens on tap of 📌 -->
-  <div class="pin-panel hidden" id="pinPanel">
-    <div class="pin-panel-head">
-      <span>📌 Pinned Patients</span>
-      <button onclick="togglePinPanel()" style="background:none;border:none;cursor:pointer;color:var(--text-3);font-size:16px">✕</button>
-    </div>
-    <div id="pinPanelList"><div class="pin-panel-empty">No patients pinned yet.</div></div>
   </div>
   <div class="tabs" id="tabBar">
     <button class="tab-btn active" data-tab="today">Today <span class="tab-count" id="cnt-today">0</span></button>
@@ -4031,6 +3953,7 @@ const COL = {
 // Values are parsed once and dropped whenever the key is written (here or in
 // another tab), so reads always reflect the latest stored data.
 const _lsParsed = Object.create(null);
+try { localStorage.removeItem('vapiq_pins'); } catch (e) {}   // pins were removed (Oct 24, 2026)
 function _lsGet(key, fallback) {
   if (!(key in _lsParsed)) {
     try { _lsParsed[key] = JSON.parse(localStorage.getItem(key) || fallback); }
@@ -4411,15 +4334,13 @@ function updateTabCounts() {
     if (c.overdue > 0) { badge.textContent = c.overdue; badge.classList.remove('hidden'); }
     else badge.classList.add('hidden');
   }
-  // Update reminder badge and pin UI after every load
+  // Update reminder badge after every load
   if (typeof updateReminderBadge === 'function') updateReminderBadge();
-  if (typeof renderPins === 'function') renderPins();
   // If already on the Reminders tab, refresh its content too
   if (typeof renderReminders === 'function' && typeof currentView !== 'undefined' && currentView === 'reminders') {
     renderReminders();
   }
-  // Sync pins and reminders from Supabase in background (cross-device)
-  if (typeof syncPinsFromSupabase === 'function') syncPinsFromSupabase();
+  // Sync reminders from Supabase in background (cross-device)
   if (typeof syncRemindersFromSupabase === 'function') syncRemindersFromSupabase();
 }
 
@@ -4551,17 +4472,6 @@ function _vsReset() {
   _vsSegments = [];
   _vsNextIdx  = 0;
 }
-
-// ── Pin helpers — must be defined BEFORE renderPatientList uses them ──
-// Full pin system is further below; these lightweight functions are
-// needed early so the patient card template can call isPinned().
-const _PIN_KEY = 'vapiq_pins';
-function loadPins() {
-  const v = _lsGet(_PIN_KEY, '[]');
-  return Array.isArray(v) ? v.slice() : [];   // copy: callers may modify before savePins()
-}
-function savePins(pins) { localStorage.setItem(_PIN_KEY, JSON.stringify(pins)); }
-function isPinned(fileNum) { const v = _lsGet(_PIN_KEY, '[]'); return Array.isArray(v) && v.includes(String(fileNum)); }
 
 function renderPatientList() {
   const el = document.getElementById('mainContent');
@@ -4826,7 +4736,6 @@ function renderCard(p, idx) {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 2l4 4-10 10-6 2 2-6L18 2z"/><line x1="14" y1="6" x2="18" y2="10"/></svg>
       Record
     </button>
-    <button class="pin-btn js-pin ${isPinned(p['File Number'])?'pinned':''}" data-fnum="${p['File Number']}" title="${isPinned(p['File Number'])?'Unpin patient':'Pin patient'}">📌</button>
     <button class="note-icon-btn ${hasQuickNote(p['File Number'])?'has-note':''}" data-fnum="${p['File Number']}"
       title="Quick note" onclick="event.stopPropagation();toggleNoteArea('${esc(p['File Number']||'')}')">📝</button>
     <button class="expand-btn js-expand">&#9660;</button>
@@ -4947,12 +4856,6 @@ function _handleCardClick(e) {
   if (mapBtn) {
     e.stopPropagation();
     window.open('https://maps.google.com/?q=' + encodeURIComponent(mapBtn.dataset.addr));
-    return;
-  }
-  const pinBtn = e.target.closest('.js-pin');
-  if (pinBtn) {
-    e.stopPropagation();
-    togglePin(pinBtn.dataset.fnum);
     return;
   }
   const injectBtn = e.target.closest('.js-inject');
@@ -7798,7 +7701,7 @@ async function importNotesPatients() {
             <span style="color:var(--amber);font-weight:700">(${esc(d.existingStatus)})</span>
             ${d.existingName !== d.triedName ? `<br><span style="color:var(--text-3)">You tried to import: "${esc(d.triedName)}"</span>` : ''}
           </div>
-          <button onclick="closeModal('notesImportModal');navigateToPin('${esc(d.fileNum)}')"
+          <button onclick="closeModal('notesImportModal');goToPatient('${esc(d.fileNum)}')"
             style="flex-shrink:0;padding:5px 10px;border-radius:6px;border:1.5px solid var(--teal);
             background:var(--card);color:var(--teal);font-size:11px;font-weight:700;cursor:pointer">
             👁 Find it
@@ -8494,6 +8397,23 @@ function _applyInvoiceOp(data, op) {
     case 'setDay':
       data.days = data.days.filter(d => d.date !== op.day.date).concat([op.day]).sort((a, b) => a.date.localeCompare(b.date)); break;
     case 'removeDay': data.days = data.days.filter(d => d.date !== op.date); break;
+    case 'addToDay': {
+      // Extra visit(s) after the day was billed: the commute (20 km / 40 min) was
+      // already deducted once, so the extra km and minutes are added as they are.
+      let day = data.days.find(d => d.date === op.date);
+      if (!day) {   // day removed meanwhile on the other device → a normal day
+        day = { date: op.date, raw_km: op.add_km, net_km: Math.max(0, op.add_km - INVOICE_DEDUCT_KM),
+                raw_time: op.add_min, net_time: Math.max(0, op.add_min - INVOICE_DEDUCT_MIN), patients: [] };
+        data.days = data.days.concat([day]).sort((a, b) => a.date.localeCompare(b.date));
+      } else {
+        day.raw_km = (day.raw_km || 0) + op.add_km;   day.net_km = (day.net_km || 0) + op.add_km;
+        day.raw_time = (day.raw_time || 0) + op.add_min; day.net_time = (day.net_time || 0) + op.add_min;
+      }
+      const have = new Set(day.patients.map(p => String(p.file)));
+      day.patients = day.patients.concat(op.patients.filter(p => !have.has(String(p.file))));
+      day.extras = (day.extras || []).concat([{ km: op.add_km, min: op.add_min, files: op.patients.map(p => p.file) }]);
+      break;
+    }
     case 'setCpp': {
       const day = data.days.find(d => d.date === op.date);
       const p = day && day.patients.find(x => String(x.file) === String(op.file));
@@ -8850,12 +8770,15 @@ function _renderInvoiceViewInner() {
           <span style="font-size:14px;font-weight:800;color:var(--text);flex:1">${dayLabel}</span>
           <span style="font-size:12px;color:var(--text-2)">${day.patients.length} patients</span>
           <span style="font-size:11px;font-weight:700;color:var(--teal-dark)">${fmt(dayAmt)}</span>
+          ${data.finalized ? '' : `<button onclick="openAddDayModal('${day.date}','extra')" title="Add a patient seen later the same day (extra km and time, no second deduction)"
+            style="font-size:11px;font-weight:700;color:#fff;background:linear-gradient(135deg,var(--teal),var(--teal-dark));border:none;border-radius:999px;padding:4px 10px;cursor:pointer;white-space:nowrap">＋ Extra visit</button>`}
           <button onclick="removeDayFromInvoice(${realIdx})" style="color:var(--red);font-size:14px;cursor:pointer;background:none;border:none;padding:0 4px" title="Remove day">✕</button>
         </div>
         <div style="padding:8px 14px;font-size:11px;color:var(--text-2);display:flex;gap:16px;flex-wrap:wrap">
           <span>🚗 ${day.raw_km}km − 20 = <strong>${day.net_km}km billed</strong></span>
           <span>⏱ ${day.raw_time}min − 40 = <strong>${day.net_time}min billed</strong></span>
           ${dayCpp ? `<span>🩺 ${dayCpp} CPP survey${dayCpp>1?'s':''}</span>` : ''}
+          ${(day.extras||[]).length ? `<span style="color:var(--teal-dark)">➕ incl. extra visit${day.extras.length>1?'s':''}: +${day.extras.reduce((t,x)=>t+(x.km||0),0)} km, +${day.extras.reduce((t,x)=>t+(x.min||0),0)} min</span>` : ''}
         </div>
         <div style="padding:4px 14px 8px;display:flex;flex-wrap:wrap;gap:4px">
           ${day.patients.map((p,pi)=>`
@@ -8917,30 +8840,45 @@ let _addDaySelected = new Set();
 let _addDayNotes    = {};   // id -> note string
 let _cppChecked     = new Set(); // id -> CPP questionnaire confirmed
 
-function openAddDayModal(date) {
+function openAddDayModal(date, mode) {
+  const extra = mode === 'extra';
+  document.getElementById('addDayModal').dataset.mode = extra ? 'extra' : '';
+  document.getElementById('addDayTitle').textContent = extra ? '➕ Extra Visit — Same Day' : '📋 Add Day to Invoice';
+  document.getElementById('addDayKmLabel').textContent = extra ? '🚗 Extra KM driven' : '🚗 Total KM driven';
+  document.getElementById('addDayTimeLabel').textContent = extra ? '⏱ Extra time (min)' : '⏱ Total time (min)';
   _addDaySelected = new Set();
   _addDayNotes    = {};
   _cppChecked     = new Set();
   const autoPats = getPatientsSeenOn(date);
   const dt = new Date(date + 'T00:00:00');
   document.getElementById('addDayDateLabel').textContent =
-    dt.toLocaleDateString('en-CA', {weekday:'long', month:'long', day:'numeric'});
+    dt.toLocaleDateString('en-CA', {weekday:'long', month:'long', day:'numeric'}) + (extra ? ' · already billed — add the extra km and time only' : '');
   document.getElementById('addDayKm').value   = '';
   document.getElementById('addDayTime').value = '';
   document.getElementById('addDayCalcPreview').style.display = 'none';
   document.getElementById('addDayModal').dataset.date = date;
   document.getElementById('addDayKm').oninput  = () => updateAddDayPreview();
   document.getElementById('addDayTime').oninput = () => updateAddDayPreview();
-  // Pre-select auto-detected patients
-  autoPats.forEach(p => _addDaySelected.add(p.id));
+  // Pre-select auto-detected patients (extra mode: only those not billed yet that day)
+  const billed = _billedFilesOn(date);
+  autoPats.filter(p => !extra || !billed.has(String(p['File Number']))).forEach(p => _addDaySelected.add(p.id));
   renderAddDayPatientList(date);
   openModal('addDayModal');
 }
 
+// File numbers already billed on a date (extra-visit mode leaves them out)
+function _billedFilesOn(date) {
+  const key = invoiceStorageKey(+date.slice(0, 4), +date.slice(5, 7));
+  const day = (loadInvoiceData(key).days || []).find(d => d.date === date);
+  return new Set(day ? day.patients.map(p => String(p.file)) : []);
+}
 function renderAddDayPatientList(date) {
-  const autoPats  = getPatientsSeenOn(date);
+  const extraMode = document.getElementById('addDayModal').dataset.mode === 'extra';
+  const billedNow = extraMode ? _billedFilesOn(date) : new Set();
+  const notBilled = p => !billedNow.has(String(p['File Number']));
+  const autoPats  = getPatientsSeenOn(date).filter(notBilled);
   const autoIds   = new Set(autoPats.map(p => p.id));
-  const allSorted = [...patients].sort((a,b) =>
+  const allSorted = [...patients].filter(notBilled).sort((a,b) =>
     (a['Patient Name']||'').localeCompare(b['Patient Name']||''));
   const selPats   = patients.filter(p => _addDaySelected.has(p.id));
   const q         = (document.getElementById('addDaySearch')?.value||'').toLowerCase();
@@ -9027,7 +8965,11 @@ function renderAddDayPatientList(date) {
   const el  = document.getElementById('addDayPatientList');
   if (el) el.innerHTML = html;
   const btn = document.querySelector('#addDayModal .btn-primary');
-  if (btn) btn.textContent = selPats.length ? `💾 Add ${selPats.length} Patient${selPats.length!==1?'s':''} to Invoice` : '💾 Add to Invoice';
+  if (btn) btn.textContent = selPats.length ? `💾 Add ${selPats.length} Patient${selPats.length!==1?'s':''} to ${extraMode ? 'This Day' : 'Invoice'}` : '💾 Add to Invoice';
+  if (extraMode && billedNow.size) {
+    const note = `<div style="padding:7px 12px;font-size:11px;color:var(--text-2);background:var(--bg);border-bottom:1px solid var(--border)">Already billed this day: ${billedNow.size} patient${billedNow.size!==1?'s':''} (not shown)</div>`;
+    if (el) el.insertAdjacentHTML('afterbegin', note);
+  }
 }
 
 function syncDaySearch(val) {
@@ -9054,6 +8996,17 @@ function setCppChecked(id, checked) {
 function updateAddDayPreview() {
   const rawKm  = parseInt(document.getElementById('addDayKm').value)  || 0;
   const rawMin = parseInt(document.getElementById('addDayTime').value) || 0;
+  const modal  = document.getElementById('addDayModal');
+  if (modal.dataset.mode === 'extra') {
+    const date = modal.dataset.date;
+    const day  = (loadInvoiceData(invoiceStorageKey(+date.slice(0, 4), +date.slice(5, 7))).days || []).find(d => d.date === date) || {};
+    const box  = document.getElementById('addDayCalcPreview');
+    box.style.display = (rawKm > 0 || rawMin > 0) ? 'block' : 'none';
+    box.innerHTML = `
+      🚗 ${day.net_km||0} km billed + ${rawKm} extra = <strong>${(day.net_km||0) + rawKm} km billed</strong> (no second 20 km deduction)<br>
+      ⏱ ${day.net_time||0} min billed + ${rawMin} extra = <strong>${(day.net_time||0) + rawMin} min billed</strong> (no second 40 min deduction)`;
+    return;
+  }
   const netKm  = Math.max(0, rawKm  - INVOICE_DEDUCT_KM);
   const netMin = Math.max(0, rawMin - INVOICE_DEDUCT_MIN);
   const box    = document.getElementById('addDayCalcPreview');
@@ -9069,6 +9022,7 @@ function updateAddDayPreview() {
 
 function saveDayToInvoice() {
   const date   = document.getElementById('addDayModal').dataset.date;
+  const extraMode = document.getElementById('addDayModal').dataset.mode === 'extra';
   const rawKm  = parseInt(document.getElementById('addDayKm').value)  || 0;
   const rawMin = parseInt(document.getElementById('addDayTime').value) || 0;
   const netKm  = Math.max(0, rawKm  - INVOICE_DEDUCT_KM);
@@ -9088,6 +9042,14 @@ function saveDayToInvoice() {
     note:     _addDayNotes[p.id] || ''
   }));
   if (!pats.length) { toast('Select at least one patient to add', 'warning'); return; }
+  if (extraMode) {
+    changeInvoice(invoiceStorageKey(+date.slice(0, 4), +date.slice(5, 7)),
+      { type: 'addToDay', date, patients: pats, add_km: rawKm, add_min: rawMin });
+    closeModal('addDayModal');
+    toast(`✓ ${pats.length} extra patient${pats.length !== 1 ? 's' : ''} added to ${date} — +${rawKm} km, +${rawMin} min`, 'success');
+    renderInvoiceView();
+    return;
+  }
   const key  = invoiceStorageKey();
   const data = loadInvoiceData(key);
   // Replaces this date's entry if any — on the latest saved month, not this device's copy
@@ -11245,7 +11207,7 @@ function rawFinderSearch() {
         <div style="background:var(--teal);color:#fff;padding:8px 12px;font-weight:700;font-size:13px;
           display:flex;align-items:center;justify-content:space-between">
           <span>${esc(p['Patient Name']||'(no name)')}  ·  #${esc(p['File Number']||'?')}</span>
-          <button onclick="closeModal('rawFinderModal');navigateToPin('${esc(String(p['File Number']||''))}')"
+          <button onclick="closeModal('rawFinderModal');goToPatient('${esc(String(p['File Number']||''))}')"
             style="background:#fff;color:var(--teal);border:none;border-radius:6px;
               padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer">👁 Go to record</button>
         </div>
@@ -11257,133 +11219,10 @@ function rawFinderSearch() {
 }
 window.rawFinderSearch = rawFinderSearch;
 
-// ════════════════════════════════════════════════════════════
-// ── PIN SYSTEM (Supabase-synced, cross-device) ───────────────
-// loadPins / savePins / isPinned defined early (before renderPatientList).
-// Full panel + sync logic here.
-// ════════════════════════════════════════════════════════════
-const PIN_KEY  = _PIN_KEY;
-const PIN_MAX  = 10;
-const PIN_TABLE = 'vapiq_pins';
-
-let _pinPanelOpen = false;
-
-// ── Supabase sync (background, non-blocking) ─────────────────
-async function syncPinsFromSupabase() {
-  try {
-    const { data: u } = await _sb.auth.getUser();
-    if (!u?.user?.id) return;
-    const { data, error } = await _sb.from(PIN_TABLE)
-      .select('pins').eq('user_id', u.user.id).maybeSingle();
-    if (error || !data) return;
-    const remote = data.pins || [];
-    // Only update if different from local
-    const local = JSON.parse(localStorage.getItem(PIN_KEY) || '[]');
-    if (JSON.stringify(remote) !== JSON.stringify(local)) {
-      localStorage.setItem(PIN_KEY, JSON.stringify(remote));
-      renderPins();
-    }
-  } catch(e) { console.warn('Pin sync read:', e.message); }
-}
-
-async function savePinsToSupabase(pins) {
-  localStorage.setItem(PIN_KEY, JSON.stringify(pins)); // immediate local
-  try {
-    const { data: u } = await _sb.auth.getUser();
-    if (!u?.user?.id) return;
-    await _sb.from(PIN_TABLE).upsert({
-      user_id: u.user.id,
-      pins: pins,
-      updated_at: new Date().toISOString()
-    }, { onConflict: 'user_id' });
-  } catch(e) { console.warn('Pin sync write:', e.message); }
-}
-
-// ── Pin panel UI ─────────────────────────────────────────────
-function togglePinPanel() {
-  _pinPanelOpen = !_pinPanelOpen;
-  const panel = document.getElementById('pinPanel');
-  if (!panel) return;
-  if (_pinPanelOpen) { panel.classList.remove('hidden'); renderPinPanel(); }
-  else panel.classList.add('hidden');
-}
-
-function renderPinPanel() {
-  const list = document.getElementById('pinPanelList');
-  if (!list) return;
-  const pins = loadPins();
-  if (!pins.length) {
-    list.innerHTML = '<div class="pin-panel-empty">No patients pinned yet.<br><small>Tap 📌 on any patient card.</small></div>';
-    return;
-  }
-  list.innerHTML = pins.map(fn => {
-    const p = patients.find(pt => String(pt['File Number']) === String(fn));
-    const name = p ? (p['Patient Name'] || '').trim() : `#${fn}`;
-    const init = (name.split(' ').map(w=>w[0]).join('').toUpperCase()||'?').slice(0,2);
-    const rem  = loadRem();
-    const decl = rem[String(fn)]?.status === 'declined';
-    return `<div class="pin-row" onclick="navigateToPin('${fn}')">
-      <div class="pin-row-avatar">${esc(init)}</div>
-      <div style="flex:1;min-width:0">
-        <div class="pin-row-name">${esc(name)}</div>
-        <div class="pin-row-file">#${fn}${decl ? ' <span class="pin-row-declined">⚠ Needs reschedule</span>' : ''}</div>
-      </div>
-      <button class="pin-row-x" onclick="event.stopPropagation();unpinFromPanel('${fn}')" title="Unpin">✕</button>
-    </div>`;
-  }).join('');
-}
-
-function renderPins() {
-  const badge = document.getElementById('pinBadgeCount');
-  const btn   = document.getElementById('pinToggleBtn');
-  const count = loadPins().length;
-  if (badge) {
-    badge.textContent = count;
-    if (count > 0) badge.classList.remove('hidden');
-    else badge.classList.add('hidden');
-  }
-  if (_pinPanelOpen) renderPinPanel();
-}
-
-async function togglePin(fileNum) {
-  const fn = String(fileNum);
-  let pins = loadPins();
-  if (pins.includes(fn)) {
-    if (!confirm('Unpin this patient?')) return;
-    pins = pins.filter(p => p !== fn);
-    await savePinsToSupabase(pins);
-    renderPins();
-    document.querySelectorAll(`.js-pin[data-fnum="${fn}"]`).forEach(b => {
-      b.classList.remove('pinned'); b.title = 'Pin patient';
-    });
-    return;
-  }
-  if (pins.length >= PIN_MAX) { showToast(`Max ${PIN_MAX} pins reached`, 'warn'); return; }
-  pins.push(fn);
-  await savePinsToSupabase(pins);
-  renderPins();
-  document.querySelectorAll(`.js-pin[data-fnum="${fn}"]`).forEach(b => {
-    b.classList.add('pinned'); b.title = 'Unpin patient';
-  });
-  showToast('📌 Patient pinned', 'success');
-}
-
-async function unpinFromPanel(fn) {
-  if (!confirm('Unpin this patient?')) return;
-  const pins = loadPins().filter(p => p !== String(fn));
-  await savePinsToSupabase(pins);
-  renderPins();
-  document.querySelectorAll(`.js-pin[data-fnum="${fn}"]`).forEach(b => {
-    b.classList.remove('pinned'); b.title = 'Pin patient';
-  });
-}
-
-function navigateToPin(fn) {
+// Open the patient's card in the right tab (used by notes import and the raw finder)
+function goToPatient(fn) {
   const p = patients.find(pt => String(pt['File Number']) === String(fn));
   if (!p) { showToast('Patient not found in current data', 'warn'); return; }
-  // Close pin panel
-  _pinPanelOpen = false;
-  document.getElementById('pinPanel')?.classList.add('hidden');
   // Determine best tab — Archived MUST be checked first; an archived patient
   // can also have Pending=true or old appointment data, which would otherwise
   // incorrectly route to those tabs instead of Archived where they actually live.
@@ -11414,15 +11253,6 @@ function navigateToPin(fn) {
   }, 250);
 }
 
-// Close pin panel when clicking outside
-document.addEventListener('click', e => {
-  if (!_pinPanelOpen) return;
-  const btn   = document.getElementById('pinToggleBtn');
-  const panel = document.getElementById('pinPanel');
-  if (btn?.contains(e.target) || panel?.contains(e.target)) return;
-  _pinPanelOpen = false;
-  panel?.classList.add('hidden');
-});
 
 // ════════════════════════════════════════════════════════════
 // ── REMINDER SYSTEM ──────────────────────────────────────────
@@ -11642,13 +11472,13 @@ function renderReminders() {
       </button>
       <button class="rem-btn rem-btn--declined" onclick="markDeclined('${fn}')">✗ No</button>
       <button class="rem-btn rem-btn--snooze"   onclick="toggleSnooze('${fn}')">⏰</button>
-      <button class="rem-btn rem-btn--view"     onclick="navigateToPin('${fn}')">👁</button>
+      <button class="rem-btn rem-btn--view"     onclick="goToPatient('${fn}')">👁</button>
       <button class="rem-btn rem-btn--cancel"   onclick="markCancelled('${fn}','${(p['Appointment Date & Time']||'').replace(/'/g,'')}')">✕</button>
     ` : `
       <button class="rem-btn rem-btn--called"    onclick="markCalled('${fn}')">✓ Called</button>
       <button class="rem-btn rem-btn--no-answer" onclick="markNoAnswer('${fn}')">📵 No</button>
       <button class="rem-btn rem-btn--snooze"    onclick="toggleSnooze('${fn}')">⏰</button>
-      <button class="rem-btn rem-btn--view"      onclick="navigateToPin('${fn}')">👁</button>
+      <button class="rem-btn rem-btn--view"      onclick="goToPatient('${fn}')">👁</button>
       <button class="rem-btn rem-btn--cancel"    onclick="markCancelled('${fn}','')">✕</button>
     `;
 
@@ -11790,20 +11620,8 @@ async function markDeclined(fn) {
   const rem = loadRem();
   rem[String(fn)] = { status:'declined', declinedAt: Date.now() };
   saveRem(rem);
-  // Auto-pin the patient so they show in pins for reschedule tracking
-  let pins = loadPins();
-  if (!pins.includes(String(fn))) {
-    if (pins.length < PIN_MAX) {
-      pins.push(String(fn));
-      await savePinsToSupabase(pins);
-      renderPins();
-      document.querySelectorAll(`.js-pin[data-fnum="${fn}"]`).forEach(b => {
-        b.classList.add('pinned'); b.title = 'Unpin patient';
-      });
-    }
-  }
   renderReminders(); updateReminderBadge();
-  showToast('❌ Declined — patient pinned for reschedule', 'warn');
+  showToast('❌ Declined — recorded on the reminder', 'warn');
 }
 
 function snoozeReminder(fn, hours) {
@@ -11928,11 +11746,7 @@ function clearCalledReminders() {
 }
 
 // ── Expose globally ───────────────────────────────────────────
-window.togglePin           = togglePin;
-window.unpinFromPanel      = unpinFromPanel;
-window.navigateToPin       = navigateToPin;
-window.togglePinPanel      = togglePinPanel;
-window.renderPins          = renderPins;
+window.goToPatient       = goToPatient;
 window.markCalled          = markCalled;
 window.markCancelled       = markCancelled;
 window.markNoAnswer        = markNoAnswer;
@@ -11947,61 +11761,7 @@ window.renderReminders     = renderReminders;
 window.updateReminderBadge = updateReminderBadge;
 window.calcTimeWindow      = calcTimeWindow;
 window.stripTimeWindow     = stripTimeWindow;
-window.syncPinsFromSupabase = syncPinsFromSupabase;
 
-function togglePin(fileNum) {
-  const fn = String(fileNum);
-  let pins = loadPins();
-  if (pins.includes(fn)) {
-    if (!confirm('Unpin this patient?')) return;
-    pins = pins.filter(p => p !== fn);
-    savePins(pins);
-    renderPins();
-    // Update button state
-    document.querySelectorAll(`.js-pin[data-fnum="${fn}"]`).forEach(b => {
-      b.classList.remove('pinned');
-      b.title = 'Pin patient';
-    });
-    return;
-  }
-  if (pins.length >= PIN_MAX) {
-    showToast(`Maximum ${PIN_MAX} pins reached. Unpin one first.`, 'warn');
-    return;
-  }
-  pins.push(fn);
-  savePins(pins);
-  renderPins();
-  document.querySelectorAll(`.js-pin[data-fnum="${fn}"]`).forEach(b => {
-    b.classList.add('pinned');
-    b.title = 'Unpin patient';
-  });
-  showToast('📌 Patient pinned', 'success');
-}
-function renderPins() {
-  const strip = document.getElementById('pinStrip');
-  if (!strip) return;
-  const pins = loadPins();
-  if (!pins.length) { strip.innerHTML = ''; return; }
-  strip.innerHTML = pins.map(fn => {
-    const p = patients.find(pt => String(pt['File Number']) === fn);
-    const name = p ? (p['Patient Name'] || '').split(' ').slice(0,2).join(' ') : `#${fn}`;
-    return `<div class="pin-chip" onclick="navigateToPin('${fn}')" title="Go to patient ${name}">
-      <span class="pin-chip-name">${esc(name)}</span>
-      <span class="pin-chip-file">#${fn}</span>
-      <button class="pin-chip-x" onclick="event.stopPropagation();unpinChip('${fn}')" title="Unpin">✕</button>
-    </div>`;
-  }).join('');
-}
-function unpinChip(fn) {
-  if (!confirm('Unpin this patient?')) return;
-  const pins = loadPins().filter(p => p !== String(fn));
-  savePins(pins);
-  renderPins();
-  document.querySelectorAll(`.js-pin[data-fnum="${fn}"]`).forEach(b => {
-    b.classList.remove('pinned'); b.title = 'Pin patient';
-  });
-}
-// navigateToPin defined earlier (with Archived-first tab routing) — duplicate removed
 
   window.toggleDark = toggleDark;
   window.ignoreDate = ignoreDate;
@@ -12284,7 +12044,7 @@ function unpinChip(fn) {
     <div class="modal-handle"></div>
     <div class="modal-header" style="flex-shrink:0">
       <div>
-        <div class="modal-title">📋 Add Day to Invoice</div>
+        <div class="modal-title" id="addDayTitle">📋 Add Day to Invoice</div>
         <div style="font-size:12px;color:var(--text-2);margin-top:2px" id="addDayDateLabel"></div>
       </div>
       <button class="modal-close" onclick="closeModal('addDayModal')">✕</button>
@@ -12296,12 +12056,12 @@ function unpinChip(fn) {
     <div class="modal-footer" style="flex-shrink:0;padding:12px 16px;border-top:1px solid var(--border);background:var(--bg)">
       <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap">
         <div style="flex:1;min-width:120px">
-          <label style="font-size:10px;font-weight:700;color:var(--text-2);display:block;margin-bottom:4px">🚗 Total KM driven</label>
+          <label style="font-size:10px;font-weight:700;color:var(--text-2);display:block;margin-bottom:4px" id="addDayKmLabel">🚗 Total KM driven</label>
           <input id="addDayKm" type="number" min="0" placeholder="e.g. 45"
             style="width:100%;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--card);color:var(--text)">
         </div>
         <div style="flex:1;min-width:120px">
-          <label style="font-size:10px;font-weight:700;color:var(--text-2);display:block;margin-bottom:4px">⏱ Total time (min)</label>
+          <label style="font-size:10px;font-weight:700;color:var(--text-2);display:block;margin-bottom:4px" id="addDayTimeLabel">⏱ Total time (min)</label>
           <input id="addDayTime" type="number" min="0" placeholder="e.g. 240"
             style="width:100%;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--card);color:var(--text)">
         </div>

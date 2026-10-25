@@ -15,7 +15,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Dubbi">
-  <meta name="theme-color" content="#F4F6F9" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#1B2638" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#0E141D" media="(prefers-color-scheme: dark)">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -266,6 +266,159 @@ nav.tabbar .in{display:flex;width:100%;max-width:520px}
 .keybox{font-family:ui-monospace,Menlo,monospace;font-size:13px;background:var(--card-2);border:1px dashed var(--teal);border-radius:12px;padding:10px;word-break:break-all;margin:8px 0}
 ol.steps{padding-left:20px;margin:8px 0;font-size:14px;line-height:1.5}
 
+/* ══ VaPiq look (Oct 24, 2026): navy hero, teal gradients, colour per kind, gentle motion ══ */
+:root{
+  --navy:#1B2638;--navy-mid:#243047;--navy-ink:#0F1726;
+  --g-teal:linear-gradient(135deg,#3AA8A5 0%,#2D8C8A 55%,#1E6665 100%);
+  --g-red:linear-gradient(135deg,#F2685E 0%,#D1453B 60%,#A8322A 100%);
+  --g-amber:linear-gradient(135deg,#F4B451 0%,#D98F24 60%,#B7741A 100%);
+  --g-violet:linear-gradient(135deg,#9B83F0 0%,#6B4FD0 60%,#5238B0 100%);
+  --g-blue:linear-gradient(135deg,#5C9BF0 0%,#2E6FD6 60%,#1F55AE 100%);
+  --g-green:linear-gradient(135deg,#4CC38A 0%,#23855A 100%);
+  --page:linear-gradient(170deg,#EAF0F7 0%,#F3F5F9 45%,#F6F7FA 100%);
+  --card-grad:linear-gradient(160deg,#FFFFFF 0%,#FAFCFF 100%);
+  --lift:0 1px 2px rgba(16,24,40,.06),0 8px 24px rgba(27,38,56,.10);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --page:linear-gradient(170deg,#0B111A 0%,#0E141D 50%,#101824 100%);
+    --card-grad:linear-gradient(160deg,#1A2432 0%,#16202D 100%);
+    --lift:0 1px 2px rgba(0,0,0,.35),0 10px 28px rgba(0,0,0,.35);
+  }
+}
+:root[data-theme="dark"]{
+  --page:linear-gradient(170deg,#0B111A 0%,#0E141D 50%,#101824 100%);
+  --card-grad:linear-gradient(160deg,#1A2432 0%,#16202D 100%);
+  --lift:0 1px 2px rgba(0,0,0,.35),0 10px 28px rgba(0,0,0,.35);
+}
+body{background:var(--bg) var(--page) fixed}
+
+/* Hero header — VaPiq's navy band with a soft teal glow */
+header.top{background:linear-gradient(115deg,var(--navy) 0%,var(--navy-mid) 70%,#2A3A55 100%);border-bottom:0;color:#fff;
+  box-shadow:0 10px 30px rgba(15,23,38,.28);overflow:hidden;isolation:isolate;border-radius:0 0 22px 22px}
+header.top::before{content:'';position:absolute;z-index:-1;width:260px;height:260px;right:-70px;top:-130px;border-radius:50%;
+  background:radial-gradient(circle,rgba(58,168,165,.55) 0%,rgba(58,168,165,0) 70%);animation:drift 14s ease-in-out infinite alternate}
+header.top::after{content:'';position:absolute;z-index:-1;width:200px;height:200px;left:-80px;bottom:-140px;border-radius:50%;
+  background:radial-gradient(circle,rgba(107,79,208,.35) 0%,rgba(107,79,208,0) 70%);animation:drift 18s ease-in-out infinite alternate-reverse}
+@keyframes drift{to{transform:translate(-24px,18px) scale(1.08)}}
+.hrow{padding:12px 0 14px}
+.htxt h1{color:#fff;font-size:21px}
+.htxt .sub,.health{color:rgba(255,255,255,.78)}
+.health{background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:3px 10px 3px 8px;margin-top:3px}
+.health.bad{color:#FFD2CE;background:rgba(209,69,59,.22);border-color:rgba(242,104,94,.45)}
+.dot{box-shadow:0 0 0 3px rgba(76,195,138,.25)}
+.avatar{background:var(--g-teal);box-shadow:0 0 0 2px rgba(255,255,255,.18),0 6px 18px rgba(45,140,138,.55);position:relative}
+.avatar::after{content:'';position:absolute;inset:-4px;border-radius:17px;border:2px solid rgba(58,168,165,.55);animation:halo 3.2s ease-out infinite}
+@keyframes halo{0%{opacity:.9;transform:scale(.92)}70%,100%{opacity:0;transform:scale(1.18)}}
+header.top .iconbtn{background:rgba(255,255,255,.10);border-color:rgba(255,255,255,.16);color:#fff;transition:background .2s,transform .15s}
+header.top .iconbtn:hover{background:rgba(255,255,255,.18)}
+
+/* Tiles — each with its own colour; vivid when there is something to do */
+.tiles{margin-top:16px}
+.tile{position:relative;overflow:hidden;background:var(--card-grad);border:1px solid var(--line);box-shadow:var(--lift);
+  animation:cardIn .45s cubic-bezier(.2,.8,.2,1) both;transition:transform .18s,box-shadow .18s}
+.tile:nth-child(2){animation-delay:.05s}.tile:nth-child(3){animation-delay:.1s}.tile:nth-child(4){animation-delay:.15s}
+.tile:hover{transform:translateY(-2px)}
+.tile::before{content:'';position:absolute;left:0;right:0;top:0;height:4px;background:var(--g-teal)}
+.tile.t-overdue::before{background:var(--g-red)}.tile.t-todo::before{background:var(--g-teal)}
+.tile.t-waiting::before{background:var(--g-amber)}.tile.t-sched::before{background:var(--g-violet)}
+.tile.on{color:#fff;border-color:transparent}
+.tile.on span{color:rgba(255,255,255,.88)}
+.tile.on b{color:#fff!important;animation:pop .5s cubic-bezier(.2,1.6,.4,1) both .2s}
+.tile.on::after{content:'';position:absolute;inset:0;background:linear-gradient(115deg,transparent 30%,rgba(255,255,255,.28) 48%,transparent 66%);
+  transform:translateX(-120%);animation:shine 3.6s ease-in-out infinite 1s}
+.tile.on.t-overdue{background:var(--g-red);box-shadow:0 8px 22px rgba(209,69,59,.38)}
+.tile.on.t-todo{background:var(--g-teal);box-shadow:0 8px 22px rgba(45,140,138,.38)}
+.tile.on.t-waiting{background:var(--g-amber);box-shadow:0 8px 22px rgba(217,143,36,.36)}
+.tile.on.t-sched{background:var(--g-violet);box-shadow:0 8px 22px rgba(107,79,208,.36)}
+.tile.on::before{display:none}
+.tile.t-overdue.on{animation:cardIn .45s cubic-bezier(.2,.8,.2,1) both,throb 2.4s ease-in-out infinite 1s}
+@keyframes pop{0%{transform:scale(.6);opacity:0}100%{transform:none;opacity:1}}
+@keyframes shine{0%{transform:translateX(-120%)}35%,100%{transform:translateX(120%)}}
+@keyframes throb{50%{box-shadow:0 8px 30px rgba(209,69,59,.6)}}
+@keyframes cardIn{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:none}}
+
+/* Section headers — coloured pill and a fading rule */
+.sec{color:var(--ink);margin-top:22px}
+.sec::after{content:'';flex:1;height:2px;border-radius:2px;background:linear-gradient(90deg,var(--line),transparent)}
+.sec .count{background:var(--g-teal);color:#fff;box-shadow:0 2px 8px rgba(45,140,138,.35)}
+.sec.red{color:var(--red)}
+.sec.red .count{background:var(--g-red);color:#fff;box-shadow:0 2px 8px rgba(209,69,59,.35)}
+.sec.red::after{background:linear-gradient(90deg,color-mix(in srgb,var(--red) 40%,transparent),transparent)}
+
+/* Cards — gradient surface, colour edge by kind, lift on hover, staggered entrance */
+.card{background:var(--card-grad);box-shadow:var(--lift);position:relative;overflow:hidden;
+  animation:cardIn .45s cubic-bezier(.2,.8,.2,1) both;transition:transform .18s,box-shadow .18s}
+#main .card:nth-of-type(2){animation-delay:.04s}#main .card:nth-of-type(3){animation-delay:.08s}
+#main .card:nth-of-type(4){animation-delay:.12s}#main .card:nth-of-type(5){animation-delay:.16s}#main .card:nth-of-type(n+6){animation-delay:.2s}
+@media (hover:hover){.card:hover{transform:translateY(-2px);box-shadow:0 2px 4px rgba(16,24,40,.06),0 14px 30px rgba(27,38,56,.14)}}
+.card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--line)}
+.card:has(.ic-new)::before{background:var(--g-blue)}
+.card:has(.ic-reply)::before{background:var(--g-teal)}
+.card:has(.ic-close)::before{background:var(--g-amber)}
+.card:has(.ic-rx)::before{background:var(--g-violet)}
+.card:has(.ic-wait)::before{background:linear-gradient(180deg,#C9D1DD,#9AA6B8)}
+.card.overdue{background:linear-gradient(135deg,color-mix(in srgb,var(--red) 9%,var(--card)) 0%,var(--card) 50%);
+  border-color:color-mix(in srgb,var(--red) 40%,var(--line));box-shadow:0 0 0 3px var(--red-soft),var(--lift)}
+.card.overdue::before{background:var(--g-red);animation:edge 1.8s ease-in-out infinite}
+@keyframes edge{50%{opacity:.45}}
+.cicon{box-shadow:inset 0 0 0 1px rgba(255,255,255,.5),0 3px 10px rgba(16,24,40,.08)}
+.ic-new{background:linear-gradient(140deg,#E7F0FD,#D3E3FB)}.ic-reply{background:linear-gradient(140deg,#E4F3F2,#CDEAE8)}
+.ic-close{background:linear-gradient(140deg,#FFF4DF,#FDE6BC)}.ic-rx{background:linear-gradient(140deg,#EFEAFD,#DFD6FA)}
+.ctitle .kind{color:var(--teal-ink)}
+.chip.late{background:var(--g-red);color:#fff;box-shadow:0 2px 8px rgba(209,69,59,.3)}
+.chip.ok{background:var(--g-green);color:#fff}
+.doc.have{background:linear-gradient(140deg,var(--green-soft),color-mix(in srgb,var(--green) 16%,var(--card)))}
+.doc.miss{background:linear-gradient(140deg,var(--red-soft),color-mix(in srgb,var(--red) 14%,var(--card)))}
+
+/* Buttons — teal gradient with a light sweep */
+.btn{position:relative;overflow:hidden}
+.btn.pri{background:var(--g-teal);box-shadow:0 6px 16px rgba(45,140,138,.38)}
+.btn.pri::after{content:'';position:absolute;inset:0;background:linear-gradient(115deg,transparent 35%,rgba(255,255,255,.35) 50%,transparent 65%);transform:translateX(-120%);transition:transform .6s}
+.btn.pri:hover::after{transform:translateX(120%)}
+.btn.warnb{background:var(--g-amber);color:#fff;box-shadow:0 6px 16px rgba(217,143,36,.3)}
+.btn.sec2{background:var(--card-grad);box-shadow:0 2px 6px rgba(16,24,40,.06)}
+.lang button.on,.seg button.on{background:var(--g-teal)}
+.toggle.on{background:linear-gradient(140deg,var(--teal-soft),color-mix(in srgb,var(--teal) 18%,var(--card)))}
+
+/* Journey — gradient progress */
+.step.done i{background:var(--g-teal);border-color:transparent;box-shadow:0 2px 8px rgba(45,140,138,.4)}
+.step.done::before{background:var(--g-teal)}
+.step.late i{background:var(--g-red);color:#fff;border-color:transparent}
+
+/* Tab bar — navy glass with a glowing active pill */
+nav.tabbar{background:color-mix(in srgb,var(--navy) 94%,transparent);border-top:1px solid rgba(255,255,255,.08);box-shadow:0 -8px 24px rgba(15,23,38,.25)}
+.tab{color:rgba(255,255,255,.55);transition:color .2s}
+.tab::before{content:'';position:absolute;top:2px;left:50%;width:44px;height:30px;margin-left:-22px;border-radius:12px;background:var(--g-teal);
+  opacity:0;transform:scale(.6);transition:opacity .25s,transform .3s cubic-bezier(.2,1.4,.4,1);z-index:-1;box-shadow:0 4px 14px rgba(45,140,138,.55)}
+.tab{isolation:isolate}
+.tab.on{color:#fff}
+.tab.on::before{opacity:1;transform:none}
+.tab .badge{background:var(--g-red);box-shadow:0 2px 6px rgba(209,69,59,.5);animation:pop .4s cubic-bezier(.2,1.6,.4,1) both}
+
+/* Dubbi button and chat */
+.fab{background:var(--g-teal);box-shadow:0 10px 28px rgba(45,140,138,.5)}
+.fab::after{content:'';position:absolute;inset:-6px;border-radius:50%;border:2px solid rgba(58,168,165,.6);animation:halo 3.2s ease-out infinite}
+.shead{background:linear-gradient(115deg,var(--navy),var(--navy-mid));color:#fff;border-bottom:0;border-radius:24px 24px 0 0;margin-top:-1px}
+.sheet .grab{background:rgba(255,255,255,.35);position:relative;z-index:1;margin-bottom:-12px}
+.sheet .shead{padding-top:16px}
+.shead .iconbtn{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.16);color:#fff}
+.msg.me{background:var(--g-teal);box-shadow:0 4px 12px rgba(45,140,138,.3)}
+.msg.bot{background:var(--card-grad);box-shadow:var(--lift);border-left:3px solid var(--teal)}
+.prop{background:var(--card-grad);box-shadow:0 0 0 3px var(--teal-soft),var(--lift)}
+.suggest button{background:var(--card-grad);box-shadow:0 2px 6px rgba(16,24,40,.06);transition:transform .15s,border-color .15s}
+.suggest button:hover{border-color:var(--teal);transform:translateY(-1px)}
+.mic{background:var(--g-teal);box-shadow:0 4px 12px rgba(45,140,138,.4)}
+#login .card{box-shadow:0 20px 50px rgba(27,38,56,.18)}
+
+/* Entrance animations only when the app opens or the tab changes — not on the
+   automatic refresh every minute (body.intro is set briefly by the script) */
+body:not(.intro) .card,body:not(.intro) .tile,body:not(.intro) .tile.on b{animation:none}
+body:not(.intro) .tile.t-overdue.on{animation:throb 2.4s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+}
+
 </style>
 </head>
 <body>
@@ -357,6 +510,13 @@ const hoursSince = iso => iso ? (Date.now() - Date.parse(iso)) / 36e5 : 0;
 const ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 let S = { rows: [], tasks: [], beat: null, sched: [], unconf: [], pts: {} }, tab = 'today', user = null;
 
+// Plays the entrance animations (app opened / tab changed)
+function intro() {
+  document.body.classList.add('intro');
+  clearTimeout(intro._t); intro._t = setTimeout(() => document.body.classList.remove('intro'), 1500);
+}
+intro();
+
 function toast(msg, ms = 2800) {
   const t = $('toast'); t.textContent = msg; t.classList.add('on');
   clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('on'), ms);
@@ -418,6 +578,7 @@ async function load() {
     const { data } = await sb.from('patients').select('id,appointment_date_time,appointment_confirmed,archived').in('id', ids);
     (data || []).forEach(x => { S.pts[String(x.id)] = x; });
   }
+  if (!load.done) { load.done = true; intro(); }   // first data → entrance animation
   render();
 }
 
@@ -523,7 +684,8 @@ function render() {
   else html += banner + historyView();
   $('main').innerHTML = html;
 }
-const tile = (n, label, cls, jump) => `<button class="tile ${cls}" data-jump="${jump}"><b>${n}</b><span>${label}</span></button>`;
+// Each tile has its own colour (t-overdue / t-todo / t-waiting / t-sched); "on" = something to do
+const tile = (n, label, cls, jump) => `<button class="tile t-${jump} ${n ? 'on' : ''} ${cls}" data-jump="${jump}"><b>${n}</b><span>${label}</span></button>`;
 const section = (name, n, cls = '', id = '') => `<div class="sec ${cls}"${id ? ` id="sec-${id}"` : ''}>${esc(name)}<span class="count">${n}</span></div>`;
 
 function from(t) {
@@ -853,7 +1015,7 @@ $('main').addEventListener('click', async e => {
     load();
   } catch (err) { btn.disabled = false; toast('Could not save — ' + err.message); }
 });
-document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => { tab = b.dataset.tab; render(); window.scrollTo({ top: 0 }); }));
+document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => { tab = b.dataset.tab; intro(); render(); window.scrollTo({ top: 0 }); }));
 $('refreshBtn').addEventListener('click', () => load().then(() => toast('Up to date')));
 // Fresh data when you come back — never while you're typing
 const typing = () => document.activeElement?.matches('textarea, input, select');
