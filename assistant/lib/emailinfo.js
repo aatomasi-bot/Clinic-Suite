@@ -84,3 +84,36 @@ export function openingText(body) {
   }
   return out.join('\n').slice(0, 800);
 }
+
+// Patient updates from a coordinator (Oct 25, 2026), read from the subject and
+// her own message (often the subject is just "Name - AB 35251"):
+//   transfer  — "temporarily transferred to your portal" → new patient, Temporary
+//   permanent — "will remain in your portal permanently" → Assignment Type Permanent
+//   back      — "Patient is Back" / "is back from …" → out of Hold, due date from the email
+//   on_hold   — "File on Hold" / "placed on hold" → moved to Hold with the reason
+// → { kind, reason, due } or null
+const UPDATE_RULES = [
+  ['transfer', /temporar(?:y|ily)\s+transfer|transf[ée]r[ée]e?\s+temporairement|transfert\s+temporaire/i],
+  ['permanent', /permanently\s+in\s+your\s+portal|in\s+your\s+portal\s+permanently|remain\s+in\s+your\s+portal\s+permanently|de\s+fa[çc]on\s+permanente|en\s+permanence\s+dans\s+votre\s+portail/i],
+  ['back', /\bpatient\s+is\s+back\b|\bis\s+(?:now\s+)?back\b|\best\s+de\s+retour\b|patient\s+de\s+retour/i],
+  ['on_hold', /\bon\s*hold\b|\ben\s+attente\b|\bsuspendu|mis\s+en\s+pause|placed\s+on\s+pause/i],
+];
+const clean = s => s.replace(/^\s*(?:\*+\s*)?(?:please\s+(?:be\s+advised|note)\s+(?:that\s+)?|veuillez\s+(?:noter|prendre\s+note)\s+que\s+)/i, '').replace(/\s+/g, ' ').trim();
+export function patientUpdate({ subject = '', body = '', date } = {}) {
+  if (/^\s*(re|tr|fw|fwd)\s*:/i.test(subject)) return null;   // replies are not new requests
+  const msg = openingText(body);
+  const hit = UPDATE_RULES.find(([, re]) => re.test(subject) || re.test(msg));
+  if (!hit) return null;
+  const [kind, re] = hit;
+  const sentences = msg.replace(/\n+/g, ' ').split(/(?<!\b(?:Mr|Mrs|Ms|Dr|Mme|Mlle|M|St))(?<=[.!?])\s+/);
+  // "Mr. Kim 34451 is currently in hospital…" → "Currently in hospital…" (the card already shows who)
+  const what = clean(sentences.find(s => re.test(s)) || sentences.find(s => s.trim().length > 20) || '')
+    .replace(/^.*?\b\d{4,6}\b\s*(?:is\s+|has\s+been\s+|has\s+|will\s+|est\s+|a\s+été\s+)?/i, '');
+  const reason = (what.charAt(0).toUpperCase() + what.slice(1)).slice(0, 180);
+  let due = '';
+  if (kind === 'back' || kind === 'transfer') {
+    const m = msg.match(/(?:was\s+)?(?:due|pr[ée]vue?|d[ûu]e?)\s+(?:on\s+|le\s+|pour\s+le\s+)?([A-Za-zÀ-ÿ]+\.?\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4}|\d{1,2}(?:er)?\s+[A-Za-zÀ-ÿ]+\s+\d{4}|\d{4}-\d{2}-\d{2})/i);
+    due = (m && readDate(m[1], date)) || emailDueDate(body, date).due || '';
+  }
+  return { kind, reason, due };
+}

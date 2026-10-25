@@ -15,12 +15,12 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import { classifyEmail, subjectFileNumber, senderAddress, isNewPatientSubject } from './lib/classify.js';
+import { classifyEmail, subjectFileNumber, senderAddress, isNewPatientSubject, senderAllowed } from './lib/classify.js';
 import { documentTypes, summarizeDocuments, isCopyDocument } from './lib/doctype.js';
 import { findExisting, sameNameOtherFile, patientStatus, normFile } from './lib/match.js';
 import { buildRecord, toIsoDate } from './lib/record.js';
 import { parsePdf, parseScan, repeatsFor } from './lib/pdf.js';
-import { needsSignature, emailDueDate, cardNotes, signedBy, openingText } from './lib/emailinfo.js';
+import { needsSignature, emailDueDate, cardNotes, signedBy, openingText, patientUpdate } from './lib/emailinfo.js';
 import { testFolderSource, imapSource } from './lib/sources.js';
 import { supabaseStore, offlineStore } from './lib/store.js';
 import { summaryText, macNotification, pushToPhones } from './lib/notify.js';
@@ -48,13 +48,15 @@ const sha = s => crypto.createHash('sha256').update(s).digest('hex');
 //   3 Enrollment_Form_Auto_Generated (text PDF, every field)
 //   2 the assignment form ("RA35037.pdf", "JS35335New.pdf"), text or scan
 //   1 any other readable form · 0 nothing usable. FAX/RX copies are never read.
+export const DEFAULT_TOTAL_NOTE = 'Total doses: default';   // the Dubbi card highlights the field when it sees this
 const ENROLLMENT_FORM = /enrol+ment[\s_-]*form/i;
 const hasData = f => !!(f && f.parsed && (f.parsed.name || f.parsed.file));
 const formRank = f => !hasData(f) ? 0 : ENROLLMENT_FORM.test(f.pdf.name) ? 3 : f.types.includes('assignment') ? 2 : 1;
 const nameRank = n => ENROLLMENT_FORM.test(n || '') ? 3 : isCopyDocument(n) ? 0 : documentTypes({ name: n || '', scanned: true }).includes('assignment') ? 2 : 1;
 const stateFile = path.join(path.dirname(fileURLToPath(import.meta.url)), 'state', 'related-search.json');   // when each item was last searched
 // Kept on the patient's item, for a card created by a later email
-const remember = said => ({ ...(said.signature ? { signature_required: true } : {}), ...(said.due ? { email_due: said.due, email_note: said.note || '' } : {}) });
+const remember = said => ({ ...(said.signature ? { signature_required: true } : {}), ...(said.due ? { email_due: said.due, email_note: said.note || '' } : {}),
+  ...(said.transfer ? { transfer: said.transfer } : {}) });
 
 export { needsSignature } from './lib/emailinfo.js';
 
@@ -73,8 +75,15 @@ export async function runIntake({ source, store, rules, replies = {}, isTest, lo
   const touched = new Set();   // file numbers of new-patient items seen this run
   const handle = async email => {
     counts.emails++;
-    const { kind } = email.skipped ? { kind: null } : classifyEmail(email, rules);
-    if (!kind) { counts.skipped++; return; }
+    let { kind } = email.skipped ? { kind: null } : classifyEmail(email, rules);
+    // Patient updates (on hold / back / permanent / temporary transfer) — often only
+    // recognisable from the coordinator's message, the subject being just the name
+    const update = !email.skipped && senderAllowed(email.from, rules) && (!kind || kind === 'new_patient_notice' || kind === 'assignment')
+      ? patientUpdate({ subject: email.subject, body: email.bodyText, date: email.date }) : null;
+    const transfer = update && update.kind === 'transfer' ? update : null;
+    if (transfer && !kind) kind = email.pdfs && email.pdfs.length ? 'assignment' : 'new_patient_notice';
+    if (update && !transfer && kind) kind = null;   // an update about an existing patient, not a new one
+    if (!kind && !(update && !transfer)) { counts.skipped++; return; }
 
     const subjectFile = subjectFileNumber(email.subject);
     // What every reply needs — the draft is ready on the card when you get to it.
@@ -89,6 +98,35 @@ export async function runIntake({ source, store, rules, replies = {}, isTest, lo
     const draft = (k, fileNumber) => replies.enabled === false ? null
       : draftReply({ kind: k, lang, coordinatorName, fileNumber, subjectRef, signature: replies.signature || '' });
 
+    // ── On hold / back / permanent ───────────────────────────────────────
+    if (update && !transfer) {
+      const key = sha(`${email.messageId}|${update.kind}`);
+      if ((await store.knownTaskKeys([key])).size) { counts.already++; return; }
+      const fileNo = subjectFile || ((openingText(email.bodyText).match(/\b\d{4,6}\b/) || [])[0]) || '';
+      const existing = findExisting(fileNo, patients);
+      const warnings = [];
+      if (!fileNo) warnings.push('No file number found — find the patient yourself.');
+      else if (!existing) warnings.push(`File #${fileNo} is not in VaPiq.`);
+      else if (update.kind === 'on_hold' && existing.archived) warnings.push('This file is already on hold in VaPiq.');
+      else if (update.kind === 'back' && !existing.archived) warnings.push('This file is not on hold in VaPiq (already active).');
+      let id;
+      try {
+        id = await store.insertTask({ ...replyBase, kind: update.kind, status: 'todo', source_key: key,
+          file_number: fileNo || null, existing_patient: existingSummary(existing), warnings, reply_body: draft(update.kind, fileNo),
+          details: { signature: replies.signature || '', reason: update.reason, due: update.due || null } });
+      } catch (e) {
+        // Database not updated yet for these cards (supabase/2026-10-25_patient_updates.sql):
+        // leave the email for the next run instead of failing the whole check
+        if (/check constraint|violates/i.test(e.message)) { log(`  wait    ${update.kind} email for #${fileNo} — run supabase/2026-10-25_patient_updates.sql`); counts.skipped++; return; }
+        throw e;
+      }
+      await store.audit('ASSISTANT_UPDATE_REQUEST', fileNo, { task_id: id, kind: update.kind, test: !!isTest });
+      counts.updates = (counts.updates || 0) + 1;
+      log(`  ${update.kind.padEnd(7)} card ${id}${warnings.length ? ` (${warnings.length} warning${warnings.length > 1 ? 's' : ''})` : ''}`);
+      await source.markHandled(email);
+      return;
+    }
+
     // ── Close file ───────────────────────────────────────────────────────
     if (kind === 'close_file') {
       const key = sha(`${email.messageId}|close_file`);
@@ -97,7 +135,7 @@ export async function runIntake({ source, store, rules, replies = {}, isTest, lo
       const warnings = [];
       if (!subjectFile) warnings.push('No file number in the subject — find the patient yourself.');
       else if (!existing) warnings.push(`File #${subjectFile} is not in VaPiq.`);
-      else if (existing.archived) warnings.push('This file is already closed (archived) in VaPiq.');
+      else if (existing.archived) warnings.push('This file is on hold in VaPiq — closing it deletes the record.');
       const id = await store.insertTask({ ...replyBase, kind: 'close_file', status: 'todo', source_key: key,
         file_number: subjectFile || null, existing_patient: existingSummary(existing), warnings, reply_body: draft('close_file', subjectFile),
         details: { signature: replies.signature || '' } });
@@ -116,7 +154,9 @@ export async function runIntake({ source, store, rules, replies = {}, isTest, lo
     if (await store.knownMessage(email.messageId)) { counts.already++; return; }
     const sender = senderAddress(email.from);
     // What the coordinator's email says: signature needed, due date (+ the reason in brackets)
-    const said = { signature: needsSignature(email.bodyText), ...emailDueDate(email.bodyText, email.date) };
+    const said = { signature: needsSignature(email.bodyText), ...emailDueDate(email.bodyText, email.date),
+                   ...(transfer ? { transfer: transfer.reason || 'Temporary transfer' } : {}) };
+    if (transfer && transfer.due && !said.due) said.due = transfer.due;
     const saysSomething = said.signature || said.due;
     const fromReports = sender === (replies.reportsAddress || 'reports@medicum.ca');
     const noReply = (rules.noReplySenders || []).map(s => s.toLowerCase()).includes(sender);   // no-reply@ "New Appointment"
@@ -162,7 +202,7 @@ export async function runIntake({ source, store, rules, replies = {}, isTest, lo
     }
 
     // Already a VaPiq patient and not part of a recent new-patient item → prescription to apply
-    if (existing && !group && kind === 'assignment' && !isNewPatientSubject(email.subject, rules)) {
+    if (existing && !group && kind === 'assignment' && !isNewPatientSubject(email.subject, rules) && !transfer) {
       const rxForms = parsedForms.length ? parsedForms
         : [{ key: sha(`${email.messageId}|prescription`), pdf: { name: files[0] ? files[0].name : '' }, parsed: null, warnings: [] }];
       for (const f of rxForms) {
@@ -204,8 +244,13 @@ export async function runIntake({ source, store, rules, replies = {}, isTest, lo
       const note = said.due ? said.note : (earlier.email_note || '');
       const formDue = form.parsed && toIsoDate(form.parsed.date);
       if (due && formDue && formDue !== due) cardWarnings.push(`Due date from the coordinator's email (${due}) replaces the form's (${formDue}).`);
-      const { record, missing } = buildRecord(form.parsed, { fileNumber, dueDate: due, specialInstructions: cardNotes({ signature, note }) });
+      const moved = said.transfer || earlier.transfer || '';
+      const { record, missing } = buildRecord(form.parsed, { fileNumber, dueDate: due,
+        specialInstructions: [cardNotes({ signature, note }), moved ? `Temporary transfer: ${moved}` : ''].filter(Boolean).join(' | ') });
+      if (moved) record.assignment_type = 'Temporary';   // temporarily transferred to this nurse
       if (form.parsed && !form.parsed.totalDoses && form.parsed.totalWhy) cardWarnings.push(form.parsed.totalWhy);
+      // Nothing on the forms → the default is used: say so, so it is checked (Oct 25, 2026)
+      else if (!(form.parsed && form.parsed.totalDoses)) cardWarnings.push(`${DEFAULT_TOTAL_NOTE} ${record.total_doses} — not marked on the forms. Please check.`);
       for (const p of sameNameOtherFile(record.patient_name, fileNumber, patients)) cardWarnings.push(`Same name as existing patient #${p.file_number} (${patientStatus(p)}) — possible duplicate.`);
       const card = {
         email_from: email.from, email_subject: email.subject, email_date: email.date,
@@ -334,7 +379,8 @@ async function main() {
       ? offlineStore({ patientsFile: path.join(here, 'test/fixtures/patients.json'), outFile: path.join(stateDir, 'offline-pending.json') })
       : await supabaseStore(cfg.supabase);
     source = live
-      ? imapSource(cfg.imap, { wanted: e => !!classifyEmail(e, cfg.rules).kind })
+      ? imapSource(cfg.imap, { wanted: e => !!classifyEmail(e, cfg.rules).kind
+          || (senderAllowed(e.from, cfg.rules) && !!subjectFileNumber(e.subject) && !/^\s*(re|tr|fw|fwd)\s*:/i.test(e.subject)) })
       : testFolderSource(path.resolve(here, cfg.testInbox));
 
     console.log(`[${new Date().toISOString()}] intake: ${live ? 'LIVE' : 'TEST'} · ${source.name} · ${store.kind}`);

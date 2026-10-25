@@ -154,6 +154,8 @@ details.form[open] summary::after{transform:rotate(90deg)}
 .fld input[type=date]{min-height:44px}
 .fld.miss input,.fld.miss select{border-color:var(--red);background:var(--red-soft)}
 .fld.miss label{color:var(--red)}
+.fld.soft input{border-color:var(--amber);background:var(--amber-soft);box-shadow:0 0 0 3px color-mix(in srgb,var(--amber) 18%,transparent)}
+.fld.soft label{color:var(--amber)}
 @media (max-width:420px){.grid{grid-template-columns:minmax(0,1fr)}}
 
 /* reply editor */
@@ -595,6 +597,11 @@ async function load() {
   render();
 }
 
+async function auditFull(action, fileNum, detail) {
+  const { error } = await sb.from('audit_log').insert({ user_email: user.email, action, patient_file_num: String(fileNum || ''),
+    detail: JSON.stringify(detail), created_at: new Date().toISOString() });
+  if (error) console.warn('[audit]', error.message);
+}
 async function audit(action, fileNum, detail) {
   const { error } = await sb.from('audit_log').insert({
     user_email: user.email, action, patient_file_num: String(fileNum || ''),
@@ -638,7 +645,7 @@ function todoItems() {
     if (t.status === 'reply_ready' || t.status === 'failed') view = 'reply';
     else if (t.status === 'waiting_docs') view = 'waiting';
     else if (t.kind === 'new_patient') view = (r && r.status === 'approved') ? 'docs-done' : 'new';
-    else view = t.kind === 'close_file' ? 'close' : 'rx';
+    else view = { close_file: 'close', on_hold: 'hold', back: 'back', permanent: 'perm' }[t.kind] || 'rx';
     items.push({ t, r, view });
   }
   for (const r of S.rows) {
@@ -649,8 +656,8 @@ function todoItems() {
   items.forEach(i => { i.late = lateness(i); });
   return items;
 }
-const ORDER = { new: 1, 'docs-done': 2, reply: 2, close: 3, rx: 4, waiting: 5, dup: 6 };
-const SECTION = { new: 'New patients', 'docs-done': 'Replies to send', reply: 'Replies to send', close: 'Files to close', rx: 'Prescriptions to apply', waiting: 'Waiting for documents', dup: 'Duplicates' };
+const ORDER = { new: 1, 'docs-done': 2, reply: 2, close: 3, hold: 3, back: 3, perm: 3, rx: 4, waiting: 5, dup: 6 };
+const SECTION = { new: 'New patients', 'docs-done': 'Replies to send', reply: 'Replies to send', close: 'Files to close', hold: 'Patient updates', back: 'Patient updates', perm: 'Patient updates', rx: 'Prescriptions to apply', waiting: 'Waiting for documents', dup: 'Duplicates' };
 
 // ── Render ──────────────────────────────────────────────────────────────
 function render() {
@@ -718,6 +725,7 @@ function card(item) {
     case 'docs-done': return docsDoneCard(item);
     case 'waiting': return waitingCard(item);
     case 'close': return closeCard(item);
+    case 'hold': case 'back': case 'perm': return updateCard(item);
     case 'rx': return rxCard(item);
     default: return dupCard(item);
   }
@@ -726,14 +734,18 @@ const cardOpen = (item, icon, cls) => `<article class="card${item.late ? ' overd
   <div class="ctop"><div class="cicon ${cls}" aria-hidden="true">${icon}</div>`;
 const warnBox = list => list && list.length ? `<div class="warn">${list.map(w => `<div>⚠️ ${esc(w)}</div>`).join('')}</div>` : '';
 
+// The assistant used the default total doses (nothing marked on the forms)
+const defaultTotal = r => (r.warnings || []).some(w => /^Total doses: default|does not divide/.test(w));
 function field(r, key, label, opts = {}) {
   const v = r.record[key] ?? '';
   const miss = (r.missing_fields || []).includes(label) || (opts.required && !String(v).trim());
+  const soft = !miss && opts.check;   // filled with a default — worth a look
+
   const id = `${key}-${r.id}`;
   const input = opts.select
     ? `<select id="${id}" data-k="${key}"><option value="">Choose…</option>${opts.select.map(o => `<option${o === v ? ' selected' : ''}>${o}</option>`).join('')}</select>`
     : `<input id="${id}" data-k="${key}" type="${opts.type || 'text'}" value="${esc(v)}" autocomplete="off"${opts.type === 'tel' ? ' inputmode="tel"' : ''}>`;
-  return `<div class="fld${opts.wide ? ' wide' : ''}${miss ? ' miss' : ''}"><label for="${id}">${esc(label)}${miss ? ' · check' : ''}</label>${input}</div>`;
+  return `<div class="fld${opts.wide ? ' wide' : ''}${miss ? ' miss' : soft ? ' soft' : ''}"><label for="${id}">${esc(label)}${miss ? ' · check' : soft ? ' · default' : ''}</label>${input}</div>`;
 }
 function docsBlock(t) {
   if (!t || !t.documents) return '';
@@ -766,8 +778,8 @@ function newCard(item) {
       ${field(r, 'phone1', 'Phone 1', { type: 'tel' })}
       ${field(r, 'phone2', 'Phone 2', { type: 'tel' })}
       ${field(r, 'due_date', 'Due Date', { type: 'date' })}
-      ${field(r, 'total_doses', 'Total Doses', { type: 'number' })}
-      ${field(r, 'doses_remaining', 'Doses Left', { type: 'number' })}
+      ${field(r, 'total_doses', 'Total Doses', { type: 'number', check: defaultTotal(r) })}
+      ${field(r, 'doses_remaining', 'Doses Left', { type: 'number', check: defaultTotal(r) })}
       ${field(r, 'special_instructions', 'Special Instructions', { wide: true })}
     </div></details>` : `<p class="note">The assignment form hasn't arrived yet — you can ask the coordinator for the documents now.</p>`}
     <div class="acts">
@@ -786,7 +798,7 @@ function docsDoneCard(item) {
 function replyCard(item) {
   const t = item.t, ask = t.details && t.details.reply_mode === 'ask_docs';
   const to = t.to_name ? `${esc(t.to_name)} &lt;${esc(t.to_address)}&gt;` : esc(t.to_address);
-  const done = ask ? 'Ask for documents' : { new_patient: 'Patient added ✓', prescription: 'Prescription applied ✓', close_file: 'File closed ✓' }[t.kind];
+  const done = ask ? 'Ask for documents' : { new_patient: 'Patient added ✓', prescription: 'Prescription applied ✓', close_file: 'File deleted ✓', on_hold: 'On hold ✓', back: 'Back from hold ✓', permanent: 'Permanent ✓' }[t.kind];
   const subj = /^re\s*:/i.test(t.email_subject || '') ? t.email_subject : 'Re: ' + (t.email_subject || '');
   return `${cardOpen(item, '✉️', 'ic-reply')}<div class="ctitle"><div class="kind">Reply · ${esc(done)}</div><b>File ${fileRef(t.file_number, t.subject_ref)}</b><div class="meta">${from(t)}</div></div>${chips(item)}</div>
     ${t.status === 'failed' ? `<div class="warn err"><div>⚠️ Not sent: ${esc(t.error || 'unknown error')}</div></div>` : ''}
@@ -806,7 +818,7 @@ function waitingCard(item) {
 }
 function patientLine(e) {
   if (!e) return '<p class="note">Not found in VaPiq.</p>';
-  return `<p class="note">In VaPiq as <b>${esc(e.patient_name || '(blank name)')}</b> <span class="chip ${e.status === 'Archived' ? 'warn' : 'ok'}">${esc(e.status)}</span></p>`;
+  return `<p class="note">In VaPiq as <b>${esc(e.patient_name || '(blank name)')}</b> <span class="chip ${e.status === 'Archived' || e.status === 'On hold' ? 'warn' : 'ok'}">${esc(e.status)}</span></p>`;
 }
 function rxCard(item) {
   const t = item.t, e = t.existing_patient || {}, d = t.details || {};
@@ -821,12 +833,31 @@ function rxCard(item) {
     <div class="acts"><button class="btn ghost" data-act="dismiss-task">Dismiss</button><a class="btn sec2" href="../" target="_blank" rel="noopener">Open VaPiq</a><button class="btn pri" data-act="applied">Applied</button></div></article>`;
 }
 function closeCard(item) {
-  const t = item.t, e = t.existing_patient, active = e && e.status !== 'Archived';
+  const t = item.t, e = t.existing_patient, active = !!e;   // closing a file deletes the record (on hold or not)
   return `${cardOpen(item, '📁', 'ic-close')}<div class="ctitle"><div class="kind">Close file</div><b>File ${fileRef(t.file_number, t.subject_ref)}</b><div class="meta">${from(t)}</div></div>${chips(item)}</div>
     ${warnBox(t.warnings)}
     ${patientLine(e)}
     <div class="acts"><button class="btn ghost" data-act="dismiss-task">Dismiss</button>
-      ${active ? `<button class="btn pri" data-act="close-file">${t.is_test ? 'Close (test)' : 'Close file'}</button>` : `<button class="btn pri" data-act="reply-anyway">${e ? 'Already closed — reply' : 'Reply anyway'}</button>`}</div></article>`;
+      ${active ? `<button class="btn pri" data-act="close-file">${t.is_test ? 'Delete (test)' : '🗑 Delete file'}</button>` : `<button class="btn pri" data-act="reply-anyway">Reply anyway</button>`}</div></article>`;
+}
+// On hold / back / permanent — what VaPiq will do, then the drafted reply
+const UPDATE = {
+  on_hold:   { icon: '⏸', cls: 'ic-close', kind: 'On hold',            btn: '⏸ Put on hold' },
+  back:      { icon: '▶', cls: 'ic-reply', kind: 'Back from hold',     btn: '▶ Back from hold' },
+  permanent: { icon: '📌', cls: 'ic-rx',   kind: 'Stays permanently',  btn: 'Make permanent' },
+};
+function updateCard(item) {
+  const t = item.t, e = t.existing_patient, u = UPDATE[t.kind], d = t.details || {};
+  const what = t.kind === 'on_hold' ? 'Moves the patient to the Hold tab with this reason.'
+    : t.kind === 'back' ? `Brings the patient back from Hold${d.due ? ' with due date ' + dayLabel(d.due) : ''}.`
+    : 'Sets Assignment Type to Permanent.';
+  return `${cardOpen(item, u.icon, u.cls)}<div class="ctitle"><div class="kind">${u.kind}</div><b>File ${fileRef(t.file_number)}</b><div class="meta">${from(t)}</div></div>${chips(item)}</div>
+    ${d.reason ? `<p class="note" style="margin-top:8px">“${esc(d.reason)}”</p>` : ''}
+    ${warnBox(t.warnings)}
+    ${patientLine(e)}
+    ${e ? `<p class="note">${what}</p>` : ''}
+    <div class="acts"><button class="btn ghost" data-act="dismiss-task">Dismiss</button>
+      ${e ? `<button class="btn pri" data-act="apply-update">${t.is_test ? u.btn + ' (test)' : u.btn}</button>` : `<button class="btn pri" data-act="reply-anyway">Reply anyway</button>`}</div></article>`;
 }
 function dupCard(item) {
   const r = item.r, e = r.existing_patient || {};
@@ -875,7 +906,7 @@ function historyView() {
   S.rows.filter(r => ['approved', 'rejected', 'dismissed'].includes(r.status)).forEach(r => items.push({ at: r.decided_at,
     html: `<b>${esc(r.record.patient_name || '—')}</b><div class="meta">New patient #${esc(r.record.file_number || '—')} · ${when(r.decided_at)}${r.is_test ? ' · TEST' : ''}</div>`, pill: pill[r.status] }));
   S.tasks.filter(t => ['sent', 'done', 'dismissed'].includes(t.status)).forEach(t => items.push({ at: t.sent_at || t.decided_at,
-    html: `<b>Reply to ${esc(t.to_name || t.to_address)}</b><div class="meta">${esc({ new_patient: 'New patient', prescription: 'Prescription', close_file: 'Close file' }[t.kind])} ${fileRef(t.file_number, t.subject_ref)} · ${when(t.sent_at || t.decided_at)}${t.moved_to_folder ? ' · moved to ' + esc(t.moved_to_folder) : ''}${t.is_test ? ' · TEST' : ''}</div>`, pill: pill[t.status] }));
+    html: `<b>Reply to ${esc(t.to_name || t.to_address)}</b><div class="meta">${esc({ new_patient: 'New patient', prescription: 'Prescription', close_file: 'Close file', on_hold: 'On hold', back: 'Back from hold', permanent: 'Permanent' }[t.kind])} ${fileRef(t.file_number, t.subject_ref)} · ${when(t.sent_at || t.decided_at)}${t.moved_to_folder ? ' · moved to ' + esc(t.moved_to_folder) : ''}${t.is_test ? ' · TEST' : ''}</div>`, pill: pill[t.status] }));
   if (!items.length) return `<div class="empty"><div class="big">🗂️</div>Nothing in the last 30 days.</div>`;
   items.sort((a, b) => String(b.at).localeCompare(String(a.at)));
   return section('Last 30 days', items.length) + `<div class="card">${items.map(i => `<div class="row"><div class="t">${i.html}</div>${i.pill || ''}</div>`).join('')}</div>`;
@@ -942,17 +973,38 @@ async function approve(item, card, btn) {
 function openDetails(card, msg) { const d = card.querySelector('details.form'); if (d) d.open = true; toast(msg); }
 
 // Close file = VaPiq's Archive (archivePatient in index.html)
-let dubbiConfirmed = false;   // set when you confirmed the same action in Dubbi's chat
+// Closing a file DELETES the patient from VaPiq (Oct 25, 2026). Always asks first,
+// even after "yes" to Dubbi — it cannot be undone. A full copy goes to the audit log.
 async function closeFile(t) {
   const e = t.existing_patient, fn = String(e.file_number || '').trim();
-  const ok = dubbiConfirmed; dubbiConfirmed = false;
-  if (!ok && !confirm(`Close file #${fn} (${e.patient_name}) in VaPiq?\n\nThis archives the patient, like the Archive button in VaPiq.`)) return false;
+  if (!confirm(`DELETE file #${fn} (${e.patient_name}) from VaPiq?\n\nThe patient record is removed permanently. A copy is kept in the audit log.`)) return false;
   if (t.is_test) { toast('Test card — VaPiq not changed. Reply is ready.'); return true; }
-  const { data, error } = await sb.from('patients').update({ archived: true }).eq('id', e.id).select('id,file_number');
+  const { data: row, error: re } = await sb.from('patients').select('*').eq('id', e.id).maybeSingle();
+  if (re) throw re;
+  if (!row || normFile(row.file_number) !== normFile(e.file_number)) throw new Error('patient not found — it may already be deleted');
+  const { error } = await sb.from('patients').delete().eq('id', e.id);
   if (error) throw error;
-  if (!data.length || normFile(data[0].file_number) !== normFile(e.file_number)) throw new Error('patient not found — open VaPiq and close it there');
-  await audit('UPDATE', fn, { id: e.id, source: 'assistant', action: 'close_file', task_id: t.id });
-  toast(`✓ File #${fn} closed — reply is ready`);
+  await auditFull('DELETE', fn, { source: 'assistant', action: 'close_file', task_id: t.id, deleted: row });
+  toast(`🗑 File #${fn} deleted — reply is ready`);
+  return true;
+}
+// "⏸ On hold since 2026-10-25: reason" — the same note VaPiq's Hold button writes
+const HOLD_NOTE = /\s*(?:\|\s*)?⏸ On hold since [^|]*/g;
+const withoutHold = si => String(si || '').replace(HOLD_NOTE, '').replace(/^\s*\|\s*/, '').trim();
+async function applyUpdate(t) {
+  const e = t.existing_patient, fn = String(e.file_number || '').trim(), d = t.details || {};
+  if (t.is_test) { toast('Test card — VaPiq not changed. Reply is ready.'); return true; }
+  const { data: row, error: re } = await sb.from('patients').select('id,file_number,special_instructions,archived').eq('id', e.id).maybeSingle();
+  if (re) throw re;
+  if (!row || normFile(row.file_number) !== normFile(e.file_number)) throw new Error('patient not found in VaPiq');
+  let fields;
+  if (t.kind === 'on_hold') fields = { archived: true, special_instructions: [`⏸ On hold since ${ymd(new Date())}: ${d.reason || 'see coordinator email'}`, withoutHold(row.special_instructions)].filter(Boolean).join(' | ') };
+  else if (t.kind === 'back') fields = { archived: false, special_instructions: withoutHold(row.special_instructions), ...(d.due ? { due_date: d.due } : {}) };
+  else fields = { assignment_type: 'Permanent' };
+  const { error } = await sb.from('patients').update(fields).eq('id', e.id);
+  if (error) throw error;
+  await audit('UPDATE', fn, { id: e.id, source: 'assistant', action: t.kind, task_id: t.id });
+  toast({ on_hold: `⏸ #${fn} on hold — reply is ready`, back: `▶ #${fn} back from hold — reply is ready`, permanent: `#${fn} is now Permanent — reply is ready` }[t.kind]);
   return true;
 }
 
@@ -1006,6 +1058,10 @@ $('main').addEventListener('click', async e => {
     if (act === 'docs-in') { await setTask(t, 'todo'); toast('Back in your list'); }
     if (act === 'applied' || act === 'reply-anyway') {
       await setTask(t, 'reply_ready', { reply_body: redraft(t), details: { ...(t.details || {}), reply_mode: 'confirm' } });
+    }
+    if (act === 'apply-update') {
+      if (!(await applyUpdate(t))) { btn.disabled = false; return; }
+      await setTask(t, 'reply_ready');
     }
     if (act === 'close-file') {
       if (!(await closeFile(t))) { btn.disabled = false; return; }
@@ -1116,7 +1172,6 @@ function runProposal(p) {
   const m = L('Done — check the card.', 'C’est fait — vérifiez la carte.'); bubble(m, 'bot'); speak(m);
   closeSheet();
   el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  if (p.act === 'close-file') dubbiConfirmed = true;
   btn.click();   // the same code as tapping the button yourself
 }
 // What can be done to which kind of item (the card's button = act)
@@ -1132,10 +1187,16 @@ const ACTIONS = [
     say: i => L(`Send the reply for file #${fileOf(i)} to ${i.t.to_name || i.t.to_address}${(i.t.cc_addresses || []).length ? ', copy to ' + i.t.cc_addresses.join(', ') : ''}. Your Mac sends it within about 2 minutes.`,
       `Envoyer la réponse du dossier #${fileOf(i)} à ${i.t.to_name || i.t.to_address}${(i.t.cc_addresses || []).length ? ', copie à ' + i.t.cc_addresses.join(', ') : ''}. Votre Mac l’envoie d’ici 2 minutes.`) },
   { re: /\b(close|ferme[rz]?|fermeture)\b/, views: ['close'],
-    act: i => i.t.existing_patient && i.t.existing_patient.status !== 'Archived' ? 'close-file' : 'reply-anyway',
-    say: i => i.t.existing_patient && i.t.existing_patient.status !== 'Archived'
-      ? L(`Close file #${fileOf(i)} (${i.t.existing_patient.patient_name}) in VaPiq — it will be archived — and prepare the reply.`, `Fermer le dossier #${fileOf(i)} (${i.t.existing_patient.patient_name}) dans VaPiq — il sera archivé — et préparer la réponse.`)
-      : L(`File #${fileOf(i)} is already closed or not in VaPiq. Prepare the reply anyway.`, `Le dossier #${fileOf(i)} est déjà fermé ou absent de VaPiq. Préparer la réponse quand même.`) },
+    act: i => i.t.existing_patient ? 'close-file' : 'reply-anyway',
+    say: i => i.t.existing_patient
+      ? L(`DELETE file #${fileOf(i)} (${i.t.existing_patient.patient_name}) from VaPiq — this cannot be undone — and prepare the reply. You will be asked once more.`, `SUPPRIMER le dossier #${fileOf(i)} (${i.t.existing_patient.patient_name}) de VaPiq — c’est définitif — et préparer la réponse. Une dernière confirmation suivra.`)
+      : L(`File #${fileOf(i)} is not in VaPiq. Prepare the reply anyway.`, `Le dossier #${fileOf(i)} est absent de VaPiq. Préparer la réponse quand même.`) },
+  { re: /\b(hold|attente)\b/, views: ['hold'], act: i => i.t.existing_patient ? 'apply-update' : 'reply-anyway',
+    say: i => L(`Put file #${fileOf(i)} on hold in VaPiq${(i.t.details || {}).reason ? ' (“' + i.t.details.reason + '”)' : ''} and prepare the reply.`, `Mettre le dossier #${fileOf(i)} en attente dans VaPiq et préparer la réponse.`) },
+  { re: /\b(back|retour|reactivat\w*|r[ée]activ\w*)\b/, views: ['back'], act: i => i.t.existing_patient ? 'apply-update' : 'reply-anyway',
+    say: i => L(`Bring file #${fileOf(i)} back from hold${(i.t.details || {}).due ? ', due ' + dayLabel(i.t.details.due) : ''}, and prepare the reply.`, `Sortir le dossier #${fileOf(i)} de l’attente et préparer la réponse.`) },
+  { re: /\b(permanent\w*)\b/, views: ['perm'], act: i => i.t.existing_patient ? 'apply-update' : 'reply-anyway',
+    say: i => L(`Set file #${fileOf(i)} to Permanent in VaPiq and prepare the reply.`, `Mettre le dossier #${fileOf(i)} en Permanent dans VaPiq et préparer la réponse.`) },
   { re: /\b(appl(y|ied)|appliqu\w*)\b/, views: ['rx'], act: () => 'applied',
     say: i => L(`Mark the prescription for file #${fileOf(i)} as applied and prepare the reply.`, `Marquer l’ordonnance du dossier #${fileOf(i)} comme appliquée et préparer la réponse.`) },
   { re: /\b(add|ajoute\w*)\b/, views: ['new'], act: () => 'approve',
@@ -1171,7 +1232,7 @@ const plain = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 const L = (en, fr) => D.fr ? fr : en;
 const n = (k, en1, enN, fr1, frN) => `${k} ${k === 1 ? L(en1, fr1) : L(enN, frN)}`;
 const fileOf = i => String(i.t?.file_number || i.r?.record?.file_number || '').trim();
-const KIND = { new: ['new patient', 'nouveau patient'], reply: ['reply to send', 'réponse à envoyer'], 'docs-done': ['confirmation to send', 'confirmation à envoyer'],
+const KIND = { hold: ['on hold', 'en attente'], back: ['back from hold', 'retour'], perm: ['stays permanently', 'permanent'], new: ['new patient', 'nouveau patient'], reply: ['reply to send', 'réponse à envoyer'], 'docs-done': ['confirmation to send', 'confirmation à envoyer'],
   close: ['file to close', 'dossier à fermer'], rx: ['prescription to apply', 'ordonnance à appliquer'], waiting: ['waiting for documents', 'en attente de documents'], dup: ['duplicate', 'doublon'] };
 const kindOf = i => L(...KIND[i.view]);
 const itemLine = i => `${kindOf(i)}${fileOf(i) ? ' #' + fileOf(i) : ''}${i.late ? ' (' + i.late + ')' : ''}`;

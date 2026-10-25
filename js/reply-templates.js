@@ -59,6 +59,9 @@ const T = {
     new_patient: r => `I confirm the receipt of this email${r ? ` for file ${r}` : ''}. The patient has been added to my patient list and I will contact them to schedule the injection.`,
     prescription: r => `I have added this prescription to the file${r ? ` ${r}` : ''}.`,
     close_file: r => `I have closed the file${r ? ` ${r}` : ''}.`,
+    on_hold: r => `Thank you for the update. I have placed the file${r ? ` ${r}` : ''} on hold and will wait for your news before scheduling the next injection.`,
+    back: r => `Thank you for the update. I have reactivated the file${r ? ` ${r}` : ''} and will contact the patient to schedule the injection.`,
+    permanent: r => `Thank you for the update. The file${r ? ` ${r}` : ''} will remain in my patient list permanently.`,
     thanks: 'Thank you!',
   },
   fr: {
@@ -66,6 +69,9 @@ const T = {
     new_patient: r => `Je confirme la réception de ce courriel${r ? ` pour le dossier ${r}` : ''}. Le dossier a été ajouté à ma liste de patients et je communiquerai avec la personne pour planifier l'injection.`,
     prescription: r => `J'ai ajouté cette ordonnance au dossier${r ? ` ${r}` : ''}.`,
     close_file: r => `J'ai fermé le dossier${r ? ` ${r}` : ''}.`,
+    on_hold: r => `Merci pour la mise à jour. J'ai mis le dossier${r ? ` ${r}` : ''} en attente et j'attendrai de vos nouvelles avant de planifier la prochaine injection.`,
+    back: r => `Merci pour la mise à jour. J'ai réactivé le dossier${r ? ` ${r}` : ''} et je communiquerai avec la personne pour planifier l'injection.`,
+    permanent: r => `Merci pour la mise à jour. Le dossier${r ? ` ${r}` : ''} restera dans ma liste de patients de façon permanente.`,
     thanks: 'Merci!',
   },
 };

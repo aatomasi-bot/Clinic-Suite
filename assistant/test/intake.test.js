@@ -122,6 +122,7 @@ test('intake end to end (offline): new, prescription, close-file; re-run adds no
   const byFile = Object.fromEntries(store.rows.map(r => [r.record.file_number, r]));
   assert.equal(byFile['98001'], undefined, 'existing patient → prescription task, not a new-patient card');
   assert.equal(byFile['99001'].status, 'pending');
+  assert.ok(byFile['99001'].warnings.some(w => /^Total doses: default 4/.test(w)), 'default total doses is flagged');
   assert.ok(store.rows.every(r => r.is_test) && store.tasks.every(t => t.is_test));
   assert.ok(byFile['99002'].warnings.some(w => /Same name as existing patient #98002/.test(w)));
   assert.ok(byFile['99007'].missing_fields.includes('Dose Prescribed'));
@@ -191,7 +192,18 @@ test('intake end to end (offline): new, prescription, close-file; re-run adds no
   assert.equal(task('new_patient', '99009').to_name, null, 'reports@ → no first name');
   assert.deepEqual(task('new_patient', '99009').cc_addresses, [], 'no CC to reports@ when replying to reports@');
   assert.equal(task('close_file', '98004').existing_patient.status, 'Active');
-  assert.ok(task('close_file', '98002').warnings.some(w => /already closed/.test(w)));
+  // Patient updates read from the coordinator's message
+  const hold = task('on_hold', '98004');
+  assert.ok(hold, 'on hold card');
+  assert.equal(hold.details.reason, 'Currently in hospital, and injections have been placed on hold for 3 months.');
+  assert.match(hold.reply_body, /placed the file #98004 on hold/);
+  const back = task('back', '98002');
+  assert.equal(back.details.due, '2026-10-12');
+  assert.equal(task('permanent', '98004').kind, 'permanent', 'recognised from the message (subject is just the name)');
+  const tt = store.rows.find(r => r.record.file_number === '99040');
+  assert.equal(tt.record.assignment_type, 'Temporary', 'temporary transfer → new patient, Temporary');
+  assert.match(tt.record.special_instructions, /Temporary transfer: Temporarily transferred to your portal for one injection only/);
+  assert.ok(task('close_file', '98002').warnings.some(w => /on hold in VaPiq — closing it deletes the record/.test(w)));
   assert.ok(task('close_file', '99999').warnings.some(w => /not in VaPiq/.test(w)));
   assert.equal(task('close_file', '98002').lang, 'fr');
 

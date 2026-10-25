@@ -27,7 +27,7 @@ export function overdueItems({ pending, tasks }, alerts, now = Date.now()) {
     if (t.status === 'reply_ready' && ageHours(t.decided_at || t.created_at, now) > alerts.replyHours)
       out.push({ table: 'email_tasks', id: t.id, why: 'reply_not_sent', alerted_at: t.alerted_at });
     else if (t.status === 'todo' && t.kind !== 'new_patient' && ageHours(t.created_at, now) > alerts.newPatientHours)
-      out.push({ table: 'email_tasks', id: t.id, why: t.kind === 'close_file' ? 'file_not_closed' : 'prescription_not_applied', alerted_at: t.alerted_at });
+      out.push({ table: 'email_tasks', id: t.id, why: { close_file: 'file_not_closed', prescription: 'prescription_not_applied' }[t.kind] || 'update_not_applied', alerted_at: t.alerted_at });
     else if (t.status === 'todo' && docsMissing && !t.asked_docs_at && ageHours(t.created_at, now) > alerts.waitingDocsHours)
       out.push({ table: 'email_tasks', id: t.id, why: 'documents_missing', alerted_at: t.alerted_at });
     else if (t.status === 'waiting_docs' && ageHours(t.asked_docs_at || t.decided_at, now) > 48)
@@ -62,6 +62,7 @@ export function openCounts({ pending, tasks }) {
     newPatients: pending.filter(r => r.status === 'pending').length,
     prescriptions: tasks.filter(t => t.kind === 'prescription' && t.status === 'todo').length,
     closes: tasks.filter(t => t.kind === 'close_file' && t.status === 'todo').length,
+    updates: tasks.filter(t => ['on_hold', 'back', 'permanent'].includes(t.kind) && t.status === 'todo').length,
     replies: tasks.filter(t => t.status === 'reply_ready').length,
     waitingDocs: tasks.filter(t => t.status === 'waiting_docs' || (open(t) && t.kind === 'new_patient' && t.documents && (!t.documents.assignment || !t.documents.enrollment))).length,
     failed: tasks.filter(t => t.status === 'failed').length,
@@ -71,7 +72,7 @@ export function openCounts({ pending, tasks }) {
 const plural = (n, one, many = one + 's') => `${n} ${n === 1 ? one : many}`;
 
 export function morningText(c, g, overdue) {
-  const todo = c.newPatients + c.prescriptions + c.closes + c.replies + c.failed;
+  const todo = c.newPatients + c.prescriptions + c.closes + (c.updates || 0) + c.replies + c.failed;
   const parts = [];
   if (todo) parts.push(`${plural(todo, 'item')} to do`);
   if (overdue) parts.push(`⚠️ ${overdue} overdue`);
