@@ -40,7 +40,7 @@ function database() {
 function device(db) {
   const store = {};
   const ctx = vm.createContext({
-    _sb: db.client, _invoiceCache: {}, currentView: 'patients', console, JSON, Date, Math, Set, Object, Error,
+    _sb: db.client, _invoiceCache: {}, INVOICE_DEDUCT_KM: 20, INVOICE_DEDUCT_MIN: 40, currentView: 'patients', console, JSON, Date, Math, Set, Object, Error,
     toast() {}, renderInvoiceView() {}, autoInvoiceNumber: () => '010-2026',
     _lsGet: (k, fb) => JSON.parse(store[k] || fb),
     localStorage: { setItem: (k, v) => { store[k] = String(v); }, getItem: k => store[k] ?? null },
@@ -107,4 +107,24 @@ test('offline: the change waits on the device, stays on screen after a reload, a
   await iphone._flushInvoiceOps();
   assert.equal(iphone.waiting(), 0);
   assert.deepEqual(dates(db), ['2026-10-06']);
+});
+
+test('extra visit on a billed day: km and minutes added once, no second deduction', async () => {
+  const db = database();
+  const imac = device(db), iphone = device(db);
+  const ten = Array.from({ length: 10 }, (_, i) => String(1001 + i));
+  imac.changeInvoice(K, { type: 'setDay', day: { date: '2026-10-20', raw_km: 100, net_km: 80, raw_time: 340, net_time: 300, patients: ten.map(f => ({ file: f, cpp: false })) } });
+  await imac._flushInvoiceOps(); iphone.reload();
+  // two more patients the same day: +20 km, +100 min (from the iPhone, with the iMac copy older)
+  iphone.changeInvoice(K, { type: 'addToDay', date: '2026-10-20', add_km: 20, add_min: 100, patients: [{ file: '2001', cpp: false }, { file: '1001', cpp: false }] });
+  await iphone._flushInvoiceOps();
+  const d = db.rows[0].days[0];
+  assert.equal(d.net_km, 100, '80 + 20');
+  assert.equal(d.net_time, 400, '300 + 100');
+  assert.equal(d.raw_km, 120); assert.equal(d.raw_time, 440);
+  assert.equal(d.patients.length, 11, 'already-billed patient not added twice');
+  assert.equal(d.extras.length, 1);
+  // and the iMac adding another day meanwhile keeps the extra visit
+  imac.changeInvoice(K, { type: 'setDay', day: day('2026-10-21', '3001') }); await imac._flushInvoiceOps();
+  assert.equal(db.rows[0].days.find(x => x.date === '2026-10-20').net_km, 100);
 });
