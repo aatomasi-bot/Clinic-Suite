@@ -3,6 +3,11 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
 <title>VaPiq · Schedule Builder</title>
 <style>
+/* 👁 → the patient's card in VaPiq (new tab, so the schedule stays as it is) */
+.eye{display:inline-grid;place-items:center;width:18px;height:18px;margin-left:4px;border-radius:50%;vertical-align:-3px;flex:none;
+  color:var(--teal,#2D8C8A);background:rgba(45,140,138,.1);border:1px solid rgba(45,140,138,.28);text-decoration:none;transition:background .15s,transform .15s}
+.eye:hover{background:rgba(45,140,138,.22);transform:scale(1.08)}
+.eye svg{width:12px;height:12px}
 :root{
   --bg:#0F1923;--card:#1B2638;--card2:#1D2B3E;--navy:#0B1420;
   --teal:#2D8C8A;--td:#1E6665;--tl:rgba(45,140,138,.14);
@@ -930,7 +935,7 @@ function renderPool(){
     });
     const outside=!pool.some(pp=>pp.id===p.id)&&!isAssigned(p.id);
     return`<div class="pc${outside?' outw':''}" data-pid="${p.id}">
-      <div class="pc-name">${esc(nm)}</div>
+      <div class="pc-name">${esc(nm)}${eyeLink(p)}</div>
       <div class="pc-meta">
         <span class="zpill" style="background:${z.c}">${z.n}</span>
         <span class="pc-addr">${esc(addr)}</span>
@@ -944,6 +949,13 @@ function renderPool(){
   }).join('');
   // Attach pointer drag to pool cards
   el.querySelectorAll('.pc').forEach(el=>ptDown(el,'pool'));
+}
+
+// 👁 link to the patient's card in VaPiq (pointerdown stopped so it never starts a drag)
+const EYE_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+function eyeLink(p){
+  const fn=String(p.file_number||'').trim(); if(!fn)return'';
+  return `<a class="eye" href="index.html?patient=${encodeURIComponent(fn)}" target="_blank" rel="noopener" title="Open ${esc(p.patient_name||'patient')}'s card in VaPiq" onpointerdown="event.stopPropagation()" onmousedown="event.stopPropagation()" ontouchstart="event.stopPropagation()" onclick="event.stopPropagation()">${EYE_SVG}</a>`;
 }
 
 // ════════════════════════════════════════════════════════════
@@ -1079,7 +1091,7 @@ function renderGrid(){
       html+=`<div class="sc${editMode?' edit-sc':' conf-sc'}${canDrag?'':' locked-card'}${cancelMode?' cancel-mode':''}${cancelSelected.has(String(p.id))?' selected-cancel':''}"
           style="border-left-color:${z.c}"
           data-pid="${p.id}" data-day="${i}" data-bkt="conf" data-idx="${ci}">
-          <span class="sc-name">${esc(nm)}</span>
+          <span class="sc-name">${esc(nm)}${eyeLink(p)}</span>
           <div class="sc-row">
             <span class="sc-addr">${esc(addr)}</span>
             ${editMode?`<span class="sc-badge badge-lock">Edit</span>
@@ -1105,7 +1117,7 @@ function renderGrid(){
       html+=`<div class="sc${isSugg?' sugg-sc':' pend-sc'}"
           style="border-left-color:${z.c}"
           data-pid="${p.id}" data-day="${i}" data-bkt="active" data-idx="${ai}">
-          <span class="sc-name">${esc(nm)}</span>
+          <span class="sc-name">${esc(nm)}${eyeLink(p)}</span>
           <div class="sc-row">
             <span class="sc-addr">${esc(addr)}</span>
             ${isSugg?'<span class="sc-badge badge-sugg">auto</span>':''}

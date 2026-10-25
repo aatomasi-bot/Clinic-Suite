@@ -120,6 +120,16 @@ they differ) and the reason in brackets goes into **Special Instructions** as
 "Signature required!". When that email arrives after the forms, the waiting card is
 updated (never a patient already added to VaPiq).
 
+## Notes to Medicum from VaPiq
+
+On a patient card (open it), **✉️ Medicum** writes to reports@medicum.ca about that
+patient; the **✉️** button next to the search bar turns on Select mode to write about
+several patients in one email. Pick reasons (✏️ Other lets you type one), add details,
+check the preview, tap Send. Every email lists each patient's name and file number.
+VaPiq saves it as an approved "note to Medicum" (`email_tasks.kind = medicum_note`,
+`supabase/2026-10-25_medicum_notes.sql`); your Mac sends it as a new email from
+abdulmedicum@yahoo.com within ~2 minutes (live mode), and it appears in Dubbi's History.
+
 ## Dubbi — ask by typing or voice
 
 Tap the round button in the Dubbi app and ask: "What's new?", "Anything overdue?",

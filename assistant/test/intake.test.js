@@ -349,3 +349,19 @@ test('coordinator email: due date and the reason in brackets', async () => {
   assert.equal(readDate('February 30 2026'), '', 'impossible dates are ignored');
   assert.equal(readDate('Jan 5', new Date('2026-12-20')), '2027-01-05', 'no year → next one when long past');
 });
+
+test('note to Medicum from VaPiq: a new email (no Re:, not threaded), nothing filed', async () => {
+  const store = offlineStore({ patientsFile: fixtures, outFile: path.join(tmp, 'note.json') });
+  const id = await store.insertTask({ is_test: true, kind: 'medicum_note', status: 'send_approved', source_key: 'note-1',
+    to_address: 'reports@medicum.ca', email_subject: 'Update — Jean TESTPATIENT #99001',
+    reply_body: 'Hello,\n\nPlease note the following update for:\n• Jean TESTPATIENT — #99001\nNew phone.\n\nThank you!' });
+  const tm = testMailer(path.join(tmp, 'outbox-note'));
+  const c = await runOutbox({ store, mailer: null, testMailer: tm, rules, live: false, moveToFolder: 'Medicum', log: () => {} });
+  assert.equal(c.sent, 1);
+  const eml = fs.readFileSync(path.join(tmp, 'outbox-note', `${id}.eml`), 'utf8');
+  assert.match(eml, /Subject: Update — Jean TESTPATIENT #99001|Subject: =\?UTF-8/);
+  assert.doesNotMatch(eml, /Subject: Re:/);
+  assert.doesNotMatch(eml, /In-Reply-To/);
+  assert.match(eml, /To: reports@medicum\.ca/);
+  assert.deepEqual(tm.moves, [], 'nothing to file');
+});

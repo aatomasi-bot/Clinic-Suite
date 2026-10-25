@@ -1207,6 +1207,31 @@ body:has(.bottom-nav.nav-hidden) #reminderView {
 
 /* Expanded Buttons */
 .card-btn-row { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.25rem; }
+/* ── Email Medicum (reports@medicum.ca) — Oct 25, 2026 ── */
+.mm-sel-btn.on { background: linear-gradient(135deg,var(--teal-2),var(--teal)) !important; box-shadow: 0 0 0 2px rgba(255,255,255,.35); }
+body.mm-select .patient-card { position: relative; cursor: pointer; }
+body.mm-select .patient-card::after { content: ''; position: absolute; bottom: 14px; left: 14px; width: 22px; height: 22px; border-radius: 7px;
+  border: 2px solid #C5CEDB; background: var(--card); z-index: 3; }
+body.mm-select .patient-card.mm-picked::after { content: '✓'; background: linear-gradient(135deg,var(--teal-2),var(--teal)); border-color: transparent;
+  color: #fff; font-weight: 900; font-size: 14px; display: grid; place-items: center; }
+body.mm-select .patient-card.mm-picked { outline: 2px solid var(--teal); outline-offset: 1px; }
+.mm-bar { position: fixed; left: 12px; right: 12px; bottom: calc(84px + env(safe-area-inset-bottom)); z-index: 60; max-width: 560px; margin: 0 auto;
+  display: none; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 16px; color: #fff; font-weight: 700; font-size: 13px;
+  background: linear-gradient(115deg,var(--navy),var(--navy-mid)); box-shadow: 0 12px 28px rgba(15,23,38,.35); }
+body.mm-select .mm-bar { display: flex; }
+.mm-bar button { border: 0; border-radius: 10px; padding: 8px 12px; font: inherit; font-weight: 800; cursor: pointer; }
+.mm-bar .mm-go { margin-left: auto; color: #fff; background: linear-gradient(135deg,var(--teal-2),var(--teal)); box-shadow: 0 4px 12px rgba(45,140,138,.4); }
+.mm-bar .mm-go:disabled { opacity: .5; }
+.mm-bar .mm-x { color: #fff; background: rgba(255,255,255,.12); }
+.mm-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.mm-chip { border: 1.5px solid var(--border); background: var(--bg); color: var(--text-2); border-radius: 999px; padding: 6px 11px; font-size: 12px; font-weight: 700; cursor: pointer; }
+.mm-chip.on { border-color: var(--teal); background: var(--teal-light); color: var(--teal-dark); }
+.mm-pats { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.mm-pats div { display: flex; align-items: center; gap: 8px; padding: 7px 10px; font-size: 13px; border-bottom: 1px solid var(--border); }
+.mm-pats div:last-child { border-bottom: 0; }
+.mm-pats span { margin-left: auto; color: var(--text-3); cursor: pointer; font-size: 15px; }
+.mm-preview { white-space: pre-wrap; font-size: 12.5px; line-height: 1.5; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; color: var(--text); }
+.mm-label { font-size: 11px; font-weight: 800; color: var(--text-2); text-transform: uppercase; letter-spacing: .05em; margin: 12px 0 6px; }
 .card-btn {
   flex: 1;
   min-width: 0;
@@ -2995,6 +3020,7 @@ a:focus:not(:focus-visible) { outline: none; }
       <button class="search-clear" id="clearSearch">✕</button>
     </div>
     <button class="search-bar__refresh" id="refreshBtn" title="Refresh">⟳</button>
+    <button class="search-bar__refresh mm-sel-btn" id="mmSelectBtn" title="Select patients to email Medicum" onclick="toggleMedicumSelect()">✉️</button>
   </div>
   <div class="tabs" id="tabBar">
     <button class="tab-btn active" data-tab="today">Today <span class="tab-count" id="cnt-today">0</span></button>
@@ -4418,6 +4444,7 @@ function _vsRenderBatch(el) {
   tmp.innerHTML = batchHtml;
   while (tmp.firstChild) el.appendChild(tmp.firstChild);
   _vsNextIdx = end;
+  if (document.body.classList.contains('mm-select') && typeof _mmBar === 'function') _mmBar();   // keep Medicum selection ticks
 
   // attachCardEvents() is a no-op — _handleCardClick listener is permanent
 
@@ -4774,8 +4801,9 @@ function renderCard(p, idx) {
         `<button class="card-btn card-btn--pending js-pending" data-id="${p.id}">⏳ Mark Pending</button>`}
       ${p['Archived'] ? '' : `<button class="card-btn card-btn--archive js-archive" data-id="${p.id}" style="flex:0.7">⏸ Hold</button>`}
     </div>
-    <div style="margin-top:8px;text-align:right">
-      <button class="card-btn card-btn--edit" style="flex:0;padding:6px 12px;font-size:11px" onclick="openApptModal(${p.id})">
+    <div style="margin-top:8px;display:flex;justify-content:flex-end;gap:6px">
+      <button class="card-btn card-btn--edit" style="flex:0 0 auto;padding:6px 10px;font-size:11px;white-space:nowrap" onclick="openMedicumMail([${p.id}])" title="Email Medicum (reports@medicum.ca) about this patient">✉️ Medicum</button>
+      <button class="card-btn card-btn--edit" style="flex:0 0 auto;white-space:nowrap;padding:6px 12px;font-size:11px" onclick="openApptModal(${p.id})">
         📅 ${confirmed ? 'Edit Appointment' : 'Set Appointment'}
       </button>
     </div>
@@ -4808,6 +4836,10 @@ function formatAddrForMaps(addr) { return addr; }
 // Do NOT call this function manually — it is wired up once at startup.
 // Adding it again would create duplicate listeners causing toggle bugs.
 function _handleCardClick(e) {
+  if (document.body.classList.contains('mm-select')) {
+    const card = e.target.closest('.patient-card');
+    if (card && !e.target.closest('a[href^="tel:"]')) { e.preventDefault(); e.stopPropagation(); _mmToggle(card); return; }
+  }
   const head = e.target.closest('.card-head');
   if (head) {
     if (e.target.closest('button') || e.target.closest('a')) return;
@@ -5371,6 +5403,113 @@ async function savePatient() {
 }
 
 // ========== MODAL HELPERS ==========
+// ══ Email Medicum (reports@medicum.ca) — one or several patients ══════════
+// Every email lists each patient's name and file number. It is saved as an
+// approved "note to Medicum"; your Mac sends it from abdulmedicum@yahoo.com
+// within ~2 minutes (assistant/lib/outbox.js) and it shows in Dubbi's History.
+const MEDICUM_TO = 'reports@medicum.ca';
+const MAIL_SIGNATURE = 'Abdul Rahim Akhtar';
+const MM_REASONS = ['📞 Phone / address changed', '📅 Appointment changed', '🙅 Declined injection', '🏥 In hospital', '💊 Dose / prescription', '✈️ Travelling / away', '✏️ Other'];
+let _mmPicked = new Set(), _mmIds = [], _mmReasonsOn = new Set();
+function toggleMedicumSelect(on) {
+  const b = document.body, want = on === undefined ? !b.classList.contains('mm-select') : on;
+  b.classList.toggle('mm-select', want);
+  document.getElementById('mmSelectBtn').classList.toggle('on', want);
+  if (!want) { _mmPicked.clear(); document.querySelectorAll('.patient-card.mm-picked').forEach(c => c.classList.remove('mm-picked')); }
+  else toast('Tap patients to select them, then Email Medicum', '', '✉️');
+  _mmBar();
+}
+function _mmToggle(card) {
+  const id = parseInt(card.dataset.id);
+  if (_mmPicked.has(id)) _mmPicked.delete(id); else _mmPicked.add(id);
+  card.classList.toggle('mm-picked', _mmPicked.has(id));
+  _mmBar();
+}
+function _mmBar() {
+  const n = _mmPicked.size;
+  document.getElementById('mmBarCount').textContent = n ? `✓ ${n} patient${n > 1 ? 's' : ''}` : 'Tap patients to select';
+  document.getElementById('mmBarGo').disabled = !n;
+  // keep ticks after the list re-renders
+  document.querySelectorAll('.patient-card').forEach(c => c.classList.toggle('mm-picked', _mmPicked.has(parseInt(c.dataset.id))));
+}
+const _mmPats = () => _mmIds.map(id => patients.find(p => p.id === id)).filter(Boolean);
+function openMedicumMail(ids) {
+  _mmIds = [...new Set(ids)];
+  if (!_mmIds.length) return;
+  _mmReasonsOn = new Set();
+  document.getElementById('mmOther').value = ''; document.getElementById('mmOther').style.display = 'none';
+  document.getElementById('mmNote').value = '';
+  document.getElementById('mmReasons').innerHTML = MM_REASONS.map((r, i) => `<button type="button" class="mm-chip" data-i="${i}" onclick="_mmReason(${i})">${r}</button>`).join('');
+  _mmRenderPats(); _mmPreview();
+  openModal('medicumMailModal');
+}
+function _mmRenderPats() {
+  const pats = _mmPats();
+  document.getElementById('mmPats').innerHTML = pats.map(p => `<div><b>${esc(p['Patient Name'] || '')}</b> #${esc(String(p['File Number'] || '').trim())}
+    ${pats.length > 1 ? `<span title="Remove" onclick="_mmRemove(${p.id})">✕</span>` : ''}</div>`).join('');
+}
+function _mmReason(i) {
+  if (_mmReasonsOn.has(i)) _mmReasonsOn.delete(i); else _mmReasonsOn.add(i);
+  document.querySelectorAll('#mmReasons .mm-chip').forEach(c => c.classList.toggle('on', _mmReasonsOn.has(+c.dataset.i)));
+  const other = MM_REASONS.length - 1, box = document.getElementById('mmOther');
+  box.style.display = _mmReasonsOn.has(other) ? 'block' : 'none';
+  if (_mmReasonsOn.has(other)) setTimeout(() => box.focus(), 50);
+  _mmPreview();
+}
+function _mmCompose() {
+  const pats = _mmPats(), files = pats.map(p => '#' + String(p['File Number'] || '').trim());
+  const other = MM_REASONS.length - 1;
+  const reasons = [..._mmReasonsOn].sort((a, b) => a - b).map(i => i === other
+    ? document.getElementById('mmOther').value.trim() : MM_REASONS[i].replace(/^\S+\s/, '')).filter(Boolean);
+  const note = document.getElementById('mmNote').value.trim();
+  const subject = pats.length === 1 ? `Update — ${pats[0]['Patient Name'] || ''} ${files[0]}`
+    : `Update — ${pats.length} patients (${files.join(', ')})`;
+  const lines = ['Hello,', '', pats.length === 1 ? 'Please note the following update for:' : 'Please note the following update for these patients:',
+    ...pats.map(p => `• ${p['Patient Name'] || ''} — #${String(p['File Number'] || '').trim()}`), ''];
+  if (reasons.length) lines.push(reasons.join('; ') + (note ? ':' : '.'));
+  if (note) lines.push(note);
+  if (reasons.length || note) lines.push('');
+  lines.push('Thank you!', '', MAIL_SIGNATURE);
+  return { subject, body: lines.join('\n'), reasons, note, pats };
+}
+function _mmPreview() {
+  const m = _mmCompose();
+  document.getElementById('mmSubject').textContent = m.subject;
+  document.getElementById('mmPreview').textContent = m.body;
+  document.getElementById('mmSend').disabled = !m.pats.length || (!m.reasons.length && !m.note);
+}
+async function sendMedicumMail() {
+  const m = _mmCompose();
+  if (!m.reasons.length && !m.note) { toast('Choose a reason or write a detail first', 'warning'); return; }
+  const btn = document.getElementById('mmSend'); btn.disabled = true;
+  try {
+    const { data: { user } } = await _sb.auth.getUser();
+    const now = new Date().toISOString();
+    const { error } = await _sb.from('email_tasks').insert({
+      kind: 'medicum_note', status: 'send_approved', is_test: false,
+      source_key: 'note-' + now + '-' + Math.random().toString(36).slice(2, 10),
+      to_address: MEDICUM_TO, to_name: 'Medicum', lang: 'en',
+      email_subject: m.subject, reply_body: m.body,
+      file_number: m.pats.map(p => String(p['File Number'] || '').trim()).join(', '),
+      details: { patients: m.pats.map(p => ({ name: p['Patient Name'] || '', file: String(p['File Number'] || '').trim() })), reasons: m.reasons, note: m.note },
+      decided_at: now, decided_by: user && user.email,
+    });
+    if (error) throw error;
+    for (const p of m.pats) _auditLog('EMAIL_MEDICUM', p['File Number'], { reasons: m.reasons, note: m.note.slice(0, 200) });
+    closeModal('medicumMailModal');
+    toggleMedicumSelect(false);
+    toast(`✉️ Queued — your Mac sends it to Medicum within ~2 minutes`, 'success');
+  } catch (e) {
+    btn.disabled = false;
+    toast('Could not queue the email — ' + (e.message || e), 'error');
+  }
+}
+window.toggleMedicumSelect = toggleMedicumSelect; window.openMedicumMail = openMedicumMail;
+function _mmGo() { openMedicumMail([..._mmPicked]); }
+function _mmRemove(id) { _mmIds = _mmIds.filter(x => x !== id); _mmRenderPats(); _mmPreview(); }
+window._mmGo = _mmGo; window._mmRemove = _mmRemove;
+window.sendMedicumMail = sendMedicumMail; window._mmReason = _mmReason; window._mmPreview = _mmPreview; window._mmRenderPats = _mmRenderPats;
+
 function openModal(id) {
   const el = document.getElementById(id);
   el.classList.add('open');
@@ -10270,6 +10409,7 @@ async function doLogin() {
     _verifyRLS(); // background RLS health check
     _initRealtime(); // start real-time patient sync
     _flushInvoiceOps(); // invoice changes made offline on this device
+    if (window._openPatientFromLink) window._openPatientFromLink();
   } catch(e) {
     _loginAttempts++;
     console.warn('[doLogin] Auth error (attempt', _loginAttempts, ')');
@@ -10574,6 +10714,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadInjectionHistoryFromDB();
     _initRealtime();       // live sync was previously only started after typing the password
     _flushInvoiceOps();
+    if (window._openPatientFromLink) window._openPatientFromLink();
     _lastSyncTs = Date.now();
   } else {
     // Not logged in — show login screen
@@ -11110,7 +11251,15 @@ function rawFinderSearch() {
 }
 window.rawFinderSearch = rawFinderSearch;
 
-// Open the patient's card in the right tab (used by notes import and the raw finder)
+// index.html?patient=35037 — opened from the scheduler's 👁 — goes to that card once patients are loaded
+function _openPatientFromLink() {
+  const fn = new URLSearchParams(location.search).get('patient');
+  if (!fn) return;
+  history.replaceState(null, '', location.pathname);   // only once
+  setTimeout(() => goToPatient(fn), 300);
+}
+window._openPatientFromLink = _openPatientFromLink;
+// Open the patient's card in the right tab (used by notes import, the raw finder and the scheduler's 👁)
 function goToPatient(fn) {
   const p = patients.find(pt => String(pt['File Number']) === String(fn));
   if (!p) { showToast('Patient not found in current data', 'warn'); return; }
@@ -11136,6 +11285,7 @@ function goToPatient(fn) {
   setTimeout(() => {
     const card = document.querySelector(`.patient-card[data-id="${p.id}"]`);
     if (card) {
+      card.classList.add('expanded');
       card.scrollIntoView({ behavior:'smooth', block:'center' });
       card.style.outline = '3px solid var(--amber)';
       card.style.outlineOffset = '2px';
@@ -11930,6 +12080,40 @@ window.stripTimeWindow     = stripTimeWindow;
 </div>
 
 <!-- ADD DAY TO INVOICE MODAL -->
+<div class="mm-bar" id="mmBar">
+  <button class="mm-x" onclick="toggleMedicumSelect(false)">✕</button>
+  <span id="mmBarCount">Tap patients to select</span>
+  <button class="mm-go" id="mmBarGo" onclick="_mmGo()" disabled>✉️ Email Medicum</button>
+</div>
+<div class="modal-overlay" id="medicumMailModal">
+  <div class="modal" style="max-height:92vh;display:flex;flex-direction:column">
+    <div class="modal-handle"></div>
+    <div class="modal-header" style="flex-shrink:0">
+      <div>
+        <div class="modal-title">✉️ Email Medicum</div>
+        <div style="font-size:12px;color:var(--text-2);margin-top:2px">To reports@medicum.ca · sent by your Mac from abdulmedicum@yahoo.com</div>
+      </div>
+      <button class="modal-close" onclick="closeModal('medicumMailModal')">✕</button>
+    </div>
+    <div class="modal-body" style="flex:1;overflow-y:auto">
+      <div class="mm-label" style="margin-top:0">Patients</div>
+      <div class="mm-pats" id="mmPats"></div>
+      <div class="mm-label">Reason</div>
+      <div class="mm-chips" id="mmReasons"></div>
+      <input id="mmOther" type="text" class="form-control" placeholder="Type the reason…" style="display:none;margin-top:8px;font-size:16px" oninput="_mmPreview()">
+      <div class="mm-label">Details <span style="text-transform:none;letter-spacing:0;font-weight:600;color:var(--text-3)">(optional)</span></div>
+      <textarea id="mmNote" class="form-control" rows="3" placeholder="e.g. new phone number, appointment moved to Nov 12…" style="font-size:16px" oninput="_mmPreview()"></textarea>
+      <div class="mm-label">Email</div>
+      <div style="font-size:12px;color:var(--text-2);margin-bottom:6px">Subject: <b id="mmSubject"></b></div>
+      <div class="mm-preview" id="mmPreview"></div>
+    </div>
+    <div class="modal-footer" style="flex-shrink:0;display:flex;gap:10px">
+      <button class="btn-secondary" style="flex:1" onclick="closeModal('medicumMailModal')">Cancel</button>
+      <button class="btn-primary" id="mmSend" style="flex:2;background:linear-gradient(135deg,var(--teal),var(--teal-dark));color:#fff;border:none" onclick="sendMedicumMail()">✉️ Send</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="addDayModal">
   <div class="modal" style="max-height:92vh;display:flex;flex-direction:column">
     <div class="modal-handle"></div>
