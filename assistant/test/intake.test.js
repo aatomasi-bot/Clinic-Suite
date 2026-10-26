@@ -373,12 +373,13 @@ test('a coordinator question → a reply card with what VaPiq knows (name kept f
   const source = { name: 'mem', async *emails() {
     yield mail('Patient CT 98004', 'Hi Abdul,\nI am reaching out regarding patient Closing Testcase (98004). Has he been contacted yet to arrange his appointment? He can be reached at 514-667-9987.\nThank you!');
     yield mail('Question', 'Bonjour Abdul, avez-vous des disponibilités la semaine prochaine?');
+    yield mail('Follow up', 'Hi Abdul,\nCould you update me on these patients: Closing Testcase 98004, 98002 and 98777? Call me at 514-555-1234.\nThanks');
     yield mail('Re: Patient CT 98004', 'Thanks!');
     yield mail('New Appointment', 'x', 'Medicum <no-reply@medicum.ca>');
   }, markHandled: async e => handled.push(e.subject), findRelated: async () => [] };
   const counts = await runIntake({ source, store, rules, replies: { signature: 'Nurse Test' }, isTest: true, log: () => {} });
   const q = store.tasks.filter(t => t.kind === 'question');
-  assert.equal(counts.questions, 2, 'thank-you replies and no-reply@ are not questions');
+  assert.equal(counts.questions, 3, 'thank-you replies and no-reply@ are not questions');
   const a = q.find(t => t.file_number === '98004');
   assert.equal(a.status, 'reply_ready');
   assert.match(a.reply_body, /^Hello Giulia,\n\nThank you for your message\. The appointment for file #98004 is not booked yet\./);
@@ -388,6 +389,11 @@ test('a coordinator question → a reply card with what VaPiq knows (name kept f
   assert.equal(b.lang, 'fr');
   assert.match(b.reply_body, /Je vérifie et je vous reviens rapidement/);
   assert.ok(handled.includes('Patient CT 98004'));
+  const m = q.find(t => t.email_subject === 'Follow up');
+  assert.deepEqual(m.details.files, ['98004', '98002'], 'files in VaPiq; phone digits are never a file');
+  assert.match(m.reply_body, /Here is an update on these files:\n- File #98004: appointment not booked yet\.[^\n]*\n- File #98002: currently on hold/);
+  assert.ok(m.warnings.some(w => /98777 is not in VaPiq/.test(w)));
+  assert.ok(!/Closing|Testcase|555-1234/.test(m.details.excerpt));
   const { draftReply } = require('../../js/reply-templates.js');
   assert.match(draftReply({ kind: 'question', lang: 'en', fileNumber: '98004', facts: { found: true, appointment: '2026-10-28T10:00', confirmed: true } }),
     /scheduled for Wednesday, October 28 at 10:00, confirmed with the patient/);

@@ -835,13 +835,14 @@ function replyCard(item) {
   const to = t.to_name ? `${esc(t.to_name)} &lt;${esc(t.to_address)}&gt;` : esc(t.to_address);
   const done = ask ? 'Ask for documents' : { new_patient: 'Patient added ✓', prescription: 'Prescription applied ✓', close_file: 'File deleted ✓', on_hold: 'On hold ✓', back: 'Back from hold ✓', permanent: 'Permanent ✓', question: 'Coordinator question' }[t.kind];
   const subj = /^re\s*:/i.test(t.email_subject || '') ? t.email_subject : 'Re: ' + (t.email_subject || '');
-  return `${cardOpen(item, '✉️', 'ic-reply')}<div class="ctitle"><div class="kind">Reply · ${esc(done)}</div><b>File ${fileRef(t.file_number, t.subject_ref)}</b><div class="meta">${from(t)}</div></div>${chips(item)}</div>
+  const many = t.kind === 'question' && t.details && (t.details.files || []).length > 1 ? t.details.files : null;
+  return `${cardOpen(item, '✉️', 'ic-reply')}<div class="ctitle"><div class="kind">Reply · ${esc(done)}</div><b>${many ? `${many.length} files: ${many.map(n => esc('#' + n)).join(', ')}` : `File ${fileRef(t.file_number, t.subject_ref)}`}</b><div class="meta">${from(t)}</div></div>${chips(item)}</div>
     ${t.status === 'failed' ? `<div class="warn err"><div>⚠️ Not sent: ${esc(t.error || 'unknown error')}</div></div>` : ''}
     <div class="mailhead"><div><span>To</span><em>${to}</em></div>${(t.cc_addresses || []).length ? `<div><span>CC</span><em>${esc(t.cc_addresses.join(', '))}</em></div>` : ''}<div><span>Subject</span><em>${esc(subj)}</em></div></div>
     ${t.kind === 'question' && t.details && t.details.excerpt ? `<div class="asked"><span>${esc(t.to_name || 'Coordinator')} wrote</span>${esc(t.details.excerpt)}</div>` : ''}
     ${t.kind === 'question' ? warnBox(t.warnings) : ''}
     <div class="lang" role="group" aria-label="Language"><button data-act="lang" data-l="en" class="${t.lang !== 'fr' ? 'on' : ''}">EN</button><button data-act="lang" data-l="fr" class="${t.lang === 'fr' ? 'on' : ''}">FR</button></div>
-    <textarea class="reply" data-k="reply_body" rows="9" aria-label="Reply text">${esc(t.reply_body || '')}</textarea>
+    <textarea class="reply" data-k="reply_body" rows="${many ? 9 + many.length : 9}" aria-label="Reply text">${esc(t.reply_body || '')}</textarea>
     ${aiPanel(t)}
     <div class="acts">
       <button class="btn ghost" data-act="no-reply">${ask ? 'Not now' : "Don't reply"}</button>
