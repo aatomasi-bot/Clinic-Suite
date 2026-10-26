@@ -87,12 +87,12 @@ export function checkReply(text, draft) {
 
 // ── Run Claude (your subscription) ─────────────────────────────────────────
 const EMPTY_DIR = path.join(os.tmpdir(), 'vapiq-ai-empty');
-export function claudeRunner({ command, timeoutMs = 90e3 } = {}) {
+export function claudeRunner({ command, timeoutMs = 90e3, system = SYSTEM } = {}) {
   const bin = String(command || '~/.local/bin/claude').replace(/^~(?=\/)/, os.homedir());
   return (prompt) => new Promise((resolve, reject) => {
     fs.mkdirSync(EMPTY_DIR, { recursive: true });
     const child = spawn(bin, ['-p', '--tools', '', '--strict-mcp-config', '--setting-sources', '', '--no-session-persistence',
-      '--output-format', 'text', '--system-prompt', SYSTEM], { cwd: EMPTY_DIR, stdio: ['pipe', 'pipe', 'pipe'] });
+      '--output-format', 'text', '--system-prompt', system], { cwd: EMPTY_DIR, stdio: ['pipe', 'pipe', 'pipe'] });
     let out = '', err = '';
     const timer = setTimeout(() => { child.kill('SIGTERM'); reject(new Error('Claude did not answer in time')); }, timeoutMs);
     child.stdout.on('data', d => { out += d; });
