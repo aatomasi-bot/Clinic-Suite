@@ -21,6 +21,7 @@ import { findExisting, sameNameOtherFile, patientStatus, normFile } from './lib/
 import { buildRecord, toIsoDate } from './lib/record.js';
 import { parsePdf, parseScan, repeatsFor } from './lib/pdf.js';
 import { needsSignature, emailDueDate, cardNotes, signedBy, openingText, patientUpdate } from './lib/emailinfo.js';
+import { excerptOf } from './lib/ai.js';
 import { testFolderSource, imapSource } from './lib/sources.js';
 import { supabaseStore, offlineStore } from './lib/store.js';
 import { summaryText, macNotification, pushToPhones } from './lib/notify.js';
@@ -38,7 +39,7 @@ export function loadConfig(file = path.join(here, 'config.json')) {
   const base = JSON.parse(fs.readFileSync(path.join(here, 'config.example.json'), 'utf8'));
   const own = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {};
   const merged = { ...base, ...own };
-  for (const k of ['imap', 'rules', 'supabase', 'push', 'replies', 'alerts']) merged[k] = { ...base[k], ...(own[k] || {}) };
+  for (const k of ['imap', 'rules', 'supabase', 'push', 'replies', 'alerts', 'ai']) merged[k] = { ...base[k], ...(own[k] || {}) };
   return merged;
 }
 
@@ -90,6 +91,8 @@ export async function runIntake({ source, store, rules, replies = {}, isTest, lo
     const lang = detectLanguage(`${email.subject} ${openingText(email.bodyText)}`);
     const coordinatorName = coordinatorFirstName(email.from);
     const subjectRef = subjectReference(email.subject);
+    // The coordinator's message, contact details removed — what the reply AI may read (lib/ai.js)
+    const excerpt = excerptOf(email.bodyText);
     const replyBase = {
       is_test: !!isTest, email_message_id: email.messageId, email_folder: email.folder || null,
       email_from: email.from, email_subject: email.subject, email_date: email.date,
@@ -113,7 +116,7 @@ export async function runIntake({ source, store, rules, replies = {}, isTest, lo
       try {
         id = await store.insertTask({ ...replyBase, kind: update.kind, status: 'todo', source_key: key,
           file_number: fileNo || null, existing_patient: existingSummary(existing), warnings, reply_body: draft(update.kind, fileNo),
-          details: { signature: replies.signature || '', reason: update.reason, due: update.due || null } });
+          details: { excerpt, signature: replies.signature || '', reason: update.reason, due: update.due || null } });
       } catch (e) {
         // Database not updated yet for these cards (supabase/2026-10-25_patient_updates.sql):
         // leave the email for the next run instead of failing the whole check
@@ -138,7 +141,7 @@ export async function runIntake({ source, store, rules, replies = {}, isTest, lo
       else if (existing.archived) warnings.push('This file is on hold in VaPiq — closing it deletes the record.');
       const id = await store.insertTask({ ...replyBase, kind: 'close_file', status: 'todo', source_key: key,
         file_number: subjectFile || null, existing_patient: existingSummary(existing), warnings, reply_body: draft('close_file', subjectFile),
-        details: { signature: replies.signature || '' } });
+        details: { excerpt, signature: replies.signature || '' } });
       await store.audit('ASSISTANT_CLOSE_REQUEST', subjectFile, { task_id: id, test: !!isTest });
       counts.closes++;
       log(`  close   card ${id}${warnings.length ? ` (${warnings.length} warning${warnings.length > 1 ? 's' : ''})` : ''}`);
@@ -209,7 +212,7 @@ export async function runIntake({ source, store, rules, replies = {}, isTest, lo
         const id = await store.insertTask({ ...replyBase, kind: 'prescription', status: 'todo', source_key: f.key,
           file_number: groupKey, group_key: groupKey, existing_patient: existingSummary(existing),
           related_emails: [emailRef(email)],
-          details: { pdf_dose: f.parsed?.dose || null, pdf_due_date: f.parsed?.date || null, attachment_name: f.pdf.name, signature: replies.signature || '' },
+          details: { excerpt, pdf_dose: f.parsed?.dose || null, pdf_due_date: f.parsed?.date || null, attachment_name: f.pdf.name, signature: replies.signature || '' },
           warnings: f.warnings, reply_body: draft('prescription', groupKey) });
         await store.audit('ASSISTANT_PRESCRIPTION', groupKey, { task_id: id, test: !!isTest });
         counts.prescriptions++;
@@ -284,6 +287,7 @@ export async function runIntake({ source, store, rules, replies = {}, isTest, lo
       }
       // Reply goes to the coordinator, in the coordinator's thread
       if ((!fromDocs || signer) && (group.to_address === reports || noReplyAddr(group.to_address))) {
+        fields.details = { ...(fields.details || group.details || {}), ...(excerpt ? { excerpt } : {}) };   // reply to her message
         Object.assign(fields, { to_address: coordAddress, to_name: coordName,
           email_message_id: email.messageId, email_folder: email.folder || null, email_from: email.from,
           email_subject: email.subject, email_date: email.date, lang, subject_ref: subjectRef || group.subject_ref });
@@ -307,7 +311,7 @@ export async function runIntake({ source, store, rules, replies = {}, isTest, lo
       const to = noReply ? reports : coordAddress;
       const id = await store.insertTask({ ...replyBase, kind: 'new_patient', status: 'todo',
         source_key: sha(`${email.messageId}|new_patient`), pending_id: pendingId, group_key: groupKey,
-        details: { signature: replies.signature || '', ...remember(said) },
+        details: { excerpt, signature: replies.signature || '', ...remember(said) },
         file_number: groupKey, cc_addresses: to === reports ? [] : [reports], to_address: to, to_name: noReply ? null : coordName,
         existing_patient: existingSummary(existing), related_emails: [emailRef(email)], documents: docs, warnings,
         reply_body: replies.enabled === false ? null : draftReply({ kind: 'new_patient', lang, coordinatorName: noReply ? '' : (coordName || ''), fileNumber: groupKey,

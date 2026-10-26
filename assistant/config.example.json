@@ -81,5 +81,12 @@
     "waitingDocsHours": 24,
     "morningSummary": "07:00",
     "noAppointmentDays": 14
+  },
+  "ai": {
+    "enabled": true,
+    "realEmails": false,
+    "command": "~/.local/bin/claude",
+    "maxPerRun": 4,
+    "//": "realEmails: true only after the privacy officer approves sending coordinator messages (contact details removed) to Anthropic"
   }
 }

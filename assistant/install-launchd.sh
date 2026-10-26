@@ -7,13 +7,16 @@ set -e
 LABEL=com.vapiq.intake
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 SLABEL=com.vapiq.summary
+ALABEL=com.vapiq.ai
+APLIST="$HOME/Library/LaunchAgents/$ALABEL.plist"
 SPLIST="$HOME/Library/LaunchAgents/$SLABEL.plist"
 DIR="$(cd "$(dirname "$0")" && pwd)"
 NODE="$(command -v node)"
 
 launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
 launchctl bootout "gui/$(id -u)/$SLABEL" 2>/dev/null || true
-if [[ "$1" == "remove" ]]; then rm -f "$PLIST" "$SPLIST"; echo "Removed."; exit 0; fi
+launchctl bootout "gui/$(id -u)/$ALABEL" 2>/dev/null || true
+if [[ "$1" == "remove" ]]; then rm -f "$PLIST" "$SPLIST" "$APLIST"; echo "Removed."; exit 0; fi
 
 mkdir -p "$DIR/state" "$HOME/Library/LaunchAgents"
 cat > "$PLIST" <<PL
@@ -48,4 +51,19 @@ cat > "$SPLIST" <<PL
 </dict></plist>
 PL
 launchctl bootstrap "gui/$(id -u)" "$SPLIST"
-echo "Installed: checks mail every 2 minutes; morning summary at $TIME. Logs: $DIR/state/"
+
+# Reply suggestions (Claude, your subscription) — every 30 seconds, quick when idle
+cat > "$APLIST" <<PL
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>$ALABEL</string>
+  <key>ProgramArguments</key><array><string>$NODE</string><string>$DIR/ai-queue.js</string></array>
+  <key>WorkingDirectory</key><string>$DIR</string>
+  <key>StartInterval</key><integer>30</integer>
+  <key>StandardOutPath</key><string>$DIR/state/ai.log</string>
+  <key>StandardErrorPath</key><string>$DIR/state/ai.log</string>
+</dict></plist>
+PL
+launchctl bootstrap "gui/$(id -u)" "$APLIST"
+echo "Installed: checks mail every 2 minutes; reply suggestions every 30 seconds; morning summary at $TIME. Logs: $DIR/state/"
