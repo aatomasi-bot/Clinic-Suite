@@ -285,6 +285,9 @@ nav.tabbar .in{display:flex;width:100%;max-width:520px}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
 .seg button{border:0;background:none;padding:6px 11px;font-size:13px;font-weight:800;color:var(--ink-3)}
 .seg button.on{background:var(--teal);color:#fff}
+.vrow{display:flex;gap:6px;align-items:center;margin-top:6px}
+.vrow select{flex:1;min-width:0;border:1.5px solid var(--line);border-radius:10px;padding:7px 8px;background:var(--card-2);color:var(--ink);font:inherit;font-size:14px}
+.vrow button{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:7px 11px;font-weight:800;color:var(--teal)}
 .keybox{font-family:ui-monospace,Menlo,monospace;font-size:13px;background:var(--card-2);border:1px dashed var(--teal);border-radius:12px;padding:10px;word-break:break-all;margin:8px 0}
 ol.steps{padding-left:20px;margin:8px 0;font-size:14px;line-height:1.5}
 
@@ -1478,17 +1481,45 @@ async function answer(text) {
   return { say: L('Sorry, I didn’t catch that. Try one of these:', 'Désolé, je n’ai pas compris. Essayez :'), go: SUGGEST[D.fr ? 'fr' : 'en'].map(s => [s, () => ask(s, true)]) };
 }
 
-// Speaking — the iPhone's built-in voices, on the device
-function speak(text) {
-  if (!pref('speak', true) || !('speechSynthesis' in window)) return;
+// Speaking — the iPhone's built-in voices, on the device. The phone lists its
+// voices in no useful order (often a robotic or novelty voice first), so Dubbi
+// picks the most natural one: Premium > Enhanced > natural-sounding names, and
+// never the novelty voices. You can choose another in ⚙︎.
+const NOVELTY = /\b(albert|bad news|bahh|bells|boing|bubbles|cellos|good news|jester|organ|superstar|trinoids|whisper|wobble|zarvox|fred|junior|ralph|kathy|grandma|grandpa|eddy|flo|reed|rocko|sandy|shelley|grand-m[eè]re|grand-p[eè]re)\b/i;
+const NICE = /\b(ava|zoe|evan|nathan|joelle|noelle|samantha|allison|susan|tom|serena|daniel|karen|moira|tessa|am[ée]lie|chantal|nicolas|audrey|thomas|aur[ée]lie|marie)\b/i;
+function voiceScore(v, fr) {
+  const lang = v.lang.replace('_', '-').toLowerCase();
+  let sc = 0;
+  if (/premium|naturelle?/i.test(v.name)) sc += 100;
+  else if (/enhanced|am[ée]lior[ée]e?/i.test(v.name)) sc += 60;
+  if (NICE.test(v.name)) sc += 20;
+  if (NOVELTY.test(v.name)) sc -= 200;
+  if (lang === (fr ? 'fr-ca' : 'en-ca')) sc += 10; else if (lang === (fr ? 'fr-fr' : 'en-us')) sc += 6;
+  if (v.localService) sc += 2;
+  return sc;
+}
+function voicesFor(fr) {
+  if (!('speechSynthesis' in window)) return [];
+  return speechSynthesis.getVoices().filter(v => v.lang.replace('_', '-').toLowerCase().startsWith(fr ? 'fr' : 'en'))
+    .sort((a, b) => voiceScore(b, fr) - voiceScore(a, fr) || a.name.localeCompare(b.name));
+}
+function voiceFor(fr) {
+  const list = voicesFor(fr), chosen = pref(fr ? 'voice_fr' : 'voice_en', '');
+  return list.find(v => v.voiceURI === chosen) || list[0] || null;
+}
+// "#35037" is read as "file 35037", not "number sign…"
+const sayable = (text, fr) => String(text).replace(/👍/g, '').replace(/#(\d{4,6})/g, (fr ? 'dossier ' : 'file ') + '$1').replace(/—/g, ', ');
+function speak(text, force) {
+  if ((!pref('speak', true) && !force) || !('speechSynthesis' in window)) return;
   speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text.replace(/👍/g, ''));
-  u.lang = D.fr ? 'fr-CA' : 'en-CA';
-  const v = speechSynthesis.getVoices().find(v => v.lang.replace('_', '-').startsWith(D.fr ? 'fr' : 'en'));
+  const u = new SpeechSynthesisUtterance(sayable(text, D.fr));
+  const v = voiceFor(D.fr);
+  u.lang = v ? v.lang : (D.fr ? 'fr-CA' : 'en-CA');
   if (v) u.voice = v;
-  u.rate = 1.03;
+  u.rate = 1;
   speechSynthesis.speak(u);
 }
+if ('speechSynthesis' in window) speechSynthesis.addEventListener?.('voiceschanged', () => { if (!$('settings').hidden) showSettings(); });
 
 // Listening (only if you turned the microphone on) — tap the mic; it stops when you stop talking
 const recLang = () => D.lang === 'fr' ? 'fr-CA' : D.lang === 'en' ? 'en-CA' : (D.fr ? 'fr-CA' : 'en-CA');
@@ -1519,14 +1550,26 @@ function showSettings() {
   s.innerHTML = `
     <div class="setrow"><div>Dubbi’s brain (Claude)<small>Your questions go to your Mac, which asks Claude with your subscription. Claude sees file numbers, dates and statuses — never names or addresses. Off = quick fixed answers only.</small></div><input type="checkbox" class="sw" data-p="brain" ${brainOn() ? 'checked' : ''}></div>
     <div class="setrow"><div>Speak answers aloud<small>Uses your iPhone’s own voices, on the phone.</small></div><input type="checkbox" class="sw" data-p="speak" ${pref('speak', true) ? 'checked' : ''}></div>
+    ${[[false, 'English voice'], [true, 'Voix française']].map(([fr, label]) => { const list = voicesFor(fr), cur = voiceFor(fr); return `
+    <div class="setrow" style="display:block"><div>${label}<small>${list.some(v => /premium|enhanced|naturelle?|am[ée]lior/i.test(v.name)) ? 'Premium and Enhanced voices sound the most natural.' : 'For a natural voice, download one (see below).'}</small></div>
+      <div class="vrow"><select data-voice="${fr ? 'fr' : 'en'}" aria-label="${label}">${list.length ? list.map(v => `<option value="${esc(v.voiceURI)}"${cur && v.voiceURI === cur.voiceURI ? ' selected' : ''}>${esc(v.name)} · ${esc(v.lang.replace('_', '-'))}</option>`).join('') : '<option>Loading voices…</option>'}</select>
+      <button type="button" data-try="${fr ? 'fr' : 'en'}" aria-label="Play a sample">▶</button></div></div>`; }).join('')}
+    <p class="note">🎙️ <b>Most natural voice (free, stays on your phone):</b> iPhone Settings → Accessibility → Spoken Content → Voices → English → tap <b>Ava</b> or <b>Zoe</b> → download <b>Premium</b>. For French: Français (Canada) → <b>Amélie</b> or <b>Nicolas</b> (Enhanced). Then reopen Dubbi and pick it here.</p>
     <div class="setrow"><div>Language<small>Auto follows the language you use.</small></div><div class="seg" data-p="lang">${['auto', 'en', 'fr'].map(l => `<button type="button" data-v="${l}" class="${D.lang === l ? 'on' : ''}">${l.toUpperCase()}</button>`).join('')}</div></div>
     <div class="setrow"><div>Microphone<small>${SR ? 'Off by default. Speech goes through Apple’s dictation (like the keyboard’s mic). Turn on only once your privacy officer agrees.' : 'Not available in this browser.'}</small></div><input type="checkbox" class="sw" data-p="mic" ${micOn() ? 'checked' : ''} ${SR ? '' : 'disabled'}></div>
     <p class="note">🔒 With the brain on, your question goes through your VaPiq database to your own Mac; names are swapped for file numbers before Claude sees it, and put back on your Mac. With it off, Dubbi works only on this phone. Either way it never acts on its own: it proposes, you confirm.</p>
     <button class="btn ghost" type="button" id="backChat" style="width:100%;margin-top:8px">Back to Dubbi</button>`;
 }
+$('settings').addEventListener('change', e => {
+  const sel = e.target.closest('select[data-voice]');
+  if (sel) { savePref('voice_' + sel.dataset.voice, sel.value); sel.nextElementSibling.click(); }
+});
 $('settings').addEventListener('click', e => {
   const t = e.target;
   if (t.matches('.sw')) { savePref(t.dataset.p, t.checked); $('micBtn').hidden = !micOn(); return; }
+  const tr = t.closest('[data-try]');
+  if (tr) { const fr = tr.dataset.try === 'fr', was = D.fr; D.fr = fr;
+    speak(fr ? 'Bonjour! Le dossier 35037 est dû jeudi, et il n’a pas encore de rendez-vous.' : 'Hi! File 35037 is due Thursday, and has no appointment yet. Want me to show it?', true); D.fr = was; return; }
   const seg = t.closest('.seg button'); if (seg) { D.lang = seg.dataset.v; savePref('lang', D.lang); showSettings(); return; }
   if (t.id === 'backChat') { $('settings').hidden = true; $('chat').hidden = false; }
 });
