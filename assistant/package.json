@@ -12,6 +12,7 @@
     "intake:offline": "node intake.js --offline",
     "login": "node login.js",
     "setup-push": "node setup-push.js",
+    "voice-setup": "node voice-setup.js",
     "fake-pdfs": "node make-fake-pdfs.js",
     "test": "node --test test/*.test.js",
     "test-push": "node test-push.js",

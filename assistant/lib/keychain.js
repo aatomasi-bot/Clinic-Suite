@@ -26,5 +26,6 @@ export const SECRETS = {
   supabaseSession: 'vapiq-assistant-supabase',  // refresh token from `npm run login`
   yahooPassword:   'vapiq-assistant-yahoo',     // Yahoo *app password* (you add it yourself)
   vapid:           'vapiq-assistant-vapid',     // web-push keys from `npm run setup-push`
+  elevenLabs:      'vapiq-assistant-elevenlabs', // Dubbi's AI voice key, from `npm run voice-setup`
 };
 export { ACCOUNT as KEYCHAIN_ACCOUNT };

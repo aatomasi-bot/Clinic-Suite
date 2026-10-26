@@ -158,6 +158,11 @@ send", "Missing documents", a file number, or "Find <name>" (English or French).
   and answers in ~5–10 seconds. Claude sees **file numbers, dates, statuses, dose and
   city only** — names in your question become file numbers first, and names are put
   back on your Mac for you to read. Questions are deleted after 7 days.
+- **AI voice (optional, ElevenLabs):** run `npm run voice-setup` once, paste your
+  ElevenLabs API key (hidden; stored in your Keychain), pick a voice and hear a
+  sample. Your Mac then turns each Claude answer into natural speech. Only the
+  name-free answer is sent ("file 35037 is due Thursday"); quick answers and Confirm
+  cards use the phone's own voice. Switch it off in Dubbi → ⚙︎.
 - If your Mac is asleep or offline (or the brain is off), Dubbi answers instantly with
   fixed rules on your phone instead. The quick buttons always use the fixed rules.
 - **It never acts on its own.** Say or type "close file 32604", "send the reply for 35290",

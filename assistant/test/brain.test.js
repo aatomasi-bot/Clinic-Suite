@@ -53,3 +53,24 @@ test('one question end to end (fake Claude)', async () => {
   const bad = await answerOne({ ask: { question: 'x' }, data: { patients, tasks: [], pending: [] }, run: async () => { throw new Error('You have hit your usage limit'); } });
   assert.deepEqual(bad, { status: 'failed', answer: { error: 'Claude usage limit reached' } });
 });
+
+test('AI voice: only the name-free answer is sent, and a failure never breaks the answer', async () => {
+  const { speakable, elevenLabs } = await import('../lib/voice.js');
+  assert.equal(speakable('#35037 is due Thursday 👍', false), 'file 35037 is due Thursday');
+  assert.equal(speakable('Le #35037 est dû jeudi.', true), 'Le dossier 35037 est dû jeudi.');
+  assert.equal(speakable('Call Mr. Kim at 514-555-0100', false), '', 'anything identifying → nothing is sent');
+  const sent = [];
+  const fetchFn = async (url, opt) => { sent.push(JSON.parse(opt.body).text); return { ok: true, arrayBuffer: async () => new TextEncoder().encode('mp3').buffer }; };
+  const tts = elevenLabs({ key: 'test-key', fetchFn });
+  const run = async () => '{"say":"#35037 is due Thursday.","show":[],"action":null}';
+  const r = await answerOne({ ask: { question: 'When is Hélène Testcase due?', lang: 'en' }, data: { patients, tasks: [], pending: [] }, run, tts });
+  assert.deepEqual(sent, ['file 35037 is due Thursday.'], 'no name in the voice text');
+  assert.equal(Buffer.from(r.answer.audio, 'base64').toString(), 'mp3');
+  assert.match(r.answer.say, /Hélène TESTCASE/, 'you still read the name');
+  const down = elevenLabs({ key: 'k', fetchFn: async () => { throw new Error('offline'); } });
+  const r2 = await answerOne({ ask: { question: 'x' }, data: { patients, tasks: [], pending: [] }, run, tts: down });
+  assert.equal(r2.status, 'answered'); assert.equal(r2.answer.audio, undefined);
+  const act = await answerOne({ ask: { question: 'close 30001' }, data: { patients, tasks: [], pending: [] }, run: async () => '{"say":"Closing #30001.","show":[],"action":{"type":"close_file","file":"30001"}}', tts });
+  assert.equal(act.answer.audio, undefined, 'Confirm cards are read by the phone');
+  assert.equal(elevenLabs({ key: null }), null, 'no key → no voice');
+});

@@ -9,13 +9,14 @@ import { fileURLToPath } from 'node:url';
 import { loadConfig } from './intake.js';
 import { supabaseStore } from './lib/store.js';
 import { claudeRunner } from './lib/ai.js';
+import { elevenLabs } from './lib/voice.js';
 import { BRAIN_SYSTEM, buildContext, brainPrompt, cleanQuestion, parseBrain, withNames } from './lib/brain.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // One question → the row update. Pure enough to test with a fake store and a fake Claude.
-export async function answerOne({ ask, data, history = [], run, now = new Date() }) {
+export async function answerOne({ ask, data, history = [], run, tts = null, now = new Date() }) {
   const question = cleanQuestion(ask.question, data.patients);
   const context = buildContext({ ...data, now });
   const prompt = brainPrompt({ question, context, history: history.map(h => ({ q: h.answer?.q || '', a: h.answer?.raw || '' })).filter(h => h.q) });
@@ -25,7 +26,9 @@ export async function answerOne({ ask, data, history = [], run, now = new Date()
   const files = data.patients.map(p => String(p.file_number || '').trim()).filter(Boolean);
   const out = parseBrain(raw, files);
   if (!out) return { status: 'failed', answer: { error: 'The answer could not be used' } };
-  return { status: 'answered', answer: { say: withNames(out.say, data.patients), show: out.show, action: out.action, q: question, raw: out.say } };
+  // the AI voice reads the name-free text (an action's Confirm card is read by the phone instead)
+  const audio = tts && !out.action ? await tts(out.say, ask.lang === 'fr') : null;
+  return { status: 'answered', answer: { say: withNames(out.say, data.patients), show: out.show, action: out.action, q: question, raw: out.say, ...(audio ? { audio } : {}) } };
 }
 
 async function main() {
@@ -33,6 +36,7 @@ async function main() {
   if (ai.enabled === false || ai.brain === false || cfg.mode !== 'live') { await sleep(10 * 60e3); return; }
   const store = await supabaseStore(cfg.supabase);
   const run = claudeRunner({ command: ai.command, system: BRAIN_SYSTEM, timeoutMs: 75e3 });
+  const tts = ai.voice === false ? null : elevenLabs({ model: ai.voiceModel });   // null until `npm run voice-setup`
   await store.purgeAsks(7).catch(() => {});     // questions are kept a week, then removed
   const until = Date.now() + 20 * 60e3;
   let data = null, dataAt = 0;
@@ -43,9 +47,9 @@ async function main() {
     try {
       if (!data || Date.now() - dataAt > 20e3) { data = await store.brainData(); dataAt = Date.now(); }
       const history = await store.askHistory(ask.conv, ask.created_at);
-      const r = await answerOne({ ask, data, history, run });
+      const r = await answerOne({ ask, data, history, run, tts });
       await store.answerAsk(ask.id, r);
-      console.log(`[${new Date().toISOString()}] brain: ${r.status}${r.status === 'failed' ? ' — ' + r.answer.error : ''}`);
+      console.log(`[${new Date().toISOString()}] brain: ${r.status}${r.status === 'failed' ? ' — ' + r.answer.error : r.answer.audio ? ' (voice)' : ''}`);
     } catch (e) {
       await store.answerAsk(ask.id, { status: 'failed', answer: { error: String(e.message).slice(0, 200) } }).catch(() => {});
       console.error('brain:', e.message);
