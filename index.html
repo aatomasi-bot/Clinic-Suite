@@ -4090,8 +4090,8 @@ function toast(msg, type='', icon='', sub='') {
   el.innerHTML = `
     <span class="toast__icon">${ico}</span>
     <div class="toast__body">
-      <div class="toast__title">${msg}</div>
-      ${sub ? `<div class="toast__sub">${sub}</div>` : ''}
+      <div class="toast__title">${esc(String(msg ?? ''))}</div>
+      ${sub ? `<div class="toast__sub">${esc(String(sub))}</div>` : ''}
     </div>
     <div class="toast__bar" style="background:${barColor}"></div>`;
   wrap.appendChild(el);
@@ -4210,9 +4210,11 @@ async function loadPatients(opts = {}) {
       if (data.length < PAGE) break; // last page reached
       from += PAGE;
     }
+    _savedRows = new Map();
     patients = allRows.map(row => {
       const p = { id: row.id };
       for (const [k, v] of Object.entries(COL)) p[k] = row[v] ?? null;
+      _savedRows.set(row.id, row);   // what the server had, to save only what changes
       return p;
     });
     updateTabCounts();
@@ -4264,13 +4266,22 @@ async function dbInsert(p) {
   }
 }
 
+// Patients loaded from the server, by id — dbUpdate sends only the fields that
+// differ from it, so an edit on one device never rewinds fields another device
+// changed meanwhile (e.g. doses left after an injection recorded on the iPhone).
+let _savedRows = new Map();
 async function dbUpdate(id, p) {
   try {
   _lastLocalUpdateTs = Date.now(); // suppress real-time reload for our own changes
+  const full = {};
+  for (const [k,v] of Object.entries(COL)) full[v] = p[k] ?? null;
+  const before = _savedRows.get(id);
   const row = {};
-  for (const [k,v] of Object.entries(COL)) row[v] = p[k] ?? null;
+  for (const [col, v] of Object.entries(full)) if (!before || JSON.stringify(before[col] ?? null) !== JSON.stringify(v)) row[col] = v;
+  if (!Object.keys(row).length) return;   // nothing changed
   const { error } = await _sb.from('patients').update(row).eq('id', id);
   if (error) throw error;
+  if (before) _savedRows.set(id, Object.assign({}, before, row));
   await _auditLog('UPDATE', p['File Number'], { id });
   } catch(e) {
     console.error('[dbUpdate]', e);
@@ -4743,7 +4754,7 @@ function renderCard(p, idx) {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 2l4 4-10 10-6 2 2-6L18 2z"/><line x1="14" y1="6" x2="18" y2="10"/></svg>
       Record
     </button>
-    <button class="note-icon-btn ${hasQuickNote(p['File Number'])?'has-note':''}" data-fnum="${p['File Number']}"
+    <button class="note-icon-btn ${hasQuickNote(p['File Number'])?'has-note':''}" data-fnum="${esc(p['File Number'])}"
       title="Quick note" onclick="event.stopPropagation();toggleNoteArea('${esc(p['File Number']||'')}')">📝</button>
     <button class="expand-btn js-expand">&#9660;</button>
   </div>
