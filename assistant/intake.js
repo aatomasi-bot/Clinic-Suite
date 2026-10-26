@@ -15,7 +15,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import { classifyEmail, subjectFileNumber, senderAddress, isNewPatientSubject, senderAllowed } from './lib/classify.js';
+import { classifyEmail, subjectFileNumber, senderAddress, isNewPatientSubject, senderAllowed, replyAllowed } from './lib/classify.js';
 import { documentTypes, summarizeDocuments, isCopyDocument } from './lib/doctype.js';
 import { findExisting, sameNameOtherFile, patientStatus, normFile } from './lib/match.js';
 import { buildRecord, toIsoDate } from './lib/record.js';
@@ -84,7 +84,10 @@ export async function runIntake({ source, store, rules, replies = {}, isTest, lo
     const transfer = update && update.kind === 'transfer' ? update : null;
     if (transfer && !kind) kind = email.pdfs && email.pdfs.length ? 'assignment' : 'new_patient_notice';
     if (update && !transfer && kind) kind = null;   // an update about an existing patient, not a new one
-    if (!kind && !(update && !transfer)) { counts.skipped++; return; }
+    // Anything else a coordinator writes (a question, "has the patient been contacted?") → a reply card
+    const question = !kind && !update && !email.skipped && replyAllowed(email.from, rules)
+      && !/^\s*(re|tr|fw|fwd)\s*:/i.test(email.subject || '');
+    if (!kind && !(update && !transfer) && !question) { counts.skipped++; return; }
 
     const subjectFile = subjectFileNumber(email.subject);
     // What every reply needs — the draft is ready on the card when you get to it.
@@ -100,6 +103,32 @@ export async function runIntake({ source, store, rules, replies = {}, isTest, lo
     };
     const draft = (k, fileNumber) => replies.enabled === false ? null
       : draftReply({ kind: k, lang, coordinatorName, fileNumber, subjectRef, signature: replies.signature || '' });
+
+    // ── Coordinator question ─────────────────────────────────────────────
+    if (question) {
+      const key = sha(`${email.messageId}|question`);
+      if ((await store.knownTaskKeys([key])).size) { counts.already++; return; }
+      const fileNo = subjectFile || ((openingText(email.bodyText).match(/\b\d{4,6}\b/) || [])[0]) || '';
+      const existing = fileNo ? findExisting(fileNo, patients) : null;
+      const facts = { found: !!existing, onHold: !!(existing && existing.archived),
+        appointment: (existing && existing.appointment_date_time) || null, confirmed: !!(existing && existing.appointment_confirmed) };
+      let id;
+      try { id = await store.insertTask({ ...replyBase, kind: 'question', status: 'reply_ready', source_key: key,
+        file_number: fileNo || null, existing_patient: existingSummary(existing),
+        warnings: fileNo && !existing ? [`File #${fileNo} is not in VaPiq.`] : [],
+        reply_body: replies.enabled === false ? null : draftReply({ kind: 'question', lang, coordinatorName, fileNumber: fileNo, subjectRef, signature: replies.signature || '', facts }),
+        // the patient's name is removed too: Claude only sees "[patient]"
+        details: { excerpt: excerptOf(email.bodyText, [existing && existing.patient_name]), signature: replies.signature || '', facts } }); }
+      catch (e) {
+        if (/check constraint|violates/i.test(e.message)) { log('  wait    question email — run supabase/2026-10-26_coordinator_questions.sql'); counts.skipped++; return; }
+        throw e;
+      }
+      await store.audit('ASSISTANT_QUESTION', fileNo || null, { task_id: id, test: !!isTest });
+      counts.questions = (counts.questions || 0) + 1;
+      log(`  question card ${id}${fileNo ? ` for #${fileNo}` : ''}`);
+      await source.markHandled(email);
+      return;
+    }
 
     // ── On hold / back / permanent ───────────────────────────────────────
     if (update && !transfer) {
@@ -384,14 +413,14 @@ async function main() {
       : await supabaseStore(cfg.supabase);
     source = live
       ? imapSource(cfg.imap, { wanted: e => !!classifyEmail(e, cfg.rules).kind
-          || (senderAllowed(e.from, cfg.rules) && !!subjectFileNumber(e.subject) && !/^\s*(re|tr|fw|fwd)\s*:/i.test(e.subject)) })
+          || ((replyAllowed(e.from, cfg.rules) || (senderAllowed(e.from, cfg.rules) && !!subjectFileNumber(e.subject))) && !/^\s*(re|tr|fw|fwd)\s*:/i.test(e.subject)) })
       : testFolderSource(path.resolve(here, cfg.testInbox));
 
     console.log(`[${new Date().toISOString()}] intake: ${live ? 'LIVE' : 'TEST'} · ${source.name} · ${store.kind}`);
     const counts = await runIntake({ source, store, rules: cfg.rules, replies: cfg.replies, isTest: !live });
     console.log(`  emails ${counts.emails}, ignored ${counts.skipped}, already handled ${counts.already}, ` +
       `new ${counts.queued}, prescriptions ${counts.prescriptions}, close-file ${counts.closes}, ` +
-      `duplicates ${counts.exists}, needs reading ${counts.needsReview}`);
+      `duplicates ${counts.exists}, needs reading ${counts.needsReview}, questions ${counts.questions || 0}`);
     const sourceName = source.name;
     await source.close(); source = null;
 
