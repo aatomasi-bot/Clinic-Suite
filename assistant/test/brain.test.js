@@ -53,3 +53,30 @@ test('one question end to end (fake Claude)', async () => {
   const bad = await answerOne({ ask: { question: 'x' }, data: { patients, tasks: [], pending: [] }, run: async () => { throw new Error('You have hit your usage limit'); } });
   assert.deepEqual(bad, { status: 'failed', answer: { error: 'Claude usage limit reached' } });
 });
+
+test('natural voice (Kokoro, on this Mac): reads names, not "number sign"', async () => {
+  const { speakable } = await import('../lib/voice.js');
+  assert.equal(speakable('#35037 (Hélène TESTCASE) is due Thursday 👍', false), 'Hélène TESTCASE is due Thursday');
+  assert.equal(speakable('Le #35037 est dû jeudi — rien d’autre.', true), 'Le dossier 35037 est dû jeudi, rien d’autre.');
+  const said = [];
+  const tts = async (t, fr) => { said.push([t, fr]); return 'QUFD'; };
+  const run = async () => '{"say":"#35037 is due Thursday.","show":[],"action":null}';
+  const r = await answerOne({ ask: { question: 'When is Hélène Testcase due?', lang: 'fr' }, data: { patients, tasks: [], pending: [] }, run, tts });
+  assert.equal(r.answer.audio, 'QUFD');
+  assert.deepEqual(said, [['#35037 (Hélène TESTCASE) is due Thursday.', true]]);
+  const act = await answerOne({ ask: { question: 'close 30001' }, data: { patients, tasks: [], pending: [] }, run: async () => '{"say":"Closing #30001.","show":[],"action":{"type":"close_file","file":"30001"}}', tts });
+  assert.equal(act.answer.audio, undefined, 'Confirm cards are read separately');
+});
+
+test('the real Kokoro voice makes an iPhone-playable recording (skipped if not installed)', async t => {
+  const { kokoroVoice, voiceInstalled } = await import('../lib/voice.js');
+  if (!voiceInstalled()) return t.skip('voice not installed');
+  const tts = kokoroVoice();
+  const b64 = await tts('File 98001 is due Thursday.', false);
+  const buf = Buffer.from(b64 || '', 'base64');
+  assert.ok(buf.length > 5000, 'audio made');
+  assert.equal(buf.subarray(4, 8).toString(), 'ftyp', 'an .m4a (AAC) file');
+  const fr = await tts('Le dossier 98003 est en attente.', true);
+  tts.close();
+  assert.ok(fr && fr.length > 5000, 'French too');
+});
