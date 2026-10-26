@@ -1187,7 +1187,7 @@ const brainOn = () => pref('brain', true);
 const micOn = () => !!SR && pref('mic', false);
 
 function openSheet(opts = {}) {
-  stopWake();
+  if (!opts.keepWake) stopWake();
   D.open = true; unlockAudio();
   $('sheet').classList.add('on'); $('scrim').classList.add('on');
   $('settings').hidden = true; $('chat').hidden = false; $('micBtn').hidden = !micOn();
@@ -1198,6 +1198,7 @@ function openSheet(opts = {}) {
 function closeSheet() {
   D.open = false; stopListening(); speechSynthesis?.cancel(); D.speakTok = (D.speakTok || 0) + 1; try { D.audio?.pause(); } catch {}
   $('sheet').classList.remove('on'); $('scrim').classList.remove('on');
+  stopWake(); $('micBtn').classList.remove('live'); $('interim').textContent = '';
   setTimeout(startWake, 600);   // back to waiting for "Hey Dubbi" (if it's on)
 }
 function bubble(text, who) {
@@ -1586,6 +1587,7 @@ if ('speechSynthesis' in window) speechSynthesis.addEventListener?.('voiceschang
 const recLang = () => D.lang === 'fr' ? 'fr-CA' : D.lang === 'en' ? 'en-CA' : (D.fr ? 'fr-CA' : 'en-CA');
 function startListening() {
   if (!micOn()) return;
+  stopWake();
   speechSynthesis?.cancel(); stopListening();
   const r = new SR(); D.rec = r;
   r.lang = recLang(); r.interimResults = true; r.continuous = false; r.maxAlternatives = 1;
@@ -1606,17 +1608,20 @@ function startListening() {
 function stopListening() { try { D.rec?.stop(); } catch {} }
 
 // "Hey Dubbi" — only while Dubbi is open on screen, only if you turned it on (⚙︎).
-// It listens for the words "Hey Dubbi" (or "Dis Dubbi"); what you say right after
-// is your question. It stops when you leave the app, lock the phone, or open Dubbi.
-// Speech recognition mishears "Dubbi", so close sound-alikes count too.
-const WAKE = /\b(?:hey|hi|ok|okay|dis|salut|allo)[,\s]+(?:dubbi|dubby|dubi|doobie|doobi|dubie|debbie|dobby|dobbie|dubai|dougie|duby|double|tubby|tobi|toby)\b[,.!?\s]*/i;
+// It listens for "Hey Dubbi" (or "Dis Dubbi"); what you say next is your question.
+// ONE listening session does both (iPhones often refuse to restart the microphone
+// without a tap). It stops when you leave the app or lock the phone.
+// Speech recognition writes "Dubbi" many ways (Debbie, Dubai, Toby, Doobie, Dubey…),
+// so any "d/t + vowel + b/p/v + ending" word after "hey" counts.
+const WAKE = /\b(?:hey|hay|hi|hello|ok|okay|dis|salut|allo|allô)[,\s]+(?:(?:d|t)[aeiouy]{1,2}(?:bb?|pp?|v)(?:ie|ee|ey|i|y|e|ai|a|le)|to be|do be|dub be|dougie)\b[,.!?\s]*/i;
 const wakeOn = () => !!SR && micOn() && pref('wake', false);
-const W = { rec: null, want: false, fails: 0 };
-function wakeChip(state) {
+const W = { rec: null, want: false, fails: 0, heardT: null };
+function wakeChip(state, heard) {
   const c = $('wakeChip'); if (!c) return;
   c.hidden = !state || !user;
   c.className = 'wake' + (state === 'on' ? ' on' : state === 'heard' ? ' heard' : '');
-  c.querySelector('span').textContent = state === 'on' ? L('Say “Hey Dubbi”', 'Dites « Dis Dubbi »') : state === 'heard' ? L('Listening…', 'J’écoute…') : L('Tap to hear “Hey Dubbi”', 'Touchez pour « Dis Dubbi »');
+  c.querySelector('span').textContent = state === 'on' ? (heard ? '“…' + heard + '”' : L('Say “Hey Dubbi”', 'Dites « Dis Dubbi »'))
+    : state === 'heard' ? L('Listening…', 'J’écoute…') : L('Tap to hear “Hey Dubbi”', 'Touchez pour « Dis Dubbi »');
 }
 function startWake() {
   if (!wakeOn() || D.open || document.hidden || !user) { wakeChip(wakeOn() && user && !D.open ? 'tap' : null); return; }
@@ -1624,37 +1629,48 @@ function startWake() {
   W.want = true;
   const r = new SR(); W.rec = r;
   r.lang = recLang(); r.continuous = true; r.interimResults = true;
-  let heardAt = 0, question = '', timer = null;
+  let heardAt = 0, question = '', timer = null, done = false;
+  const t0 = Date.now();
   const finish = () => {
-    clearTimeout(timer);
-    const q = question.trim(); W.want = false; try { r.stop(); } catch {}
-    openSheet({ listen: !q });
+    if (done || r._cancel) return; done = true;   // closed or mic tapped meanwhile: ask nothing
+    clearTimeout(timer); W.want = false; try { r.stop(); } catch {}
+    $('micBtn').classList.remove('live'); $('interim').textContent = '';
+    const q = question.trim();
     if (q) ask(q);
+    else { bubble(L('I didn’t hear a question — type it, or tap the mic.', 'Je n’ai pas entendu de question — écrivez-la, ou touchez le micro.'), 'sys'); $('askInput').focus({ preventScroll: true }); }
   };
   r.onresult = e => {
-    // everything heard in this session; the question is what follows the last "Hey Dubbi"
     const text = [...e.results].map(x => x[0].transcript).join(' ');
     const all = [...text.matchAll(new RegExp(WAKE.source, 'gi'))], m = all[all.length - 1];
-    if (!m) return;
-    if (!heardAt) { heardAt = Date.now(); wakeChip('heard'); }
+    if (!m) {
+      // show the last words heard for a moment, so you can see it is listening
+      if (!heardAt) { wakeChip('on', text.trim().split(/\s+/).slice(-4).join(' ')); clearTimeout(W.heardT); W.heardT = setTimeout(() => !heardAt && W.rec && wakeChip('on'), 2500); }
+      return;
+    }
+    if (!heardAt) {
+      heardAt = Date.now(); wakeChip(null);
+      openSheet({ listen: false, keepWake: true });   // the same session keeps listening for your question
+      $('micBtn').classList.add('live');
+    }
     question = text.slice(m.index + m[0].length);
-    // your question ends when you pause (~1.2 s); "Hey Dubbi" alone opens Dubbi listening
+    $('interim').textContent = question.trim() || L('Listening…', 'J’écoute…');
+    // your question ends when you pause; nothing within 8 s → type instead
     clearTimeout(timer);
-    timer = setTimeout(finish, question.trim() ? 1200 : 1500);
+    timer = setTimeout(finish, question.trim() ? 1400 : 8000);
   };
   r.onerror = e => { if (e.error === 'not-allowed' || e.error === 'service-not-allowed') { W.want = false; W.fails = 9; } };
-  const t0 = Date.now();
   r.onend = () => {
-    W.rec = null;
+    if (W.rec === r) W.rec = null;
+    if (r._cancel) return;                       // you closed Dubbi or tapped the mic
+    if (heardAt) return finish();                // the iPhone ended the session: use what was heard
     if (Date.now() - t0 > 5000) W.fails = 0;     // a normal pause, not a failure
-    if (heardAt) return;                         // finish() takes it from here
-    if (W.want && wakeOn() && !D.open && !document.hidden && W.fails < 8) { W.fails++; setTimeout(startWake, 400); return; }
-    wakeChip(wakeOn() && !D.open ? 'tap' : null);   // iPhone wants a tap to start listening again
+    if (W.want && wakeOn() && !D.open && !document.hidden && W.fails < 6) { W.fails++; setTimeout(startWake, 300); return; }
+    wakeChip(wakeOn() && !D.open ? 'tap' : null);   // the iPhone wants a tap to listen again
   };
   try { r.start(); wakeChip('on'); }
   catch { W.rec = null; wakeChip('tap'); }
 }
-function stopWake() { W.want = false; try { W.rec?.abort(); } catch {} W.rec = null; if (!wakeOn()) wakeChip(null); }
+function stopWake() { W.want = false; if (W.rec) { W.rec._cancel = true; try { W.rec.abort(); } catch {} } W.rec = null; if (!wakeOn()) wakeChip(null); }
 document.addEventListener('visibilitychange', () => { if (document.hidden) stopWake(); else setTimeout(startWake, 500); });
 
 // Settings: speaking, language, microphone
