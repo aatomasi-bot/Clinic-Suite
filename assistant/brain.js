@@ -41,9 +41,16 @@ async function main() {
   const run = claudeRunner({ command: ai.command, system: BRAIN_SYSTEM, timeoutMs: 75e3 });
   const tts = ai.voice === false ? null : kokoroVoice();   // null until install-voice.sh has run
   await store.purgeAsks(7).catch(() => {});     // questions are kept a week, then removed
-  const until = Date.now() + 20 * 60e3;
+  const until = Date.now() + (Number(process.env.BRAIN_MINUTES) || 20) * 60e3;   // BRAIN_MINUTES: shorter runs for testing
+  // Watchdog: if the loop stops moving for 3 minutes (a stuck request or voice), quit —
+  // launchd starts a fresh brain within ~10 s. Also a hard stop at 22 minutes.
+  let beat = Date.now();
+  const dog = setInterval(() => {
+    if (Date.now() - beat > 3 * 60e3 || Date.now() > until + 2 * 60e3) { console.error(`[${new Date().toISOString()}] brain: stuck — restarting`); process.exit(1); }
+  }, 15e3);
   let data = null, dataAt = 0;
   while (Date.now() < until) {
+    beat = Date.now();
     const ask = await store.nextAsk();
     if (!ask) { await sleep(1000); continue; }
     if (!(await store.claimAsk(ask.id))) continue;
@@ -64,9 +71,12 @@ async function main() {
       console.error('brain:', e.message);
     }
   }
+  clearInterval(dog);
+  tts?.close?.();
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   fs.mkdirSync(path.join(here, 'state'), { recursive: true });
-  main().catch(async e => { console.error('brain failed:', e.message); await sleep(30e3); process.exitCode = 1; });
+  // exit for real when done: the voice helper must not keep this process alive doing nothing
+  main().then(() => process.exit(0), async e => { console.error('brain failed:', e.message); await sleep(30e3); process.exit(1); });
 }

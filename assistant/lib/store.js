@@ -45,6 +45,8 @@ async function withAuthLock(fn) {
 export async function supabaseStore(cfg) {
   const sb = createClient(cfg.url, cfg.publishableKey, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    // A request that never answers (Mac asleep, Wi-Fi changed) must not hang a job forever
+    global: { fetch: (url, opts = {}) => fetch(url, { ...opts, signal: opts.signal || AbortSignal.timeout(20e3) }) },
   });
   // The refresh key changes on every use; two jobs using it at once could
   // invalidate each other, so only one refreshes at a time.
