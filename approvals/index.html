@@ -248,6 +248,7 @@ nav.tabbar .in{display:flex;width:100%;max-width:520px}
 .msg{max-width:86%;padding:10px 13px;border-radius:18px;font-size:15.5px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere;animation:rise .25s both}
 .msg.me{align-self:flex-end;background:var(--teal);color:#fff;border-bottom-right-radius:6px}
 .msg.bot{align-self:flex-start;background:var(--card);border:1px solid var(--line);border-bottom-left-radius:6px}
+.msg .play{display:block;margin-top:8px;border:0;border-radius:999px;padding:7px 13px;font-weight:800;font-size:13px;background:var(--teal);color:#fff}
 .msg.sys{align-self:center;background:none;color:var(--ink-3);font-size:13px;padding:2px}
 .msg.thinking{display:flex;gap:5px;align-items:center;padding:13px 15px}
 .msg.thinking i{width:7px;height:7px;border-radius:50%;background:var(--teal);opacity:.35;animation:think 1.2s infinite}
@@ -1236,7 +1237,7 @@ async function ask(text, quick = false) {
     }
     if (!out) out = await answer(text);
   } catch (e) { out = { say: D.fr ? 'Je n’arrive pas à lire vos données. Vérifiez la connexion.' : 'I couldn’t read your data. Check your connection.' }; }
-  bubble(out.say, 'bot'); voiceOut(out.say, out.audio);
+  const said = bubble(out.say, 'bot'); voiceOut(out.say, out.audio, said);
   buttons(out.go || []);
   if (out.propose) proposeCard(out.propose);
 }
@@ -1535,22 +1536,43 @@ function silentWav() {
 // iPhones only let a page play sound after a tap: the player is "unlocked" with a
 // silent sound when you open Dubbi or send a question, then reused for every answer.
 function unlockAudio() {
-  if (!D.audio) { D.audio = new Audio(); D.audio.setAttribute('playsinline', ''); }
-  if (D.audioReady) return;
+  if (!D.audio) { D.audio = new Audio(); D.audio.setAttribute('playsinline', ''); D.audio.addEventListener('ended', () => { if (D.audio.src.startsWith('data:audio/mp4')) resumeWake(); }); }
+  if (D.audioReady || !D.audio.paused) return;
   D.audio.src = silentWav();
   D.audio.play().then(() => { D.audioReady = true; }).catch(() => {});
 }
-function playVoice(b64, text) {
-  speechSynthesis?.cancel(); unlockAudio();
-  D.audio.src = 'data:audio/mp4;base64,' + b64;
-  D.audio.play().catch(() => speak(text));   // blocked or unreadable → the phone's voice
+// Any tap anywhere in Dubbi unlocks sound for the rest of this visit (an iPhone rule:
+// a page may only play sound after you have touched it).
+document.addEventListener('pointerdown', () => {
+  unlockAudio();
+  if (!D.ttsReady && 'speechSynthesis' in window) { D.ttsReady = true; try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); } catch {} }
+}, { passive: true });
+// While the microphone is on, the iPhone plays sound through the quiet earpiece:
+// turn every microphone off before Dubbi speaks.
+// When Dubbi has finished speaking, listen for the next "Hey Dubbi" (chat still open)
+function resumeWake() { if (wakeOn() && D.open && !D.rec && !W.rec) setTimeout(() => startWake(true), 400); }
+const speaking = () => (D.audio && !D.audio.paused && !D.audio.ended && D.audio.src.startsWith('data:audio/mp4')) || speechSynthesis?.speaking;
+function micOff() { stopListening(); if (W.rec) stopWake(); $('micBtn').classList.remove('live'); $('interim').textContent = ''; }
+// If the iPhone still blocks the sound, the answer gets a 🔊 Play button (a tap always works).
+function playButton(b, run) {
+  if (!b || b.querySelector('.play')) return;
+  const x = document.createElement('button'); x.type = 'button'; x.className = 'play'; x.textContent = '🔊 ' + L('Play', 'Écouter');
+  x.onclick = e => { e.stopPropagation(); x.remove(); run(); };
+  b.appendChild(x);
 }
-async function voiceOut(text, audio) {
+function playVoice(b64, text, b) {
+  speechSynthesis?.cancel(); micOff();
+  if (!D.audio) unlockAudio();
+  const go = () => { D.audio.src = 'data:audio/mp4;base64,' + b64; D.audio.volume = 1; return D.audio.play(); };
+  // a moment for the iPhone to switch from the microphone to the loudspeaker
+  setTimeout(() => go().then(() => { D.audioReady = true; }).catch(() => playButton(b, () => go().catch(() => speak(text, true)))), 300);
+}
+async function voiceOut(text, audio, b) {
   if (!pref('speak', true)) return;
   const tok = D.speakTok = (D.speakTok || 0) + 1;
-  if (audio && macVoiceOn()) return playVoice(audio, text);
+  if (audio && macVoiceOn()) return playVoice(audio, text, b);
   const bt = S.beat && S.beat.created_at;
-  if (!macVoiceOn() || !user || !bt || hoursSince(bt) > 0.25) return speak(text);
+  if (!macVoiceOn() || !user || !bt || hoursSince(bt) > 0.25) return speak(text, false, b);
   try {
     const { data, error } = await sb.from('dubbi_asks').insert({ question: String(text).slice(0, 1000), lang: 'speak-' + (D.fr ? 'fr' : 'en'), conv: D.conv, user_email: user.email }).select('id').single();
     if (error) throw error;
@@ -1561,25 +1583,27 @@ async function voiceOut(text, audio) {
       if (!row || row.status === 'failed') break;
       if (row.status === 'answered' && row.answer && row.answer.audio) {
         sb.from('dubbi_asks').delete().eq('id', data.id).then(() => {});
-        if (tok === D.speakTok) playVoice(row.answer.audio, text);
+        if (tok === D.speakTok) playVoice(row.answer.audio, text, b);
         return;
       }
     }
     sb.from('dubbi_asks').update({ status: 'cancelled' }).eq('id', data.id).eq('status', 'asked').then(() => {});
   } catch (e) { console.warn('[voice]', e.message || e); }
-  if (tok === D.speakTok) speak(text);
+  if (tok === D.speakTok) speak(text, false, b);
 }
 // "#35037" is read as "file 35037", not "number sign…"
 const sayable = (text, fr) => String(text).replace(/👍/g, '').replace(/#(\d{4,6})/g, (fr ? 'dossier ' : 'file ') + '$1').replace(/—/g, ', ');
-function speak(text, force) {
+function speak(text, force, b) {
   if ((!pref('speak', true) && !force) || !('speechSynthesis' in window)) return;
-  speechSynthesis.cancel();
+  speechSynthesis.cancel(); if (b) micOff();
   const u = new SpeechSynthesisUtterance(sayable(text, D.fr));
   const v = voiceFor(D.fr);
   u.lang = v ? v.lang : (D.fr ? 'fr-CA' : 'en-CA');
   if (v) u.voice = v;
   u.rate = 1;
+  let started = false; u.onstart = () => { started = true; }; u.onend = () => { if (b) resumeWake(); };
   speechSynthesis.speak(u);
+  if (b) setTimeout(() => { if (!started && !speechSynthesis.speaking) playButton(b, () => speak(text, true)); }, 1500);
 }
 if ('speechSynthesis' in window) speechSynthesis.addEventListener?.('voiceschanged', () => { if (!$('settings').hidden) showSettings(); });
 
@@ -1623,8 +1647,11 @@ function wakeChip(state, heard) {
   c.querySelector('span').textContent = state === 'on' ? (heard ? '“…' + heard + '”' : L('Say “Hey Dubbi”', 'Dites « Dis Dubbi »'))
     : state === 'heard' ? L('Listening…', 'J’écoute…') : L('Tap to hear “Hey Dubbi”', 'Touchez pour « Dis Dubbi »');
 }
-function startWake() {
-  if (!wakeOn() || D.open || document.hidden || !user) { wakeChip(wakeOn() && user && !D.open ? 'tap' : null); return; }
+// inChat: also listen while the chat is open (after Dubbi has finished speaking)
+function startWake(inChat = false) {
+  if (!wakeOn() || (D.open && !inChat) || document.hidden || !user) { wakeChip(wakeOn() && user && !D.open ? 'tap' : null); return; }
+  if (D.rec) return;                             // the mic button is listening
+  if (inChat && speaking()) return;              // never while Dubbi is talking (it would go to the earpiece)
   if (W.rec) return;
   W.want = true;
   const r = new SR(); W.rec = r;
@@ -1649,7 +1676,7 @@ function startWake() {
     }
     if (!heardAt) {
       heardAt = Date.now(); wakeChip(null);
-      openSheet({ listen: false, keepWake: true });   // the same session keeps listening for your question
+      if (!D.open) openSheet({ listen: false, keepWake: true });   // the same session keeps listening for your question
       $('micBtn').classList.add('live');
     }
     question = text.slice(m.index + m[0].length);
@@ -1664,7 +1691,7 @@ function startWake() {
     if (r._cancel) return;                       // you closed Dubbi or tapped the mic
     if (heardAt) return finish();                // the iPhone ended the session: use what was heard
     if (Date.now() - t0 > 5000) W.fails = 0;     // a normal pause, not a failure
-    if (W.want && wakeOn() && !D.open && !document.hidden && W.fails < 6) { W.fails++; setTimeout(startWake, 300); return; }
+    if (W.want && wakeOn() && (!D.open || inChat) && !document.hidden && W.fails < 6) { W.fails++; setTimeout(() => startWake(inChat), 300); return; }
     wakeChip(wakeOn() && !D.open ? 'tap' : null);   // the iPhone wants a tap to listen again
   };
   try { r.start(); wakeChip('on'); }
