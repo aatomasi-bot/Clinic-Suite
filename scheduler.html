@@ -761,7 +761,12 @@ async function doLogin(){
   }
 }
 
+// Start once per tab: sign-in refreshes (coming back to the tab, VaPiq refreshing its
+// sign-in in another tab) used to call this again and rebuild every day from scratch,
+// losing the patients you had stacked but not confirmed yet.
+let _booted=false;
 async function bootApp(){
+  if(_booted)return; _booted=true;
   const saved=localStorage.getItem('vapiq_sched_theme')
     ||(window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark');
   document.documentElement.setAttribute('data-theme',saved);
@@ -860,6 +865,8 @@ async function reload(){
       if(due>=eligFrom&&due<=eligTo)pool.push({...p,_sugg:false});
     });
 
+    _restoreStacks(winDates,confirmedIds);
+    _stacksReady=true;
     sortPool();
     // Restore Undo Last Batch button visibility
     const batchData=loadBatch();
@@ -961,7 +968,39 @@ function eyeLink(p){
 // ════════════════════════════════════════════════════════════
 // RENDER GRID
 // ════════════════════════════════════════════════════════════
+// ── Day stacks you built but haven't confirmed: kept for this tab (sessionStorage) ──
+// They survive a reload of the data or of the page (e.g. after looking at the maps in
+// another tab) and are cleared when you confirm the day or close the planner.
+const STACK_KEY='vapiq_sched_stacks';
+function _loadStacks(){try{return JSON.parse(sessionStorage.getItem(STACK_KEY)||'{}');}catch(e){return{};}}
+let _stacksReady=false;   // nothing is saved until the data has loaded once (never an empty grid over your stacks)
+function _saveStacks(){
+  if(!_stacksReady)return;
+  try{
+    const all=_loadStacks(),winD=windowDates();
+    winD.forEach((ds,i)=>{const a=(days[i]&&days[i].active)||[];all[ds]=a.map(p=>({id:p.id,s:!!p._sugg}));});
+    sessionStorage.setItem(STACK_KEY,JSON.stringify(all));
+  }catch(e){}
+}
+function _restoreStacks(winDates,confirmedIds){
+  const saved=_loadStacks(); if(!Object.keys(saved).length)return;
+  const byId=new Map(allPats.map(p=>[String(p.id),p]));
+  const taken=new Set();
+  winDates.forEach(ds=>{(saved[ds]||[]).forEach(x=>taken.add(String(x.id)));});
+  winDates.forEach((ds,i)=>{
+    if(!saved[ds])return;
+    // what the fresh plan had put here but you had moved elsewhere goes back to the pool
+    days[i].active.forEach(p=>{if(!taken.has(String(p.id)))pool.push({...p,_sugg:false});});
+    days[i].active=saved[ds].map(x=>byId.get(String(x.id))).filter(p=>p&&!confirmedIds.has(p.id))
+      .map(p=>({...p,_sugg:!!(saved[ds].find(x=>String(x.id)===String(p.id))||{}).s}));
+  });
+  // a restored patient appears only once: remove it from other days and from the pool
+  winDates.forEach((ds,i)=>{if(!saved[ds])days[i].active=days[i].active.filter(p=>!taken.has(String(p.id)));});
+  const seen=new Set();
+  pool=pool.filter(p=>!taken.has(String(p.id))&&!seen.has(String(p.id))&&seen.add(String(p.id)));
+}
 function renderGrid(){
+  _saveStacks();
   const grid=document.getElementById('grid');
   const winD=windowDates();
   const tod=todayYMD();
