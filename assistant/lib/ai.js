@@ -24,15 +24,32 @@ const RULES = [
   [/\b[A-Za-z]\d[A-Za-z][\s-]?\d[A-Za-z]\d\b/g, '[postal code]'],
   // "1234 Boulevard Deguire", "45, rue Saint-Denis", "2-310 avenue X" (apartment-number forms too)
   [/\b\d{1,5}(?:-\d{1,5})?,?\s+(?:rue|boul(?:evard)?\.?|bd\.?|avenue|av\.?|chemin|ch\.?|street|st\.?|road|rd\.?|drive|dr\.?|place|pl\.?|crescent|croissant|terrasse|mont[ée]e|rang|route|autoroute|ave\.?)\b[^\n,.;]{0,40}/gi, '[address]'],
-  [/\b(?:apt|app|appartement|apartment|unit|unité|suite|bureau)\.?\s*#?\s*\w{1,6}\b/gi, '[unit]'],
+  [/\b(?:apt|app|appartement|apartment|unit|unité|suite|bureau)\b\.?\s*#?\s*(?:\d[\w-]{0,5}|[A-Z])\b/gi, '[unit]'],
 ];
-export function redact(text) {
+// Patient names out too (Oct 26, 2026 — authorization requires confidential information
+// removed): known names for the card, titles + names ("Mr. Kim", "Mme Tremblay"), and
+// Medicum's "First LASTNAME" style.
+const FAMILY = 'daughter|son|wife|husband|spouse|partner|mother|father|sister|brother|caregiver|niece|nephew|friend|neighbou?r|fille|fils|épouse|epouse|époux|epoux|conjointe?|femme|mari|mère|mere|père|pere|sœur|soeur|frère|frere|aidante?|nièce|niece|neveu|amie?|voisine?';
+// family words match with or without a capital first letter; the NAME after them must start with a capital
+const FAMILY_RE = FAMILY.split('|').map(w => `[${w[0].toUpperCase()}${w[0]}]${w.slice(1)}`).join('|');
+const NAME_RULES = [
+  [/\b(?:Mr|Mrs|Ms|Miss|Mister|Dr|M|Mme|Mlle|Madame|Monsieur)\.?\s+[A-ZÀ-Ý][a-zà-ÿ'-]+(?:\s+[A-ZÀ-Ý][A-Za-zà-ÿ'-]+)?/g, '[patient]'],
+  [/\b[A-ZÀ-Ý][a-zà-ÿ'-]+(?:\s+[A-ZÀ-Ý][a-zà-ÿ'-]+)?\s+[A-ZÀ-Ý]{2,}(?:[\s-][A-ZÀ-Ý]{2,})*\b/g, '[patient]'],
+  // family and contacts: "his daughter Anna", "Saliou (mother)", "sa fille Marie"
+  [new RegExp(`\\b(${FAMILY_RE})\\s+(?:named\\s+|nommée?\\s+)?[A-ZÀ-Ý][a-zà-ÿ'-]+(?:\\s+[A-ZÀ-Ý][A-Za-zà-ÿ'-]+)?`, 'g'), '$1 [name]'],
+  [new RegExp(`\\b[A-ZÀ-Ý][a-zà-ÿ'-]+(?:\\s+[A-ZÀ-Ý][A-Za-zà-ÿ'-]+)?\\s*\\((${FAMILY_RE})\\)`, 'g'), '[name] ($1)'],
+];
+export function redact(text, names = []) {
   let s = String(text || '');
   for (const [re, by] of RULES) s = s.replace(re, by);
-  return s;
+  const escRe = p => p.replace(/[.*+?^${}()|[\]\\]/g, ch => '\\' + ch);
+  for (const n of names) for (const part of String(n || '').split(/[\s,]+/).filter(p => p.length > 2))
+    s = s.replace(new RegExp(`\\b${escRe(part)}\\b`, 'gi'), '[patient]');
+  for (const [re, by] of NAME_RULES) s = s.replace(re, by);
+  return s.replace(/\[patient\](?:\s+\[patient\])+/g, '[patient]');
 }
 // The part of a coordinator email the AI may see: her message, cleaned, capped.
-export const excerptOf = body => redact(openingText(body)).replace(/\n{3,}/g, '\n\n').trim().slice(0, 1500);
+export const excerptOf = (body, names = []) => redact(openingText(body), names).replace(/\n{3,}/g, '\n\n').trim().slice(0, 1500);
 
 // ── What we ask ────────────────────────────────────────────────────────────
 export const ACTIONS = {
@@ -50,7 +67,7 @@ Rules:
 - Keep every fact from the standard draft (file numbers, what was done, which documents are missing).
 - Never invent facts, dates, times, doses, phone numbers, actions or promises that are not in the draft, the message or the nurse's instruction (e.g. do not say you noted, called or sent anything unless the draft says so).
 - Keep the greeting line and end exactly with the same closing and signature as the draft.
-- Text in [brackets] like [phone] was removed for privacy: never try to fill it in.`;
+- Text in [brackets] like [phone] or [patient] was removed for privacy: never try to fill it in, and never write a patient's name.`;
 
 export function buildPrompt({ action = 'suggest', instruction = '', draft = '', excerpt = '' }) {
   const ask = action === 'custom' ? `Rewrite the reply following this instruction from the nurse: "${String(instruction).slice(0, 400)}"` : (ACTIONS[action] || ACTIONS.suggest);
@@ -87,10 +104,11 @@ export function claudeRunner({ command, timeoutMs = 90e3 } = {}) {
 }
 
 // One request → { text } or { error }
-export async function aiReply({ run, action, instruction, draft, excerpt }) {
+export async function aiReply({ run, action, instruction, draft, excerpt, names = [] }) {
   try {
-    const raw = await run(buildPrompt({ action, instruction, draft, excerpt }));
-    const c = checkReply(raw, draft);
+    // last pass right before sending: no names or contact details in anything we send
+    const raw = await run(buildPrompt({ action, instruction: redact(instruction, names), draft: redact(draft, names), excerpt: redact(excerpt, names) }));
+    const c = checkReply(raw, redact(draft, names));
     return c.ok ? { text: c.text } : { error: `Suggestion not used (${c.why})` };
   } catch (e) { return { error: /usage limit|rate limit|quota/i.test(e.message) ? 'Claude usage limit reached — try later' : e.message }; }
 }

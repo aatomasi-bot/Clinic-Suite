@@ -51,3 +51,12 @@ test('privacy switch: real cards are never sent to Claude until realEmails is on
   const again = await processAi({ tasks: [{ ...tasks[1], details: off[0].details }], run, realEmails: false });
   assert.equal(again.length, 0, 'one suggestion per card, not every 30 seconds');
 });
+
+test('patient names are removed too (authorization: confidential information out)', () => {
+  const s = redact('Please be advised that Mr. Kim Testcase 34451 is in hospital. Rene ABEL #35037 and Mme Tremblay too. Jean Doe called.', ['Jean Doe']);
+  for (const bad of ['Kim', 'Testcase', 'Rene', 'ABEL', 'Tremblay', 'Jean', 'Doe']) assert.ok(!s.includes(bad), bad + ' must be removed');
+  assert.match(s, /\[patient\] 34451 is in hospital/);
+  assert.match(s, /#35037/, 'file numbers stay');
+  assert.equal(redact('His daughter Anna will call; Saliou (mother) too.'), 'His daughter [name] will call; [name] (mother) too.', 'family names');
+  assert.equal(redact('Hello Abdul, please confirm.'), 'Hello Abdul, please confirm.', 'ordinary sentences untouched');
+});
