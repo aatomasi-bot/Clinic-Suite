@@ -128,11 +128,12 @@ suggested reply on each reply card, and for the rewrites you ask for in Dubbi (S
 More formal, En français, In English, Add a thank-you, or your own instruction). It only
 suggests: **Use this** puts the text in the reply box; you still review and tap Send.
 
-- Claude sees only the coordinator's own message with phone numbers, emails, street
-  addresses, postal codes and links removed (`lib/ai.js` redact), plus the standard draft.
+- Claude sees only the coordinator's own message with patient names, family members'
+  names, phone numbers, emails, street addresses, postal codes and links removed
+  (`lib/ai.js` redact, applied again right before sending), plus the standard draft.
   It runs with no tools, no MCP servers, no settings and no saved session.
-- **Privacy switch:** `"ai": { "realEmails": false }` (default) = TEST cards only. Set it to
-  `true` in `config.json` only after your privacy officer approves.
+- **Privacy switch:** `"ai": { "realEmails": false }` (default) = TEST cards only. Turned on in
+  `config.json` on Oct 26, 2026 after authorization (confidential information removed).
 - Suggestions that lose the file number or signature, or add contact details, are dropped.
 
 ## Notes to Medicum from VaPiq

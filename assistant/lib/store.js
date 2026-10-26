@@ -121,7 +121,7 @@ export async function supabaseStore(cfg) {
     // Reply cards for the AI job: open replies of the last 30 days (filtered in ai-queue.js)
     async tasksForAi() {
       const since = new Date(Date.now() - 30 * 864e5).toISOString();
-      return must(await sb.from('email_tasks').select('id,status,is_test,reply_body,details')
+      return must(await sb.from('email_tasks').select('id,status,is_test,reply_body,details,existing_patient')
         .in('status', ['reply_ready', 'todo', 'waiting_docs', 'failed']).gte('created_at', since).limit(200));
     },
     // Items you chose to "Leave it" whose email still has the assistant's ★

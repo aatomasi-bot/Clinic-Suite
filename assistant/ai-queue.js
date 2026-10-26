@@ -24,13 +24,14 @@ export async function processAi({ tasks, run, realEmails, maxPerRun = 4, now = (
       continue;
     }
     const draft = t.reply_body || '';
+    const names = [t.existing_patient && t.existing_patient.patient_name, d.patient_name].filter(Boolean);
     if (!draft.trim()) continue;
     if (req && !req.done) {                                        // a rewrite you asked for
-      const r = await aiReply({ run, action: req.action, instruction: req.instruction, draft: req.base || draft, excerpt: d.excerpt });
+      const r = await aiReply({ run, action: req.action, instruction: req.instruction, draft: req.base || draft, excerpt: d.excerpt, names });
       updates.push({ id: t.id, details: { ...d, ai_request: { ...req, done: now() },
         ...(r.text ? { ai_suggestion: { text: r.text, action: req.action, at: now() }, ai_error: null } : { ai_error: r.error }) } });
     } else if (t.status === 'reply_ready' && !d.ai_suggestion && !d.ai_error) {   // first suggestion
-      const r = await aiReply({ run, action: 'suggest', draft, excerpt: d.excerpt });
+      const r = await aiReply({ run, action: 'suggest', draft, excerpt: d.excerpt, names });
       updates.push({ id: t.id, details: { ...d, ...(r.text ? { ai_suggestion: { text: r.text, action: 'suggest', at: now() } } : { ai_error: r.error }) } });
     }
   }
