@@ -21,7 +21,7 @@ import { findExisting, sameNameOtherFile, patientStatus, normFile } from './lib/
 import { buildRecord, toIsoDate } from './lib/record.js';
 import { parsePdf, parseScan, repeatsFor } from './lib/pdf.js';
 import { needsSignature, emailDueDate, cardNotes, signedBy, openingText, patientUpdate } from './lib/emailinfo.js';
-import { excerptOf } from './lib/ai.js';
+import { excerptOf, redact } from './lib/ai.js';
 import { testFolderSource, imapSource } from './lib/sources.js';
 import { supabaseStore, offlineStore } from './lib/store.js';
 import { summaryText, macNotification, pushToPhones } from './lib/notify.js';
@@ -108,24 +108,30 @@ export async function runIntake({ source, store, rules, replies = {}, isTest, lo
     if (question) {
       const key = sha(`${email.messageId}|question`);
       if ((await store.knownTaskKeys([key])).size) { counts.already++; return; }
-      const fileNo = subjectFile || ((openingText(email.bodyText).match(/\b\d{4,6}\b/) || [])[0]) || '';
+      // Every file number in the subject and her message (phone numbers removed first) — a follow-up often lists several
+      const nums = [...new Set(`${email.subject} ${redact(openingText(email.bodyText))}`.match(/\b\d{4,6}\b/g) || [])];
+      const known = nums.filter(n => findExisting(n, patients));
+      const fileList = known.length ? known : nums.slice(0, 1);
+      const fileNo = fileList[0] || '';
+      const factOf = n => { const p = findExisting(n, patients);
+        return { file: n, found: !!p, onHold: !!(p && p.archived), appointment: (p && p.appointment_date_time) || null, confirmed: !!(p && p.appointment_confirmed) }; };
+      const facts = fileList.length > 1 ? { files: fileList.map(factOf) } : factOf(fileNo);
       const existing = fileNo ? findExisting(fileNo, patients) : null;
-      const facts = { found: !!existing, onHold: !!(existing && existing.archived),
-        appointment: (existing && existing.appointment_date_time) || null, confirmed: !!(existing && existing.appointment_confirmed) };
+      const names = fileList.map(n => (findExisting(n, patients) || {}).patient_name);
       let id;
       try { id = await store.insertTask({ ...replyBase, kind: 'question', status: 'reply_ready', source_key: key,
         file_number: fileNo || null, existing_patient: existingSummary(existing),
-        warnings: fileNo && !existing ? [`File #${fileNo} is not in VaPiq.`] : [],
+        warnings: nums.filter(n => !findExisting(n, patients)).slice(0, 3).map(n => `File #${n} is not in VaPiq.`),
         reply_body: replies.enabled === false ? null : draftReply({ kind: 'question', lang, coordinatorName, fileNumber: fileNo, subjectRef, signature: replies.signature || '', facts }),
         // the patient's name is removed too: Claude only sees "[patient]"
-        details: { excerpt: excerptOf(email.bodyText, [existing && existing.patient_name]), signature: replies.signature || '', facts } }); }
+        details: { excerpt: excerptOf(email.bodyText, names), signature: replies.signature || '', facts, files: fileList } }); }
       catch (e) {
         if (/check constraint|violates/i.test(e.message)) { log('  wait    question email — run supabase/2026-10-26_coordinator_questions.sql'); counts.skipped++; return; }
         throw e;
       }
       await store.audit('ASSISTANT_QUESTION', fileNo || null, { task_id: id, test: !!isTest });
       counts.questions = (counts.questions || 0) + 1;
-      log(`  question card ${id}${fileNo ? ` for #${fileNo}` : ''}`);
+      log(`  question card ${id}${fileList.length ? ` for ${fileList.length} file${fileList.length > 1 ? 's' : ''}` : ''}`);
       await source.markHandled(email);
       return;
     }

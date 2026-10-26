@@ -98,12 +98,28 @@ function newPatientSentence(lang, r, docs) {
 
 // A coordinator's question ("has the patient been contacted?") → what VaPiq knows about the file.
 // facts = { found, onHold, appointment: 'YYYY-MM-DDTHH:MM', confirmed }. Only facts, nothing made up.
+// Several patients in one follow-up: facts = { files: [{ file, found, onHold, appointment, confirmed }, …] } → one line each.
+function fileLine(lang, f) {
+  const fr = lang === 'fr', r = fmtRef(f.file), d = apptText(lang, f.appointment);
+  if (!f.found) return fr ? `Dossier ${r} : je vérifie et je vous reviens rapidement.` : `File ${r}: I will look into it and get back to you shortly.`;
+  if (f.onHold) return fr ? `Dossier ${r} : présentement en attente dans ma liste.` : `File ${r}: currently on hold in my patient list.`;
+  if (d) return fr ? `Dossier ${r} : injection prévue le ${d}${f.confirmed ? ', rendez-vous confirmé' : ''}.` : `File ${r}: injection scheduled for ${d}${f.confirmed ? ', confirmed with the patient' : ''}.`;
+  return fr ? `Dossier ${r} : rendez-vous pas encore fixé. Je communiquerai avec la personne et je vous confirmerai la date.` : `File ${r}: appointment not booked yet. I will contact the patient and confirm the date with you.`;
+}
+function apptText(lang, appointment) {
+  const fr = lang === 'fr', m = String(appointment || '').match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}))?/);
+  if (!m) return '';
+  const day = new Date(+m[1], +m[2] - 1, +m[3]).toLocaleDateString(fr ? 'fr-CA' : 'en-CA', { weekday: 'long', month: 'long', day: 'numeric' });
+  return day + (m[4] ? (fr ? ` à ${+m[4]} h ${m[5]}` : ` at ${m[4]}:${m[5]}`) : '');
+}
 function questionSentence(lang, r, facts) {
+  if (facts && facts.files && facts.files.length > 1)
+    return (lang === 'fr' ? 'Merci pour votre message. Voici le suivi des dossiers :' : 'Thank you for your message. Here is an update on these files:')
+      + '\n' + facts.files.map(f => '- ' + fileLine(lang, f)).join('\n');
+  if (facts && facts.files) facts = facts.files[0] || {};
   const f = facts || {}, fr = lang === 'fr', file = r ? (fr ? ` pour le dossier ${r}` : ` for file ${r}`) : '';
   const about = r ? (fr ? ` concernant le dossier ${r}` : ` about file ${r}`) : '';
-  const m = String(f.appointment || '').match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}))?/);
-  const day = m && new Date(+m[1], +m[2] - 1, +m[3]).toLocaleDateString(fr ? 'fr-CA' : 'en-CA', { weekday: 'long', month: 'long', day: 'numeric' });
-  const at = m && m[4] ? (fr ? ` à ${+m[4]} h ${m[5]}` : ` at ${m[4]}:${m[5]}`) : '';
+  const day = apptText(lang, f.appointment), at = '';
   if (fr) {
     if (!r || !f.found) return `Merci pour votre message${about}. Je vérifie et je vous reviens rapidement.`;
     if (f.onHold) return `Merci pour votre message. Le dossier ${r} est présentement en attente dans ma liste.`;
