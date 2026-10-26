@@ -1197,7 +1197,7 @@ function openSheet(opts = {}) {
   if (micOn()) startListening(); else setTimeout(() => $('askInput').focus({ preventScroll: true }), 300);
 }
 function closeSheet() {
-  D.open = false; stopListening(); speechSynthesis?.cancel(); D.speakTok = (D.speakTok || 0) + 1; try { D.audio?.pause(); } catch {}
+  D.open = false; stopListening(); speechSynthesis?.cancel(); D.speakTok = (D.speakTok || 0) + 1; try { D.audio?.pause(); } catch {} try { D.src?.stop(); } catch {} D.src = null;
   $('sheet').classList.remove('on'); $('scrim').classList.remove('on');
   stopWake(); $('micBtn').classList.remove('live'); $('interim').textContent = '';
   setTimeout(startWake, 600);   // back to waiting for "Hey Dubbi" (if it's on)
@@ -1543,15 +1543,40 @@ function unlockAudio() {
 }
 // Any tap anywhere in Dubbi unlocks sound for the rest of this visit (an iPhone rule:
 // a page may only play sound after you have touched it).
+// The iPhone's audio engine (Web Audio): one tap unlocks it for the whole visit, and
+// it can then play answers that arrive later by themselves — a plain <audio> player
+// often can't. "playback" mode = loudspeaker, even with the phone on silent.
+function audioCtx() {
+  const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return null;
+  if (!D.ctx) D.ctx = new AC();
+  return D.ctx;
+}
+function unlockCtx() {
+  const c = audioCtx(); if (!c) return;
+  if (c.state !== 'running') c.resume().catch(() => {});
+  try { const x = c.createBufferSource(); x.buffer = c.createBuffer(1, 1, 22050); x.connect(c.destination); x.start(0); } catch {}
+}
+function audioMode(t) { try { if (navigator.audioSession) navigator.audioSession.type = t; } catch {} }
+async function playCtx(b64) {
+  const c = audioCtx(); if (!c) throw new Error('no audio engine');
+  if (c.state !== 'running') await Promise.race([c.resume(), new Promise(r => setTimeout(r, 400))]);
+  if (c.state !== 'running') throw new Error('locked');
+  const bin = Uint8Array.from(atob(b64), ch => ch.charCodeAt(0));
+  const buf = await c.decodeAudioData(bin.buffer);
+  try { D.src?.stop(); } catch {}
+  const x = c.createBufferSource(); x.buffer = buf; x.connect(c.destination);
+  x.onended = () => { if (D.src === x) { D.src = null; resumeWake(); } };
+  D.src = x; x.start(0);
+}
 document.addEventListener('pointerdown', () => {
-  unlockAudio();
+  unlockCtx(); unlockAudio();
   if (!D.ttsReady && 'speechSynthesis' in window) { D.ttsReady = true; try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); } catch {} }
 }, { passive: true });
 // While the microphone is on, the iPhone plays sound through the quiet earpiece:
 // turn every microphone off before Dubbi speaks.
 // When Dubbi has finished speaking, listen for the next "Hey Dubbi" (chat still open)
 function resumeWake() { if (wakeOn() && D.open && !D.rec && !W.rec) setTimeout(() => startWake(true), 400); }
-const speaking = () => (D.audio && !D.audio.paused && !D.audio.ended && D.audio.src.startsWith('data:audio/mp4')) || speechSynthesis?.speaking;
+const speaking = () => !!D.src || (D.audio && !D.audio.paused && !D.audio.ended && D.audio.src.startsWith('data:audio/mp4')) || speechSynthesis?.speaking;
 function micOff() { stopListening(); if (W.rec) stopWake(); $('micBtn').classList.remove('live'); $('interim').textContent = ''; }
 // If the iPhone still blocks the sound, the answer gets a 🔊 Play button (a tap always works).
 function playButton(b, run) {
@@ -1561,11 +1586,11 @@ function playButton(b, run) {
   b.appendChild(x);
 }
 function playVoice(b64, text, b) {
-  speechSynthesis?.cancel(); micOff();
-  if (!D.audio) unlockAudio();
-  const go = () => { D.audio.src = 'data:audio/mp4;base64,' + b64; D.audio.volume = 1; return D.audio.play(); };
-  // a moment for the iPhone to switch from the microphone to the loudspeaker
-  setTimeout(() => go().then(() => { D.audioReady = true; }).catch(() => playButton(b, () => go().catch(() => speak(text, true)))), 300);
+  speechSynthesis?.cancel(); micOff(); audioMode('playback');
+  const viaTag = () => { if (!D.audio) unlockAudio(); D.audio.src = 'data:audio/mp4;base64,' + b64; D.audio.volume = 1; return D.audio.play().then(() => { D.audioReady = true; }); };
+  // a moment for the iPhone to switch from the microphone to the loudspeaker; then the
+  // audio engine, else the <audio> player, else a 🔊 Play button (a tap always works)
+  setTimeout(() => playCtx(b64).catch(viaTag).catch(() => playButton(b, () => { unlockCtx(); playCtx(b64).catch(viaTag).catch(() => speak(text, true)); })), 300);
 }
 async function voiceOut(text, audio, b) {
   if (!pref('speak', true)) return;
@@ -1613,6 +1638,7 @@ function startListening() {
   if (!micOn()) return;
   stopWake();
   speechSynthesis?.cancel(); stopListening();
+  audioMode('play-and-record');
   const r = new SR(); D.rec = r;
   r.lang = recLang(); r.interimResults = true; r.continuous = false; r.maxAlternatives = 1;
   let final = '';
@@ -1655,6 +1681,7 @@ function startWake(inChat = false) {
   if (W.rec) return;
   W.want = true;
   const r = new SR(); W.rec = r;
+  audioMode('play-and-record');
   r.lang = recLang(); r.continuous = true; r.interimResults = true;
   let heardAt = 0, question = '', timer = null, done = false;
   const t0 = Date.now();
