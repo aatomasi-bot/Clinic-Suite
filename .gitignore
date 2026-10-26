@@ -10,3 +10,6 @@ assistant/test-inbox/
 # Local Claude preview settings
 .claude/
 supabase/.temp/
+
+# Dubbi voice (Kokoro): private Python, packages and model — local only
+assistant/voice/

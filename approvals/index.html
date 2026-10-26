@@ -10,7 +10,7 @@
                  font-src https://fonts.gstatic.com;
                  img-src 'self' data:;
                  connect-src 'self' https://*.supabase.co;
-                 media-src 'self';">
+                 media-src 'self' data: blob:;">
   <meta name="robots" content="noindex, nofollow">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -1178,14 +1178,14 @@ const brainOn = () => pref('brain', true);
 const micOn = () => !!SR && pref('mic', false);
 
 function openSheet() {
-  D.open = true;
+  D.open = true; unlockAudio();
   $('sheet').classList.add('on'); $('scrim').classList.add('on');
   $('settings').hidden = true; $('chat').hidden = false; $('micBtn').hidden = !micOn();
   if (!$('chat').children.length) greetDubbi();
   if (micOn()) startListening(); else setTimeout(() => $('askInput').focus({ preventScroll: true }), 300);
 }
 function closeSheet() {
-  D.open = false; stopListening(); speechSynthesis?.cancel();
+  D.open = false; stopListening(); speechSynthesis?.cancel(); D.speakTok = (D.speakTok || 0) + 1; try { D.audio?.pause(); } catch {}
   $('sheet').classList.remove('on'); $('scrim').classList.remove('on');
 }
 function bubble(text, who) {
@@ -1223,7 +1223,7 @@ async function ask(text, quick = false) {
     }
     if (!out) out = await answer(text);
   } catch (e) { out = { say: D.fr ? 'Je n’arrive pas à lire vos données. Vérifiez la connexion.' : 'I couldn’t read your data. Check your connection.' }; }
-  bubble(out.say, 'bot'); speak(out.say);
+  bubble(out.say, 'bot'); voiceOut(out.say, out.audio);
   buttons(out.go || []);
   if (out.propose) proposeCard(out.propose);
 }
@@ -1262,11 +1262,11 @@ async function brainAnswer(text) {
 function fromBrain(a) {
   const items = todoItems();
   const go = (a.show || []).map(f => { const i = items.find(i => normFile(fileOf(i)) === normFile(f)); return i ? showBtn(i) : [`#${f}`, () => ask(f, true)]; });
-  const out = { say: a.say, go };
+  const out = { say: a.say, go, audio: a.audio || null };
   const cmd = a.action && BRAIN_CMD[a.action.type];
   if (cmd) {
     const r = actionFor(plain(cmd(a.action.file)), String(a.action.file), items);
-    if (r && r.propose) { out.propose = r.propose; out.say = r.say; }
+    if (r && r.propose) { out.propose = r.propose; out.say = r.say; out.audio = null; }
     else if (r) out.say = a.say + ' ' + r.say;
   }
   return out;
@@ -1285,7 +1285,7 @@ function proposeCard(p) {
 }
 function cancelProposal() {
   D.pending = null; document.querySelectorAll('#chat .prop').forEach(n => n.remove());
-  const m = L('Okay, I didn’t do it.', 'D’accord, je n’ai rien fait.'); bubble(m, 'bot'); speak(m);
+  const m = L('Okay, I didn’t do it.', 'D’accord, je n’ai rien fait.'); bubble(m, 'bot'); voiceOut(m);
 }
 function runProposal(p) {
   D.pending = null; document.querySelectorAll('#chat .prop').forEach(n => n.remove());
@@ -1507,6 +1507,55 @@ function voiceFor(fr) {
   const list = voicesFor(fr), chosen = pref(fr ? 'voice_fr' : 'voice_en', '');
   return list.find(v => v.voiceURI === chosen) || list[0] || null;
 }
+// ── Natural voice: Kokoro, made on YOUR Mac (free, offline there) ──
+// Claude's answers arrive with their recording. For Dubbi's own quick answers the
+// Mac is asked to read the text (a "speak" row). No answer within ~5 s, Mac offline,
+// or switched off in ⚙︎ → the iPhone's own voice, as before.
+const macVoiceOn = () => pref('macvoice', true);
+function silentWav() {
+  const n = 400, b = new ArrayBuffer(44 + n), v = new DataView(b), w = (o, t) => [...t].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+  w(0, 'RIFF'); v.setUint32(4, 36 + n, true); w(8, 'WAVE'); w(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, 8000, true); v.setUint32(28, 8000, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true); w(36, 'data'); v.setUint32(40, n, true);
+  for (let i = 0; i < n; i++) v.setUint8(44 + i, 128);
+  return URL.createObjectURL(new Blob([b], { type: 'audio/wav' }));
+}
+// iPhones only let a page play sound after a tap: the player is "unlocked" with a
+// silent sound when you open Dubbi or send a question, then reused for every answer.
+function unlockAudio() {
+  if (!D.audio) { D.audio = new Audio(); D.audio.setAttribute('playsinline', ''); }
+  if (D.audioReady) return;
+  D.audio.src = silentWav();
+  D.audio.play().then(() => { D.audioReady = true; }).catch(() => {});
+}
+function playVoice(b64, text) {
+  speechSynthesis?.cancel(); unlockAudio();
+  D.audio.src = 'data:audio/mp4;base64,' + b64;
+  D.audio.play().catch(() => speak(text));   // blocked or unreadable → the phone's voice
+}
+async function voiceOut(text, audio) {
+  if (!pref('speak', true)) return;
+  const tok = D.speakTok = (D.speakTok || 0) + 1;
+  if (audio && macVoiceOn()) return playVoice(audio, text);
+  const bt = S.beat && S.beat.created_at;
+  if (!macVoiceOn() || !user || !bt || hoursSince(bt) > 0.25) return speak(text);
+  try {
+    const { data, error } = await sb.from('dubbi_asks').insert({ question: String(text).slice(0, 1000), lang: 'speak-' + (D.fr ? 'fr' : 'en'), conv: D.conv, user_email: user.email }).select('id').single();
+    if (error) throw error;
+    const t0 = Date.now();
+    while (Date.now() - t0 < 5000 && tok === D.speakTok) {
+      await new Promise(r => setTimeout(r, 400));
+      const { data: row } = await sb.from('dubbi_asks').select('status,answer').eq('id', data.id).maybeSingle();
+      if (!row || row.status === 'failed') break;
+      if (row.status === 'answered' && row.answer && row.answer.audio) {
+        sb.from('dubbi_asks').delete().eq('id', data.id).then(() => {});
+        if (tok === D.speakTok) playVoice(row.answer.audio, text);
+        return;
+      }
+    }
+    sb.from('dubbi_asks').update({ status: 'cancelled' }).eq('id', data.id).eq('status', 'asked').then(() => {});
+  } catch (e) { console.warn('[voice]', e.message || e); }
+  if (tok === D.speakTok) speak(text);
+}
 // "#35037" is read as "file 35037", not "number sign…"
 const sayable = (text, fr) => String(text).replace(/👍/g, '').replace(/#(\d{4,6})/g, (fr ? 'dossier ' : 'file ') + '$1').replace(/—/g, ', ');
 function speak(text, force) {
@@ -1549,7 +1598,8 @@ function showSettings() {
   $('chat').hidden = true; const s = $('settings'); s.hidden = false;
   s.innerHTML = `
     <div class="setrow"><div>Dubbi’s brain (Claude)<small>Your questions go to your Mac, which asks Claude with your subscription. Claude sees file numbers, dates and statuses — never names or addresses. Off = quick fixed answers only.</small></div><input type="checkbox" class="sw" data-p="brain" ${brainOn() ? 'checked' : ''}></div>
-    <div class="setrow"><div>Speak answers aloud<small>Uses your iPhone’s own voices, on the phone.</small></div><input type="checkbox" class="sw" data-p="speak" ${pref('speak', true) ? 'checked' : ''}></div>
+    <div class="setrow"><div>Speak answers aloud<small>Dubbi reads its answers to you.</small></div><input type="checkbox" class="sw" data-p="speak" ${pref('speak', true) ? 'checked' : ''}></div>
+    <div class="setrow"><div>Natural voice (from your Mac)<small>A free AI voice (Kokoro) made on your Mac — nothing goes to any other company. When your Mac is off, the iPhone voice below is used.</small></div><input type="checkbox" class="sw" data-p="macvoice" ${macVoiceOn() ? 'checked' : ''}></div>
     ${[[false, 'English voice'], [true, 'Voix française']].map(([fr, label]) => { const list = voicesFor(fr), cur = voiceFor(fr); return `
     <div class="setrow" style="display:block"><div>${label}<small>${list.some(v => /premium|enhanced|naturelle?|am[ée]lior/i.test(v.name)) ? 'Premium and Enhanced voices sound the most natural.' : 'For a natural voice, download one (see below).'}</small></div>
       <div class="vrow"><select data-voice="${fr ? 'fr' : 'en'}" aria-label="${label}">${list.length ? list.map(v => `<option value="${esc(v.voiceURI)}"${cur && v.voiceURI === cur.voiceURI ? ' selected' : ''}>${esc(v.name)} · ${esc(v.lang.replace('_', '-'))}</option>`).join('') : '<option>Loading voices…</option>'}</select>
@@ -1578,7 +1628,7 @@ $('scrim').addEventListener('click', closeSheet);
 $('closeSheet').addEventListener('click', closeSheet);
 $('setBtn').addEventListener('click', () => $('settings').hidden ? showSettings() : ($('settings').hidden = true, $('chat').hidden = false));
 $('micBtn').addEventListener('click', () => D.rec ? stopListening() : startListening());
-$('askForm').addEventListener('submit', e => { e.preventDefault(); ask($('askInput').value); });
+$('askForm').addEventListener('submit', e => { e.preventDefault(); unlockAudio(); ask($('askInput').value); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && D.open) closeSheet(); });
 
 // ── iPhone / browser push ───────────────────────────────────────────────

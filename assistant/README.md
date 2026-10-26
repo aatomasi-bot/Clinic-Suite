@@ -158,6 +158,11 @@ send", "Missing documents", a file number, or "Find <name>" (English or French).
   and answers in ~5–10 seconds. Claude sees **file numbers, dates, statuses, dose and
   city only** — names in your question become file numbers first, and names are put
   back on your Mac for you to read. Questions are deleted after 7 days.
+- **Natural voice (free, on your Mac):** `./install-voice.sh` installs Kokoro, an
+  open-source AI voice, into `assistant/voice/` (~420 MB, no admin password; pinned
+  versions, model checked by SHA-256). Your Mac records every answer — Claude's and
+  the quick ones — and Dubbi plays it. It runs offline, so nothing goes to any other
+  company. `./install-voice.sh remove` deletes it all. Switch: Dubbi → ⚙︎.
 - If your Mac is asleep or offline (or the brain is off), Dubbi answers instantly with
   fixed rules on your phone instead. The quick buttons always use the fixed rules.
 - **It never acts on its own.** Say or type "close file 32604", "send the reply for 35290",
