@@ -227,6 +227,13 @@ nav.tabbar .in{display:flex;width:100%;max-width:520px}
   width:60px;height:60px;border-radius:50%;border:0;color:#fff;display:grid;place-items:center;
   background:radial-gradient(circle at 30% 25%,var(--teal-2),var(--teal) 60%,var(--teal-ink));box-shadow:0 10px 28px color-mix(in srgb,var(--teal) 45%,transparent)}
 .fab svg{width:26px;height:26px}.fab:active{transform:scale(.94)}
+/* "Hey Dubbi" chip, next to the Dubbi button */
+.wake{position:fixed;right:calc(max(16px,env(safe-area-inset-right)) + 70px);bottom:calc(var(--tabbar) + 32px + env(safe-area-inset-bottom));z-index:25;
+  border:1px solid var(--line);background:var(--card);color:var(--ink-2);border-radius:999px;padding:7px 12px;font-size:12.5px;font-weight:800;
+  display:flex;align-items:center;gap:6px;box-shadow:var(--lift,0 4px 14px rgba(0,0,0,.15))}
+.wake i{width:8px;height:8px;border-radius:50%;background:var(--ink-3)}
+.wake.on i{background:var(--teal);animation:think 1.4s infinite}
+.wake.heard{background:var(--teal);color:#fff;border-color:transparent}
 @keyframes ring{0%{opacity:.8;transform:scale(.92)}100%{opacity:0;transform:scale(1.25)}}
 .scrim{position:fixed;inset:0;z-index:30;background:rgba(10,16,24,.38);opacity:0;pointer-events:none;transition:opacity .2s}
 .scrim.on{opacity:1;pointer-events:auto}
@@ -508,6 +515,7 @@ body:not(.intro) .tile.t-overdue.on{animation:throb 2.4s ease-in-out infinite}
 <button class="fab" id="fab" type="button" aria-label="Ask Dubbi" hidden>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
 </button>
+<button class="wake" id="wakeChip" type="button" hidden><i></i><span></span></button>
 <div class="scrim" id="scrim"></div>
 <section class="sheet" id="sheet" role="dialog" aria-label="Dubbi" aria-modal="true">
   <div class="grab"></div>
@@ -579,6 +587,7 @@ async function start() {
   $('login').hidden = !!user; $('app').hidden = !user;
   if (user) { await load(); setupPush(); resetInactivity(); $('fab').hidden = false; }
   else $('fab').hidden = true;
+  if (user) setTimeout(startWake, 800); else stopWake();
 }
 $('loginForm').addEventListener('submit', async e => {
   e.preventDefault();
@@ -1177,16 +1186,19 @@ const D = { rec: null, open: false, lang: pref('lang', 'auto'), fr: false, pendi
 const brainOn = () => pref('brain', true);
 const micOn = () => !!SR && pref('mic', false);
 
-function openSheet() {
+function openSheet(opts = {}) {
+  stopWake();
   D.open = true; unlockAudio();
   $('sheet').classList.add('on'); $('scrim').classList.add('on');
   $('settings').hidden = true; $('chat').hidden = false; $('micBtn').hidden = !micOn();
   if (!$('chat').children.length) greetDubbi();
+  if (opts.listen === false) return;
   if (micOn()) startListening(); else setTimeout(() => $('askInput').focus({ preventScroll: true }), 300);
 }
 function closeSheet() {
   D.open = false; stopListening(); speechSynthesis?.cancel(); D.speakTok = (D.speakTok || 0) + 1; try { D.audio?.pause(); } catch {}
   $('sheet').classList.remove('on'); $('scrim').classList.remove('on');
+  setTimeout(startWake, 600);   // back to waiting for "Hey Dubbi" (if it's on)
 }
 function bubble(text, who) {
   const b = document.createElement('div'); b.className = 'msg ' + who; b.textContent = text;
@@ -1593,6 +1605,58 @@ function startListening() {
 }
 function stopListening() { try { D.rec?.stop(); } catch {} }
 
+// "Hey Dubbi" — only while Dubbi is open on screen, only if you turned it on (⚙︎).
+// It listens for the words "Hey Dubbi" (or "Dis Dubbi"); what you say right after
+// is your question. It stops when you leave the app, lock the phone, or open Dubbi.
+// Speech recognition mishears "Dubbi", so close sound-alikes count too.
+const WAKE = /\b(?:hey|hi|ok|okay|dis|salut|allo)[,\s]+(?:dubbi|dubby|dubi|doobie|doobi|dubie|debbie|dobby|dobbie|dubai|dougie|duby|double|tubby|tobi|toby)\b[,.!?\s]*/i;
+const wakeOn = () => !!SR && micOn() && pref('wake', false);
+const W = { rec: null, want: false, fails: 0 };
+function wakeChip(state) {
+  const c = $('wakeChip'); if (!c) return;
+  c.hidden = !state || !user;
+  c.className = 'wake' + (state === 'on' ? ' on' : state === 'heard' ? ' heard' : '');
+  c.querySelector('span').textContent = state === 'on' ? L('Say “Hey Dubbi”', 'Dites « Dis Dubbi »') : state === 'heard' ? L('Listening…', 'J’écoute…') : L('Tap to hear “Hey Dubbi”', 'Touchez pour « Dis Dubbi »');
+}
+function startWake() {
+  if (!wakeOn() || D.open || document.hidden || !user) { wakeChip(wakeOn() && user && !D.open ? 'tap' : null); return; }
+  if (W.rec) return;
+  W.want = true;
+  const r = new SR(); W.rec = r;
+  r.lang = recLang(); r.continuous = true; r.interimResults = true;
+  let heardAt = 0, question = '', timer = null;
+  const finish = () => {
+    clearTimeout(timer);
+    const q = question.trim(); W.want = false; try { r.stop(); } catch {}
+    openSheet({ listen: !q });
+    if (q) ask(q);
+  };
+  r.onresult = e => {
+    // everything heard in this session; the question is what follows the last "Hey Dubbi"
+    const text = [...e.results].map(x => x[0].transcript).join(' ');
+    const all = [...text.matchAll(new RegExp(WAKE.source, 'gi'))], m = all[all.length - 1];
+    if (!m) return;
+    if (!heardAt) { heardAt = Date.now(); wakeChip('heard'); }
+    question = text.slice(m.index + m[0].length);
+    // your question ends when you pause (~1.2 s); "Hey Dubbi" alone opens Dubbi listening
+    clearTimeout(timer);
+    timer = setTimeout(finish, question.trim() ? 1200 : 1500);
+  };
+  r.onerror = e => { if (e.error === 'not-allowed' || e.error === 'service-not-allowed') { W.want = false; W.fails = 9; } };
+  const t0 = Date.now();
+  r.onend = () => {
+    W.rec = null;
+    if (Date.now() - t0 > 5000) W.fails = 0;     // a normal pause, not a failure
+    if (heardAt) return;                         // finish() takes it from here
+    if (W.want && wakeOn() && !D.open && !document.hidden && W.fails < 8) { W.fails++; setTimeout(startWake, 400); return; }
+    wakeChip(wakeOn() && !D.open ? 'tap' : null);   // iPhone wants a tap to start listening again
+  };
+  try { r.start(); wakeChip('on'); }
+  catch { W.rec = null; wakeChip('tap'); }
+}
+function stopWake() { W.want = false; try { W.rec?.abort(); } catch {} W.rec = null; if (!wakeOn()) wakeChip(null); }
+document.addEventListener('visibilitychange', () => { if (document.hidden) stopWake(); else setTimeout(startWake, 500); });
+
 // Settings: speaking, language, microphone
 function showSettings() {
   $('chat').hidden = true; const s = $('settings'); s.hidden = false;
@@ -1606,6 +1670,7 @@ function showSettings() {
       <button type="button" data-try="${fr ? 'fr' : 'en'}" aria-label="Play a sample">▶</button></div></div>`; }).join('')}
     <p class="note">🎙️ <b>Most natural voice (free, stays on your phone):</b> iPhone Settings → Accessibility → Spoken Content → Voices → English → tap <b>Ava</b> or <b>Zoe</b> → download <b>Premium</b>. For French: Français (Canada) → <b>Amélie</b> or <b>Nicolas</b> (Enhanced). Then reopen Dubbi and pick it here.</p>
     <div class="setrow"><div>Language<small>Auto follows the language you use.</small></div><div class="seg" data-p="lang">${['auto', 'en', 'fr'].map(l => `<button type="button" data-v="${l}" class="${D.lang === l ? 'on' : ''}">${l.toUpperCase()}</button>`).join('')}</div></div>
+    ${SR ? `<div class="setrow"><div>“Hey Dubbi”<small>While Dubbi is open on screen, say “Hey Dubbi” (or “Dis Dubbi”) and your question — no tap. Needs the microphone on. Off by default: while waiting, the iPhone’s speech recognition hears what’s around you (on iPhone it may go to Apple’s dictation, like the keyboard mic), so leave it off in patients’ homes unless your privacy officer agrees. Stops when you leave the app or lock the phone.</small></div><input type="checkbox" class="sw" data-p="wake" ${pref('wake', false) ? 'checked' : ''} ${micOn() ? '' : 'disabled'}></div>` : ''}
     <div class="setrow"><div>Microphone<small>${SR ? 'Off by default. Speech goes through Apple’s dictation (like the keyboard’s mic). Turn on only once your privacy officer agrees.' : 'Not available in this browser.'}</small></div><input type="checkbox" class="sw" data-p="mic" ${micOn() ? 'checked' : ''} ${SR ? '' : 'disabled'}></div>
     <p class="note">🔒 With the brain on, your question goes through your VaPiq database to your own Mac; names are swapped for file numbers before Claude sees it, and put back on your Mac. With it off, Dubbi works only on this phone. Either way it never acts on its own: it proposes, you confirm.</p>
     <button class="btn ghost" type="button" id="backChat" style="width:100%;margin-top:8px">Back to Dubbi</button>`;
@@ -1616,14 +1681,15 @@ $('settings').addEventListener('change', e => {
 });
 $('settings').addEventListener('click', e => {
   const t = e.target;
-  if (t.matches('.sw')) { savePref(t.dataset.p, t.checked); $('micBtn').hidden = !micOn(); return; }
+  if (t.matches('.sw')) { savePref(t.dataset.p, t.checked); $('micBtn').hidden = !micOn(); if (t.dataset.p === 'mic' || t.dataset.p === 'wake') { if (!micOn()) savePref('wake', false); showSettings(); } return; }
   const tr = t.closest('[data-try]');
   if (tr) { const fr = tr.dataset.try === 'fr', was = D.fr; D.fr = fr;
     speak(fr ? 'Bonjour! Le dossier 35037 est dû jeudi, et il n’a pas encore de rendez-vous.' : 'Hi! File 35037 is due Thursday, and has no appointment yet. Want me to show it?', true); D.fr = was; return; }
   const seg = t.closest('.seg button'); if (seg) { D.lang = seg.dataset.v; savePref('lang', D.lang); showSettings(); return; }
   if (t.id === 'backChat') { $('settings').hidden = true; $('chat').hidden = false; }
 });
-$('fab').addEventListener('click', openSheet);
+$('fab').addEventListener('click', () => openSheet());
+$('wakeChip').addEventListener('click', () => { W.fails = 0; stopWake(); startWake(); });
 $('scrim').addEventListener('click', closeSheet);
 $('closeSheet').addEventListener('click', closeSheet);
 $('setBtn').addEventListener('click', () => $('settings').hidden ? showSettings() : ($('settings').hidden = true, $('chat').hidden = false));

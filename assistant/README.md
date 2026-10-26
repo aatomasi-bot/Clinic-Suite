@@ -170,6 +170,10 @@ send", "Missing documents", a file number, or "Find <name>" (English or French).
   says what it will do and waits for **Confirm** (or "yes"). Then it presses that card's
   own button, so every check the card does still applies.
 - Answers are read aloud with the iPhone's own voices (on the phone).
+- **"Hey Dubbi"** (Dubbi → ⚙︎, needs the microphone on): while Dubbi is open on
+  screen, say "Hey Dubbi" (or "Dis Dubbi") and your question — no tap. It stops when
+  you leave the app or lock the phone (iPhones only let Siri listen in the
+  background). While waiting it hears what's around you, so it is off by default.
 - The **microphone is off by default** (Dubbi → ⚙︎). Speech goes through Apple's
   dictation, like the keyboard mic, so turn it on only once your privacy officer
   agrees. Typing always works.
