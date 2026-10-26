@@ -96,11 +96,32 @@ function newPatientSentence(lang, r, docs) {
   return `I confirm the receipt of this email${r ? ` for file ${r}` : ''}. However, I did not receive ${joinList(names, 'or')}. Could you please send ${missing.length > 1 ? 'them' : 'it'} at your earliest convenience?`;
 }
 
-function draftReply({ kind, lang, coordinatorName, fileNumber, subjectRef, signature, docs }) {
+// A coordinator's question ("has the patient been contacted?") → what VaPiq knows about the file.
+// facts = { found, onHold, appointment: 'YYYY-MM-DDTHH:MM', confirmed }. Only facts, nothing made up.
+function questionSentence(lang, r, facts) {
+  const f = facts || {}, fr = lang === 'fr', file = r ? (fr ? ` pour le dossier ${r}` : ` for file ${r}`) : '';
+  const about = r ? (fr ? ` concernant le dossier ${r}` : ` about file ${r}`) : '';
+  const m = String(f.appointment || '').match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}))?/);
+  const day = m && new Date(+m[1], +m[2] - 1, +m[3]).toLocaleDateString(fr ? 'fr-CA' : 'en-CA', { weekday: 'long', month: 'long', day: 'numeric' });
+  const at = m && m[4] ? (fr ? ` à ${+m[4]} h ${m[5]}` : ` at ${m[4]}:${m[5]}`) : '';
+  if (fr) {
+    if (!r || !f.found) return `Merci pour votre message${about}. Je vérifie et je vous reviens rapidement.`;
+    if (f.onHold) return `Merci pour votre message. Le dossier ${r} est présentement en attente dans ma liste.`;
+    if (day) return `Merci pour votre message. L'injection${file} est prévue le ${day}${at}${f.confirmed ? ', rendez-vous confirmé avec la personne' : ''}.`;
+    return `Merci pour votre message. Le rendez-vous${file} n'est pas encore fixé. Je communiquerai avec la personne et je vous confirmerai la date dès qu'il sera planifié.`;
+  }
+  if (!r || !f.found) return `Thank you for your message${about}. I will look into it and get back to you shortly.`;
+  if (f.onHold) return `Thank you for your message. File ${r} is currently on hold in my patient list.`;
+  if (day) return `Thank you for your message. The injection${file} is scheduled for ${day}${at}${f.confirmed ? ', confirmed with the patient' : ''}.`;
+  return `Thank you for your message. The appointment${file} is not booked yet. I will contact the patient and confirm the date with you as soon as it is scheduled.`;
+}
+
+function draftReply({ kind, lang, coordinatorName, fileNumber, subjectRef, signature, docs, facts }) {
   const L = lang === 'fr' ? 'fr' : 'en', t = T[L];
-  if (!t[kind]) throw new Error('Unknown reply kind: ' + kind);
+  if (!t[kind] && kind !== 'question') throw new Error('Unknown reply kind: ' + kind);
   const ref = fmtRef(subjectRef || fileNumber || '');
-  const body = kind === 'new_patient' && docs ? newPatientSentence(L, ref, docs) : t[kind](ref);
+  const body = kind === 'question' ? questionSentence(L, ref, facts)
+    : kind === 'new_patient' && docs ? newPatientSentence(L, ref, docs) : t[kind](ref);
   const lines = [t.hello(coordinatorName), '', body, '', t.thanks];
   if (signature) lines.push('', signature);   // blank line between "Thank you!" and the name
   return lines.join('\n');

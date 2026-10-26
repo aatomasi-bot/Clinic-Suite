@@ -71,7 +71,7 @@ export async function supabaseStore(cfg) {
     async loadPatients() {
       const out = [];
       for (let from = 0; ; from += 1000) {
-        const page = must(await sb.from('patients').select('id,file_number,patient_name,archived,pending,dose_prescribed,doses_remaining').range(from, from + 999));
+        const page = must(await sb.from('patients').select('id,file_number,patient_name,archived,pending,dose_prescribed,doses_remaining,appointment_date_time,appointment_confirmed').range(from, from + 999));
         out.push(...page);
         if (page.length < 1000) return out;
       }

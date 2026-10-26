@@ -9,6 +9,7 @@ approve every step.
 | New patient (PDF, file # not in VaPiq) | patient form, pre-filled | **Add to VaPiq** | "I confirm the receipt of this email…" |
 | Prescription (PDF, file # in VaPiq) | current dose vs prescription | apply it in VaPiq → **Applied** | "…I have added this prescription to the file." |
 | Close file / Fermeture de dossier | patient + status | **Close file in VaPiq** (= Archive) | "…I have closed the file." |
+| Any other coordinator question ("has the patient been contacted?") | her message + a reply drafted from VaPiq (appointment booked/confirmed, on hold, not booked yet) + ✨ Claude's version | edit if needed | your answer |
 
 Replies greet the coordinator by first name, use their language (French or English),
 are fully editable, and are sent by your Mac within ~2 minutes of you tapping

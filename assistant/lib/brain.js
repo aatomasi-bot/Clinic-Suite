@@ -66,7 +66,7 @@ export function cityOf(address) {
   return c ? c.slice(0, 30) : '';
 }
 
-const VIEW = { close_file: 'file to close', on_hold: 'put on hold', back: 'back from hold', permanent: 'make permanent', prescription: 'prescription to apply', medicum_note: 'email to Medicum' };
+const VIEW = { close_file: 'file to close', on_hold: 'put on hold', back: 'back from hold', permanent: 'make permanent', prescription: 'prescription to apply', medicum_note: 'email to Medicum', question: 'coordinator question to answer' };
 // The data Claude may use: one line per patient, one per open item. No names, no streets.
 export function buildContext({ patients, tasks = [], pending = [], now = new Date() }) {
   const ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
