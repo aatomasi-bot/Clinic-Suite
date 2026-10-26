@@ -1189,7 +1189,7 @@ const micOn = () => !!SR && pref('mic', false);
 
 function openSheet(opts = {}) {
   if (!opts.keepWake) stopWake();
-  D.open = true; unlockAudio();
+  D.open = true; unlockCtx(); unlockAudio();
   $('sheet').classList.add('on'); $('scrim').classList.add('on');
   $('settings').hidden = true; $('chat').hidden = false; $('micBtn').hidden = !micOn();
   if (!$('chat').children.length) greetDubbi();
@@ -1568,10 +1568,13 @@ async function playCtx(b64) {
   x.onended = () => { if (D.src === x) { D.src = null; resumeWake(); } };
   D.src = x; x.start(0);
 }
-document.addEventListener('pointerdown', () => {
+// On an iPhone only a finished tap counts (finger lifted: touchend/click), or a key
+// such as Send on the keyboard — touching down (pointerdown) does not.
+const unlockAll = () => {
   unlockCtx(); unlockAudio();
   if (!D.ttsReady && 'speechSynthesis' in window) { D.ttsReady = true; try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); } catch {} }
-}, { passive: true });
+};
+['touchend', 'click', 'keydown'].forEach(ev => document.addEventListener(ev, unlockAll, { passive: true, capture: true }));
 // While the microphone is on, the iPhone plays sound through the quiet earpiece:
 // turn every microphone off before Dubbi speaks.
 // When Dubbi has finished speaking, listen for the next "Hey Dubbi" (chat still open)
@@ -1764,7 +1767,7 @@ $('scrim').addEventListener('click', closeSheet);
 $('closeSheet').addEventListener('click', closeSheet);
 $('setBtn').addEventListener('click', () => $('settings').hidden ? showSettings() : ($('settings').hidden = true, $('chat').hidden = false));
 $('micBtn').addEventListener('click', () => D.rec ? stopListening() : startListening());
-$('askForm').addEventListener('submit', e => { e.preventDefault(); unlockAudio(); ask($('askInput').value); });
+$('askForm').addEventListener('submit', e => { e.preventDefault(); unlockAll(); ask($('askInput').value); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && D.open) closeSheet(); });
 
 // ── iPhone / browser push ───────────────────────────────────────────────
