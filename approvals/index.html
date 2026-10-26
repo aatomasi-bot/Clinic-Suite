@@ -245,6 +245,21 @@ nav.tabbar .in{display:flex;width:100%;max-width:520px}
 .prop{align-self:stretch;background:var(--card);border:1.5px solid var(--teal);border-radius:16px;padding:12px;animation:rise .25s both}
 .prop p{margin:0 0 10px;font-size:14.5px}
 .card.flash{animation:flash 1.6s ease-out}
+/* ✨ AI reply panel */
+.ai{margin-top:10px;border:1px solid color-mix(in srgb,var(--violet) 30%,var(--line));border-radius:14px;padding:10px 11px;
+  background:linear-gradient(160deg,color-mix(in srgb,var(--violet) 7%,var(--card)),var(--card))}
+.ai .h{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:800;color:var(--violet);text-transform:uppercase;letter-spacing:.05em}
+.ai .h span{margin-left:auto;text-transform:none;letter-spacing:0;font-weight:600;color:var(--ink-3)}
+.ai pre{white-space:pre-wrap;font:inherit;font-size:14px;line-height:1.5;margin:8px 0 0;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:9px 10px}
+.ai .row2{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.ai .chipb{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:6px 10px;font-size:12.5px;font-weight:700;color:var(--ink-2)}
+.ai .chipb:active{transform:scale(.96)}
+.ai .use{background:var(--g-violet);color:#fff;border:0;border-radius:10px;padding:8px 12px;font-weight:800;font-size:13px;margin-top:8px}
+.ai .own{display:flex;gap:6px;margin-top:8px}.ai .own input{flex:1;min-width:0;border:1.5px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--card-2)}
+.ai .wait{font-size:13px;color:var(--violet);margin-top:8px;display:flex;align-items:center;gap:8px}
+.ai .wait i{width:14px;height:14px;border-radius:50%;border:2px solid currentColor;border-right-color:transparent;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ai .err{font-size:12.5px;color:var(--amber);margin-top:8px}
 @keyframes flash{0%,30%{box-shadow:0 0 0 3px var(--teal-2)}100%{box-shadow:0 0 0 0 transparent}}
 .suggest{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
 .suggest button{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:8px 12px;font-size:14px;font-weight:600;color:var(--ink-2)}
@@ -793,7 +808,7 @@ function docsDoneCard(item) {
   const t = item.t;
   return `${cardOpen(item, '✉️', 'ic-reply')}<div class="ctitle"><div class="kind">Documents received</div><b>File ${fileRef(t.file_number, t.subject_ref)}</b><div class="meta">${from(t)}</div></div>${chips(item)}</div>
     ${docsBlock(t)}
-    <div class="acts"><button class="btn ghost" data-act="dismiss-task">Dismiss</button><button class="btn pri" data-act="reply-anyway">Write the confirmation</button></div></article>`;
+    <div class="acts"><button class="btn ghost" data-act="dismiss-task" title="No action — the email stays in your Inbox, unread">Leave it</button><button class="btn pri" data-act="reply-anyway">Write the confirmation</button></div></article>`;
 }
 function replyCard(item) {
   const t = item.t, ask = t.details && t.details.reply_mode === 'ask_docs';
@@ -805,16 +820,32 @@ function replyCard(item) {
     <div class="mailhead"><div><span>To</span><em>${to}</em></div>${(t.cc_addresses || []).length ? `<div><span>CC</span><em>${esc(t.cc_addresses.join(', '))}</em></div>` : ''}<div><span>Subject</span><em>${esc(subj)}</em></div></div>
     <div class="lang" role="group" aria-label="Language"><button data-act="lang" data-l="en" class="${t.lang !== 'fr' ? 'on' : ''}">EN</button><button data-act="lang" data-l="fr" class="${t.lang === 'fr' ? 'on' : ''}">FR</button></div>
     <textarea class="reply" data-k="reply_body" rows="9" aria-label="Reply text">${esc(t.reply_body || '')}</textarea>
+    ${aiPanel(t)}
     <div class="acts">
       <button class="btn ghost" data-act="no-reply">${ask ? 'Not now' : "Don't reply"}</button>
       <button class="btn pri" data-act="send">${t.status === 'failed' ? 'Retry' : 'Send'}${t.is_test ? ' (test)' : ''}</button>
     </div></article>`;
 }
+// ✨ Claude (through your subscription, on your Mac): a suggestion + rewrites. It only
+// suggests — "Use this" puts it in the reply box; you still review and tap Send.
+const AI_ASKS = [['shorter', 'Shorter'], ['formal', 'More formal'], ['french', 'En français'], ['english', 'In English'], ['thanks', 'Add a thank-you']];
+function aiPanel(t) {
+  const d = t.details || {}, sug = d.ai_suggestion, req = d.ai_request, waiting = req && !req.done;
+  const label = sug ? ({ suggest: 'Suggested reply', shorter: 'Shorter', formal: 'More formal', french: 'En français', english: 'In English', thanks: 'With a thank-you', custom: 'Your instruction' }[sug.action] || 'Suggestion') : '';
+  return `<div class="ai">
+    <div class="h">✨ Claude<span>${sug ? esc(label) : waiting ? '' : 'Ask for a rewrite'}</span></div>
+    ${sug ? `<pre>${esc(sug.text)}</pre><button class="use" type="button" data-act="ai-use">Use this</button>` : ''}
+    ${waiting ? '<div class="wait"><i></i>Working on it — ready within a minute…</div>' : ''}
+    ${d.ai_error && !waiting ? `<div class="err">⚠️ ${esc(d.ai_error)}</div>` : ''}
+    <div class="row2">${AI_ASKS.map(([a, l]) => `<button class="chipb" type="button" data-act="ai-ask" data-a="${a}"${waiting ? ' disabled' : ''}>${l}</button>`).join('')}</div>
+    <div class="own"><input type="text" data-k="ai_own" placeholder="Your own instruction, e.g. tell her I'll call Monday" enterkeyhint="send"><button class="chipb" type="button" data-act="ai-own"${waiting ? ' disabled' : ''}>✨ Ask</button></div>
+  </div>`;
+}
 function waitingCard(item) {
   const t = item.t, miss = missingDocs(t.documents || {}).map(k => DOC_NAMES.en[k]).join(' and ');
   return `${cardOpen(item, '⏳', 'ic-wait')}<div class="ctitle"><div class="kind">Waiting for documents</div><b>File ${fileRef(t.file_number, t.subject_ref)}</b><div class="meta">Asked ${esc(t.to_name || t.to_address)} ${ago(t.asked_docs_at)} ago for the ${esc(miss || 'documents')}</div></div>${chips(item)}</div>
     ${docsBlock(t)}
-    <div class="acts"><button class="btn ghost" data-act="dismiss-task">Dismiss</button><button class="btn sec2" data-act="ask-again">Ask again</button><button class="btn pri" data-act="docs-in">Got them</button></div></article>`;
+    <div class="acts"><button class="btn ghost" data-act="dismiss-task" title="No action — the email stays in your Inbox, unread">Leave it</button><button class="btn sec2" data-act="ask-again">Ask again</button><button class="btn pri" data-act="docs-in">Got them</button></div></article>`;
 }
 function patientLine(e) {
   if (!e) return '<p class="note">Not found in VaPiq.</p>';
@@ -830,14 +861,14 @@ function rxCard(item) {
       <div><span>Prescription</span><b class="${changed ? 'chg' : ''}">${esc(d.pdf_dose || '?')}${d.pdf_dose ? ' mg' : ''}</b></div>
       <div><span>Doses left</span><b>${esc(e.doses_remaining ?? '—')}</b></div></div>
     <p class="note">Apply it in VaPiq, then tap <b>Applied</b> to reply.</p>
-    <div class="acts"><button class="btn ghost" data-act="dismiss-task">Dismiss</button><a class="btn sec2" href="../" target="_blank" rel="noopener">Open VaPiq</a><button class="btn pri" data-act="applied">Applied</button></div></article>`;
+    <div class="acts"><button class="btn ghost" data-act="dismiss-task" title="No action — the email stays in your Inbox, unread">Leave it</button><a class="btn sec2" href="../" target="_blank" rel="noopener">Open VaPiq</a><button class="btn pri" data-act="applied">Applied</button></div></article>`;
 }
 function closeCard(item) {
   const t = item.t, e = t.existing_patient, active = !!e;   // closing a file deletes the record (on hold or not)
   return `${cardOpen(item, '📁', 'ic-close')}<div class="ctitle"><div class="kind">Close file</div><b>File ${fileRef(t.file_number, t.subject_ref)}</b><div class="meta">${from(t)}</div></div>${chips(item)}</div>
     ${warnBox(t.warnings)}
     ${patientLine(e)}
-    <div class="acts"><button class="btn ghost" data-act="dismiss-task">Dismiss</button>
+    <div class="acts"><button class="btn ghost" data-act="dismiss-task" title="No action — the email stays in your Inbox, unread">Leave it</button>
       ${active ? `<button class="btn pri" data-act="close-file">${t.is_test ? 'Delete (test)' : '🗑 Delete file'}</button>` : `<button class="btn pri" data-act="reply-anyway">Reply anyway</button>`}</div></article>`;
 }
 // On hold / back / permanent — what VaPiq will do, then the drafted reply
@@ -856,7 +887,7 @@ function updateCard(item) {
     ${warnBox(t.warnings)}
     ${patientLine(e)}
     ${e ? `<p class="note">${what}</p>` : ''}
-    <div class="acts"><button class="btn ghost" data-act="dismiss-task">Dismiss</button>
+    <div class="acts"><button class="btn ghost" data-act="dismiss-task" title="No action — the email stays in your Inbox, unread">Leave it</button>
       ${e ? `<button class="btn pri" data-act="apply-update">${t.is_test ? u.btn + ' (test)' : u.btn}</button>` : `<button class="btn pri" data-act="reply-anyway">Reply anyway</button>`}</div></article>`;
 }
 function dupCard(item) {
@@ -1044,11 +1075,29 @@ $('main').addEventListener('click', async e => {
       const { error } = await sb.from('email_tasks').update({ lang: l, reply_body: body }).eq('id', t.id);
       if (error) throw error; t.lang = l; t.reply_body = body; return render();
     }
+    if (act === 'ai-ask' || act === 'ai-own') {
+      const instruction = act === 'ai-own' ? (cardEl.querySelector('[data-k="ai_own"]').value || '').trim() : '';
+      if (act === 'ai-own' && !instruction) return toast('Type what you want first');
+      const base = (cardEl.querySelector('[data-k="reply_body"]') || {}).value || t.reply_body || '';
+      const details = { ...(t.details || {}), ai_request: { action: act === 'ai-own' ? 'custom' : btn.dataset.a, instruction, base, at: new Date().toISOString() }, ai_error: null };
+      const { error } = await sb.from('email_tasks').update({ details, reply_body: base }).eq('id', t.id);   // your edits are kept
+      if (error) throw error;
+      t.details = details; t.reply_body = base; render(); aiPoll();
+      return toast('✨ Asked Claude — ready within a minute');
+    }
+    if (act === 'ai-use') {
+      const text = t.details && t.details.ai_suggestion && t.details.ai_suggestion.text;
+      if (!text) return;
+      const { error } = await sb.from('email_tasks').update({ reply_body: text }).eq('id', t.id);
+      if (error) throw error;
+      t.reply_body = text; render();
+      return toast('Suggestion placed in the reply — review it, then Send');
+    }
     btn.disabled = true;
     if (act === 'reject') {
       if (r) { await decide(r, 'rejected'); await audit('ASSISTANT_REJECTED', r.record.file_number, { pending_id: r.id, test: r.is_test }); }
-      if (t && t.status === 'todo') await setTask(t, 'dismissed');
-      toast(r ? 'Rejected' : 'Dismissed');
+      if (t && t.status === 'todo') await setTask(t, 'dismissed', { details: { ...(t.details || {}), leave: true } });
+      toast(r ? 'Rejected — email left in your Inbox' : 'Left in your Inbox — no action taken');
     }
     if (act === 'dismiss' && r) { await decide(r, 'dismissed'); toast('Dismissed'); }
     if (act === 'ask' || act === 'ask-again') {
@@ -1067,7 +1116,8 @@ $('main').addEventListener('click', async e => {
       if (!(await closeFile(t))) { btn.disabled = false; return; }
       await setTask(t, 'reply_ready');
     }
-    if (act === 'dismiss-task') { await setTask(t, 'dismissed'); toast('Dismissed'); }
+    // "Leave it": nothing is done; your Mac removes its ★ from the email so it sits in your Inbox as it arrived
+    if (act === 'dismiss-task') { await setTask(t, 'dismissed', { details: { ...(t.details || {}), leave: true } }); toast('Left in your Inbox — no action taken'); }
     if (act === 'no-reply') {
       const ask = t.details && t.details.reply_mode === 'ask_docs';
       if (ask) { await setTask(t, 'todo', { details: { ...t.details, reply_mode: 'confirm' } }); toast('Not sent — back in your list'); }
@@ -1090,6 +1140,14 @@ $('refreshBtn').addEventListener('click', () => load().then(() => toast('Up to d
 const typing = () => document.activeElement?.matches('textarea, input, select');
 document.addEventListener('visibilitychange', () => { if (!document.hidden && user && !typing()) load(); });
 setInterval(() => { if (!document.hidden && user && !typing()) load(); }, 60000);
+// While a rewrite is being prepared, look again every 15 s (stops when none is pending)
+let _aiPollT = null;
+function aiPoll() {
+  clearTimeout(_aiPollT);
+  const pending = S.tasks.some(t => t.details && t.details.ai_request && !t.details.ai_request.done);
+  if (!pending) return;
+  _aiPollT = setTimeout(async () => { if (!document.hidden && user && !typing()) await load(); aiPoll(); }, 15000);
+}
 
 
 // ── Dubbi: talk or type ─────────────────────────────────────────────────

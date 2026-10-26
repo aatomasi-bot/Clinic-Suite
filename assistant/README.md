@@ -120,6 +120,21 @@ they differ) and the reason in brackets goes into **Special Instructions** as
 "Signature required!". When that email arrives after the forms, the waiting card is
 updated (never a patient already added to VaPiq).
 
+## ✨ Reply suggestions (Claude, through your subscription)
+
+The `com.vapiq.ai` job (every 30 s) asks Claude — via Claude Code's non-interactive mode
+(`~/.local/bin/claude -p`, signed in with your Claude subscription, no API key) — for a
+suggested reply on each reply card, and for the rewrites you ask for in Dubbi (Shorter,
+More formal, En français, In English, Add a thank-you, or your own instruction). It only
+suggests: **Use this** puts the text in the reply box; you still review and tap Send.
+
+- Claude sees only the coordinator's own message with phone numbers, emails, street
+  addresses, postal codes and links removed (`lib/ai.js` redact), plus the standard draft.
+  It runs with no tools, no MCP servers, no settings and no saved session.
+- **Privacy switch:** `"ai": { "realEmails": false }` (default) = TEST cards only. Set it to
+  `true` in `config.json` only after your privacy officer approves.
+- Suggestions that lose the file number or signature, or add contact details, are dropped.
+
 ## Notes to Medicum from VaPiq
 
 On a patient card (open it), **✉️ Medicum** writes to reports@medicum.ca about that

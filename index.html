@@ -3535,6 +3535,9 @@ a:focus:not(:focus-visible) { outline: none; }
       <button class="drawer-btn" onclick="closeMenuDrawer();openModal('rawFinderModal');document.getElementById('rawFinderInput')?.focus()" style="border-color:var(--purple,#6B4FBB)">
         <span class="drawer-btn-icon">🔍</span>Find Patient (Raw Search)
       </button>
+      <button class="drawer-btn" onclick="closeMenuDrawer();openRestoreModal()" style="border-color:var(--green,#23855A)">
+        <span class="drawer-btn-icon">♻️</span>Restore Deleted Patient
+      </button>
       <button class="drawer-btn" onclick="closeMenuDrawer();openDedupeModal()" style="border-color:var(--orange)">
         <span class="drawer-btn-icon">🧹</span>Remove Duplicates
         <span style="margin-left:auto;font-size:10px;font-weight:700;background:var(--orange-bg);color:var(--orange);padding:2px 7px;border-radius:20px" id="dedupeBadge"></span>
@@ -5414,6 +5417,58 @@ async function savePatient() {
 }
 
 // ========== MODAL HELPERS ==========
+// ══ Restore a deleted patient ═════════════════════════════════════════════
+// Deleting (VaPiq's Delete, or "Close file" in Dubbi) keeps a full copy of the
+// record in the audit log; this puts it back exactly as it was.
+let _restoreRows = [];
+async function openRestoreModal() {
+  const el = document.getElementById('restoreList');
+  el.innerHTML = '<p style="color:var(--text-2);font-size:13px">Loading…</p>';
+  openModal('restoreModal');
+  try {
+    const since = new Date(Date.now() - 90 * 864e5).toISOString();
+    const { data, error } = await _sb.from('audit_log').select('id,created_at,patient_file_num,detail,user_email')
+      .eq('action', 'DELETE').gte('created_at', since).order('created_at', { ascending: false }).limit(60);
+    if (error) throw error;
+    const restored = new Set();
+    const { data: back } = await _sb.from('audit_log').select('detail').eq('action', 'RESTORE').gte('created_at', since);
+    (back || []).forEach(b => { try { restored.add(JSON.parse(b.detail).from_audit); } catch (e) {} });
+    _restoreRows = (data || []).map(a => { let d = {}; try { d = JSON.parse(a.detail || '{}'); } catch (e) {} return { a, snap: d.deleted || null, via: d.source === 'assistant' ? 'Dubbi · Close file' : 'VaPiq · Delete' }; });
+    if (!_restoreRows.length) { el.innerHTML = '<p style="color:var(--text-2);font-size:14px;text-align:center;padding:24px 8px">No patients deleted in the last 90 days.</p>'; return; }
+    el.innerHTML = _restoreRows.map((x, i) => {
+      const s = x.snap, fn = String((s && s.file_number) || x.a.patient_file_num || '').trim();
+      const when = new Date(x.a.created_at).toLocaleString('en-CA', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+      const already = restored.has(x.a.id) || patients.some(p => String(p['File Number']).trim() === fn);
+      const btn = !s ? '<span style="font-size:11px;color:var(--text-3)">No copy kept<br>(deleted before Oct 25)</span>'
+        : already ? '<span style="font-size:12px;font-weight:700;color:var(--green,#23855A)">✓ In VaPiq</span>'
+        : `<button class="btn-primary" style="padding:8px 14px;font-size:12px;border-radius:9px;border:none;background:linear-gradient(135deg,var(--teal),var(--teal-dark));color:#fff" onclick="restorePatientFromAudit(${i})">♻️ Restore</button>`;
+      return `<div style="display:flex;align-items:center;gap:10px;padding:11px 2px;border-bottom:1px solid var(--border)">
+        <div style="flex:1;min-width:0"><div style="font-weight:800;font-size:14px">${esc((s && s.patient_name) || 'Unknown name')} <span style="color:var(--text-3);font-weight:600">#${esc(fn)}</span></div>
+          <div style="font-size:11px;color:var(--text-2);margin-top:2px">Deleted ${esc(when)} · ${esc(x.via)}</div></div>${btn}</div>`;
+    }).join('');
+  } catch (e) { el.innerHTML = `<p style="color:var(--red)">Could not load: ${esc(e.message || e)}</p>`; }
+}
+async function restorePatientFromAudit(i) {
+  const x = _restoreRows[i]; if (!x || !x.snap) return;
+  const s = x.snap, fn = String(s.file_number || '').trim();
+  if (patients.some(p => String(p['File Number']).trim() === fn)) { toast(`#${fn} is already in VaPiq — nothing restored`, 'warning'); return; }
+  if (!confirm(`Restore ${s.patient_name || 'this patient'} #${fn} to VaPiq exactly as it was when deleted?`)) return;
+  setLoading(true, 'Restoring…');
+  try {
+    const row = { ...s };
+    let { error } = await _sb.from('patients').insert(row);
+    if (error && /duplicate key|already exists/i.test(error.message)) { delete row.id; ({ error } = await _sb.from('patients').insert(row)); }
+    if (error) throw error;
+    await _auditLog('RESTORE', fn, { from_audit: x.a.id, name: s.patient_name || '' });
+    closeModal('restoreModal');
+    toast(`♻️ ${s.patient_name || 'Patient'} #${fn} restored`, 'success');
+    await loadPatients({ silent: true });
+    goToPatient(fn);
+  } catch (e) { toast('Could not restore — ' + (e.message || e), 'error'); }
+  finally { setLoading(false); }
+}
+window.openRestoreModal = openRestoreModal; window.restorePatientFromAudit = restorePatientFromAudit;
+
 // ══ Email Medicum (reports@medicum.ca) — one or several patients ══════════
 // Every email lists each patient's name and file number. It is saved as an
 // approved "note to Medicum"; your Mac sends it from abdulmedicum@yahoo.com
@@ -12095,6 +12150,19 @@ window.stripTimeWindow     = stripTimeWindow;
   <button class="mm-x" onclick="toggleMedicumSelect(false)">✕</button>
   <span id="mmBarCount">Tap patients to select</span>
   <button class="mm-go" id="mmBarGo" onclick="_mmGo()" disabled>✉️ Email Medicum</button>
+</div>
+<div class="modal-overlay" id="restoreModal">
+  <div class="modal" style="max-height:92vh;display:flex;flex-direction:column">
+    <div class="modal-handle"></div>
+    <div class="modal-header" style="flex-shrink:0">
+      <div>
+        <div class="modal-title">♻️ Restore Deleted Patient</div>
+        <div style="font-size:12px;color:var(--text-2);margin-top:2px">Patients deleted in the last 90 days — a full copy was kept</div>
+      </div>
+      <button class="modal-close" onclick="closeModal('restoreModal')">✕</button>
+    </div>
+    <div class="modal-body" style="flex:1;overflow-y:auto" id="restoreList"></div>
+  </div>
 </div>
 <div class="modal-overlay" id="medicumMailModal">
   <div class="modal" style="max-height:92vh;display:flex;flex-direction:column">

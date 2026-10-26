@@ -118,6 +118,17 @@ export async function supabaseStore(cfg) {
       return must(await sb.from('email_tasks').select('id,group_key,pending_id,documents,status').eq('kind', 'new_patient')
         .in('status', ['todo', 'waiting_docs', 'reply_ready']).not('group_key', 'is', null).gte('created_at', since));
     },
+    // Reply cards for the AI job: open replies of the last 30 days (filtered in ai-queue.js)
+    async tasksForAi() {
+      const since = new Date(Date.now() - 30 * 864e5).toISOString();
+      return must(await sb.from('email_tasks').select('id,status,is_test,reply_body,details')
+        .in('status', ['reply_ready', 'todo', 'waiting_docs', 'failed']).gte('created_at', since).limit(200));
+    },
+    // Items you chose to "Leave it" whose email still has the assistant's ★
+    async tasksToLeave() {
+      const rows = must(await sb.from('email_tasks').select('*').eq('status', 'dismissed').contains('details', { leave: true }).limit(50));
+      return rows.filter(t => !(t.details && t.details.left));
+    },
     async getCard(id) {
       return must(await sb.from('pending_patients').select('id,status,attachment_name').eq('id', id).maybeSingle());
     },
@@ -216,6 +227,8 @@ export function offlineStore({ patientsFile, outFile }) {
       return tasks.filter(t => t.kind === 'new_patient' && t.group_key && ['todo', 'waiting_docs', 'reply_ready'].includes(t.status) && Date.parse(t.created_at) >= since);
     },
     async getCard(id) { return rows.find(r => r.id === id) || null; },
+    async tasksForAi() { return tasks.filter(t => ['reply_ready', 'todo', 'waiting_docs', 'failed'].includes(t.status)); },
+    async tasksToLeave() { return tasks.filter(t => t.status === 'dismissed' && t.details && t.details.leave && !t.details.left); },
     async replaceCard(id, fields) { const r = rows.find(x => x.id === id); if (r && r.status === 'pending') { Object.assign(r, fields); save(); } },
     async insertTask(row) { const id = `task-${tasks.length + 1}`; tasks.push({ id, created_at: new Date().toISOString(), ...row }); save(); return id; },
     async tasksToSend() { return tasks.filter(t => t.status === 'send_approved'); },

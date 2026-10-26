@@ -44,6 +44,8 @@ export function testMailer(outDir) {
       return { file };
     },
     async moveOriginal(task, toFolder) { moves.push({ id: task.id, toFolder, emails: emailsOf(task).length }); return true; },
+    unflags: [],
+    async unflag(task) { this.unflags.push(task.id); return true; },
     async close() {},
   };
 }
@@ -89,6 +91,20 @@ export function liveMailer(imapCfg, replyCfg) {
         } finally { lock.release(); }
       }
       return moved > 0;
+    },
+    // "Leave it": take the assistant's ★ off the email(s) — they stay where they are, unread
+    async unflag(task) {
+      const c = await imapClient();
+      let done = 0;
+      for (const e of emailsOf(task)) {
+        if (!e.message_id || !e.folder) continue;
+        const lock = await c.getMailboxLock(e.folder);
+        try {
+          const uids = await c.search({ header: { 'message-id': e.message_id } }, { uid: true });
+          if (uids.length) { await c.messageFlagsRemove(uids, ['\\Flagged'], { uid: true }); done++; }
+        } finally { lock.release(); }
+      }
+      return done > 0;
     },
     async close() { try { await imap?.logout(); } catch {} smtp.close(); },
   };
