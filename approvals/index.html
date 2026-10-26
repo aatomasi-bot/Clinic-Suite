@@ -242,6 +242,11 @@ nav.tabbar .in{display:flex;width:100%;max-width:520px}
 .msg.me{align-self:flex-end;background:var(--teal);color:#fff;border-bottom-right-radius:6px}
 .msg.bot{align-self:flex-start;background:var(--card);border:1px solid var(--line);border-bottom-left-radius:6px}
 .msg.sys{align-self:center;background:none;color:var(--ink-3);font-size:13px;padding:2px}
+.msg.thinking{display:flex;gap:5px;align-items:center;padding:13px 15px}
+.msg.thinking i{width:7px;height:7px;border-radius:50%;background:var(--teal);opacity:.35;animation:think 1.2s infinite}
+.msg.thinking i:nth-child(2){animation-delay:.2s}.msg.thinking i:nth-child(3){animation-delay:.4s}
+.msg.thinking span{font-size:12.5px;color:var(--ink-3);margin-left:6px}
+@keyframes think{0%,100%{opacity:.25;transform:translateY(0)}40%{opacity:1;transform:translateY(-3px)}}
 .prop{align-self:stretch;background:var(--card);border:1.5px solid var(--teal);border-radius:16px;padding:12px;animation:rise .25s both}
 .prop p{margin:0 0 10px;font-size:14.5px}
 .card.flash{animation:flash 1.6s ease-out}
@@ -1151,8 +1156,12 @@ function aiPoll() {
 
 
 // ── Dubbi: talk or type ─────────────────────────────────────────────────
-// Dubbi runs entirely on this phone: no AI service, nothing sent anywhere new.
-// It understands a fixed set of requests (English or French) and answers from
+// Dubbi's brain: what you type or say goes to YOUR Mac, which asks Claude through
+// your subscription (assistant/brain.js) — Claude sees file numbers, dates and
+// statuses, never names or addresses. If the Mac doesn't answer in ~15 s (asleep,
+// offline), the fixed rules below answer on this phone instead. The quick
+// buttons always use the rules (instant).
+// The rules understand a fixed set of requests (English or French) and answer from
 // the same data this page shows. For actions ("close file 32604") it proposes;
 // when you confirm, it presses that card's own button, so every check the card
 // does still applies. Answers are read aloud by the phone's own voices.
@@ -1161,7 +1170,8 @@ const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 const PREF = (() => { try { return JSON.parse(localStorage.getItem('dubbi_prefs') || '{}'); } catch { return {}; } })();
 const pref = (k, d) => PREF[k] ?? d;
 const savePref = (k, v) => { PREF[k] = v; try { localStorage.setItem('dubbi_prefs', JSON.stringify(PREF)); } catch {} };
-const D = { rec: null, open: false, lang: pref('lang', 'auto'), fr: false, pending: null };
+const D = { rec: null, open: false, lang: pref('lang', 'auto'), fr: false, pending: null, conv: '' };
+const brainOn = () => pref('brain', true);
 const micOn = () => !!SR && pref('mic', false);
 
 function openSheet() {
@@ -1189,10 +1199,12 @@ const SUGGEST = { en: ["What's new?", 'Anything overdue?', 'Who needs an appoint
                   fr: ['Quoi de neuf?', 'Des retards?', 'Qui doit être planifié?', 'Cherche les nouvelles assignations'] };
 function greetDubbi() {
   const fr = D.lang === 'fr';
+  D.conv = Math.random().toString(36).slice(2) + Date.now().toString(36);   // a new conversation for the brain
   bubble(fr ? 'Bonjour! Que puis-je faire pour vous?' : 'Hi! What can I do for you?', 'bot');
-  buttons(SUGGEST[fr ? 'fr' : 'en'].map(q => [q, () => ask(q)]));
+  buttons(SUGGEST[fr ? 'fr' : 'en'].map(q => [q, () => ask(q, true)]));
 }
-async function ask(text) {
+// quick = a button: answered instantly by the rules on this phone
+async function ask(text, quick = false) {
   text = String(text || '').trim(); if (!text) return;
   document.querySelectorAll('#chat .suggest').forEach(n => n.remove());
   D.fr = D.lang === 'fr' || (D.lang === 'auto' && /[éèêàçùô]|\b(bonjour|salut|quoi|qui|des|les|dossier|retards?|planifi\w*|rendez|cherche|trouve|aide|aujourd'hui|documents? manquants?)\b/i.test(text));
@@ -1200,10 +1212,61 @@ async function ask(text) {
   if (D.pending && YES.test(plain(text))) return runProposal(D.pending);
   if (D.pending && NO.test(plain(text))) return cancelProposal();
   let out;
-  try { out = await answer(text); } catch (e) { out = { say: D.fr ? 'Je n’arrive pas à lire vos données. Vérifiez la connexion.' : 'I couldn’t read your data. Check your connection.' }; }
+  try {
+    if (brainOn() && !quick) {
+      // a clear command ("close 32604") is still done by the rules, instantly
+      const q = plain(text), act = actionFor(q, (q.match(/\b\d{4,6}\b/) || [])[0], todoItems());
+      out = act && act.propose ? act : await brainAnswer(text);
+    }
+    if (!out) out = await answer(text);
+  } catch (e) { out = { say: D.fr ? 'Je n’arrive pas à lire vos données. Vérifiez la connexion.' : 'I couldn’t read your data. Check your connection.' }; }
   bubble(out.say, 'bot'); speak(out.say);
   buttons(out.go || []);
   if (out.propose) proposeCard(out.propose);
+}
+
+// ── The brain: ask your Mac (Claude), wait for the answer ──
+const BRAIN_CMD = { ask_docs: f => 'ask for the documents ' + f, docs_received: f => 'received documents ' + f, send_reply: f => 'send ' + f,
+  close_file: f => 'close ' + f, hold: f => 'hold ' + f, back: f => 'back ' + f, permanent: f => 'permanent ' + f, rx_applied: f => 'applied ' + f, add_patient: f => 'add ' + f };
+async function brainAnswer(text) {
+  const bt = S.beat && S.beat.created_at;
+  if (!bt || hoursSince(bt) > 0.25) { bubble(L('Your Mac is offline — here’s a quick answer instead.', 'Votre Mac est hors ligne — voici une réponse rapide.'), 'sys'); return null; }
+  const think = bubble('', 'bot thinking');
+  think.innerHTML = '<i></i><i></i><i></i><span>' + esc(L('Thinking…', 'Je réfléchis…')) + '</span>';
+  let note = L('Your Mac isn’t answering (asleep or offline?) — here’s a quick answer instead.', 'Votre Mac ne répond pas (en veille ou hors ligne?) — voici une réponse rapide.');
+  try {
+    const { data, error } = await sb.from('dubbi_asks').insert({ question: text.slice(0, 1000), conv: D.conv, lang: D.fr ? 'fr' : 'en', user_email: user.email }).select('id').single();
+    if (error) throw error;
+    const t0 = Date.now();
+    while (Date.now() - t0 < 90000) {
+      await new Promise(r => setTimeout(r, 1200));
+      const { data: row } = await sb.from('dubbi_asks').select('status,answer').eq('id', data.id).maybeSingle();
+      if (!row) break;
+      if (row.status === 'answered' && row.answer && row.answer.say) return fromBrain(row.answer);
+      if (row.status === 'failed') { note = L('Claude couldn’t answer', 'Claude n’a pas pu répondre') + (row.answer && row.answer.error ? ' (' + row.answer.error + ')' : '') + L(' — here’s a quick answer instead.', ' — voici une réponse rapide.'); break; }
+      if (row.status === 'asked' && Date.now() - t0 > 15000) {
+        const { data: gone } = await sb.from('dubbi_asks').update({ status: 'cancelled' }).eq('id', data.id).eq('status', 'asked').select('id');
+        if (gone && gone.length) break;   // else your Mac just picked it up: keep waiting
+      }
+      if (row.status === 'thinking') think.querySelector('span').textContent = L('Thinking… (your Mac)', 'Je réfléchis… (votre Mac)');
+    }
+  } catch (e) { console.warn('[brain]', e.message || e); }
+  finally { think.remove(); }
+  bubble(note, 'sys');
+  return null;
+}
+// The Mac's answer → what Dubbi shows. An action becomes the usual Confirm card (with every check).
+function fromBrain(a) {
+  const items = todoItems();
+  const go = (a.show || []).map(f => { const i = items.find(i => normFile(fileOf(i)) === normFile(f)); return i ? showBtn(i) : [`#${f}`, () => ask(f, true)]; });
+  const out = { say: a.say, go };
+  const cmd = a.action && BRAIN_CMD[a.action.type];
+  if (cmd) {
+    const r = actionFor(plain(cmd(a.action.file)), String(a.action.file), items);
+    if (r && r.propose) { out.propose = r.propose; out.say = r.say; }
+    else if (r) out.say = a.say + ' ' + r.say;
+  }
+  return out;
 }
 
 // ── Actions: Dubbi proposes, you confirm, the card's own button does it ──
@@ -1278,7 +1341,7 @@ function actionFor(q, num, items) {
   const cands = items.filter(i => A.views.includes(i.view) && (!num || normFile(fileOf(i)) === normFile(num)));
   if (!cands.length) return { say: num ? L(`There’s nothing like that open for file #${num}.`, `Rien de tel n’est ouvert pour le dossier #${num}.`) : L('There’s nothing like that open right now.', 'Rien de tel n’est ouvert pour le moment.') };
   if (cands.length > 1) return { say: L('Which file? ', 'Quel dossier? ') + cands.slice(0, 6).map(i => '#' + fileOf(i)).join(', ') + '.',
-    go: cands.slice(0, 6).map(i => [`#${fileOf(i)}`, () => ask(`${q.replace(/\b\d{4,6}\b/g, '').trim()} ${fileOf(i)}`)]) };
+    go: cands.slice(0, 6).map(i => [`#${fileOf(i)}`, () => ask(`${q.replace(/\b\d{4,6}\b/g, '').trim()} ${fileOf(i)}`, true)]) };
   const i = cands[0];
   if (A.ok && !A.ok(i)) return { say: L(`I can’t do that for file #${fileOf(i)}: `, `Impossible pour le dossier #${fileOf(i)} : `) + A.why(i) + '.', go: [showBtn(i)] };
   const describe = A.say(i);
@@ -1409,10 +1472,10 @@ async function answer(text) {
     const list = data || [];
     if (!list.length) return { say: L(`No patient matching “${name}”.`, `Aucun patient pour « ${name} ».`) };
     return { say: listSay(L(`${n(list.length, 'match', 'matches')}:`, `${list.length} résultat${list.length > 1 ? 's' : ''} :`), list.map(p => `${p.patient_name} #${String(p.file_number).trim()}${p.archived ? L(' (archived)', ' (archivé)') : ''}`)),
-      go: list.slice(0, 4).map(p => [`#${String(p.file_number).trim()}`, () => ask(String(p.file_number).trim())]) };
+      go: list.slice(0, 4).map(p => [`#${String(p.file_number).trim()}`, () => ask(String(p.file_number).trim(), true)]) };
   }
   if (/new|neuf|brief|summary|resume|status|hello|hi\b|hey|bonjour|salut|morning|matin/.test(q)) return briefing();
-  return { say: L('Sorry, I didn’t catch that. Try one of these:', 'Désolé, je n’ai pas compris. Essayez :'), go: SUGGEST[D.fr ? 'fr' : 'en'].map(s => [s, () => ask(s)]) };
+  return { say: L('Sorry, I didn’t catch that. Try one of these:', 'Désolé, je n’ai pas compris. Essayez :'), go: SUGGEST[D.fr ? 'fr' : 'en'].map(s => [s, () => ask(s, true)]) };
 }
 
 // Speaking — the iPhone's built-in voices, on the device
@@ -1454,10 +1517,11 @@ function stopListening() { try { D.rec?.stop(); } catch {} }
 function showSettings() {
   $('chat').hidden = true; const s = $('settings'); s.hidden = false;
   s.innerHTML = `
+    <div class="setrow"><div>Dubbi’s brain (Claude)<small>Your questions go to your Mac, which asks Claude with your subscription. Claude sees file numbers, dates and statuses — never names or addresses. Off = quick fixed answers only.</small></div><input type="checkbox" class="sw" data-p="brain" ${brainOn() ? 'checked' : ''}></div>
     <div class="setrow"><div>Speak answers aloud<small>Uses your iPhone’s own voices, on the phone.</small></div><input type="checkbox" class="sw" data-p="speak" ${pref('speak', true) ? 'checked' : ''}></div>
     <div class="setrow"><div>Language<small>Auto follows the language you use.</small></div><div class="seg" data-p="lang">${['auto', 'en', 'fr'].map(l => `<button type="button" data-v="${l}" class="${D.lang === l ? 'on' : ''}">${l.toUpperCase()}</button>`).join('')}</div></div>
     <div class="setrow"><div>Microphone<small>${SR ? 'Off by default. Speech goes through Apple’s dictation (like the keyboard’s mic). Turn on only once your privacy officer agrees.' : 'Not available in this browser.'}</small></div><input type="checkbox" class="sw" data-p="mic" ${micOn() ? 'checked' : ''} ${SR ? '' : 'disabled'}></div>
-    <p class="note">🔒 Dubbi works only on this phone. No AI service is used and nothing is sent anywhere new. It never acts on its own: it proposes, you confirm.</p>
+    <p class="note">🔒 With the brain on, your question goes through your VaPiq database to your own Mac; names are swapped for file numbers before Claude sees it, and put back on your Mac. With it off, Dubbi works only on this phone. Either way it never acts on its own: it proposes, you confirm.</p>
     <button class="btn ghost" type="button" id="backChat" style="width:100%;margin-top:8px">Back to Dubbi</button>`;
 }
 $('settings').addEventListener('click', e => {

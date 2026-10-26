@@ -197,6 +197,43 @@ export async function supabaseStore(cfg) {
     async removeSubscription(endpoint) {
       await sb.from('push_subscriptions').delete().eq('endpoint', endpoint);
     },
+    // ── Dubbi's brain (brain.js) ──
+    // The oldest question still waiting (older than 2 minutes = the phone gave up)
+    async nextAsk() {
+      const since = new Date(Date.now() - 2 * 60e3).toISOString();
+      const rows = must(await sb.from('dubbi_asks').select('*').eq('status', 'asked').gte('created_at', since).order('created_at').limit(1));
+      return rows[0] || null;
+    },
+    // asked → thinking, atomically (false if the phone cancelled it meanwhile)
+    async claimAsk(id) {
+      return must(await sb.from('dubbi_asks').update({ status: 'thinking' }).eq('id', id).eq('status', 'asked').select('id')).length === 1;
+    },
+    async answerAsk(id, fields) {
+      must(await sb.from('dubbi_asks').update({ ...fields, answered_at: new Date().toISOString() }).eq('id', id));
+    },
+    // Earlier turns of the same conversation (for "and the one after?")
+    async askHistory(conv, beforeIso) {
+      if (!conv) return [];
+      return must(await sb.from('dubbi_asks').select('answer').eq('conv', conv).eq('status', 'answered').lt('created_at', beforeIso)
+        .order('created_at', { ascending: false }).limit(4)).reverse();
+    },
+    // What Dubbi knows: patients (scheduling fields only) + open Dubbi items
+    async brainData() {
+      const since = new Date(Date.now() - 30 * 864e5).toISOString();
+      const patients = [];
+      for (let from = 0; ; from += 1000) {
+        const page = must(await sb.from('patients').select('file_number,patient_name,address,archived,pending,assignment_type,dose_prescribed,doses_remaining,due_date,appointment_date_time,appointment_confirmed,cpp_patient').range(from, from + 999));
+        patients.push(...page);
+        if (page.length < 1000) break;
+      }
+      const tasks = must(await sb.from('email_tasks').select('kind,status,file_number,created_at,documents,is_test,pending_id')
+        .in('status', ['todo', 'waiting_docs', 'reply_ready', 'failed', 'send_approved', 'sending']).gte('created_at', since));
+      const pending = must(await sb.from('pending_patients').select('id,status,created_at,is_test,record').in('status', ['pending', 'exists']).gte('created_at', since));
+      return { patients, tasks, pending };
+    },
+    async purgeAsks(days) {
+      await sb.from('dubbi_asks').delete().lt('created_at', new Date(Date.now() - days * 864e5).toISOString());
+    },
     // Decided cards are kept 30 days, then removed (patients/audit_log keep the record).
     async purgeDecided(days) {
       const cutoff = new Date(Date.now() - days * 864e5).toISOString();

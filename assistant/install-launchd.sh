@@ -8,6 +8,8 @@ LABEL=com.vapiq.intake
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 SLABEL=com.vapiq.summary
 ALABEL=com.vapiq.ai
+BLABEL=com.vapiq.brain
+BPLIST="$HOME/Library/LaunchAgents/$BLABEL.plist"
 APLIST="$HOME/Library/LaunchAgents/$ALABEL.plist"
 SPLIST="$HOME/Library/LaunchAgents/$SLABEL.plist"
 DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -16,7 +18,8 @@ NODE="$(command -v node)"
 launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
 launchctl bootout "gui/$(id -u)/$SLABEL" 2>/dev/null || true
 launchctl bootout "gui/$(id -u)/$ALABEL" 2>/dev/null || true
-if [[ "$1" == "remove" ]]; then rm -f "$PLIST" "$SPLIST" "$APLIST"; echo "Removed."; exit 0; fi
+launchctl bootout "gui/$(id -u)/$BLABEL" 2>/dev/null || true
+if [[ "$1" == "remove" ]]; then rm -f "$PLIST" "$SPLIST" "$APLIST" "$BPLIST"; echo "Removed."; exit 0; fi
 
 mkdir -p "$DIR/state" "$HOME/Library/LaunchAgents"
 cat > "$PLIST" <<PL
@@ -66,4 +69,21 @@ cat > "$APLIST" <<PL
 </dict></plist>
 PL
 launchctl bootstrap "gui/$(id -u)" "$APLIST"
-echo "Installed: checks mail every 2 minutes; reply suggestions every 30 seconds; morning summary at $TIME. Logs: $DIR/state/"
+
+# Dubbi's brain — always running; answers your questions within seconds
+cat > "$BPLIST" <<PL
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>$BLABEL</string>
+  <key>ProgramArguments</key><array><string>$NODE</string><string>$DIR/brain.js</string></array>
+  <key>WorkingDirectory</key><string>$DIR</string>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>10</integer>
+  <key>StandardOutPath</key><string>$DIR/state/brain.log</string>
+  <key>StandardErrorPath</key><string>$DIR/state/brain.log</string>
+</dict></plist>
+PL
+launchctl bootstrap "gui/$(id -u)" "$BPLIST"
+echo "Installed: checks mail every 2 minutes; reply suggestions every 30 seconds; Dubbi's brain always on; morning summary at $TIME. Logs: $DIR/state/"

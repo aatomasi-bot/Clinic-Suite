@@ -152,8 +152,14 @@ Tap the round button in the Dubbi app and ask: "What's new?", "Anything overdue?
 "Who needs an appointment?", "Who do I confirm?", "Today's visits", "Replies to
 send", "Missing documents", a file number, or "Find <name>" (English or French).
 
-- **Everything runs on your phone.** No AI service is used and nothing is sent
-  anywhere new: Dubbi follows fixed rules over the same data the page already shows.
+- **Dubbi's brain (on by default, Dubbi → ⚙︎):** ask anything in your own words —
+  "who in Laval still needs to confirm?", "when is Tremblay due?". The question goes
+  to your Mac (`brain.js`, always running), which asks Claude with your subscription
+  and answers in ~5–10 seconds. Claude sees **file numbers, dates, statuses, dose and
+  city only** — names in your question become file numbers first, and names are put
+  back on your Mac for you to read. Questions are deleted after 7 days.
+- If your Mac is asleep or offline (or the brain is off), Dubbi answers instantly with
+  fixed rules on your phone instead. The quick buttons always use the fixed rules.
 - **It never acts on its own.** Say or type "close file 32604", "send the reply for 35290",
   "prescription applied 30001", "ask for the documents for 34734" or "add 34734": Dubbi
   says what it will do and waits for **Confirm** (or "yes"). Then it presses that card's
