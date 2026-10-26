@@ -395,6 +395,13 @@ async function main() {
     if (live) mailer = liveMailer(cfg.imap, cfg.replies);
     const out = await runOutbox({ store, mailer, testMailer: tMailer, rules: cfg.rules, live, moveToFolder: cfg.replies.moveToFolder });
     if (out.sent || out.failed) console.log(`  replies sent ${out.sent}, failed ${out.failed}`);
+    // "Leave it" in Dubbi: take the ★ off those emails so they look untouched
+    for (const t of await store.tasksToLeave()) {
+      const m = t.is_test ? tMailer : (live ? mailer : null);
+      if (!m) continue;
+      try { await m.unflag(t); await store.updateTask(t.id, { details: { ...t.details, left: new Date().toISOString() } }); console.log(`  left    ${t.id} in the Inbox`); }
+      catch (e) { console.warn('  leave-it failed:', e.message); }
+    }
 
     const title = live ? 'VaPiq' : 'VaPiq (test)';
     const notify = async body => {

@@ -118,6 +118,11 @@ export async function supabaseStore(cfg) {
       return must(await sb.from('email_tasks').select('id,group_key,pending_id,documents,status').eq('kind', 'new_patient')
         .in('status', ['todo', 'waiting_docs', 'reply_ready']).not('group_key', 'is', null).gte('created_at', since));
     },
+    // Items you chose to "Leave it" whose email still has the assistant's ★
+    async tasksToLeave() {
+      const rows = must(await sb.from('email_tasks').select('*').eq('status', 'dismissed').contains('details', { leave: true }).limit(50));
+      return rows.filter(t => !(t.details && t.details.left));
+    },
     async getCard(id) {
       return must(await sb.from('pending_patients').select('id,status,attachment_name').eq('id', id).maybeSingle());
     },
@@ -216,6 +221,7 @@ export function offlineStore({ patientsFile, outFile }) {
       return tasks.filter(t => t.kind === 'new_patient' && t.group_key && ['todo', 'waiting_docs', 'reply_ready'].includes(t.status) && Date.parse(t.created_at) >= since);
     },
     async getCard(id) { return rows.find(r => r.id === id) || null; },
+    async tasksToLeave() { return tasks.filter(t => t.status === 'dismissed' && t.details && t.details.leave && !t.details.left); },
     async replaceCard(id, fields) { const r = rows.find(x => x.id === id); if (r && r.status === 'pending') { Object.assign(r, fields); save(); } },
     async insertTask(row) { const id = `task-${tasks.length + 1}`; tasks.push({ id, created_at: new Date().toISOString(), ...row }); save(); return id; },
     async tasksToSend() { return tasks.filter(t => t.status === 'send_approved'); },

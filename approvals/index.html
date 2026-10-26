@@ -793,7 +793,7 @@ function docsDoneCard(item) {
   const t = item.t;
   return `${cardOpen(item, '✉️', 'ic-reply')}<div class="ctitle"><div class="kind">Documents received</div><b>File ${fileRef(t.file_number, t.subject_ref)}</b><div class="meta">${from(t)}</div></div>${chips(item)}</div>
     ${docsBlock(t)}
-    <div class="acts"><button class="btn ghost" data-act="dismiss-task">Dismiss</button><button class="btn pri" data-act="reply-anyway">Write the confirmation</button></div></article>`;
+    <div class="acts"><button class="btn ghost" data-act="dismiss-task" title="No action — the email stays in your Inbox, unread">Leave it</button><button class="btn pri" data-act="reply-anyway">Write the confirmation</button></div></article>`;
 }
 function replyCard(item) {
   const t = item.t, ask = t.details && t.details.reply_mode === 'ask_docs';
@@ -814,7 +814,7 @@ function waitingCard(item) {
   const t = item.t, miss = missingDocs(t.documents || {}).map(k => DOC_NAMES.en[k]).join(' and ');
   return `${cardOpen(item, '⏳', 'ic-wait')}<div class="ctitle"><div class="kind">Waiting for documents</div><b>File ${fileRef(t.file_number, t.subject_ref)}</b><div class="meta">Asked ${esc(t.to_name || t.to_address)} ${ago(t.asked_docs_at)} ago for the ${esc(miss || 'documents')}</div></div>${chips(item)}</div>
     ${docsBlock(t)}
-    <div class="acts"><button class="btn ghost" data-act="dismiss-task">Dismiss</button><button class="btn sec2" data-act="ask-again">Ask again</button><button class="btn pri" data-act="docs-in">Got them</button></div></article>`;
+    <div class="acts"><button class="btn ghost" data-act="dismiss-task" title="No action — the email stays in your Inbox, unread">Leave it</button><button class="btn sec2" data-act="ask-again">Ask again</button><button class="btn pri" data-act="docs-in">Got them</button></div></article>`;
 }
 function patientLine(e) {
   if (!e) return '<p class="note">Not found in VaPiq.</p>';
@@ -830,14 +830,14 @@ function rxCard(item) {
       <div><span>Prescription</span><b class="${changed ? 'chg' : ''}">${esc(d.pdf_dose || '?')}${d.pdf_dose ? ' mg' : ''}</b></div>
       <div><span>Doses left</span><b>${esc(e.doses_remaining ?? '—')}</b></div></div>
     <p class="note">Apply it in VaPiq, then tap <b>Applied</b> to reply.</p>
-    <div class="acts"><button class="btn ghost" data-act="dismiss-task">Dismiss</button><a class="btn sec2" href="../" target="_blank" rel="noopener">Open VaPiq</a><button class="btn pri" data-act="applied">Applied</button></div></article>`;
+    <div class="acts"><button class="btn ghost" data-act="dismiss-task" title="No action — the email stays in your Inbox, unread">Leave it</button><a class="btn sec2" href="../" target="_blank" rel="noopener">Open VaPiq</a><button class="btn pri" data-act="applied">Applied</button></div></article>`;
 }
 function closeCard(item) {
   const t = item.t, e = t.existing_patient, active = !!e;   // closing a file deletes the record (on hold or not)
   return `${cardOpen(item, '📁', 'ic-close')}<div class="ctitle"><div class="kind">Close file</div><b>File ${fileRef(t.file_number, t.subject_ref)}</b><div class="meta">${from(t)}</div></div>${chips(item)}</div>
     ${warnBox(t.warnings)}
     ${patientLine(e)}
-    <div class="acts"><button class="btn ghost" data-act="dismiss-task">Dismiss</button>
+    <div class="acts"><button class="btn ghost" data-act="dismiss-task" title="No action — the email stays in your Inbox, unread">Leave it</button>
       ${active ? `<button class="btn pri" data-act="close-file">${t.is_test ? 'Delete (test)' : '🗑 Delete file'}</button>` : `<button class="btn pri" data-act="reply-anyway">Reply anyway</button>`}</div></article>`;
 }
 // On hold / back / permanent — what VaPiq will do, then the drafted reply
@@ -856,7 +856,7 @@ function updateCard(item) {
     ${warnBox(t.warnings)}
     ${patientLine(e)}
     ${e ? `<p class="note">${what}</p>` : ''}
-    <div class="acts"><button class="btn ghost" data-act="dismiss-task">Dismiss</button>
+    <div class="acts"><button class="btn ghost" data-act="dismiss-task" title="No action — the email stays in your Inbox, unread">Leave it</button>
       ${e ? `<button class="btn pri" data-act="apply-update">${t.is_test ? u.btn + ' (test)' : u.btn}</button>` : `<button class="btn pri" data-act="reply-anyway">Reply anyway</button>`}</div></article>`;
 }
 function dupCard(item) {
@@ -1047,8 +1047,8 @@ $('main').addEventListener('click', async e => {
     btn.disabled = true;
     if (act === 'reject') {
       if (r) { await decide(r, 'rejected'); await audit('ASSISTANT_REJECTED', r.record.file_number, { pending_id: r.id, test: r.is_test }); }
-      if (t && t.status === 'todo') await setTask(t, 'dismissed');
-      toast(r ? 'Rejected' : 'Dismissed');
+      if (t && t.status === 'todo') await setTask(t, 'dismissed', { details: { ...(t.details || {}), leave: true } });
+      toast(r ? 'Rejected — email left in your Inbox' : 'Left in your Inbox — no action taken');
     }
     if (act === 'dismiss' && r) { await decide(r, 'dismissed'); toast('Dismissed'); }
     if (act === 'ask' || act === 'ask-again') {
@@ -1067,7 +1067,8 @@ $('main').addEventListener('click', async e => {
       if (!(await closeFile(t))) { btn.disabled = false; return; }
       await setTask(t, 'reply_ready');
     }
-    if (act === 'dismiss-task') { await setTask(t, 'dismissed'); toast('Dismissed'); }
+    // "Leave it": nothing is done; your Mac removes its ★ from the email so it sits in your Inbox as it arrived
+    if (act === 'dismiss-task') { await setTask(t, 'dismissed', { details: { ...(t.details || {}), leave: true } }); toast('Left in your Inbox — no action taken'); }
     if (act === 'no-reply') {
       const ask = t.details && t.details.reply_mode === 'ask_docs';
       if (ask) { await setTask(t, 'todo', { details: { ...t.details, reply_mode: 'confirm' } }); toast('Not sent — back in your list'); }
