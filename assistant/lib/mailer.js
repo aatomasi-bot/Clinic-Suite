@@ -8,23 +8,28 @@ import path from 'node:path';
 import nodemailer from 'nodemailer';
 import { ImapFlow } from 'imapflow';
 import { getSecret, SECRETS } from './keychain.js';
+import { createRequire } from 'node:module';
+const { safeSubject } = createRequire(import.meta.url)('../../js/reply-templates.js');
 
 // The email(s) a task replies to: all paired emails, or just the original.
 const emailsOf = task => (task.related_emails && task.related_emails.length) ? task.related_emails
   : [{ message_id: task.email_message_id, folder: task.email_folder }];
 
-export function replySubject(subject) {
-  const s = String(subject || '').trim();
+export function replySubject(subject, names = []) {
+  const s = safeSubject(String(subject || '').trim(), names);   // initials + file number only, never a full name
   return /^re\s*:/i.test(s) ? s : `Re: ${s}`;
 }
+// Every patient name we know for this task (the outbox adds the ones from VaPiq by file number)
+export const taskNames = (task, extra = []) => [...extra, task.existing_patient && task.existing_patient.patient_name,
+  task.details && task.details.patient_name, ...((task.details && task.details.patients) || []).map(p => p && p.name)].filter(Boolean);
 
-function message(task, from) {
+function message(task, from, names = []) {
   return {
     from,
     to: task.to_name ? { name: task.to_name, address: task.to_address } : task.to_address,
     ...(task.cc_addresses && task.cc_addresses.length ? { cc: task.cc_addresses } : {}),
     // A note you write to Medicum from VaPiq is a new email (no "Re:", not threaded)
-    subject: task.kind === 'medicum_note' ? String(task.email_subject || 'Update') : replySubject(task.email_subject),
+    subject: task.kind === 'medicum_note' ? safeSubject(String(task.email_subject || 'Update'), taskNames(task, names)) : replySubject(task.email_subject, taskNames(task, names)),
     text: task.reply_body,
     ...(task.email_message_id && task.kind !== 'medicum_note' ? { inReplyTo: task.email_message_id, references: [task.email_message_id] } : {}),
   };
@@ -35,10 +40,10 @@ export function testMailer(outDir) {
   return {
     kind: 'test',
     moves,
-    async send(task) {
+    async send(task, names = []) {
       fs.mkdirSync(outDir, { recursive: true });
       const t = nodemailer.createTransport({ streamTransport: true, buffer: true, newline: 'unix' });
-      const info = await t.sendMail(message(task, 'VaPiq test <test@localhost>'));
+      const info = await t.sendMail(message(task, 'VaPiq test <test@localhost>', names));
       const file = path.join(outDir, `${task.id}.eml`);
       fs.writeFileSync(file, info.message);
       return { file };
@@ -68,8 +73,8 @@ export function liveMailer(imapCfg, replyCfg) {
   };
   return {
     kind: 'live',
-    async send(task) {
-      const msg = message(task, imapCfg.user);
+    async send(task, names = []) {
+      const msg = message(task, imapCfg.user, names);
       const info = await smtp.sendMail(msg);
       if (replyCfg.saveToSent) {
         const raw = await nodemailer.createTransport({ streamTransport: true, buffer: true }).sendMail({ ...msg, messageId: info.messageId });

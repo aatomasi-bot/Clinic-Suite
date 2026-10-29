@@ -5528,7 +5528,9 @@ function _mmCompose() {
   const reasons = [..._mmReasonsOn].sort((a, b) => a - b).map(i => i === other
     ? document.getElementById('mmOther').value.trim() : MM_REASONS[i].replace(/^\S+\s/, '')).filter(Boolean);
   const note = document.getElementById('mmNote').value.trim();
-  const subject = pats.length === 1 ? `Update — ${pats[0]['Patient Name'] || ''} ${files[0]}`
+  // Subject: initials + file number only (manager's rule); the full name stays in the body
+  const ini = n => String(n || '').split(/[\s,.'’-]+/).filter(w => /\p{L}/u.test(w)).map(w => w.normalize('NFD')[0].toUpperCase()).join('');
+  const subject = pats.length === 1 ? `Update — ${ini(pats[0]['Patient Name'])} ${files[0]}`
     : `Update — ${pats.length} patients (${files.join(', ')})`;
   const lines = ['Hello,', '', pats.length === 1 ? 'Please note the following update for:' : 'Please note the following update for these patients:',
     ...pats.map(p => `• ${p['Patient Name'] || ''} — #${String(p['File Number'] || '').trim()}`), ''];

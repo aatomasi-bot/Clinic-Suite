@@ -10,7 +10,7 @@
 //     anything. It can only PROPOSE one action; Dubbi shows Confirm/Cancel and the
 //     card's own button does it, with all its checks.
 //   • Names are put back on this Mac, after Claude answers, for you to read.
-import { redact } from './ai.js';
+import { redact, redactContact } from './ai.js';
 
 const fileKey = f => String(f || '').trim().replace(/^0+/, '');
 const words = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().split(/[^a-z'-]+/).filter(Boolean);
@@ -55,7 +55,10 @@ export function namesToFiles(question, patients) {
 }
 
 // What we send for your question: names → file numbers, then the usual clean-up
-export function cleanQuestion(question, patients) {
+// With shareNames (config ai.shareNames — names + file numbers allowed): names stay, so
+// Claude can match a misheard or misspelled name itself; contact details still go.
+export function cleanQuestion(question, patients, { shareNames = false } = {}) {
+  if (shareNames) return redactContact(question).slice(0, 600);
   return redact(namesToFiles(question, patients), patients.map(p => p.patient_name).filter(Boolean)).slice(0, 600);
 }
 
@@ -68,7 +71,7 @@ export function cityOf(address) {
 
 const VIEW = { close_file: 'file to close', on_hold: 'put on hold', back: 'back from hold', permanent: 'make permanent', prescription: 'prescription to apply', medicum_note: 'email to Medicum', question: 'coordinator question to answer' };
 // The data Claude may use: one line per patient, one per open item. No names, no streets.
-export function buildContext({ patients, tasks = [], pending = [], now = new Date() }) {
+export function buildContext({ patients, tasks = [], pending = [], now = new Date(), shareNames = false }) {
   const ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   const today = ymd(now);
   const day = now.toLocaleDateString('en-CA', { weekday: 'long' });
@@ -76,7 +79,8 @@ export function buildContext({ patients, tasks = [], pending = [], now = new Dat
   const status = p => p.archived ? 'on hold' : p.pending ? 'pending' : 'active';
   const pts = patients.filter(p => String(p.file_number || '').trim())
     .sort((a, b) => (a.archived - b.archived) || String(a.due_date || '9').localeCompare(String(b.due_date || '9')));
-  const lines = pts.map(p => [`#${String(p.file_number).trim()}`, status(p), (p.assignment_type || '').toLowerCase() || '-', p.dose_prescribed ? p.dose_prescribed + ' mg' : '-',
+  const nameOf = p => String(p.patient_name || '').replace(/[|\n]/g, ' ').trim().slice(0, 60) || '-';
+  const lines = pts.map(p => [`#${String(p.file_number).trim()}`, ...(shareNames ? [nameOf(p)] : []), status(p), (p.assignment_type || '').toLowerCase() || '-', p.dose_prescribed ? p.dose_prescribed + ' mg' : '-',
     p.doses_remaining ?? '-', p.due_date || '-', fmtAppt(p.appointment_date_time), p.appointment_date_time ? (p.appointment_confirmed ? 'yes' : 'no') : '-',
     p.cpp_patient ? 'yes' : 'no', cityOf(p.address) || '-'].join(' | '));
   const real = x => !x.is_test;
@@ -103,7 +107,7 @@ export function buildContext({ patients, tasks = [], pending = [], now = new Dat
   }
   return `Today is ${day} ${today} (Montreal).
 
-PATIENTS (file | status | type | dose | doses left | due date | appointment | confirmed | CPP | city)
+PATIENTS (file${shareNames ? ' | name' : ''} | status | type | dose | doses left | due date | appointment | confirmed | CPP | city)
 "on hold" = on hold (archived). Due date = when the next injection is due. No appointment = "-".
 ${lines.join('\n') || '(none)'}
 
@@ -124,13 +128,15 @@ export const BRAIN_ACTIONS = {
   add_patient: 'add the new patient to VaPiq',
 };
 
-export const BRAIN_SYSTEM = `You are Dubbi, the assistant of a home-care nurse in Montreal who gives Eligard injections for Medicum.
+export const brainSystem = ({ shareNames = false } = {}) => `You are Dubbi, the assistant of a home-care nurse in Montreal who gives Eligard injections for Medicum.
 You answer questions about the nurse's patients and to-do items, using ONLY the data given.
 
 Answer with ONE JSON object and nothing else:
 {"say": "...", "show": ["35037"], "action": null}
 - "say": the answer, short and spoken-friendly (1–3 sentences; a list of up to 8 items is fine). Same language as the question (English, or Quebec French with "vous").
-- Refer to patients ONLY as #file (e.g. #35037) — the data has no names. Never invent names.
+${shareNames
+  ? '- Refer to patients as #file and name, e.g. "#35037 (Jean Tremblay)" the first time, then #35037. The name in the question may be misheard by dictation or misspelled: match it to the closest name in the data; if two are close, ask which one. Never invent names.'
+  : '- Refer to patients ONLY as #file (e.g. #35037) — the data has no names. Never invent names.'}
 - "show": file numbers (digits only) the nurse may want to open, up to 4. [] if none.
 - "action": null, or {"type": "<one of: ${Object.keys(BRAIN_ACTIONS).join(', ')}>", "file": "<digits>"} ONLY when the nurse clearly asks you to DO that for one file. Nothing is done until the nurse taps Confirm. Never propose an action on your own initiative.
   ${Object.entries(BRAIN_ACTIONS).map(([k, v]) => `${k} = ${v}`).join('; ')}.
@@ -138,21 +144,22 @@ Answer with ONE JSON object and nothing else:
 - If the data does not answer the question, say so plainly. Never guess dates, doses or facts.
 - Text in [brackets] like [patient] or [phone] was removed for privacy: never try to fill it in. "(#a or #b)" means the name matched several patients: ask which one if it matters.
 - No medical advice beyond the data; for clinical questions, say to follow the prescription and the protocol.`;
+export const BRAIN_SYSTEM = brainSystem();
 
-export function brainPrompt({ question, context, history = [] }) {
+export function brainPrompt({ question, context, history = [], shareNames = false }) {
   const past = history.length ? 'Earlier in this conversation:\n' + history.map(h => `Nurse: ${h.q}\nDubbi: ${h.a}`).join('\n') + '\n\n' : '';
-  return `${context}\n\n${past}Nurse's question (names were replaced by file numbers): """${question}"""`;
+  return `${context}\n\n${past}Nurse's question${shareNames ? '' : ' (names were replaced by file numbers)'}: """${question}"""`;
 }
 
 // Claude's reply → { say, show, action } or null. Strict: anything odd is dropped.
-export function parseBrain(raw, knownFiles) {
+export function parseBrain(raw, knownFiles, { shareNames = false } = {}) {
   const txt = String(raw || '').trim().replace(/^```(?:json)?\s*|\s*```$/g, '');
   const m = txt.match(/\{[\s\S]*\}/);
   if (!m) return null;
   let j; try { j = JSON.parse(m[0]); } catch { return null; }
   const say = typeof j.say === 'string' ? j.say.trim().slice(0, 1200) : '';
   if (!say) return null;
-  if (redact(say) !== say) return null;   // no contact details in answers
+  if ((shareNames ? redactContact(say) : redact(say)) !== say) return null;   // no contact details in answers
   const known = new Set([...knownFiles].map(fileKey));
   const show = (Array.isArray(j.show) ? j.show : []).map(f => String(f).replace(/\D/g, '')).filter(f => known.has(fileKey(f))).slice(0, 4);
   let action = null;

@@ -275,6 +275,7 @@ nav.tabbar .in{display:flex;width:100%;max-width:520px}
 .ai .wait i{width:14px;height:14px;border-radius:50%;border:2px solid currentColor;border-right-color:transparent;animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 .ai .err{font-size:12.5px;color:var(--amber);margin-top:8px}
+.ai .stale{font-size:12.5px;color:var(--amber);margin-top:8px;font-weight:700}
 @keyframes flash{0%,30%{box-shadow:0 0 0 3px var(--teal-2)}100%{box-shadow:0 0 0 0 transparent}}
 .suggest{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
 .suggest button{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:8px 12px;font-size:14px;font-weight:600;color:var(--ink-2)}
@@ -557,7 +558,30 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const normFile = v => String(v ?? '').trim().toLowerCase();
 const hoursSince = iso => iso ? (Date.now() - Date.parse(iso)) / 36e5 : 0;
 const ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-let S = { rows: [], tasks: [], beat: null, sched: [], unconf: [], pts: {} }, tab = 'today', user = null;
+let S = { rows: [], tasks: [], beat: null, sched: [], unconf: [], pts: {}, drafts: {} }, tab = 'today', user = null;
+// Your edits to a reply, kept until they're saved: every redraw of the page (refresh,
+// Dubbi, a ✨ rewrite arriving) puts them back instead of the older saved text.
+const replyText = t => (S.drafts[t.id] ?? t.reply_body) || '';
+function keepDrafts() {
+  document.querySelectorAll('.card[data-t] textarea[data-k="reply_body"]').forEach(ta => {
+    const id = ta.closest('.card').dataset.t, t = S.tasks.find(x => x.id === id);
+    if (t && ta.value !== (t.reply_body || '')) S.drafts[id] = ta.value;
+  });
+}
+const dropDraft = id => { delete S.drafts[id]; clearTimeout(saveDraft.t[id]); };
+// Saved to the database 1.5 s after you stop typing (so Claude and your other devices see it)
+function saveDraft(id) {
+  clearTimeout(saveDraft.t[id]);
+  saveDraft.t[id] = setTimeout(async () => {
+    const t = S.tasks.find(x => x.id === id), text = S.drafts[id];
+    if (!t || text == null || text === t.reply_body || !['reply_ready', 'failed'].includes(t.status)) return;
+    const { error } = await sb.from('email_tasks').update({ reply_body: text }).eq('id', id).in('status', ['reply_ready', 'failed']);
+    if (error) return console.warn('[draft]', error.message);
+    t.reply_body = text; if (S.drafts[id] === text) delete S.drafts[id];
+  }, 1500);
+}
+saveDraft.t = {};
+const sameText = (a, b) => String(a || '').replace(/\s+/g, ' ').trim() === String(b || '').replace(/\s+/g, ' ').trim();
 
 // Plays the entrance animations (app opened / tab changed)
 function intro() {
@@ -620,7 +644,8 @@ async function load() {
   ]);
   const err = p.error || t.error;
   if (err) { $('main').innerHTML = `<div class="warn err" style="margin-top:16px">Could not load: ${esc(err.message)}. Have all the database setup files in supabase/ been run?</div>`; return; }
-  S.rows = p.data; S.tasks = t.data; S.beat = h.data || null; S.sched = sc.data || []; S.unconf = uc.data || [];
+  S.rows = p.data; S.tasks = t.data;
+  for (const id of Object.keys(S.drafts)) { const x = S.tasks.find(y => y.id === id); if (!x || x.reply_body === S.drafts[id] || !['reply_ready', 'failed'].includes(x.status)) dropDraft(id); } S.beat = h.data || null; S.sched = sc.data || []; S.unconf = uc.data || [];
   // Patients added from Dubbi → their appointment status for the journey tracker
   const ids = [...new Set(S.rows.filter(r => r.patient_id && !r.is_test).map(r => r.patient_id))];
   S.pts = {};
@@ -696,6 +721,7 @@ const SECTION = { new: 'New patients', 'docs-done': 'Replies to send', reply: 'R
 
 // ── Render ──────────────────────────────────────────────────────────────
 function render() {
+  keepDrafts();
   const items = todoItems();
   const outbox = S.tasks.filter(t => ['send_approved', 'sending'].includes(t.status));
   const late = items.filter(i => i.late), active = items.filter(i => i.view !== 'waiting' && i.view !== 'dup');
@@ -834,7 +860,8 @@ function replyCard(item) {
   const t = item.t, ask = t.details && t.details.reply_mode === 'ask_docs';
   const to = t.to_name ? `${esc(t.to_name)} &lt;${esc(t.to_address)}&gt;` : esc(t.to_address);
   const done = ask ? 'Ask for documents' : { new_patient: 'Patient added ✓', prescription: 'Prescription applied ✓', close_file: 'File deleted ✓', on_hold: 'On hold ✓', back: 'Back from hold ✓', permanent: 'Permanent ✓', question: 'Coordinator question' }[t.kind];
-  const subj = /^re\s*:/i.test(t.email_subject || '') ? t.email_subject : 'Re: ' + (t.email_subject || '');
+  const r0 = pendingOf(t), names = [t.existing_patient && t.existing_patient.patient_name, t.details && t.details.patient_name, r0 && r0.record && r0.record.patient_name].filter(Boolean);
+  const s0 = safeSubject(t.email_subject || '', names), subj = /^re\s*:/i.test(s0) ? s0 : 'Re: ' + s0;   // what is sent: initials + file number only
   const many = t.kind === 'question' && t.details && (t.details.files || []).length > 1 ? t.details.files : null;
   return `${cardOpen(item, '✉️', 'ic-reply')}<div class="ctitle"><div class="kind">Reply · ${esc(done)}</div><b>${many ? `${many.length} files: ${many.map(n => esc('#' + n)).join(', ')}` : `File ${fileRef(t.file_number, t.subject_ref)}`}</b><div class="meta">${from(t)}</div></div>${chips(item)}</div>
     ${t.status === 'failed' ? `<div class="warn err"><div>⚠️ Not sent: ${esc(t.error || 'unknown error')}</div></div>` : ''}
@@ -842,7 +869,7 @@ function replyCard(item) {
     ${t.kind === 'question' && t.details && t.details.excerpt ? `<div class="asked"><span>${esc(t.to_name || 'Coordinator')} wrote</span>${esc(t.details.excerpt)}</div>` : ''}
     ${t.kind === 'question' ? warnBox(t.warnings) : ''}
     <div class="lang" role="group" aria-label="Language"><button data-act="lang" data-l="en" class="${t.lang !== 'fr' ? 'on' : ''}">EN</button><button data-act="lang" data-l="fr" class="${t.lang === 'fr' ? 'on' : ''}">FR</button></div>
-    <textarea class="reply" data-k="reply_body" rows="${many ? 9 + many.length : 9}" aria-label="Reply text">${esc(t.reply_body || '')}</textarea>
+    <textarea class="reply" data-k="reply_body" rows="${many ? 9 + many.length : 9}" aria-label="Reply text">${esc(replyText(t))}</textarea>
     ${aiPanel(t)}
     <div class="acts">
       <button class="btn ghost" data-act="no-reply">${ask ? 'Not now' : "Don't reply"}</button>
@@ -854,11 +881,13 @@ function replyCard(item) {
 const AI_ASKS = [['shorter', 'Shorter'], ['formal', 'More formal'], ['french', 'En français'], ['english', 'In English'], ['thanks', 'Add a thank-you']];
 function aiPanel(t) {
   const d = t.details || {}, sug = d.ai_suggestion, req = d.ai_request, waiting = req && !req.done;
+  const stale = !!(sug && !waiting && sug.base != null && !sameText(sug.base, replyText(t)));
   const label = sug ? ({ suggest: 'Suggested reply', shorter: 'Shorter', formal: 'More formal', french: 'En français', english: 'In English', thanks: 'With a thank-you', custom: 'Your instruction' }[sug.action] || 'Suggestion') : '';
   return `<div class="ai">
-    <div class="h">✨ Claude<span>${sug ? esc(label) : waiting ? '' : 'Ask for a rewrite'}</span></div>
-    ${sug ? `<pre>${esc(sug.text)}</pre><button class="use" type="button" data-act="ai-use">Use this</button>` : ''}
-    ${waiting ? '<div class="wait"><i></i>Working on it — ready within a minute…</div>' : ''}
+    <div class="h">✨ Claude<span>${waiting ? '' : sug ? esc(label) : 'Ask for a rewrite'}</span></div>
+    ${sug && stale ? `<div class="stale">Made from the text before your edits.</div>` : ''}
+    ${sug && !waiting ? `<pre>${esc(sug.text)}</pre>${stale ? `<div class="row2"><button class="use" type="button" data-act="ai-redo">✨ Redo with my edits</button><button class="chipb" type="button" data-act="ai-use">Use anyway</button></div>` : `<button class="use" type="button" data-act="ai-use">Use this</button>`}` : ''}
+    ${waiting ? '<div class="wait"><i></i>Working on it — usually ready in 10–20 seconds…</div>' : ''}
     ${d.ai_error && !waiting ? `<div class="err">⚠️ ${esc(d.ai_error)}</div>` : ''}
     <div class="row2">${AI_ASKS.map(([a, l]) => `<button class="chipb" type="button" data-act="ai-ask" data-a="${a}"${waiting ? ' disabled' : ''}>${l}</button>`).join('')}</div>
     <div class="own"><input type="text" data-k="ai_own" placeholder="Your own instruction, e.g. tell her I'll call Monday" enterkeyhint="send"><button class="chipb" type="button" data-act="ai-own"${waiting ? ' disabled' : ''}>✨ Ask</button></div>
@@ -1077,6 +1106,21 @@ async function toggleDoc(t, i, k) {
   t.documents = docs; t.reply_body = redraft(t, { documents: docs }); render();
 }
 
+// A ✨ request on the text as it is now (your edits are saved with it)
+async function askAi(t, base, action, instruction) {
+  const details = { ...(t.details || {}), ai_request: { action, instruction, base, at: new Date().toISOString() }, ai_error: null };
+  const { error } = await sb.from('email_tasks').update({ details, reply_body: base }).eq('id', t.id);
+  if (error) throw error;
+  dropDraft(t.id); t.details = details; t.reply_body = base; render(); aiPoll();
+}
+$('main').addEventListener('input', e => {
+  const ta = e.target.closest('textarea[data-k="reply_body"]'); if (!ta) return;
+  const id = ta.closest('.card').dataset.t;
+  S.drafts[id] = ta.value; saveDraft(id);
+});
+$('main').addEventListener('focusout', e => {   // leaving the box: show the "made before your edits" note if it applies
+  if (e.target.matches('textarea[data-k="reply_body"]')) setTimeout(() => { if (!typing()) render(); }, 50);
+});
 $('main').addEventListener('click', async e => {
   const jump = e.target.closest('[data-jump]');
   if (jump) {
@@ -1094,6 +1138,12 @@ $('main').addEventListener('click', async e => {
     if (act === 'doc') return toggleDoc(t, +btn.dataset.i, btn.dataset.k);
     if (act === 'lang') {
       const l = btn.dataset.l; if (l === t.lang) return;
+      const cur = (cardEl.querySelector('[data-k="reply_body"]') || {}).value ?? replyText(t);
+      if (!sameText(cur, redraft(t))) {   // you edited it: translate YOUR text, don't redraw the template
+        await askAi(t, cur, l === 'fr' ? 'french' : 'english', '');
+        return toast(l === 'fr' ? '✨ Claude translates your text — ready in a few seconds' : '✨ Claude translates your text — ready in a few seconds');
+      }
+      dropDraft(t.id);
       const body = redraft(t, { lang: l });
       const { error } = await sb.from('email_tasks').update({ lang: l, reply_body: body }).eq('id', t.id);
       if (error) throw error; t.lang = l; t.reply_body = body; return render();
@@ -1101,19 +1151,22 @@ $('main').addEventListener('click', async e => {
     if (act === 'ai-ask' || act === 'ai-own') {
       const instruction = act === 'ai-own' ? (cardEl.querySelector('[data-k="ai_own"]').value || '').trim() : '';
       if (act === 'ai-own' && !instruction) return toast('Type what you want first');
-      const base = (cardEl.querySelector('[data-k="reply_body"]') || {}).value || t.reply_body || '';
-      const details = { ...(t.details || {}), ai_request: { action: act === 'ai-own' ? 'custom' : btn.dataset.a, instruction, base, at: new Date().toISOString() }, ai_error: null };
-      const { error } = await sb.from('email_tasks').update({ details, reply_body: base }).eq('id', t.id);   // your edits are kept
-      if (error) throw error;
-      t.details = details; t.reply_body = base; render(); aiPoll();
-      return toast('✨ Asked Claude — ready within a minute');
+      const base = (cardEl.querySelector('[data-k="reply_body"]') || {}).value ?? replyText(t);
+      await askAi(t, base, act === 'ai-own' ? 'custom' : btn.dataset.a, instruction);
+      return toast('✨ Asked Claude — ready in a few seconds');
+    }
+    if (act === 'ai-redo') {   // same request again, on the text as it is now
+      const sug = t.details.ai_suggestion || {};
+      const base = (cardEl.querySelector('[data-k="reply_body"]') || {}).value ?? replyText(t);
+      await askAi(t, base, sug.action || 'suggest', sug.instruction || '');
+      return toast('✨ Redoing it with your edits');
     }
     if (act === 'ai-use') {
       const text = t.details && t.details.ai_suggestion && t.details.ai_suggestion.text;
       if (!text) return;
       const { error } = await sb.from('email_tasks').update({ reply_body: text }).eq('id', t.id);
       if (error) throw error;
-      t.reply_body = text; render();
+      dropDraft(t.id); t.reply_body = text; render();
       return toast('Suggestion placed in the reply — review it, then Send');
     }
     btn.disabled = true;
@@ -1150,6 +1203,7 @@ $('main').addEventListener('click', async e => {
     if (act === 'send') {
       const body = cardEl.querySelector('[data-k="reply_body"]').value.trim();
       if (!body) { btn.disabled = false; return toast('The reply is empty'); }
+      dropDraft(t.id);
       await setTask(t, 'send_approved', { reply_body: body, error: null });
       await audit('ASSISTANT_REPLY_APPROVED', t.file_number, { task_id: t.id, kind: t.kind, test: t.is_test });
       toast(t.is_test ? 'Test reply queued — it will be saved, not sent' : 'Queued — your Mac sends it within ~2 minutes');
@@ -1163,13 +1217,13 @@ $('refreshBtn').addEventListener('click', () => load().then(() => toast('Up to d
 const typing = () => document.activeElement?.matches('textarea, input, select');
 document.addEventListener('visibilitychange', () => { if (!document.hidden && user && !typing()) load(); });
 setInterval(() => { if (!document.hidden && user && !typing()) load(); }, 60000);
-// While a rewrite is being prepared, look again every 15 s (stops when none is pending)
+// While a rewrite is being prepared, look again every 3 s (stops when none is pending)
 let _aiPollT = null;
 function aiPoll() {
   clearTimeout(_aiPollT);
   const pending = S.tasks.some(t => t.details && t.details.ai_request && !t.details.ai_request.done);
   if (!pending) return;
-  _aiPollT = setTimeout(async () => { if (!document.hidden && user && !typing()) await load(); aiPoll(); }, 15000);
+  _aiPollT = setTimeout(async () => { if (!document.hidden && user && !typing()) await load(); aiPoll(); }, 3000);
 }
 
 
@@ -1261,10 +1315,10 @@ async function brainAnswer(text) {
     if (error) throw error;
     const t0 = Date.now();
     while (Date.now() - t0 < 90000) {
-      await new Promise(r => setTimeout(r, 1200));
+      await new Promise(r => setTimeout(r, 450));   // check ~2 times a second
       const { data: row } = await sb.from('dubbi_asks').select('status,answer').eq('id', data.id).maybeSingle();
       if (!row) break;
-      if (row.status === 'answered' && row.answer && row.answer.say) return fromBrain(row.answer);
+      if (row.status === 'answered' && row.answer && row.answer.say) return fromBrain(row.answer, data.id);
       if (row.status === 'failed') { note = L('Claude couldn’t answer', 'Claude n’a pas pu répondre') + (row.answer && row.answer.error ? ' (' + row.answer.error + ')' : '') + L(' — here’s a quick answer instead.', ' — voici une réponse rapide.'); break; }
       if (row.status === 'asked' && Date.now() - t0 > 15000) {
         const { data: gone } = await sb.from('dubbi_asks').update({ status: 'cancelled' }).eq('id', data.id).eq('status', 'asked').select('id');
@@ -1278,10 +1332,11 @@ async function brainAnswer(text) {
   return null;
 }
 // The Mac's answer → what Dubbi shows. An action becomes the usual Confirm card (with every check).
-function fromBrain(a) {
+function fromBrain(a, askId) {
   const items = todoItems();
   const go = (a.show || []).map(f => { const i = items.find(i => normFile(fileOf(i)) === normFile(f)); return i ? showBtn(i) : [`#${f}`, () => ask(f, true)]; });
-  const out = { say: a.say, go, audio: a.audio || null };
+  // the text comes first; the Mac's voice for it follows a moment later in the same row
+  const out = { say: a.say, go, audio: a.audio || (a.voice === 'pending' && askId ? { row: askId } : null) };
   const cmd = a.action && BRAIN_CMD[a.action.type];
   if (cmd) {
     const r = actionFor(plain(cmd(a.action.file)), String(a.action.file), items);
@@ -1292,6 +1347,7 @@ function fromBrain(a) {
 }
 
 // ── Actions: Dubbi proposes, you confirm, the card's own button does it ──
+const snippet = t => { keepDrafts(); const s = replyText(t).replace(/^\s*(hello|hi|bonjour|allo)\b[^\n]*\n+/i, '').replace(/\s+/g, ' ').trim(); return s.length > 110 ? s.slice(0, 107) + '…' : s; };
 const YES = /^\s*(yes|yeah|yep|sure|ok(ay)?|confirm(ed)?|do it|go ahead|send it|oui|ouais|d'accord|vas-?y|confirme|envoie)\b[\s.!]*$/;
 const NO = /^\s*(no|nope|cancel|stop|don'?t|non|annule|laisse tomber)\b/;
 function proposeCard(p) {
@@ -1327,8 +1383,8 @@ const ACTIONS = [
   { re: /\b(got|received|recu)\b.*\b(docs?|documents?|forms?|formulaires?)\b/, views: ['waiting'], act: () => 'docs-in',
     say: i => L(`Mark the documents for file #${fileOf(i)} as received and put it back in your list.`, `Marquer les documents du dossier #${fileOf(i)} comme reçus.`) },
   { re: /\b(send|envoie|envoyer|envoyez)\b/, views: ['reply'], act: () => 'send',
-    say: i => L(`Send the reply for file #${fileOf(i)} to ${i.t.to_name || i.t.to_address}${(i.t.cc_addresses || []).length ? ', copy to ' + i.t.cc_addresses.join(', ') : ''}. Your Mac sends it within about 2 minutes.`,
-      `Envoyer la réponse du dossier #${fileOf(i)} à ${i.t.to_name || i.t.to_address}${(i.t.cc_addresses || []).length ? ', copie à ' + i.t.cc_addresses.join(', ') : ''}. Votre Mac l’envoie d’ici 2 minutes.`) },
+    say: i => L(`Send this reply for file #${fileOf(i)}: “${snippet(i.t)}” to ${i.t.to_name || i.t.to_address}${(i.t.cc_addresses || []).length ? ', copy to ' + i.t.cc_addresses.join(', ') : ''}. Your Mac sends it within about 2 minutes.`,
+      `Envoyer cette réponse du dossier #${fileOf(i)} : « ${snippet(i.t)} » à ${i.t.to_name || i.t.to_address}${(i.t.cc_addresses || []).length ? ', copie à ' + i.t.cc_addresses.join(', ') : ''}. Votre Mac l’envoie d’ici 2 minutes.`) },
   { re: /\b(close|ferme[rz]?|fermeture)\b/, views: ['close'],
     act: i => i.t.existing_patient ? 'close-file' : 'reply-anyway',
     say: i => i.t.existing_patient
@@ -1603,6 +1659,20 @@ function playVoice(b64, text, b) {
 async function voiceOut(text, audio, b) {
   if (!pref('speak', true)) return;
   const tok = D.speakTok = (D.speakTok || 0) + 1;
+  if (audio && audio.row) {   // the Mac is still making the voice for this answer: wait for it (max 6 s)
+    if (macVoiceOn()) {
+      const t0 = Date.now();
+      while (Date.now() - t0 < 6000 && tok === D.speakTok) {
+        await new Promise(r => setTimeout(r, 300));
+        const { data: row } = await sb.from('dubbi_asks').select('answer').eq('id', audio.row).maybeSingle();
+        const a = row && row.answer;
+        if (!a || a.voice === 'none') break;
+        if (a.audio) { if (tok === D.speakTok) playVoice(a.audio, text, b); return; }
+      }
+    }
+    if (tok === D.speakTok) speak(text, false, b);
+    return;
+  }
   if (audio && macVoiceOn()) return playVoice(audio, text, b);
   const bt = S.beat && S.beat.created_at;
   if (!macVoiceOn() || !user || !bt || hoursSince(bt) > 0.25) return speak(text, false, b);
