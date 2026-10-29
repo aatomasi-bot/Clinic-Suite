@@ -155,6 +155,14 @@ export async function supabaseStore(cfg) {
       if (!row || row.status !== 'pending') return;
       must(await sb.from('pending_patients').update(applyCardPatch(row, patch)).eq('id', pendingId));
     },
+    // Names for these file numbers (+ the pending card), so a reply's subject can use initials only
+    async patientNames(files = [], pendingId = null) {
+      const out = [];
+      const fs = files.map(f => String(f).trim()).filter(Boolean);
+      if (fs.length) out.push(...must(await sb.from('patients').select('patient_name').in('file_number', fs)).map(r => r.patient_name));
+      if (pendingId) { const r = must(await sb.from('pending_patients').select('record').eq('id', pendingId)); if (r[0] && r[0].record) out.push(r[0].record.patient_name); }
+      return out.filter(Boolean);
+    },
     async updateTask(id, fields) {
       must(await sb.from('email_tasks').update(fields).eq('id', id));
     },
@@ -272,6 +280,11 @@ export function offlineStore({ patientsFile, outFile }) {
     async insertTask(row) { const id = `task-${tasks.length + 1}`; tasks.push({ id, created_at: new Date().toISOString(), ...row }); save(); return id; },
     async tasksToSend() { return tasks.filter(t => t.status === 'send_approved'); },
     async claimTask(id) { const t = tasks.find(t => t.id === id); if (!t || t.status !== 'send_approved') return false; t.status = 'sending'; save(); return true; },
+    async patientNames(files = [], pendingId = null) {
+      const fs = files.map(f => String(f).trim());
+      return [...patients.filter(p => fs.includes(String(p.file_number).trim())).map(p => p.patient_name),
+        ...rows.filter(r => r.id === pendingId).map(r => r.record && r.record.patient_name)].filter(Boolean);
+    },
     async updateTask(id, fields) { Object.assign(tasks.find(t => t.id === id), fields); save(); },
     async patchCard(pendingId, patch) {
       const r = rows.find(x => x.id === pendingId); if (!r || r.status !== 'pending') return;

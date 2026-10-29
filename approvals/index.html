@@ -860,7 +860,8 @@ function replyCard(item) {
   const t = item.t, ask = t.details && t.details.reply_mode === 'ask_docs';
   const to = t.to_name ? `${esc(t.to_name)} &lt;${esc(t.to_address)}&gt;` : esc(t.to_address);
   const done = ask ? 'Ask for documents' : { new_patient: 'Patient added ✓', prescription: 'Prescription applied ✓', close_file: 'File deleted ✓', on_hold: 'On hold ✓', back: 'Back from hold ✓', permanent: 'Permanent ✓', question: 'Coordinator question' }[t.kind];
-  const subj = /^re\s*:/i.test(t.email_subject || '') ? t.email_subject : 'Re: ' + (t.email_subject || '');
+  const r0 = pendingOf(t), names = [t.existing_patient && t.existing_patient.patient_name, t.details && t.details.patient_name, r0 && r0.record && r0.record.patient_name].filter(Boolean);
+  const s0 = safeSubject(t.email_subject || '', names), subj = /^re\s*:/i.test(s0) ? s0 : 'Re: ' + s0;   // what is sent: initials + file number only
   const many = t.kind === 'question' && t.details && (t.details.files || []).length > 1 ? t.details.files : null;
   return `${cardOpen(item, '✉️', 'ic-reply')}<div class="ctitle"><div class="kind">Reply · ${esc(done)}</div><b>${many ? `${many.length} files: ${many.map(n => esc('#' + n)).join(', ')}` : `File ${fileRef(t.file_number, t.subject_ref)}`}</b><div class="meta">${from(t)}</div></div>${chips(item)}</div>
     ${t.status === 'failed' ? `<div class="warn err"><div>⚠️ Not sent: ${esc(t.error || 'unknown error')}</div></div>` : ''}
@@ -1314,10 +1315,10 @@ async function brainAnswer(text) {
     if (error) throw error;
     const t0 = Date.now();
     while (Date.now() - t0 < 90000) {
-      await new Promise(r => setTimeout(r, 1200));
+      await new Promise(r => setTimeout(r, 450));   // check ~2 times a second
       const { data: row } = await sb.from('dubbi_asks').select('status,answer').eq('id', data.id).maybeSingle();
       if (!row) break;
-      if (row.status === 'answered' && row.answer && row.answer.say) return fromBrain(row.answer);
+      if (row.status === 'answered' && row.answer && row.answer.say) return fromBrain(row.answer, data.id);
       if (row.status === 'failed') { note = L('Claude couldn’t answer', 'Claude n’a pas pu répondre') + (row.answer && row.answer.error ? ' (' + row.answer.error + ')' : '') + L(' — here’s a quick answer instead.', ' — voici une réponse rapide.'); break; }
       if (row.status === 'asked' && Date.now() - t0 > 15000) {
         const { data: gone } = await sb.from('dubbi_asks').update({ status: 'cancelled' }).eq('id', data.id).eq('status', 'asked').select('id');
@@ -1331,10 +1332,11 @@ async function brainAnswer(text) {
   return null;
 }
 // The Mac's answer → what Dubbi shows. An action becomes the usual Confirm card (with every check).
-function fromBrain(a) {
+function fromBrain(a, askId) {
   const items = todoItems();
   const go = (a.show || []).map(f => { const i = items.find(i => normFile(fileOf(i)) === normFile(f)); return i ? showBtn(i) : [`#${f}`, () => ask(f, true)]; });
-  const out = { say: a.say, go, audio: a.audio || null };
+  // the text comes first; the Mac's voice for it follows a moment later in the same row
+  const out = { say: a.say, go, audio: a.audio || (a.voice === 'pending' && askId ? { row: askId } : null) };
   const cmd = a.action && BRAIN_CMD[a.action.type];
   if (cmd) {
     const r = actionFor(plain(cmd(a.action.file)), String(a.action.file), items);
@@ -1657,6 +1659,20 @@ function playVoice(b64, text, b) {
 async function voiceOut(text, audio, b) {
   if (!pref('speak', true)) return;
   const tok = D.speakTok = (D.speakTok || 0) + 1;
+  if (audio && audio.row) {   // the Mac is still making the voice for this answer: wait for it (max 6 s)
+    if (macVoiceOn()) {
+      const t0 = Date.now();
+      while (Date.now() - t0 < 6000 && tok === D.speakTok) {
+        await new Promise(r => setTimeout(r, 300));
+        const { data: row } = await sb.from('dubbi_asks').select('answer').eq('id', audio.row).maybeSingle();
+        const a = row && row.answer;
+        if (!a || a.voice === 'none') break;
+        if (a.audio) { if (tok === D.speakTok) playVoice(a.audio, text, b); return; }
+      }
+    }
+    if (tok === D.speakTok) speak(text, false, b);
+    return;
+  }
   if (audio && macVoiceOn()) return playVoice(audio, text, b);
   const bt = S.beat && S.beat.created_at;
   if (!macVoiceOn() || !user || !bt || hoursSince(bt) > 0.25) return speak(text, false, b);

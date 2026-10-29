@@ -19,7 +19,9 @@ export async function runOutbox({ store, mailer, testMailer, rules, live, moveTo
     }
     if (!(await store.claimTask(task.id))) continue;            // someone else took it / you cancelled
     try {
-      await m.send(task);
+      const files = String(task.file_number || '').split(/[,\s]+/).filter(Boolean);
+      const names = store.patientNames ? await store.patientNames(files, task.pending_id).catch(() => []) : [];
+      await m.send(task, names);   // subject: initials + file number only
       const askDocs = task.details && task.details.reply_mode === 'ask_docs';
       if (askDocs) {
         // Asked for missing documents: keep the item open until they arrive; the email stays in Inbox

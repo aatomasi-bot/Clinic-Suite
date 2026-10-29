@@ -96,12 +96,14 @@ export function checkReply(text, draft, { shareNames = false } = {}) {
 
 // ── Run Claude (your subscription) ─────────────────────────────────────────
 const EMPTY_DIR = path.join(os.tmpdir(), 'vapiq-ai-empty');
-export function claudeRunner({ command, model, timeoutMs = 90e3, system = SYSTEM } = {}) {
+// fast: no extended thinking, and no update checks or other background calls at start-up.
+export function claudeRunner({ command, model, timeoutMs = 90e3, system = SYSTEM, fast = false } = {}) {
+  const env = { ...process.env, DISABLE_AUTOUPDATER: '1', CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1', ...(fast ? { MAX_THINKING_TOKENS: '0' } : {}) };
   const bin = String(command || '~/.local/bin/claude').replace(/^~(?=\/)/, os.homedir());
   return (prompt) => new Promise((resolve, reject) => {
     fs.mkdirSync(EMPTY_DIR, { recursive: true });
     const child = spawn(bin, ['-p', '--tools', '', '--strict-mcp-config', '--setting-sources', '', '--no-session-persistence',
-      '--output-format', 'text', '--system-prompt', system, ...(model ? ['--model', String(model)] : [])], { cwd: EMPTY_DIR, stdio: ['pipe', 'pipe', 'pipe'] });
+      '--output-format', 'text', '--system-prompt', system, ...(model ? ['--model', String(model)] : [])], { cwd: EMPTY_DIR, env, stdio: ['pipe', 'pipe', 'pipe'] });
     let out = '', err = '';
     const timer = setTimeout(() => { child.kill('SIGTERM'); reject(new Error('Claude did not answer in time')); }, timeoutMs);
     child.stdout.on('data', d => { out += d; });

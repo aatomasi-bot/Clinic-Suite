@@ -148,7 +148,42 @@ function missingDocs(docs) { return ['assignment', 'enrollment'].filter(k => !(d
 // Scanned faxes the computer couldn't read: you tick what they contain before sending
 function needsDocCheck(docs) { return !!(docs && docs.unknown > 0 && !docs.checked); }
 
-const api = { draftReply, detectLanguage, coordinatorFirstName, subjectReference, missingDocs, needsDocCheck, DOC_NAMES };
+// ── Subject lines: patient INITIALS + file number only (manager's rule, Oct 29 2026) ──
+// The body may have the full name and file number; the subject never has a full name.
+// initialsOf('Jean-Guy Côté') -> 'JGC'
+function initialsOf(name) {
+  return String(name || '').split(/[\s,.'’-]+/).filter(w => /\p{L}/u.test(w)).map(w => w.normalize('NFD')[0].toUpperCase()).join('');
+}
+const ACC = { a: 'aàâäá', c: 'cç', e: 'eéèêë', i: 'iîïí', o: 'oôöó', u: 'uùûüú', y: 'yÿ', n: 'nñ' };
+const loose = w => [...w.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()].map(ch => ACC[ch] ? `[${ACC[ch]}${ACC[ch].toUpperCase()}]` : ch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('');
+const TITLES = /\b(Mr|Mrs|Ms|Miss|Mister|Dr|M|Mme|Mlle|Madame|Monsieur)\.?\s+([A-ZÀ-Ý][\p{L}'’-]+)(?:\s+([A-ZÀ-Ý][\p{L}'’-]+))?/gu;
+const SUBJECT_WORDS = /^(re|tr|fw|fwd|patient|patiente|new|nouveau|nouvelle|close|closed|file|files|fax|update|dossier|fermeture|ordonnance|prescription|urgent|transfer|transfert|hold|attente|confirmation|appointment|rendez-vous|enrollment|inscription|request|demande|documents?|form|formulaire|status|statut|back|retour|permanent|temporary|temporaire|for|pour|and|et|the|le|la|les|de|du|des|of|to|from|with|avec)$/i;
+const CAPS_WORDS = /^(URGENT|CONFIRMED|CONFIRMATION|NEW|FAX|PDF|CLSC|CHSLD|CPP|NMR|RN|RE|TR|FW|FWD|ASAP|IMPORTANT|UPDATE|RAPPEL|REMINDER|MEDICUM|ELIGARD|QC|MTL|OK|AM|PM|EST|TEST)(?:[\s-](?:URGENT|CONFIRMED|NEW|FAX|PDF|ASAP|IMPORTANT|UPDATE|TEST))*$/;
+// safeSubject('Re: New patient Jean Tremblay 35037', ['Jean Tremblay']) -> 'Re: New patient JT 35037'
+function safeSubject(subject, names) {
+  let s = String(subject || '');
+  const people = (names || []).map(n => String(n || '').trim()).filter(Boolean)
+    .map(n => ({ n, parts: n.split(/[\s,]+/).filter(w => w.replace(/[^\p{L}]/gu, '').length > 1) }))
+    .filter(x => x.parts.length).sort((a, b) => b.n.length - a.n.length);
+  const L = '(?<![\\p{L}])', R = '(?![\\p{L}])';
+  for (const { n, parts } of people) {
+    const ini = initialsOf(n);
+    for (const order of [parts, [...parts].reverse()])          // "Jean Tremblay" and "Tremblay, Jean"
+      s = s.replace(new RegExp(L + order.map(loose).join('[\\s,]+') + R, 'giu'), ini);
+    for (const w of parts) if (w.replace(/[^\p{L}]/gu, '').length > 2)   // one part alone: "Tremblay 35037"
+      s = s.replace(new RegExp(L + loose(w) + R, 'giu'), initialsOf(w));
+  }
+  s = s.replace(TITLES, (all, t, a, b) => `${t} ${initialsOf(a + ' ' + (b || ''))}`);   // "Mme Tremblay" -> "Mme T"
+  // Medicum style "Jean TREMBLAY" / "TREMBLAY, Jean" (not subject words like "Patient JGC", "Transfer CONFIRMED")
+  const word = w => SUBJECT_WORDS.test(w), caps = w => CAPS_WORDS.test(w) || w.replace(/[^\p{L}]/gu, '').length < 3;
+  s = s.replace(/(?<![\p{L}])([A-ZÀ-Ý][a-zà-ÿ'’]+(?:-[A-ZÀ-Ý][a-zà-ÿ'’]+)?)\s+([A-ZÀ-Ý]{2,}(?:[\s-][A-ZÀ-Ý]{2,})*)(?![\p{L}])/gu,
+    (all, a, b) => word(a) || caps(b) ? all : initialsOf(a + ' ' + b));
+  s = s.replace(/(?<![\p{L}])([A-ZÀ-Ý]{2,}(?:[\s-][A-ZÀ-Ý]{2,})*),\s*([A-ZÀ-Ý][a-zà-ÿ'’]+(?:-[A-ZÀ-Ý][a-zà-ÿ'’]+)?)(?![\p{L}])/gu,
+    (all, a, b) => caps(a) || word(b) ? all : initialsOf(b + ' ' + a));
+  return s.replace(/\s{2,}/g, ' ').trim();
+}
+
+const api = { initialsOf, safeSubject, draftReply, detectLanguage, coordinatorFirstName, subjectReference, missingDocs, needsDocCheck, DOC_NAMES };
 if (typeof module === 'object' && module.exports) module.exports = api;
 else Object.assign(root, api);
 })(typeof self !== 'undefined' ? self : this);

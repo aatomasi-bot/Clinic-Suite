@@ -60,7 +60,7 @@ async function main() {
   const cfg = loadConfig(), ai = cfg.ai || {};
   if (ai.enabled === false || cfg.mode !== 'live') return;
   const store = await supabaseStore(cfg.supabase);
-  await aiPass({ store, ai, run: claudeRunner({ command: ai.command, model: ai.model }) });
+  await aiPass({ store, ai, run: claudeRunner({ command: ai.command, model: ai.model || 'sonnet', fast: true }) });
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main().catch(e => { console.error('ai failed:', e.message); process.exitCode = 1; });
