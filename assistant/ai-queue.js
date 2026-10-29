@@ -14,7 +14,7 @@ import { claudeRunner, aiReply } from './lib/ai.js';
 const here = path.dirname(fileURLToPath(import.meta.url));
 
 // Pure step, used by the job and the tests: tasks → updates to write.
-export async function processAi({ tasks, run, realEmails, maxPerRun = 4, now = () => new Date().toISOString() }) {
+export async function processAi({ tasks, run, realEmails, shareNames = false, maxPerRun = 4, now = () => new Date().toISOString() }) {
   const updates = [];
   for (const t of tasks) {
     if (updates.length >= maxPerRun) break;
@@ -27,31 +27,40 @@ export async function processAi({ tasks, run, realEmails, maxPerRun = 4, now = (
     const names = [t.existing_patient && t.existing_patient.patient_name, d.patient_name].filter(Boolean);
     if (!draft.trim()) continue;
     if (req && !req.done) {                                        // a rewrite you asked for
-      const r = await aiReply({ run, action: req.action, instruction: req.instruction, draft: req.base || draft, excerpt: d.excerpt, names });
+      const base = req.base != null && String(req.base).trim() ? req.base : draft;   // the text as you had it when you asked
+      const r = await aiReply({ run, action: req.action, instruction: req.instruction, draft: base, excerpt: d.excerpt, names, shareNames });
       updates.push({ id: t.id, details: { ...d, ai_request: { ...req, done: now() },
-        ...(r.text ? { ai_suggestion: { text: r.text, action: req.action, at: now() }, ai_error: null } : { ai_error: r.error }) } });
+        ...(r.text ? { ai_suggestion: { text: r.text, action: req.action, instruction: req.instruction || '', base, at: now() }, ai_error: null } : { ai_error: r.error }) } });
     } else if (t.status === 'reply_ready' && !d.ai_suggestion && !d.ai_error) {   // first suggestion
-      const r = await aiReply({ run, action: 'suggest', draft, excerpt: d.excerpt, names });
-      updates.push({ id: t.id, details: { ...d, ...(r.text ? { ai_suggestion: { text: r.text, action: 'suggest', at: now() } } : { ai_error: r.error }) } });
+      const r = await aiReply({ run, action: 'suggest', draft, excerpt: d.excerpt, names, shareNames });
+      updates.push({ id: t.id, details: { ...d, ...(r.text ? { ai_suggestion: { text: r.text, action: 'suggest', base: draft, at: now() } } : { ai_error: r.error }) } });
     }
   }
   return updates;
 }
 
+// One pass: read the cards, ask Claude, save. Used by this job (every 30 s, the backup)
+// and by Dubbi's brain (every few seconds, so a rewrite starts right away).
+// The lock file keeps the two from working on the same cards at once.
+const LOCK = path.join(here, 'state', 'ai.lock');
+export async function aiPass({ store, ai, run }) {
+  try { if (Date.now() - fs.statSync(LOCK).mtimeMs < 5 * 60e3) return 0; } catch {}
+  fs.mkdirSync(path.dirname(LOCK), { recursive: true }); fs.writeFileSync(LOCK, String(process.pid));
+  try {
+    const tasks = await store.tasksForAi();
+    if (!tasks.length) return 0;
+    const updates = await processAi({ tasks, run, realEmails: ai.realEmails === true, shareNames: ai.shareNames === true, maxPerRun: ai.maxPerRun || 4 });
+    for (const u of updates) await store.updateTask(u.id, { details: u.details });
+    if (updates.length) console.log(`[${new Date().toISOString()}] ai: ${updates.length} suggestion(s)`);
+    return updates.length;
+  } finally { fs.rmSync(LOCK, { force: true }); }
+}
+
 async function main() {
   const cfg = loadConfig(), ai = cfg.ai || {};
   if (ai.enabled === false || cfg.mode !== 'live') return;
-  const lock = path.join(here, 'state', 'ai.lock');
-  try { if (Date.now() - fs.statSync(lock).mtimeMs < 5 * 60e3) return; } catch {}
-  fs.mkdirSync(path.dirname(lock), { recursive: true }); fs.writeFileSync(lock, String(process.pid));
-  try {
-    const store = await supabaseStore(cfg.supabase);
-    const tasks = await store.tasksForAi();
-    if (!tasks.length) return;
-    const updates = await processAi({ tasks, run: claudeRunner({ command: ai.command }), realEmails: ai.realEmails === true, maxPerRun: ai.maxPerRun || 4 });
-    for (const u of updates) await store.updateTask(u.id, { details: u.details });
-    if (updates.length) console.log(`[${new Date().toISOString()}] ai: ${updates.length} suggestion(s)`);
-  } finally { fs.rmSync(lock, { force: true }); }
+  const store = await supabaseStore(cfg.supabase);
+  await aiPass({ store, ai, run: claudeRunner({ command: ai.command, model: ai.model }) });
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main().catch(e => { console.error('ai failed:', e.message); process.exitCode = 1; });

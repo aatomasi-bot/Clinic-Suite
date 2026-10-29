@@ -178,3 +178,16 @@ send", "Missing documents", a file number, or "Find <name>" (English or French).
 - The **microphone is off by default** (Dubbi → ⚙︎). Speech goes through Apple's
   dictation, like the keyboard mic, so turn it on only once your privacy officer
   agrees. Typing always works.
+
+## ✨ Claude and Dubbi: speed and names (Oct 29, 2026)
+
+- **Your edits count.** Whatever is in the reply box is what Claude rewrites, what Dubbi
+  sends and what Send sends. Edits are saved 1.5 s after you stop typing. A suggestion
+  made before you edited says so, with **✨ Redo with my edits**. Tapping EN/FR after editing
+  asks Claude to translate *your* text instead of redrawing the standard reply.
+- **Faster rewrites.** Dubbi's brain (always running) starts a rewrite within ~3 s;
+  `ai-queue.js` every 30 s is the backup. The page checks every 3 s while one is pending.
+- **Names** (`"ai": { "shareNames": true }` in `config.json`): Claude sees patient names with
+  file numbers, so Dubbi understands misheard or misspelled names and answers with them.
+  Phones, emails, streets and postal codes are still removed. Off by default.
+- **Model** (`"ai": { "model": "sonnet" }`, optional `"brainModel"`): passed to `claude --model`.

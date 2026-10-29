@@ -39,9 +39,17 @@ const NAME_RULES = [
   [new RegExp(`\\b(${FAMILY_RE})\\s+(?:named\\s+|nommée?\\s+)?[A-ZÀ-Ý][a-zà-ÿ'-]+(?:\\s+[A-ZÀ-Ý][A-Za-zà-ÿ'-]+)?`, 'g'), '$1 [name]'],
   [new RegExp(`\\b[A-ZÀ-Ý][a-zà-ÿ'-]+(?:\\s+[A-ZÀ-Ý][A-Za-zà-ÿ'-]+)?\\s*\\((${FAMILY_RE})\\)`, 'g'), '[name] ($1)'],
 ];
-export function redact(text, names = []) {
+// Contact details only (phones, emails, addresses, postal codes, links) — used when
+// config ai.shareNames is on (names + file numbers allowed by your manager, Oct 29 2026).
+export function redactContact(text) {
   let s = String(text || '');
   for (const [re, by] of RULES) s = s.replace(re, by);
+  return s;
+}
+// The clean-up for what goes to Claude: names too, unless shareNames is on.
+export const cleanFor = shareNames => shareNames ? (t => redactContact(t)) : ((t, names) => redact(t, names));
+export function redact(text, names = []) {
+  let s = redactContact(text);
   const escRe = p => p.replace(/[.*+?^${}()|[\]\\]/g, ch => '\\' + ch);
   for (const n of names) for (const part of String(n || '').split(/[\s,]+/).filter(p => p.length > 2))
     s = s.replace(new RegExp(`\\b${escRe(part)}\\b`, 'gi'), '[patient]');
@@ -64,35 +72,36 @@ const SYSTEM = `You help a home-care nurse in Montreal reply to coordinators at 
 Rules:
 - Output ONLY the email text, nothing else (no subject, no notes, no quotes, no markdown).
 - Keep it short, professional and warm. Match the language of the draft unless asked to translate.
-- Keep every fact from the standard draft (file numbers, what was done, which documents are missing).
+- The draft is the nurse's CURRENT text and may contain her own edits: keep her changes, facts and wording choices unless the task asks to change them.
+- Keep every fact from the draft (file numbers, what was done, which documents are missing).
 - Never invent facts, dates, times, doses, phone numbers, actions or promises that are not in the draft, the message or the nurse's instruction (e.g. do not say you noted, called or sent anything unless the draft says so).
 - Keep the greeting line and end exactly with the same closing and signature as the draft.
-- Text in [brackets] like [phone] or [patient] was removed for privacy: never try to fill it in, and never write a patient's name.`;
+- Text in [brackets] like [phone] or [patient] was removed for privacy: never try to fill it in. Never add a patient's name that is not already in the draft or the message.`;
 
 export function buildPrompt({ action = 'suggest', instruction = '', draft = '', excerpt = '' }) {
   const ask = action === 'custom' ? `Rewrite the reply following this instruction from the nurse: "${String(instruction).slice(0, 400)}"` : (ACTIONS[action] || ACTIONS.suggest);
-  return `Coordinator's message (contact details removed):\n"""\n${excerpt || '(not available)'}\n"""\n\nStandard draft reply:\n"""\n${draft}\n"""\n\nTask: ${ask}`;
+  return `Coordinator's message (contact details removed):\n"""\n${excerpt || '(not available)'}\n"""\n\nThe nurse's current draft reply (keep her edits):\n"""\n${draft}\n"""\n\nTask: ${ask}`;
 }
 
 // Basic checks on what comes back: still the same file number(s) and signature, no contact details.
-export function checkReply(text, draft) {
+export function checkReply(text, draft, { shareNames = false } = {}) {
   const out = String(text || '').trim().replace(/^```\w*\n?|```$/g, '').replace(/^"""|"""$/g, '').trim();
   if (out.length < 15 || out.length > 3000) return { ok: false, why: 'empty or too long' };
   for (const fn of String(draft).match(/#\d{4,6}/g) || []) if (!out.includes(fn)) return { ok: false, why: `file ${fn} missing` };
   const sig = String(draft).trim().split('\n').pop().trim();
   if (sig && /^[A-ZÀ-Ý]/.test(sig) && !out.includes(sig)) return { ok: false, why: 'signature missing' };
-  if (redact(out) !== out) return { ok: false, why: 'contains contact details' };
+  if ((shareNames ? redactContact(out) : redact(out)) !== out) return { ok: false, why: 'contains contact details' };
   return { ok: true, text: out };
 }
 
 // ── Run Claude (your subscription) ─────────────────────────────────────────
 const EMPTY_DIR = path.join(os.tmpdir(), 'vapiq-ai-empty');
-export function claudeRunner({ command, timeoutMs = 90e3, system = SYSTEM } = {}) {
+export function claudeRunner({ command, model, timeoutMs = 90e3, system = SYSTEM } = {}) {
   const bin = String(command || '~/.local/bin/claude').replace(/^~(?=\/)/, os.homedir());
   return (prompt) => new Promise((resolve, reject) => {
     fs.mkdirSync(EMPTY_DIR, { recursive: true });
     const child = spawn(bin, ['-p', '--tools', '', '--strict-mcp-config', '--setting-sources', '', '--no-session-persistence',
-      '--output-format', 'text', '--system-prompt', system], { cwd: EMPTY_DIR, stdio: ['pipe', 'pipe', 'pipe'] });
+      '--output-format', 'text', '--system-prompt', system, ...(model ? ['--model', String(model)] : [])], { cwd: EMPTY_DIR, stdio: ['pipe', 'pipe', 'pipe'] });
     let out = '', err = '';
     const timer = setTimeout(() => { child.kill('SIGTERM'); reject(new Error('Claude did not answer in time')); }, timeoutMs);
     child.stdout.on('data', d => { out += d; });
@@ -104,11 +113,12 @@ export function claudeRunner({ command, timeoutMs = 90e3, system = SYSTEM } = {}
 }
 
 // One request → { text } or { error }
-export async function aiReply({ run, action, instruction, draft, excerpt, names = [] }) {
+export async function aiReply({ run, action, instruction, draft, excerpt, names = [], shareNames = false }) {
   try {
-    // last pass right before sending: no names or contact details in anything we send
-    const raw = await run(buildPrompt({ action, instruction: redact(instruction, names), draft: redact(draft, names), excerpt: redact(excerpt, names) }));
-    const c = checkReply(raw, redact(draft, names));
+    // last pass right before sending: no contact details (and no names unless shareNames) in anything we send
+    const clean = cleanFor(shareNames);
+    const raw = await run(buildPrompt({ action, instruction: clean(instruction, names), draft: clean(draft, names), excerpt: clean(excerpt, names) }));
+    const c = checkReply(raw, clean(draft, names), { shareNames });
     return c.ok ? { text: c.text } : { error: `Suggestion not used (${c.why})` };
   } catch (e) { return { error: /usage limit|rate limit|quota/i.test(e.message) ? 'Claude usage limit reached — try later' : e.message }; }
 }

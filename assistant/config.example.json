@@ -87,6 +87,10 @@
     "realEmails": false,
     "command": "~/.local/bin/claude",
     "maxPerRun": 4,
+    "shareNames": false,
+    "model": "",
+    "//names": "shareNames: true lets Claude see patient names with file numbers (approved by your manager, Oct 29 2026). Phones, emails, streets and postal codes are always removed.",
+    "//model": "model: empty = Claude's default. \"sonnet\" is a good balance; \"haiku\" is fastest for short rewrites.",
     "//": "realEmails: true only after the privacy officer approves sending coordinator messages (contact details removed) to Anthropic"
   }
 }

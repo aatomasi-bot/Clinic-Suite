@@ -11,24 +11,25 @@ import { fileURLToPath } from 'node:url';
 import { loadConfig } from './intake.js';
 import { supabaseStore } from './lib/store.js';
 import { claudeRunner } from './lib/ai.js';
+import { aiPass } from './ai-queue.js';
 import { kokoroVoice } from './lib/voice.js';
-import { BRAIN_SYSTEM, buildContext, brainPrompt, cleanQuestion, parseBrain, withNames } from './lib/brain.js';
+import { brainSystem, buildContext, brainPrompt, cleanQuestion, parseBrain, withNames } from './lib/brain.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // One question → the row update. Pure enough to test with a fake store and a fake Claude.
-export async function answerOne({ ask, data, history = [], run, tts = null, now = new Date() }) {
-  const question = cleanQuestion(ask.question, data.patients);
-  const context = buildContext({ ...data, now });
-  const prompt = brainPrompt({ question, context, history: history.map(h => ({ q: h.answer?.q || '', a: h.answer?.raw || '' })).filter(h => h.q) });
+export async function answerOne({ ask, data, history = [], run, tts = null, now = new Date(), shareNames = false }) {
+  const question = cleanQuestion(ask.question, data.patients, { shareNames });
+  const context = buildContext({ ...data, now, shareNames });
+  const prompt = brainPrompt({ question, context, shareNames, history: history.map(h => ({ q: h.answer?.q || '', a: h.answer?.raw || '' })).filter(h => h.q) });
   let raw;
   try { raw = await run(prompt); }
   catch (e) { return { status: 'failed', answer: { error: /usage limit|rate limit|quota/i.test(e.message) ? 'Claude usage limit reached' : String(e.message).slice(0, 200) } }; }
   const files = data.patients.map(p => String(p.file_number || '').trim()).filter(Boolean);
-  const out = parseBrain(raw, files);
+  const out = parseBrain(raw, files, { shareNames });
   if (!out) return { status: 'failed', answer: { error: 'The answer could not be used' } };
-  const say = withNames(out.say, data.patients);
+  const say = shareNames ? out.say : withNames(out.say, data.patients);   // with shareNames Claude already says the names
   // the voice is made on this Mac, so it may say the names (an action's Confirm card is read separately)
   const audio = tts && !out.action ? await tts(say, ask.lang === 'fr') : null;
   return { status: 'answered', answer: { say, show: out.show, action: out.action, q: question, raw: out.say, ...(audio ? { audio } : {}) } };
@@ -38,7 +39,10 @@ async function main() {
   const cfg = loadConfig(), ai = cfg.ai || {};
   if (ai.enabled === false || ai.brain === false || cfg.mode !== 'live') { await sleep(10 * 60e3); return; }
   const store = await supabaseStore(cfg.supabase);
-  const run = claudeRunner({ command: ai.command, system: BRAIN_SYSTEM, timeoutMs: 75e3 });
+  const shareNames = ai.shareNames === true;
+  const run = claudeRunner({ command: ai.command, model: ai.brainModel || ai.model, system: brainSystem({ shareNames }), timeoutMs: 75e3 });
+  const replyRun = claudeRunner({ command: ai.command, model: ai.model });   // ✨ reply rewrites (lib/ai.js rules)
+  let aiAt = 0, aiBusy = false;
   const tts = ai.voice === false ? null : kokoroVoice();   // null until install-voice.sh has run
   await store.purgeAsks(7).catch(() => {});     // questions are kept a week, then removed
   const until = Date.now() + (Number(process.env.BRAIN_MINUTES) || 20) * 60e3;   // BRAIN_MINUTES: shorter runs for testing
@@ -52,7 +56,15 @@ async function main() {
   while (Date.now() < until) {
     beat = Date.now();
     const ask = await store.nextAsk();
-    if (!ask) { await sleep(1000); continue; }
+    if (!ask) {
+      // idle: ✨ reply rewrites you asked for start within ~3 s (ai-queue.js every 30 s is the backup)
+      // in the background, so a question you ask meanwhile is not kept waiting
+      if (ai.rewritesInBrain !== false && !aiBusy && Date.now() - aiAt > 3000) {
+        aiAt = Date.now(); aiBusy = true;
+        aiPass({ store, ai, run: replyRun }).catch(e => console.error('brain ai:', e.message)).finally(() => { aiBusy = false; });
+      }
+      await sleep(1000); continue;
+    }
     if (!(await store.claimAsk(ask.id))) continue;
     // Text Dubbi wrote itself, to be read aloud: just the voice
     if (/^speak-/.test(ask.lang || '')) {
@@ -63,7 +75,7 @@ async function main() {
     try {
       if (!data || Date.now() - dataAt > 20e3) { data = await store.brainData(); dataAt = Date.now(); }
       const history = await store.askHistory(ask.conv, ask.created_at);
-      const r = await answerOne({ ask, data, history, run, tts });
+      const r = await answerOne({ ask, data, history, run, tts, shareNames });
       await store.answerAsk(ask.id, r);
       console.log(`[${new Date().toISOString()}] brain: ${r.status}${r.status === 'failed' ? ' — ' + r.answer.error : r.answer.audio ? ' (voice)' : ''}`);
     } catch (e) {
