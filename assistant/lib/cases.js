@@ -19,7 +19,7 @@ export function fileNumbersIn(text) {
   const s = redact(String(text || ''))                        // phones, postal codes, emails out first
     .replace(/\b(?:19|20)\d{2}[-/]\d{1,2}[-/]\d{1,2}\b/g, ' ') // 2026-10-30
     .replace(/\b(?:FAX|IMG|scan)[_\w-]*\.pdf\b/gi, ' ')        // FAX_20261030_179… file names
-    .replace(/_/g, ' ');                                       // "Generated_20062.pdf" → a word boundary
+    .replace(/_/g, ' ');                                       // "Generated_98062.pdf" → a word boundary
   const out = [];
   for (const m of s.matchAll(/(?<![\d#-])#?\b(\d{4,6})\b(?![-/]\d)/g)) {
     const n = m[1];

@@ -13,14 +13,14 @@ const emails = [
   E('<a>', '2026-10-21T19:57:54Z', 'ameliag@medicum.ca', 'Close File - CT 98062', 'Hello Abdul,\nPlease close the file of Mr. Jean TESTOUX (98062).'),
   E('<b>', '2026-10-30T13:57:35Z', 'no-reply@medicum.ca', 'New Appointment', 'Please find attached the enrollment form for new patient; Jean TESTOUX #98062.', [{ name: 'IMG_20220826_0001.pdf' }, { name: 'Jean TESTOUX 98062.pdf' }, { name: 'Enrollment_Form_Auto_Generated_14805.pdf' }]),
   E('<c>', '2026-10-30T13:58:13Z', 'ameliag@medicum.ca', 'ASAP - CT 98062', "Hello Abdul,\nThe doctor says he is to continue injections (file 98062). Please call him at 514-555-0101 to schedule him ASAP.\nHe was due October 29th 2026.\nThank you\nAmelia Gareau\nCoordonnatrice aux patients"),
-  E('<d>', '2026-10-30T15:45:25Z', 'ameliag@medicum.ca', 'Re: ASAP - CT 98062', 'Hello Abdul,\nMr. Jean TESTOUX (98062) may not be reachable, he is to travel in Morocco for one month.\n\nFrom: Abdul\nSent: today\nold quoted text 12345'),
+  E('<d>', '2026-10-30T15:45:25Z', 'ameliag@medicum.ca', 'Re: ASAP - CT 98062', 'Hello Abdul,\nMr. Jean TESTOUX (98062) may not be reachable, he is to travel abroad for one month.\n\nFrom: Abdul\nSent: today\nold quoted text 12345'),
   E('<e>', '2026-10-30T16:17:39Z', 'reports@medicum.ca', 'fax - CT #98062', 'Please find attached a copy of the prescription. Next injection scheduled for: 31st October 2026', [{ name: 'FAX_20261030_1793373663_895.pdf' }]),
 ];
 
 test('file numbers: never a year, a phone part or a fax id', () => {
-  assert.deepEqual(fileNumbersIn('He was due October 29th 2026. Call 514-667-9987. File 34335 and #20062'), ['34335', '20062']);
+  assert.deepEqual(fileNumbersIn('He was due October 29th 2026. Call 514-555-0199. File 98335 and #98062'), ['98335', '98062']);
   assert.deepEqual(fileNumbersIn('FAX_20261030_1793373663_895.pdf on 2026-10-30'), []);
-  assert.deepEqual(fileNumbersIn('Patient LB 34335'), ['34335']);
+  assert.deepEqual(fileNumbersIn('Patient JT 98335'), ['98335']);
 });
 
 test('PDFs: known by name, learned from you, generalised past the patient name', () => {
@@ -35,13 +35,13 @@ test('PDFs: known by name, learned from you, generalised past the patient name',
 
 test('the coordinator\'s own words only (no quoted email, no signature)', () => {
   const m = messageText(emails[3].body);
-  assert.ok(m.includes('Morocco') && !m.includes('old quoted'));
+  assert.ok(m.includes('abroad') && !m.includes('old quoted'));
   assert.ok(!messageText(emails[2].body).includes('Coordonnatrice'));
 });
 
 test('a case for Claude: emails in order, no names or phones; unknown PDFs asked by the Mac', () => {
   const c = buildCase({ file: '98062', emails: emails.slice().reverse(), patient, tasks: [{ id: 't1', kind: 'close_file', status: 'todo', email_date: '2026-10-21T19:57:54Z', email_subject: 'Close File - CT 98062' }], memory: [], now: new Date('2026-10-30T17:00:00Z') });
-  assert.ok(c.text.indexOf('E1 |') < c.text.indexOf('Close File') && c.text.indexOf('Close File') < c.text.indexOf('Morocco'), 'oldest first');
+  assert.ok(c.text.indexOf('E1 |') < c.text.indexOf('Close File') && c.text.indexOf('Close File') < c.text.indexOf('abroad'), 'oldest first');
   for (const bad of ['Jean', 'TESTOUX', '514-555']) assert.ok(!c.text.includes(bad), bad);
   assert.match(c.text, /status: ON HOLD/);
   assert.match(c.text, /C:t1 \| close_file \| todo/);
@@ -82,8 +82,8 @@ test('a reply in a thread can carry a hold instruction; the old subject alone ca
 });
 
 test('every Medicum email is kept with the file numbers it mentions', () => {
-  const r = emailLogRow({ messageId: '<x>', from: '"Amelia Gareau" <ameliag@medicum.ca>', subject: 'Re: ASAP - CH 20062', date: '2026-10-30T15:45:25Z', bodyText: 'He was due October 29th 2026 (20062).', pdfs: [] });
-  assert.deepEqual(r.file_numbers, ['20062']);
+  const r = emailLogRow({ messageId: '<x>', from: '"Amelia Gareau" <ameliag@medicum.ca>', subject: 'Re: ASAP - JT 98062', date: '2026-10-30T15:45:25Z', bodyText: 'He was due October 29th 2026 (98062).', pdfs: [] });
+  assert.deepEqual(r.file_numbers, ['98062']);
   assert.equal(r.from_name, 'Amelia Gareau');
-  assert.deepEqual(emailLogRow({ messageId: '<y>', from: 'Medicum <no-reply@medicum.ca>', subject: 'New Appointment', bodyText: 'Please confirm reception', pdfs: [{ name: 'Generated_20062.pdf' }] }).file_numbers, ['20062']);
+  assert.deepEqual(emailLogRow({ messageId: '<y>', from: 'Medicum <no-reply@medicum.ca>', subject: 'New Appointment', bodyText: 'Please confirm reception', pdfs: [{ name: 'Generated_98062.pdf' }] }).file_numbers, ['98062']);
 });

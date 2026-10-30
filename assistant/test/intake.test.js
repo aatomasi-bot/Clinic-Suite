@@ -371,7 +371,7 @@ test('a coordinator question → a reply card with what VaPiq knows (name kept f
   const handled = [];
   const mail = (subject, body, from = 'Giulia Rodi <giuliar@medicum.ca>') => ({ from, subject, bodyText: body, date: '2026-10-26T19:59:37Z', messageId: `<${subject}@x>`, pdfs: [] });
   const source = { name: 'mem', async *emails() {
-    yield mail('Patient CT 98004', 'Hi Abdul,\nI am reaching out regarding patient Closing Testcase (98004). Has he been contacted yet to arrange his appointment? He can be reached at 514-667-9987.\nThank you!');
+    yield mail('Patient CT 98004', 'Hi Abdul,\nI am reaching out regarding patient Closing Testcase (98004). Has he been contacted yet to arrange his appointment? He can be reached at 514-555-0177.\nThank you!');
     yield mail('Question', 'Bonjour Abdul, avez-vous des disponibilités la semaine prochaine?');
     yield mail('Follow up', 'Hi Abdul,\nCould you update me on these patients: Closing Testcase 98004, 98002 and 98777? Call me at 514-555-1234.\nThanks');
     yield mail('Re: Patient CT 98004', 'Thanks!');
