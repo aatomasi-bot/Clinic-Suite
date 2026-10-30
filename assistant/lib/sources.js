@@ -108,10 +108,11 @@ export function imapSource(cfg, { wanted }) {
     return metas;
   }
   // download() uses BODY.PEEK — reading never marks the email as read
-  async function full(m) {
+  async function full(m, { withPdfs = true } = {}) {
     await open(m.folder);
     const pdfs = [];
-    for (const p of m.parts) {
+    if (!withPdfs) pdfs.push(...m.parts.map(p => ({ name: p.name })));
+    else for (const p of m.parts) {
       const { content } = await client.download(String(m.uid), p.part, { uid: true, chunkSize: WHOLE });
       pdfs.push({ name: p.name, bytes: await readAll(content) });
     }
@@ -147,6 +148,16 @@ export function imapSource(cfg, { wanted }) {
           if (await known(m.messageId)) continue;   // already read — nothing to download
           yield await full(m);
         }
+      }
+    },
+    // Emails already filed in the Medicum folder, for Dubbi's case brain: text only (no PDF
+    // download), and only the ones it has not kept yet
+    async *history({ days = 45, known = async () => new Set(), wanted: want = () => true } = {}) {
+      for (const folder of cfg.relatedFolders || ['Medicum']) {
+        let metas = [];
+        try { metas = (await headers(folder, days)).filter(m => want(m)); } catch { continue; }
+        const have = await known(metas.map(m => m.messageId));
+        for (const m of metas) if (!have.has(m.messageId)) yield await full(m, { withPdfs: false });
       }
     },
     async markHandled(email) {

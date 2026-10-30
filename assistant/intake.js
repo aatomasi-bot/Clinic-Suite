@@ -22,6 +22,7 @@ import { buildRecord, toIsoDate } from './lib/record.js';
 import { parsePdf, parseScan, repeatsFor } from './lib/pdf.js';
 import { needsSignature, emailDueDate, cardNotes, signedBy, openingText, patientUpdate } from './lib/emailinfo.js';
 import { excerptOf, redact } from './lib/ai.js';
+import { fileNumbersIn, messageText, learnedType, PDF_TYPES } from './lib/cases.js';
 import { testFolderSource, imapSource } from './lib/sources.js';
 import { supabaseStore, offlineStore } from './lib/store.js';
 import { summaryText, macNotification, pushToPhones } from './lib/notify.js';
@@ -74,16 +75,31 @@ export async function runIntake({ source, store, rules, replies = {}, isTest, lo
   const counts = { emails: 0, skipped: 0, queued: 0, exists: 0, needsReview: 0, already: 0, prescriptions: 0, closes: 0 };
 
   const touched = new Set();   // file numbers of new-patient items seen this run
+  const memory = store.memory ? await store.memory().catch(() => []) : [];   // what you taught Dubbi about PDFs
+  let logOff = false;
   const handle = async email => {
     counts.emails++;
+    // Every Medicum email is kept for Dubbi's case brain (lib/cases.js), replies included
+    if (!logOff && !email.skipped && store.logEmail && senderAllowed(email.from, rules)) {
+      try { await store.logEmail(emailLogRow(email)); }
+      catch (e) { logOff = true; if (!/does not exist|schema cache/i.test(e.message)) log('  case log:', e.message); }
+    }
     let { kind } = email.skipped ? { kind: null } : classifyEmail(email, rules);
+    // Emails found while looking for a patient's missing documents only bring documents —
+    // an old "close file" or question found that way is history, not a new request
+    if (email.related && !['assignment', 'enrollment_doc', 'new_patient_notice'].includes(kind)) return;
     // Patient updates (on hold / back / permanent / temporary transfer) — often only
     // recognisable from the coordinator's message, the subject being just the name
-    const update = !email.skipped && senderAllowed(email.from, rules) && (!kind || kind === 'new_patient_notice' || kind === 'assignment')
+    const update = !email.skipped && !email.related && senderAllowed(email.from, rules) && (!kind || kind === 'new_patient_notice' || kind === 'assignment')
       ? patientUpdate({ subject: email.subject, body: email.bodyText, date: email.date }) : null;
     const transfer = update && update.kind === 'transfer' ? update : null;
     if (transfer && !kind) kind = email.pdfs && email.pdfs.length ? 'assignment' : 'new_patient_notice';
     if (update && !transfer && kind) kind = null;   // an update about an existing patient, not a new one
+    // In a reply thread, "on hold"/"back" that is already true in VaPiq is just conversation
+    if (update && /^\s*(re|tr|fw|fwd)\s*:/i.test(email.subject)) {
+      const p = findExisting(subjectFileNumber(email.subject), patients);
+      if (!p || (update.kind === 'on_hold' && p.archived) || (update.kind === 'back' && !p.archived)) { counts.skipped++; return; }
+    }
     // Anything else a coordinator writes (a question, "has the patient been contacted?") → a reply card
     const question = !kind && !update && !email.skipped && replyAllowed(email.from, rules)
       && !/^\s*(re|tr|fw|fwd)\s*:/i.test(email.subject || '');
@@ -109,7 +125,7 @@ export async function runIntake({ source, store, rules, replies = {}, isTest, lo
       const key = sha(`${email.messageId}|question`);
       if ((await store.knownTaskKeys([key])).size) { counts.already++; return; }
       // Every file number in the subject and her message (phone numbers removed first) — a follow-up often lists several
-      const nums = [...new Set(`${email.subject} ${redact(openingText(email.bodyText))}`.match(/\b\d{4,6}\b/g) || [])];
+      const nums = fileNumbersIn(`${email.subject}\n${openingText(email.bodyText)}`);
       const known = nums.filter(n => findExisting(n, patients));
       const fileList = known.length ? known : nums.slice(0, 1);
       const fileNo = fileList[0] || '';
@@ -140,7 +156,7 @@ export async function runIntake({ source, store, rules, replies = {}, isTest, lo
     if (update && !transfer) {
       const key = sha(`${email.messageId}|${update.kind}`);
       if ((await store.knownTaskKeys([key])).size) { counts.already++; return; }
-      const fileNo = subjectFile || ((openingText(email.bodyText).match(/\b\d{4,6}\b/) || [])[0]) || '';
+      const fileNo = subjectFile || fileNumbersIn(openingText(email.bodyText))[0] || '';
       const existing = findExisting(fileNo, patients);
       const warnings = [];
       if (!fileNo) warnings.push('No file number found — find the patient yourself.');
@@ -214,6 +230,7 @@ export async function runIntake({ source, store, rules, replies = {}, isTest, lo
       if (/\.(jpe?g|png|heic|tiff?)$/i.test(pdf.name)) out = parseScan(pdf.bytes, pdf.name);
       else try { out = await parsePdf(pdf.bytes, pdf.name); } catch (e) { warnings.push(`Could not read ${pdf.name} (${e.message}) — open it in the email.`); }
       let types = documentTypes({ text: out.text, scanned: out.scanned && !out.ocr, name: pdf.name });
+      if (!types.length) { const l = learnedType(pdf.name, memory, patients.filter(p => email.subject.includes(p.file_number)).map(p => p.patient_name)); if (l) types = [PDF_TYPES[l] ? PDF_TYPES[l].doc : 'copy']; }
       if (kind === 'enrollment_doc' && !types.length) types = ['enrollment'];   // the subject says what it is
       files.push({ name: pdf.name, types, from: senderAddress(email.from) });
       if (out.scanned && !out.ocr && !warnings.length) warnings.push(`${pdf.name}: scanned/faxed PDF — open it in the Medicum Parser (OCR) to read the fields.`);
@@ -364,10 +381,29 @@ export async function runIntake({ source, store, rules, replies = {}, isTest, lo
   if (source.findRelated) {
     for (const key of await relatedToLookFor(store, touched, relatedStateFile)) {
       const known = id => store.knownMessage(id);
-      for await (const email of source.findRelated(key, { known })) await handle(email);
+      for await (const email of source.findRelated(key, { known })) await handle({ ...email, related: true });
     }
   }
+  // History for the case brain: the Medicum folder (emails you already filed), read once each
+  if (store.logEmail && source.history && !logOff) {
+    try {
+      for await (const email of source.history({ days: 45, known: ids => store.knownEmails(ids), wanted: e => senderAllowed(e.from, rules) }))
+        await store.logEmail(emailLogRow(email));
+    } catch (e) { if (!/does not exist|schema cache/i.test(e.message)) log('  history:', e.message); }
+  }
   return counts;
+}
+
+// One email as Dubbi's case brain keeps it
+export function emailLogRow(email) {
+  const body = messageText(email.bodyText);
+  const atts = (email.pdfs || []).map(p => ({ name: p.name }));
+  let files = fileNumbersIn(`${email.subject}\n${body}`);
+  if (!files.length) files = fileNumbersIn(atts.map(a => a.name).join(' '));   // only the PDF names say which file
+  const m = String(email.from || '').match(/^\s*"?([^"<]*)"?\s*<?/);
+  return { message_id: email.messageId, folder: email.folder || null, email_date: email.date || null,
+    from_addr: senderAddress(email.from), from_name: (m && m[1].trim()) || null, subject: String(email.subject || '').slice(0, 300),
+    body: body.slice(0, 8000), attachments: atts, file_numbers: files.slice(0, 10) };
 }
 
 // Items worth a search: touched this run, or open and incomplete (at most every 30 min each).
@@ -419,7 +455,7 @@ async function main() {
       : await supabaseStore(cfg.supabase);
     source = live
       ? imapSource(cfg.imap, { wanted: e => !!classifyEmail(e, cfg.rules).kind
-          || ((replyAllowed(e.from, cfg.rules) || (senderAllowed(e.from, cfg.rules) && !!subjectFileNumber(e.subject))) && !/^\s*(re|tr|fw|fwd)\s*:/i.test(e.subject)) })
+          || senderAllowed(e.from, cfg.rules) })   // every Medicum email is read (Dubbi's case brain), replies too
       : testFolderSource(path.resolve(here, cfg.testInbox));
 
     console.log(`[${new Date().toISOString()}] intake: ${live ? 'LIVE' : 'TEST'} · ${source.name} · ${store.kind}`);

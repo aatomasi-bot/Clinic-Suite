@@ -100,9 +100,11 @@ const UPDATE_RULES = [
 ];
 const clean = s => s.replace(/^\s*(?:\*+\s*)?(?:please\s+(?:be\s+advised|note)\s+(?:that\s+)?|veuillez\s+(?:noter|prendre\s+note)\s+que\s+)/i, '').replace(/\s+/g, ' ').trim();
 export function patientUpdate({ subject = '', body = '', date } = {}) {
-  if (/^\s*(re|tr|fw|fwd)\s*:/i.test(subject)) return null;   // replies are not new requests
+  // A reply in a thread can carry a new instruction ("Re: Unconfirmed Patient … please place his file on
+  // hold") — then only her new message counts, never the old subject or the quoted email
+  const reply = /^\s*(re|tr|fw|fwd)\s*:/i.test(subject);
   const msg = openingText(body);
-  const hit = UPDATE_RULES.find(([, re]) => re.test(subject) || re.test(msg));
+  const hit = UPDATE_RULES.find(([k, re]) => (!reply && re.test(subject)) || (re.test(msg) && (!reply || k === 'on_hold' || k === 'back')));
   if (!hit) return null;
   const [kind, re] = hit;
   const sentences = msg.replace(/\n+/g, ' ').split(/(?<!\b(?:Mr|Mrs|Ms|Dr|Mme|Mlle|M|St))(?<=[.!?])\s+/);

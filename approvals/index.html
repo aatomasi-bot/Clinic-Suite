@@ -163,6 +163,11 @@ details.form[open] summary::after{transform:rotate(90deg)}
 .mailhead div{display:flex;gap:8px;min-width:0}.mailhead div+div{margin-top:3px}
 .mailhead span{flex:none;width:52px;font-weight:700;color:var(--ink-3)}
 .mailhead em{font-style:normal;min-width:0;overflow-wrap:anywhere}
+.case .headline{font-weight:700;margin:10px 0 2px}
+.pdfq{margin-top:10px;padding:10px;border-radius:12px;background:var(--card-2)}.pdfq code{font-size:12px;overflow-wrap:anywhere}
+.pdfq .row2{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.pdfq .own{display:flex;gap:6px;margin-top:8px}.pdfq .own input{flex:1;min-width:0}
+.cacts{margin-top:10px;display:grid;gap:8px}.cact{display:flex;gap:10px;align-items:flex-start;font-size:14px}.cact input{margin-top:3px;flex:none;width:18px;height:18px}
+.cact small{display:block;color:var(--ink-3);font-weight:400;margin-top:2px}
 .asked{font-size:14px;line-height:1.45;white-space:pre-line;margin-top:10px;padding:8px 12px;border-left:3px solid var(--line);color:var(--ink-2);max-height:220px;overflow:auto}
 .asked span{display:block;font-size:12px;font-weight:700;color:var(--ink-3);margin-bottom:2px}
 .lang{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-top:8px}
@@ -267,7 +272,7 @@ nav.tabbar .in{display:flex;width:100%;max-width:520px}
 .ai .h span{margin-left:auto;text-transform:none;letter-spacing:0;font-weight:600;color:var(--ink-3)}
 .ai pre{white-space:pre-wrap;font:inherit;font-size:14px;line-height:1.5;margin:8px 0 0;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:9px 10px}
 .ai .row2{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
-.ai .chipb{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:6px 10px;font-size:12.5px;font-weight:700;color:var(--ink-2)}
+.ai .chipb,.pdfq .chipb{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:6px 10px;font-size:12.5px;font-weight:700;color:var(--ink-2)}
 .ai .chipb:active{transform:scale(.96)}
 .ai .use{background:var(--g-violet);color:#fff;border:0;border-radius:10px;padding:8px 12px;font-weight:800;font-size:13px;margin-top:8px}
 .ai .own{display:flex;gap:6px;margin-top:8px}.ai .own input{flex:1;min-width:0;border:1.5px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--card-2)}
@@ -645,6 +650,7 @@ async function load() {
   const err = p.error || t.error;
   if (err) { $('main').innerHTML = `<div class="warn err" style="margin-top:16px">Could not load: ${esc(err.message)}. Have all the database setup files in supabase/ been run?</div>`; return; }
   S.rows = p.data; S.tasks = t.data;
+  await loadCases();
   for (const id of Object.keys(S.drafts)) { const x = S.tasks.find(y => y.id === id); if (!x || x.reply_body === S.drafts[id] || !['reply_ready', 'failed'].includes(x.status)) dropDraft(id); } S.beat = h.data || null; S.sched = sc.data || []; S.unconf = uc.data || [];
   // Patients added from Dubbi → their appointment status for the journey tracker
   const ids = [...new Set(S.rows.filter(r => r.patient_id && !r.is_test).map(r => r.patient_id))];
@@ -735,7 +741,7 @@ function render() {
     : `Mac checked ${ago(bt)}${ago(bt) === 'just now' ? '' : ' ago'}${S.beat.summary?.mode === 'test' ? ' · test' : ''}`;
   $('health').title = stale ? 'Your Mac assistant reads new emails every 2 minutes. Is your Mac on and awake?' : '';
   const setBadge = (id, n) => { const b = $(id); b.hidden = !n; b.textContent = n; };
-  setBadge('b-today', active.length);
+  setBadge('b-today', active.length + (S.cases || []).length);
   setBadge('b-patients', S.sched.filter(p => p.due_date < today).length);
   setBadge('b-outbox', outbox.length);
   document.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
@@ -751,7 +757,8 @@ function render() {
       ${tile(waiting, 'Waiting docs', '', 'waiting')}
       ${tile(S.sched.length, 'To schedule', S.sched.some(p => p.due_date < today) ? 'hot' : '', 'sched')}
     </div>` + banner;
-    if (!items.length) html += `<div class="empty"><div class="big">✨</div><b>All clear.</b><br>Nothing needs you right now.</div>`;
+    if ((S.cases || []).length) html += section('Dubbi’s analysis', S.cases.length, '', 'cases') + S.cases.map(caseCard).join('');
+    if (!items.length && !(S.cases || []).length) html += `<div class="empty"><div class="big">✨</div><b>All clear.</b><br>Nothing needs you right now.</div>`;
     else {
       const byAge = (a, b) => String((a.t || a.r).created_at).localeCompare(String((b.t || b.r).created_at));
       if (late.length) html += section('Overdue', late.length, 'red', 'overdue') + late.slice().sort(byAge).map(card).join('');
@@ -777,7 +784,8 @@ function from(t) {
 const fileRef = fn => `#${esc(String(fn || '—').trim())}`;   // file number only — no patient initials
 function chips(item) {
   const x = item.t || item.r;
-  return `<div class="chips">${x?.is_test ? '<span class="chip test">TEST</span>' : ''}${item.late ? `<span class="chip late">${esc(item.late)}</span>` : `<span class="chip">${ago(x?.created_at)}</span>`}</div>`;
+  const old = item.t && S.obsolete && S.obsolete.has(item.t.id);
+  return `<div class="chips">${old ? '<span class="chip late" title="A newer email changed this — see Dubbi’s analysis">Superseded</span>' : ''}${x?.is_test ? '<span class="chip test">TEST</span>' : ''}${item.late ? `<span class="chip late">${esc(item.late)}</span>` : `<span class="chip">${ago(x?.created_at)}</span>`}</div>`;
 }
 function card(item) {
   switch (item.view) {
@@ -1121,6 +1129,164 @@ $('main').addEventListener('input', e => {
 $('main').addEventListener('focusout', e => {   // leaving the box: show the "made before your edits" note if it applies
   if (e.target.matches('textarea[data-k="reply_body"]')) setTimeout(() => { if (!typing()) render(); }, 50);
 });
+
+// ── Dubbi's analysis (case brain on your Mac: assistant/case-brain.js) ──────────
+// One card per patient whose emails need a decision: what is true now (newer emails win),
+// what Dubbi proposes, and "what is this PDF?" questions. You tick, edit, then Do it.
+const PDF_TYPES = { prescription: ['Prescription', 'Ordonnance', 'copy'], enrollment: ['Enrollment form', "Formulaire d'inscription", 'enrollment'],
+  assignment: ['Assignment form', "Formulaire d'assignation", 'assignment'], nurse_report: ['Nurse report', 'Rapport infirmier', 'copy'],
+  lab: ['Lab / blood test', 'Analyse de sang', 'copy'], old_copy: ['Old copy (ignore)', 'Ancienne copie', 'copy'] };
+async function loadCases() {
+  const c = await sb.from('dubbi_cases').select('*').eq('status', 'ready').order('updated_at', { ascending: false });
+  S.cases = c.error ? [] : c.data;   // table not created yet → no cases
+  S.obsolete = new Set(S.cases.flatMap(x => Object.entries((x.analysis || {}).cards || {}).filter(([, v]) => v === 'obsolete').map(([k]) => k)));
+  S.casePts = {};
+  const files = S.cases.map(x => x.file_number);
+  if (files.length) {
+    const { data } = await sb.from('patients').select('id,file_number,patient_name,archived,due_date,dose_prescribed,doses_remaining,appointment_date_time,appointment_confirmed').in('file_number', files);
+    (data || []).forEach(x => { S.casePts[normFile(x.file_number)] = x; });
+  }
+}
+function caseAction(a, p) {
+  const ap = p && p.appointment_date_time ? dayLabel(String(p.appointment_date_time).slice(0, 10)) : '';
+  switch (a.type) {
+    case 'back': return L(`Take the file off hold${a.due ? ', due ' + dayLabel(a.due) : ''}`, `Sortir le dossier de l’attente${a.due ? ', dû le ' + dayLabel(a.due) : ''}`);
+    case 'on_hold': return L(`Put the file on hold: “${a.reason}”`, `Mettre le dossier en attente : « ${a.reason} »`);
+    case 'set_due': return L(`Change the due date to ${dayLabel(a.due)}`, `Changer la date due au ${dayLabel(a.due)}`);
+    case 'set_dose': return L(`Change the dose to ${a.dose} mg${a.doses_left != null ? `, ${a.doses_left} doses left` : ''}`, `Changer la dose à ${a.dose} mg`);
+    case 'add_note': return L(`Add a note: “${a.text}”`, `Ajouter une note : « ${a.text} »`);
+    case 'clear_appointment': return L(`Cancel the booked appointment${ap ? ' (' + ap + ')' : ''}`, `Annuler le rendez-vous${ap ? ' (' + ap + ')' : ''}`);
+    case 'close_file': return L('DELETE the file from VaPiq (asks once more)', 'SUPPRIMER le dossier de VaPiq (une dernière confirmation suivra)');
+    case 'dismiss_card': { const t = S.tasks.find(x => x.id === a.card); return L(`Dismiss the outdated card${t ? ' “' + (t.email_subject || t.kind) + '”' : ''}`, `Retirer la carte périmée${t ? ' « ' + (t.email_subject || t.kind) + ' »' : ''}`); }
+    case 'reply': return L(`Reply to ${a.to_name || a.to} (sent by your Mac in ~2 min)`, `Répondre à ${a.to_name || a.to} (envoyé d’ici 2 min)`);
+    case 'call_patient': return L(`Reminder in VaPiq’s quick note: 📞 ${a.text}`, `Rappel dans la note rapide : 📞 ${a.text}`);
+    default: return a.type;
+  }
+}
+function caseCard(c) {
+  const a = c.analysis || {}, p = S.casePts[normFile(c.file_number)], qs = c.questions || [];
+  const name = p ? esc(p.patient_name || '') : L('not in VaPiq', 'absent de VaPiq');
+  return `<article class="card case" data-case="${esc(c.file_number)}">
+    <div class="ctop"><div class="cicon ic-rx" aria-hidden="true">🧠</div><div class="ctitle"><div class="kind">${L('Dubbi’s analysis', 'Analyse de Dubbi')}</div><b>File ${fileRef(c.file_number)} · ${name}</b><div class="meta">${p ? (p.archived ? L('On hold in VaPiq', 'En attente dans VaPiq') : L('Active in VaPiq', 'Actif dans VaPiq')) : ''}</div></div>
+      <div class="chips">${a.urgent ? '<span class="chip late">Urgent</span>' : ''}<span class="chip">${ago(c.updated_at)}</span></div></div>
+    <p class="headline">${esc(a.headline || '')}</p>
+    <p class="note">${esc(a.summary || '')}</p>
+    ${qs.map((q, i) => `<div class="pdfq" data-q="${i}"><b>${L('What is', 'Qu’est-ce que')} <code>${esc(q.pdf)}</code>?</b>
+      <div class="row2">${Object.entries(PDF_TYPES).map(([k, v]) => `<button class="chipb" type="button" data-cact="pdf" data-q="${i}" data-v="${k}">${esc(L(v[0], v[1]))}</button>`).join('')}</div>
+      <div class="own"><input type="text" data-own="${i}" maxlength="120" placeholder="${L('Something else — say what it is', 'Autre chose — précisez')}"><button class="chipb" type="button" data-cact="pdf" data-q="${i}" data-v="">${L('Save', 'Enregistrer')}</button></div></div>`).join('')}
+    ${(a.actions || []).length ? `<div class="cacts">${a.actions.map((x, i) => `<label class="cact"><input type="checkbox" data-ai="${i}" ${x.type === 'close_file' ? '' : 'checked'}><span><b>${esc(caseAction(x, p))}</b>${x.why ? `<small>${esc(x.why)}</small>` : ''}</span></label>
+      ${x.type === 'reply' ? `<textarea class="reply" data-reply="${i}" rows="8" aria-label="Reply text">${esc(x.text)}</textarea>` : ''}`).join('')}</div>` : ''}
+    <div class="acts"><button class="btn ghost" type="button" data-cact="later">${L('Not now', 'Plus tard')}</button>${(a.actions || []).length ? `<button class="btn pri" type="button" data-cact="do">${L('Do it', 'Faire')}</button>` : `<button class="btn sec2" type="button" data-cact="ok">${L('Got it', 'Compris')}</button>`}</div></article>`;
+}
+$('main').addEventListener('click', async e => {
+  const btn = e.target.closest('button[data-cact]'); if (!btn) return;
+  const el = btn.closest('[data-case]'), c = (S.cases || []).find(x => x.file_number === el.dataset.case); if (!c) return;
+  btn.disabled = true;
+  try {
+    if (btn.dataset.cact === 'pdf') await teachPdf(c, el, +btn.dataset.q, btn.dataset.v);
+    else if (btn.dataset.cact === 'do') await caseDo(c, el);
+    else await caseClose(c, btn.dataset.cact === 'later' ? 'dismissed' : 'done', {});
+  } catch (err) { console.error('[case]', err); toast(L('Could not do it — ', 'Impossible — ') + (err.message || 'please try again')); }
+  finally { btn.disabled = false; }
+});
+async function caseClose(c, status, result) {
+  const { error } = await sb.from('dubbi_cases').update({ status, decided_at: new Date().toISOString(), decided_by: user.email, result }).eq('file_number', c.file_number).eq('basis', c.basis);
+  if (error) throw error;
+  await load();
+}
+// "What is this PDF?" → Dubbi remembers it (this file name, and files named like it), and re-reads the case
+async function teachPdf(c, el, i, v) {
+  const q = (c.questions || [])[i]; if (!q) return;
+  const value = v || (el.querySelector(`[data-own="${i}"]`).value || '').trim();
+  if (!value) return toast(L('Choose what it is, or type it', 'Choisissez, ou écrivez ce que c’est'));
+  const rows = [{ key: 'pdf:' + q.pdf.trim().toLowerCase(), kind: 'pdf_type', value, created_by: user.email }];
+  if (q.pattern && /[a-z]/.test(q.pattern.replace(/name|pdf/g, ''))) rows.push({ key: 'pdfp:' + q.pattern, kind: 'pdf_type', value, created_by: user.email });
+  const { error } = await sb.from('dubbi_memory').upsert(rows, { onConflict: 'key' });
+  if (error) throw error;
+  // the open card that lists this PDF gets it ticked too
+  const doc = PDF_TYPES[value] ? PDF_TYPES[value][2] : null;
+  for (const t of S.tasks.filter(t => normFile(t.file_number) === normFile(c.file_number) && t.documents && ['todo', 'waiting_docs'].includes(t.status))) {
+    const k = (t.documents.files || []).findIndex(f => f.name === q.pdf);
+    if (k < 0) continue;
+    const docs = JSON.parse(JSON.stringify(t.documents)); docs.files[k].types = doc && doc !== 'copy' ? [doc] : ['copy']; docs.files[k].checked = true;
+    docs.assignment = docs.files.some(x => (x.types || []).includes('assignment')); docs.enrollment = docs.files.some(x => (x.types || []).includes('enrollment'));
+    docs.unknown = docs.files.filter(x => !(x.types || []).length && !x.checked).length;
+    await sb.from('email_tasks').update({ documents: docs, reply_body: redraft(t, { documents: docs }) }).eq('id', t.id);
+  }
+  await sb.from('dubbi_cases').update({ questions: c.questions.filter((_, j) => j !== i) }).eq('file_number', c.file_number);
+  toast(L(`Thanks — I’ll remember ${q.pdf} (and files named like it). Re-reading the emails…`, `Merci — je m’en souviendrai. Je relis les courriels…`));
+  await load();
+}
+// Do the ticked actions, in order, then mark the case done
+async function caseDo(c, el) {
+  const acts = (c.analysis.actions || []).map((a, i) => ({ ...a, i })).filter(a => el.querySelector(`[data-ai="${a.i}"]`)?.checked);
+  if (!acts.length) return toast(L('Nothing ticked', 'Rien de coché'));
+  const fn = normFile(c.file_number), done = [];
+  const pt = (await allPatients()).find(p => normFile(p.file_number) === fn) || null;
+  const needsPt = acts.filter(a => ['back', 'on_hold', 'set_due', 'set_dose', 'add_note', 'clear_appointment', 'close_file', 'call_patient'].includes(a.type));
+  if (needsPt.length && !pt) throw new Error(L(`file #${fn} is not in VaPiq`, `le dossier #${fn} est absent de VaPiq`));
+  const close = acts.find(a => a.type === 'close_file');
+  if (close) {
+    const ok = await closeFile({ id: 'case-' + fn, is_test: false, existing_patient: { id: pt.id, file_number: pt.file_number, patient_name: pt.patient_name } });
+    if (!ok) return;
+    done.push('close_file');
+  } else if (pt) {
+    const { data: row, error: re } = await sb.from('patients').select('id,file_number,special_instructions').eq('id', pt.id).maybeSingle();
+    if (re) throw re;
+    let si = row.special_instructions || '';
+    const f = {};
+    for (const a of acts) {
+      if (a.type === 'back') { f.archived = false; si = withoutHold(si); if (a.due) f.due_date = a.due; }
+      if (a.type === 'on_hold') { f.archived = true; si = [`⏸ On hold since ${ymd(new Date())}: ${a.reason}`, withoutHold(si)].filter(Boolean).join(' | '); }
+      if (a.type === 'set_due') f.due_date = a.due;
+      if (a.type === 'set_dose') { f.dose_prescribed = a.dose; if (a.doses_left != null) f.doses_remaining = a.doses_left; }
+      if (a.type === 'add_note') si = [`📝 ${ymd(new Date())}: ${a.text}`, si].filter(Boolean).join(' | ');
+      if (a.type === 'clear_appointment') { f.appointment_date_time = null; f.appointment_confirmed = false; }
+    }
+    if (si !== (row.special_instructions || '')) f.special_instructions = si;
+    if (Object.keys(f).length) {
+      const { error } = await sb.from('patients').update(f).eq('id', pt.id);
+      if (error) throw error;
+      await audit('UPDATE', pt.file_number, { id: pt.id, source: 'dubbi_case', fields: Object.keys(f), actions: acts.map(a => a.type) });
+      done.push(...acts.filter(a => ['back', 'on_hold', 'set_due', 'set_dose', 'add_note', 'clear_appointment'].includes(a.type)).map(a => a.type));
+    }
+    for (const a of acts.filter(a => a.type === 'call_patient')) {
+      const { data: qn } = await sb.from('quick_notes').select('note_text').eq('file_number', String(pt.file_number)).maybeSingle();
+      const text = [qn && qn.note_text, `📞 ${a.text}`].filter(Boolean).join('\n');
+      const { error } = await sb.from('quick_notes').upsert({ file_number: String(pt.file_number), note_text: text, updated_at: new Date().toISOString() }, { onConflict: 'file_number' });
+      if (error) throw error;
+      done.push('call_patient');
+    }
+  }
+  // A card Dubbi said to keep whose action was just done (put on hold, off hold, closed) is complete too —
+  // unless the reply goes out from it
+  const replyEmails = acts.filter(a => a.type === 'reply').map(a => a.email);
+  const KIND = { on_hold: 'on_hold', back: 'back', close_file: 'close_file' };
+  for (const t of S.tasks.filter(t => normFile(t.file_number) === fn && ['todo'].includes(t.status) && done.some(d => KIND[d] === t.kind) && !replyEmails.includes(t.email_message_id)))
+    await setTask(t, 'done', { details: { ...(t.details || {}), by_case: true } });
+  for (const a of acts.filter(a => a.type === 'dismiss_card')) {
+    const t = S.tasks.find(x => x.id === a.card);
+    if (t && ['todo', 'reply_ready', 'failed', 'waiting_docs'].includes(t.status)) { await setTask(t, 'dismissed', { details: { ...(t.details || {}), leave: true, superseded: true } }); done.push('dismiss_card'); }
+  }
+  for (const a of acts.filter(a => a.type === 'reply')) {
+    const text = (el.querySelector(`[data-reply="${a.i}"]`)?.value || a.text).trim();
+    if (!text) continue;
+    // answer in the existing card for that email if there is one; otherwise a new reply in that thread
+    const t = S.tasks.find(x => x.email_message_id === a.email && ['todo', 'reply_ready', 'failed'].includes(x.status));
+    if (t) await setTask(t, 'send_approved', { reply_body: text, error: null });
+    else {
+      const { error } = await sb.from('email_tasks').insert({ kind: 'question', status: 'send_approved', source_key: `case|${a.email}|${Date.now()}`,
+        email_message_id: a.email, email_folder: a.folder, email_from: `${a.to_name || ''} <${a.to}>`, email_subject: a.subject, email_date: a.date,
+        to_address: a.to, to_name: a.to_name, lang: a.lang === 'fr' ? 'fr' : 'en', file_number: fn, reply_body: text,
+        details: { from_case: true }, decided_at: new Date().toISOString(), decided_by: user.email });
+      if (error) throw error;
+    }
+    await audit('ASSISTANT_REPLY_APPROVED', fn, { source: 'dubbi_case', to: a.to });
+    done.push('reply');
+  }
+  await caseClose(c, 'done', { done, at: new Date().toISOString() });
+  toast(L(`✓ Done for #${fn}`, `✓ Fait pour le dossier #${fn}`) + (done.includes('reply') ? L(' — reply goes out within ~2 minutes', ' — la réponse part d’ici 2 minutes') : ''));
+}
 $('main').addEventListener('click', async e => {
   const jump = e.target.closest('[data-jump]');
   if (jump) {

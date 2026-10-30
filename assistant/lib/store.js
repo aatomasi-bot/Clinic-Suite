@@ -67,7 +67,7 @@ export async function supabaseStore(cfg) {
   const must = ({ data, error }) => { if (error) throw new Error(error.message); return data; };
 
   return {
-    kind: 'supabase',
+    kind: 'supabase', sb,
     async loadPatients() {
       const out = [];
       for (let from = 0; ; from += 1000) {
@@ -232,15 +232,38 @@ export async function supabaseStore(cfg) {
       const since = new Date(Date.now() - 30 * 864e5).toISOString();
       const patients = [];
       for (let from = 0; ; from += 1000) {
-        const page = must(await sb.from('patients').select('file_number,patient_name,address,archived,pending,assignment_type,dose_prescribed,doses_remaining,due_date,appointment_date_time,appointment_confirmed,cpp_patient').range(from, from + 999));
+        const page = must(await sb.from('patients').select('file_number,patient_name,address,archived,pending,assignment_type,dose_prescribed,doses_remaining,due_date,appointment_date_time,appointment_confirmed,cpp_patient,special_instructions').range(from, from + 999));
         patients.push(...page);
         if (page.length < 1000) break;
       }
-      const tasks = must(await sb.from('email_tasks').select('kind,status,file_number,created_at,documents,is_test,pending_id')
+      const tasks = must(await sb.from('email_tasks').select('id,kind,status,file_number,created_at,documents,is_test,pending_id,email_subject,email_date')
         .in('status', ['todo', 'waiting_docs', 'reply_ready', 'failed', 'send_approved', 'sending']).gte('created_at', since));
       const pending = must(await sb.from('pending_patients').select('id,status,created_at,is_test,record').in('status', ['pending', 'exists']).gte('created_at', since));
-      return { patients, tasks, pending };
+      // Dubbi's reading of each recent case (no table yet → none)
+      const c = await sb.from('dubbi_cases').select('file_number,status,analysis,updated_at').in('status', ['ready', 'quiet']).gte('updated_at', since);
+      return { patients, tasks, pending, cases: c.error ? [] : c.data };
     },
+    // ── Case brain (lib/cases.js) ──────────────────────────────────────────
+    // Every Medicum email the Mac reads is kept, so a patient's emails can be read together.
+    async caseTablesReady() { return !(await sb.from('dubbi_cases').select('file_number').limit(1)).error; },
+    async knownEmails(ids) {
+      if (!ids.length) return new Set();
+      const out = new Set();
+      for (let i = 0; i < ids.length; i += 100) must(await sb.from('dubbi_emails').select('message_id').in('message_id', ids.slice(i, i + 100))).forEach(r => out.add(r.message_id));
+      return out;
+    },
+    async logEmail(row) { must(await sb.from('dubbi_emails').upsert(row, { onConflict: 'message_id', ignoreDuplicates: true })); },
+    async caseEmails(days) {
+      const since = new Date(Date.now() - days * 864e5).toISOString(), out = [];
+      for (let from = 0; ; from += 1000) {
+        const page = must(await sb.from('dubbi_emails').select('*').gte('email_date', since).order('email_date').range(from, from + 999));
+        out.push(...page); if (page.length < 1000) break;
+      }
+      return out;
+    },
+    async cases() { return must(await sb.from('dubbi_cases').select('file_number,basis,status,updated_at')); },
+    async saveCase(row) { must(await sb.from('dubbi_cases').upsert({ ...row, updated_at: new Date().toISOString() }, { onConflict: 'file_number' })); },
+    async memory() { const r = await sb.from('dubbi_memory').select('key,value'); return r.error ? [] : r.data; },
     async purgeAsks(days) {
       await sb.from('dubbi_asks').delete().lt('created_at', new Date(Date.now() - days * 864e5).toISOString());
     },
@@ -264,6 +287,7 @@ export function offlineStore({ patientsFile, outFile }) {
     rows,
     tasks,
     async knownTaskKeys(keys) { return new Set(tasks.map(t => t.source_key).filter(k => keys.includes(k))); },
+    async logEmail() {}, async knownEmails() { return new Set(); }, async memory() { return []; }, async caseTablesReady() { return false; },
     async knownMessage(id) { return tasks.some(t => t.email_message_id === id || (t.related_emails || []).some(r => r.message_id === id)); },
     async findGroupTask(k, days) {
       const since = Date.now() - days * 864e5;
