@@ -14,6 +14,8 @@ import { claudeRunner } from './lib/ai.js';
 import { aiPass } from './ai-queue.js';
 import { kokoroVoice } from './lib/voice.js';
 import { brainSystem, buildContext, brainPrompt, cleanQuestion, parseBrain, withNames } from './lib/brain.js';
+import { casePass } from './case-brain.js';
+import { CASE_SYSTEM } from './lib/cases.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -49,6 +51,10 @@ async function main() {
   const run = claudeRunner({ command: ai.command, model: ai.brainModel || 'haiku', system: brainSystem({ shareNames }), timeoutMs: 75e3, fast: true });
   const replyRun = claudeRunner({ command: ai.command, model: ai.model || 'sonnet', fast: true });   // ✨ reply rewrites (lib/ai.js rules)
   let aiAt = 0, aiBusy = false;
+  // Case brain: each patient's emails read together, once a minute in the background (case-brain.js)
+  const caseRun = claudeRunner({ command: ai.command, model: ai.caseModel || ai.model || 'sonnet', system: CASE_SYSTEM, timeoutMs: 150e3 });
+  const casesOn = ai.cases !== false && await store.caseTablesReady().catch(() => false);
+  let caseAt = 0, caseBusy = false;
   const tts = ai.voice === false ? null : kokoroVoice();   // null until install-voice.sh has run
   await store.purgeAsks(7).catch(() => {});     // questions are kept a week, then removed
   const until = Date.now() + (Number(process.env.BRAIN_MINUTES) || 20) * 60e3;   // BRAIN_MINUTES: shorter runs for testing
@@ -72,6 +78,11 @@ async function main() {
       if (ai.rewritesInBrain !== false && !aiBusy && Date.now() - aiAt > 3000) {
         aiAt = Date.now(); aiBusy = true;
         aiPass({ store, ai, run: replyRun }).catch(e => console.error('brain ai:', e.message)).finally(() => { aiBusy = false; });
+      }
+      if (casesOn && !caseBusy && Date.now() - caseAt > 60e3) {
+        caseAt = Date.now(); caseBusy = true;
+        casePass({ store, run: caseRun, rules: cfg.rules, signature: (cfg.replies || {}).signature || '', log: m => console.log(`[${new Date().toISOString()}]${m}`) })
+          .catch(e => console.error('brain cases:', e.message)).finally(() => { caseBusy = false; caseAt = Date.now(); });
       }
       await sleep(400); continue;   // look for your next question ~2.5 times a second
     }

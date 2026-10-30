@@ -71,7 +71,7 @@ export function cityOf(address) {
 
 const VIEW = { close_file: 'file to close', on_hold: 'put on hold', back: 'back from hold', permanent: 'make permanent', prescription: 'prescription to apply', medicum_note: 'email to Medicum', question: 'coordinator question to answer' };
 // The data Claude may use: one line per patient, one per open item. No names, no streets.
-export function buildContext({ patients, tasks = [], pending = [], now = new Date(), shareNames = false }) {
+export function buildContext({ patients, tasks = [], pending = [], cases = [], now = new Date(), shareNames = false }) {
   const ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   const today = ymd(now);
   const day = now.toLocaleDateString('en-CA', { weekday: 'long' });
@@ -112,8 +112,13 @@ PATIENTS (file${shareNames ? ' | name' : ''} | status | type | dose | doses left
 ${lines.join('\n') || '(none)'}
 
 OPEN ITEMS IN DUBBI (file | what | since)
-${open.join('\n') || '(none)'}`;
+${open.join('\n') || '(none)'}${caseLines(cases)}`;
 }
+// Dubbi's reading of each patient's recent emails (case-brain.js) — already without names
+const caseLines = cases => {
+  const l = (cases || []).filter(c => c.analysis).map(c => `#${String(c.file_number).trim()} | ${c.status === 'ready' ? 'needs your decision' : 'no action needed'} | ${String(c.analysis.summary || '').replace(/\s+/g, ' ').slice(0, 400)}${(c.analysis.actions || []).length ? ' | proposed: ' + c.analysis.actions.map(a => a.type).join(', ') : ''}`);
+  return l.length ? `\n\nLATEST SITUATION FROM THE EMAILS (file | state | summary — newer emails override older ones)\n${l.join('\n')}` : '';
+};
 
 // The actions Dubbi can propose (the phone turns these into its own Confirm card)
 export const BRAIN_ACTIONS = {

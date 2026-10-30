@@ -179,6 +179,26 @@ send", "Missing documents", a file number, or "Find <name>" (English or French).
   dictation, like the keyboard mic, so turn it on only once your privacy officer
   agrees. Typing always works.
 
+## 🧠 Dubbi's analysis: each patient's emails read together (Oct 30, 2026)
+
+Medicum writes about one patient in several emails — the coordinator, reports@ (faxed prescription),
+no-reply@ (portal forms), and replies in the thread — and a newer email can change an older one
+("close the file" → "continue injections" → "he is travelling for a month"). Now:
+
+- **Every Medicum email is kept** (`dubbi_emails`), replies included, from the Inbox and your Medicum folder (45 days).
+- **Once a minute** your Mac's brain (`case-brain.js`) re-reads any patient with a new email that week:
+  all their emails in date order + VaPiq's record + the open cards → Claude says what is true **now**
+  (newer emails win) and proposes actions. Names, phones and addresses are removed first; Claude only proposes.
+- **Dubbi shows an analysis card** at the top: what's happening, outdated cards marked *Superseded*,
+  and the proposed actions as a checklist — take off hold / put on hold / due date / dose / note /
+  cancel appointment / delete file (asks again) / dismiss outdated card / 📞 reminder in VaPiq's quick note /
+  one reply to the coordinator (editable). Tick, edit, **Do it**.
+- **"What is this PDF?"** When Dubbi can't tell what an attachment is, the card asks with the file name.
+  Your answer is remembered (`dubbi_memory`) for that file and for files named like it
+  (e.g. `IMG_#_#.pdf`, or "<patient name> #.pdf"), used by the intake cards too, and the case is re-read.
+- Replies in a thread that say "please place his file on hold" now make the hold card too.
+- Setup: run `supabase/2026-10-30_dubbi_cases.sql` once. Turn it off with `"ai": { "cases": false }`.
+
 ## ✨ Claude and Dubbi: speed and names (Oct 29, 2026)
 
 - **Your edits count.** Whatever is in the reply box is what Claude rewrites, what Dubbi
