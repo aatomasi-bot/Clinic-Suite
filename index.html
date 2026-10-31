@@ -9,7 +9,7 @@
              style-src  'self' 'unsafe-inline' https://fonts.googleapis.com;
              font-src   'self' https://fonts.gstatic.com;
              img-src    'self' data: https:;
-             connect-src 'self' https://*.supabase.co https://cdnjs.cloudflare.com;">
+             connect-src 'self' https://*.supabase.co https://cdnjs.cloudflare.com https://nominatim.openstreetmap.org https://router.project-osrm.org;">
   <meta charset="UTF-8">
 <script>
 /* ═══════════════════════════════════════════════════════════
@@ -5132,6 +5132,8 @@ async function performInjection() {
   const visitDate = (apptDate && apptDate <= today) ? apptDate :
                     (dueDate  && dueDate  <= today) ? dueDate  :
                     today;
+  // Kept with the injection: the invoice's km suggestion orders the day by it
+  const visitTime = apptDate === visitDate ? p['Appointment Date & Time'] : null;
 
   // Update injection history — use visitDate, NOT today
   let prevDates = p['Previous Injection Dates'] ? p['Previous Injection Dates'].split(',').map(s=>s.trim()).filter(Boolean) : [];
@@ -5164,15 +5166,16 @@ async function performInjection() {
 
     // 1. Insert into normalised injections table
     const { data: { user } } = await _sb.auth.getUser();
-    const { error: injErr } = await _sb.from('injections').upsert({
+    const { error: injErr } = await upsertInjection({
       file_number:     String(p['File Number']),
       injection_date:  visitDate,           // actual visit date, not recording date
       site:            site,
       dose_mg:         parseFloat(p['Dose Prescribed']) || null,
       notes:           comments || null,
       adverse_effects: adverse  || null,
-      recorded_by:     user?.id || null
-    }, { onConflict: 'file_number,injection_date' });
+      recorded_by:     user?.id || null,
+      visit_time:      visitTime
+    });
 
     if (injErr) {
       // Non-fatal: patient record still updates even if injections table fails
@@ -5188,7 +5191,9 @@ async function performInjection() {
         dose_mg:         parseFloat(p['Dose Prescribed']) || null,
         notes:           comments || '',
         adverse_effects: adverse  || '',
-        id:              null
+        id:              null,
+        visit_time:      visitTime,
+        recorded_at:     new Date().toISOString()
       };
       if (existingIdx > -1) _injectionHistory[fn][existingIdx] = newRecord;
       else _injectionHistory[fn].push(newRecord);
@@ -8078,6 +8083,16 @@ const INVOICE_RATES = { visit:41, km:0.72, hrRate:25, cpp:25 };
 // ══════════════════════════════════════════════
 let _injectionHistory = {};
 
+// One injection row; saved without visit_time until supabase/2026-10-30_injection_visit_time.sql has run
+async function upsertInjection(row) {
+  let r = await _sb.from('injections').upsert(row, { onConflict: 'file_number,injection_date' });
+  if (r.error && /visit_time/.test(r.error.message)) {
+    const { visit_time, ...rest } = row;
+    r = await _sb.from('injections').upsert(rest, { onConflict: 'file_number,injection_date' });
+  }
+  return r;
+}
+
 async function loadInjectionHistoryFromDB() {
   if (!_sb) return;
   try {
@@ -8085,12 +8100,15 @@ async function loadInjectionHistoryFromDB() {
     let allRows = [];
     let from = 0;
     const PAGE = 1000;
+    // visit_time: supabase/2026-10-30_injection_visit_time.sql (read without it until that has run)
+    let cols = 'file_number, injection_date, site, dose_mg, notes, adverse_effects, id, recorded_at, visit_time';
     while (true) {
       const { data, error } = await _sb
         .from('injections')
-        .select('file_number, injection_date, site, dose_mg, notes, adverse_effects, id')
+        .select(cols)
         .order('injection_date', { ascending: true })
         .range(from, from + PAGE - 1);
+      if (error && /visit_time/.test(error.message) && cols.includes('visit_time')) { cols = cols.replace(', visit_time', ''); continue; }
       if (error) throw error;
       if (!data || !data.length) break;
       allRows = allRows.concat(data);
@@ -8107,7 +8125,9 @@ async function loadInjectionHistoryFromDB() {
         dose_mg:         row.dose_mg,
         notes:           row.notes           || '',
         adverse_effects: row.adverse_effects || '',
-        id:              row.id
+        id:              row.id,
+        visit_time:      row.visit_time  || null,
+        recorded_at:     row.recorded_at || null
       });
     });
     console.log('Injection history loaded: ' + (data?.length || 0) +
@@ -8969,6 +8989,107 @@ let _addDaySelected = new Set();
 let _addDayNotes    = {};   // id -> note string
 let _cppChecked     = new Set(); // id -> CPP questionnaire confirmed
 
+// ── KM SUGGESTION (only a suggestion: you type the km or tap Use; formulas unchanged) ──
+// Home → the day's patients in appointment-time order → home. Each street address
+// (no name, no file #, no apartment) is placed on the map once by OpenStreetMap
+// Nominatim and remembered on this device; the driving km come from the free OSRM
+// route service, which only receives map points.
+const KM_HOME    = '42 Boulevard Deguire, Montréal, QC H4N 1N4';
+const KM_GEO_KEY = 'vapiq_geo_v1';
+let _kmGeoAt = 0, _kmKey = '', _kmTimer = null;
+
+function _kmGeoCache() { try { return JSON.parse(localStorage.getItem(KM_GEO_KEY) || '{}'); } catch { return {}; } }
+// "1400 Rue X, Montréal, QC, H3A 3B8, App. 1414" → without the apartment part
+function _kmStreet(addr) {
+  return String(addr || '').split(',').map(s => s.trim())
+    .filter(s => s && !/^(apt|app|appt|unit|unité|suite|bureau)\b|^#/i.test(s)).join(', ');
+}
+async function _kmPlace(addr) {
+  const street = _kmStreet(addr);
+  if (!street) return null;
+  const key = street.toLowerCase(), cached = _kmGeoCache()[key];
+  if (cached) return cached;
+  const pc = (street.match(/[A-Z]\d[A-Z]\s?\d[A-Z]\d/i) || [''])[0];
+  // the street address first; if OpenStreetMap doesn't know it, its postal code
+  for (const qs of ['q=' + encodeURIComponent(street), pc && 'postalcode=' + encodeURIComponent(pc)].filter(Boolean)) {
+    const wait = 1100 - (Date.now() - _kmGeoAt);   // Nominatim: at most one request a second
+    if (wait > 0) await new Promise(r => setTimeout(r, wait));
+    _kmGeoAt = Date.now();
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=ca&${qs}`, { headers: { 'Accept-Language': 'en,fr' } });
+      const hit = res.ok ? (await res.json())[0] : null;
+      if (hit) {
+        const pt = [+(+hit.lat).toFixed(5), +(+hit.lon).toFixed(5)];
+        const c = _kmGeoCache(); c[key] = pt;
+        try { localStorage.setItem(KM_GEO_KEY, JSON.stringify(c)); } catch {}
+        return pt;
+      }
+    } catch {}
+  }
+  return null;
+}
+// The day's visits in appointment-time order (the time you recorded it when the appointment time wasn't kept)
+function _kmOrder(pats, date) {
+  return pats.map(p => {
+    const r = getAllInjectionRecords(p).find(x => x.date === date) || {};
+    const t = r.visit_time || r.recorded_at;
+    return { p, t: t ? +new Date(t) : Infinity, exact: !!r.visit_time };
+  }).sort((a, b) => a.t - b.t);
+}
+async function _kmTrip(date, pats) {
+  const order = _kmOrder(pats, date), home = await _kmPlace(KM_HOME), pts = [], missing = [];
+  if (!home) throw new Error('home not found');
+  for (const o of order) { const pt = await _kmPlace(o.p['Address']); if (pt) pts.push(pt); else missing.push(o.p['File Number']); }
+  if (!pts.length) return { km: 0, order, missing };
+  const all = [home, ...pts, home];
+  const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${all.map(p => p[1] + ',' + p[0]).join(';')}?overview=false`);
+  const j = res.ok ? await res.json() : null;
+  if (!j || j.code !== 'Ok') throw new Error('route');
+  return { km: j.routes[0].distance / 1000, order, missing };
+}
+function scheduleKmSuggestion() { clearTimeout(_kmTimer); _kmTimer = setTimeout(updateKmSuggestion, 500); }
+async function updateKmSuggestion() {
+  const box = document.getElementById('addDayKmSuggest');
+  const modal = document.getElementById('addDayModal');
+  if (!box) return;
+  const date = modal.dataset.date, extra = modal.dataset.mode === 'extra';
+  const sel = patients.filter(p => _addDaySelected.has(p.id));
+  const key = date + '|' + (extra ? 'x' : '') + '|' + sel.map(p => p.id).sort().join(',');
+  if (key === _kmKey) return;
+  _kmKey = key;
+  if (!sel.length) { box.style.display = 'none'; return; }
+  box.style.display = 'block';
+  box.innerHTML = '🗺 Working out the km for this day…';
+  try {
+    let km, trip;
+    if (extra) {
+      // extra km = the whole day with the extra visit − the day as it was billed
+      const billed = _billedFilesOn(date);
+      const before = patients.filter(p => billed.has(String(p['File Number'])));
+      trip = await _kmTrip(date, before.concat(sel));
+      km = Math.max(0, Math.round(trip.km - (await _kmTrip(date, before)).km));
+    } else {
+      trip = await _kmTrip(date, sel);
+      km = Math.round(trip.km);
+    }
+    if (key !== _kmKey) return;   // the selection changed meanwhile
+    const guessed = trip.order.filter(o => !o.exact).length;
+    box.innerHTML = `<div style="display:flex;align-items:center;gap:8px">
+        <span style="flex:1">🗺 Suggested: <strong>${km} km</strong>${extra ? ' extra' : ''}
+          <span style="color:var(--text-3)">· home → ${trip.order.map(o => '#' + esc(o.p['File Number'] || '')).join(' → ')} → home</span></span>
+        <button type="button" onclick="useKmSuggestion(${km})" style="flex-shrink:0;padding:4px 12px;border-radius:7px;border:1.5px solid var(--teal);background:var(--card);color:var(--teal-dark);font-weight:700;font-size:12px;cursor:pointer">Use</button>
+      </div>`
+      + (guessed ? `<div style="color:var(--text-3)">Order by the time you recorded ${guessed === trip.order.length ? 'the visits' : guessed + ' visit' + (guessed > 1 ? 's' : '')} (appointment time not kept).</div>` : '')
+      + (trip.missing.length ? `<div style="color:var(--red)">Not found on the map, left out: ${trip.missing.map(f => '#' + esc(f)).join(', ')}</div>` : '');
+  } catch {
+    if (key === _kmKey) { box.innerHTML = '🗺 No km suggestion right now (map service unreachable). Type the km as usual.'; _kmKey = ''; }
+  }
+}
+function useKmSuggestion(km) {
+  document.getElementById('addDayKm').value = km;
+  updateAddDayPreview();
+}
+
 function openAddDayModal(date, mode) {
   const extra = mode === 'extra';
   document.getElementById('addDayModal').dataset.mode = extra ? 'extra' : '';
@@ -8985,6 +9106,8 @@ function openAddDayModal(date, mode) {
   document.getElementById('addDayKm').value   = '';
   document.getElementById('addDayTime').value = '';
   document.getElementById('addDayCalcPreview').style.display = 'none';
+  document.getElementById('addDayKmSuggest').style.display = 'none';
+  _kmKey = '';
   document.getElementById('addDayModal').dataset.date = date;
   document.getElementById('addDayKm').oninput  = () => updateAddDayPreview();
   document.getElementById('addDayTime').oninput = () => updateAddDayPreview();
@@ -9099,6 +9222,7 @@ function renderAddDayPatientList(date) {
     const note = `<div style="padding:7px 12px;font-size:11px;color:var(--text-2);background:var(--bg);border-bottom:1px solid var(--border)">Already billed this day: ${billedNow.size} patient${billedNow.size!==1?'s':''} (not shown)</div>`;
     if (el) el.insertAdjacentHTML('afterbegin', note);
   }
+  scheduleKmSuggestion();
 }
 
 function syncDaySearch(val) {
@@ -10230,15 +10354,17 @@ async function recordAllFromNote(fileNum) {
         // Dual-write to injections table — use visitDate as injection_date
         try {
           const { data: authData } = await _sb.auth.getUser();
-          await _sb.from('injections').upsert({
+          const _visitTime = _apptDate === visitDate ? _apptRaw : null;
+          await upsertInjection({
             file_number:     String(p['File Number']),
             injection_date:  visitDate,     // actual visit date, not recording date
             site,
             dose_mg:         parseFloat(p['Dose Prescribed']) || null,
             notes:           note,
             adverse_effects: adverse.length ? adverse.join(', ') : null,
-            recorded_by:     authData?.user?.id || null
-          }, { onConflict: 'file_number,injection_date' });
+            recorded_by:     authData?.user?.id || null,
+            visit_time:      _visitTime
+          });
 
           const fn = String(p['File Number']).trim();
           if (!_injectionHistory[fn]) _injectionHistory[fn] = [];
@@ -10248,7 +10374,8 @@ async function recordAllFromNote(fileNum) {
             dose_mg: parseFloat(p['Dose Prescribed']) || null,
             notes: note,
             adverse_effects: adverse.length ? adverse.join(', ') : '',
-            id: null
+            id: null,
+            visit_time: _visitTime, recorded_at: new Date().toISOString()
           };
           if (existIdx > -1) _injectionHistory[fn][existIdx] = rec;
           else _injectionHistory[fn].push(rec);
@@ -12222,6 +12349,7 @@ window.stripTimeWindow     = stripTimeWindow;
             style="width:100%;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--card);color:var(--text)">
         </div>
       </div>
+      <div id="addDayKmSuggest" style="display:none;font-size:11px;color:var(--text-2);background:var(--bg);border:1px dashed var(--border);border-radius:8px;padding:7px 10px;margin-bottom:10px;line-height:1.5"></div>
       <div id="addDayCalcPreview" style="display:none;font-size:11px;color:var(--text-2);background:var(--teal-light);border-radius:8px;padding:8px 10px;margin-bottom:10px;line-height:1.6"></div>
       <button class="btn-primary" onclick="saveDayToInvoice()"
         style="width:100%;padding:11px;font-size:13px;font-weight:700;border-radius:10px;border:none;background:linear-gradient(135deg,var(--teal),var(--teal-dark));color:#fff;cursor:pointer">
