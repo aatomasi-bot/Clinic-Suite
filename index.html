@@ -802,6 +802,15 @@ input, select, textarea { font: inherit; }
   font-size: 0.75rem;
   color: var(--text-2);
 }
+.copy-notes-btn {
+  width: 26px; height: 26px; flex-shrink: 0;
+  border-radius: 8px; border: 1.5px solid #C4B8E8; background: #F0EEF9; color: #5B48A0;
+  display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0;
+  transition: transform var(--dur-fast) var(--ease-bounce);
+}
+.copy-notes-btn:hover { transform: scale(1.08); }
+.copy-notes-btn:active { transform: scale(.9); }
+[data-theme="dark"] .copy-notes-btn { background: rgba(91,72,160,.18); border-color: rgba(196,184,232,.45); color: #C4B8E8; }
 .card-special {
   display: flex;
   align-items: center;
@@ -4733,8 +4742,9 @@ function renderCard(p, idx) {
           <div class="card-due ${dueClass}"><span>📅</span> ${dueDisplay}</div>
           ${confirmed && apptTime ? `<span style="font-size:9px;background:rgba(45,140,138,.12);color:var(--teal-dark);border:1px solid rgba(45,140,138,.3);border-radius:4px;padding:1px 6px;font-weight:700">✓ ${apptTime}</span>` : ''}
           ${(apptDate && confirmed && !p['Injection Administered'] && weeks !== '?') ? `<span class="card-next">Next: <b>${formatDateLong(addWeeks(apptDate, parseInt(DOSE_TO_WEEKS[dose]||4)))}</b></span>` : ''}
+          ${addr ? '' : copyNotesBtn(p, 'margin-left:auto')}
         </div>
-        ${addr ? `<div class="card-addr">${mapSVG}<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(formatAddrDisplay(addr))}</span></div>` : ''}
+        ${addr ? `<div class="card-addr">${mapSVG}<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(formatAddrDisplay(addr))}</span>${copyNotesBtn(p)}</div>` : ''}
         ${special ? `<div class="card-flag-strip">
           <span class="card-flag-icon">⚑</span>
           <span>${esc(special.length>80?special.substring(0,78)+'\u2026':special)}</span>
@@ -4845,6 +4855,52 @@ function formatAddrDisplay(addr) {
 
 // For Google Maps query keep original (works better for geocoding)
 function formatAddrForMaps(addr) { return addr; }
+
+// ── Copy for Apple Notes (the reverse of the Notes import) ──
+// "**Name File, 22.5 mg x 4**, address, phone, phone, **12 November 2026**"
+// x = doses remaining; bold survives the paste into Notes (HTML on the clipboard).
+function copyNotesBtn(p, style = '') {
+  return `<button type="button" class="copy-notes-btn" title="Copy for Apple Notes" aria-label="Copy for Apple Notes"
+    onclick="event.stopPropagation();copyForNotes(${p.id})" style="${style}"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg></button>`;
+}
+function notesLine(p) {
+  const head = [`${(p['Patient Name'] || '').trim()} ${p['File Number'] || ''}`.trim()];
+  const dose = String(p['Dose Prescribed'] || '').trim();
+  const left = p['Doses Remaining'];
+  if (dose) head.push(`${dose} mg` + (left !== '' && left != null ? ` x ${left}` : ''));
+  const rest = [formatAddrDisplay(p['Address'] || ''), p['Phone 1'], p['Phone 2']].map(s => String(s || '').trim()).filter(Boolean);
+  const due = /^\d{4}-\d{2}-\d{2}$/.test(p['Due Date'] || '')
+    ? new Date(p['Due Date'] + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+  const text = [head.join(', '), ...rest, due].filter(Boolean).join(', ');
+  const html = [`<b>${esc(head.join(', '))}</b>`, ...rest.map(esc), due && `<b>${esc(due)}</b>`].filter(Boolean).join(', ');
+  return { text, html };
+}
+async function copyForNotes(id) {
+  const p = patients.find(x => x.id === id);
+  if (!p) return;
+  const { text, html } = notesLine(p);
+  try {
+    if (window.ClipboardItem && navigator.clipboard?.write) {
+      await navigator.clipboard.write([new ClipboardItem({
+        'text/html':  new Blob([html], { type: 'text/html' }),
+        'text/plain': new Blob([text], { type: 'text/plain' }) })]);
+    } else {
+      await navigator.clipboard.writeText(text);
+    }
+    toast('Copied for Apple Notes', 'success');
+  } catch (e) {
+    // older browsers: copy a selected bold block the old way
+    const box = document.createElement('div');
+    box.innerHTML = html;
+    box.style.cssText = 'position:fixed;left:-9999px;top:0';
+    document.body.appendChild(box);
+    const r = document.createRange(); r.selectNodeContents(box);
+    const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+    const ok = document.execCommand('copy');
+    s.removeAllRanges(); box.remove();
+    toast(ok ? 'Copied for Apple Notes' : 'Could not copy — try again', ok ? 'success' : 'error');
+  }
+}
 
 // ── Card interaction handler (attached ONCE at DOMContentLoaded) ──
 // Do NOT call this function manually — it is wired up once at startup.
@@ -7571,7 +7627,7 @@ function parseOneNoteLine(line) {
   const doseM = tokens[1].match(/(\d+\.?\d*)\s*mg/i);
   const cntM  = tokens[1].match(/x\s*\(?\s*(\d+)/i);
   if (doseM) out.dose_prescribed = doseM[1];
-  if (cntM)  out.total_doses = cntM[1];
+  if (cntM)  out.doses_remaining = cntM[1];   // "x 4" = doses remaining (same as Copy for Apple Notes)
 
   const addrParts=[], phones=[], dates=[];
   let postalFound=false, siteFound=false, afterPostal=0;
@@ -7632,10 +7688,21 @@ function parseOneNoteLine(line) {
     out.due_date = localDateStr(last);
   }
 
-  out.doses_remaining = String(Math.max(0, parseInt(out.total_doses||0) - injCount));
+  // total = what is left + the injections listed on the line
+  // (a line without "x N" keeps the old result: 0 left, total 4)
+  if (out.doses_remaining !== '') out.total_doses = String(parseInt(out.doses_remaining) + injCount);
+  else out.doses_remaining = '0';
   return out;
 }
 
+
+// Total doses from "Left (x)" (you may have edited it in the review) + the injection dates on the line
+function notesTotalDoses(p) {
+  if (!p.total_doses) return '4';
+  const left = parseInt(p.doses_remaining || '4') || 0;
+  const given = String(p.previous_injection_dates || '').split(',').filter(s => s.trim()).length;
+  return String(left + given);
+}
 
 function showNotesReview(data) {
   document.getElementById('notesStep1').style.display = 'none';
@@ -7646,7 +7713,7 @@ function showNotesReview(data) {
     { key:'patient_name',            label:'Name',            width:140, required:true  },
     { key:'file_number',             label:'File #',          width:70,  required:true  },
     { key:'dose_prescribed',         label:'Dose(mg)',        width:65,  required:true  },
-    { key:'total_doses',             label:'Total',           width:50                  },
+    { key:'doses_remaining',         label:'Left (x)',        width:55                  },
     { key:'address',                 label:'Address',         width:220                 },
     { key:'phone1',                  label:'Phone 1',         width:110                 },
     { key:'phone2',                  label:'Phone 2',         width:110                 },
@@ -7780,8 +7847,8 @@ async function importNotesPatients() {
         'Phone 1':                  p.phone1 || '',
         'Phone 2':                  p.phone2 || '',
         'Dose Prescribed':          String(p.dose_prescribed || '22.5'),
-        'Total Doses':              String(p.total_doses || '4'),
-        'Doses Remaining':          String(p.doses_remaining || p.total_doses || '4'),
+        'Total Doses':              notesTotalDoses(p),
+        'Doses Remaining':          String(p.doses_remaining || '4'),
         'Injection Site':           p.previous_injection_site || '',
         'Previous Injection Site':  '',
         'Due Date':                 p.due_date || todayStr(),
