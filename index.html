@@ -4863,6 +4863,10 @@ function copyNotesBtn(p, style = '') {
   return `<button type="button" class="copy-notes-btn" title="Copy for Apple Notes" aria-label="Copy for Apple Notes"
     onclick="event.stopPropagation();copyForNotes(${p.id})" style="${style}"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg></button>`;
 }
+function notesNeedsSign(p) {
+  const s = String(p['Special Instructions'] || '');
+  return /signat|sign required/i.test(s) && !/\bno\s+(more\s+)?signat|signat\w*\s+(not|no longer)\s+(required|needed)/i.test(s);
+}
 function notesLine(p) {
   const head = [`${(p['Patient Name'] || '').trim()} ${p['File Number'] || ''}`.trim()];
   const dose = String(p['Dose Prescribed'] || '').trim();
@@ -4871,8 +4875,10 @@ function notesLine(p) {
   const rest = [formatAddrDisplay(p['Address'] || ''), p['Phone 1'], p['Phone 2']].map(s => String(s || '').trim()).filter(Boolean);
   const due = /^\d{4}-\d{2}-\d{2}$/.test(p['Due Date'] || '')
     ? new Date(p['Due Date'] + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
-  const text = [head.join(', '), ...rest, due].filter(Boolean).join(', ');
-  const html = [`<b>${esc(head.join(', '))}</b>`, ...rest.map(esc), due && `<b>${esc(due)}</b>`].filter(Boolean).join(', ');
+  // "Signature required!!", "Take Signature"… in Special Instructions → a bold SIGN before the due date
+  const sign = notesNeedsSign(p) ? 'SIGN' : '';
+  const text = [head.join(', '), ...rest, sign, due].filter(Boolean).join(', ');
+  const html = [`<b>${esc(head.join(', '))}</b>`, ...rest.map(esc), sign && `<b>${sign}</b>`, due && `<b>${esc(due)}</b>`].filter(Boolean).join(', ');
   return { text, html };
 }
 async function copyForNotes(id) {
@@ -7667,6 +7673,8 @@ function parseOneNoteLine(line) {
         addrParts.push(tok); afterPostal++; continue; }
     }
 
+    // "SIGN" (from Copy for Apple Notes) → Notes: Signature required
+    if (/^sign$/i.test(tok)) { out.special_instructions = 'Signature required'; continue; }
     if (IGNORE.has(tok.toLowerCase())) continue;
     if (!postalFound) addrParts.push(tok);
   }
