@@ -7627,7 +7627,7 @@ function parseOneNoteLine(line) {
   const doseM = tokens[1].match(/(\d+\.?\d*)\s*mg/i);
   const cntM  = tokens[1].match(/x\s*\(?\s*(\d+)/i);
   if (doseM) out.dose_prescribed = doseM[1];
-  if (cntM)  out.total_doses = cntM[1];
+  if (cntM)  out.doses_remaining = cntM[1];   // "x 4" = doses remaining (same as Copy for Apple Notes)
 
   const addrParts=[], phones=[], dates=[];
   let postalFound=false, siteFound=false, afterPostal=0;
@@ -7688,10 +7688,21 @@ function parseOneNoteLine(line) {
     out.due_date = localDateStr(last);
   }
 
-  out.doses_remaining = String(Math.max(0, parseInt(out.total_doses||0) - injCount));
+  // total = what is left + the injections listed on the line
+  // (a line without "x N" keeps the old result: 0 left, total 4)
+  if (out.doses_remaining !== '') out.total_doses = String(parseInt(out.doses_remaining) + injCount);
+  else out.doses_remaining = '0';
   return out;
 }
 
+
+// Total doses from "Left (x)" (you may have edited it in the review) + the injection dates on the line
+function notesTotalDoses(p) {
+  if (!p.total_doses) return '4';
+  const left = parseInt(p.doses_remaining || '4') || 0;
+  const given = String(p.previous_injection_dates || '').split(',').filter(s => s.trim()).length;
+  return String(left + given);
+}
 
 function showNotesReview(data) {
   document.getElementById('notesStep1').style.display = 'none';
@@ -7702,7 +7713,7 @@ function showNotesReview(data) {
     { key:'patient_name',            label:'Name',            width:140, required:true  },
     { key:'file_number',             label:'File #',          width:70,  required:true  },
     { key:'dose_prescribed',         label:'Dose(mg)',        width:65,  required:true  },
-    { key:'total_doses',             label:'Total',           width:50                  },
+    { key:'doses_remaining',         label:'Left (x)',        width:55                  },
     { key:'address',                 label:'Address',         width:220                 },
     { key:'phone1',                  label:'Phone 1',         width:110                 },
     { key:'phone2',                  label:'Phone 2',         width:110                 },
@@ -7836,8 +7847,8 @@ async function importNotesPatients() {
         'Phone 1':                  p.phone1 || '',
         'Phone 2':                  p.phone2 || '',
         'Dose Prescribed':          String(p.dose_prescribed || '22.5'),
-        'Total Doses':              String(p.total_doses || '4'),
-        'Doses Remaining':          String(p.doses_remaining || p.total_doses || '4'),
+        'Total Doses':              notesTotalDoses(p),
+        'Doses Remaining':          String(p.doses_remaining || '4'),
         'Injection Site':           p.previous_injection_site || '',
         'Previous Injection Site':  '',
         'Due Date':                 p.due_date || todayStr(),
