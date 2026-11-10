@@ -71,13 +71,16 @@ const emailRef = e => ({ from: e.from, subject: e.subject, date: e.date, message
 
 // Core pipeline — exported for tests.
 export async function runIntake({ source, store, rules, replies = {}, isTest, log = console.log, relatedStateFile = stateFile }) {
-  const patients = await store.loadPatients();
+  // Patients and what you taught Dubbi about PDFs: downloaded only when there is an email to handle
+  // (most runs find none — Supabase free plan: 5 GB of downloads a month)
+  let loaded = null;
+  const load = () => loaded || (loaded = Promise.all([store.loadPatients(), store.memory ? store.memory().catch(() => []) : []]));
   const counts = { emails: 0, skipped: 0, queued: 0, exists: 0, needsReview: 0, already: 0, prescriptions: 0, closes: 0 };
 
   const touched = new Set();   // file numbers of new-patient items seen this run
-  const memory = store.memory ? await store.memory().catch(() => []) : [];   // what you taught Dubbi about PDFs
   let logOff = false;
   const handle = async email => {
+    const [patients, memory] = await load();
     counts.emails++;
     // Every Medicum email is kept for Dubbi's case brain (lib/cases.js), replies included
     if (!logOff && !email.skipped && store.logEmail && senderAllowed(email.from, rules)) {
@@ -488,8 +491,13 @@ async function main() {
     const body = summaryText(counts);
     if (body) await notify(body);
 
-    // Safety net: anything waiting too long → one reminder per item per day
-    const overdue = dueForAlert(overdueItems(forMode(await store.snapshot(), live), cfg.alerts));
+    // Safety net: anything waiting too long → one reminder per item per day (looked at every 15 min)
+    const overdueFile = path.join(stateDir, 'overdue-check.txt');
+    let lastCheck = 0;
+    try { lastCheck = +fs.readFileSync(overdueFile, 'utf8') || 0; } catch {}
+    const checkOverdue = Date.now() - lastCheck > 15 * 60e3;
+    if (checkOverdue) fs.writeFileSync(overdueFile, String(Date.now()));
+    const overdue = checkOverdue ? dueForAlert(overdueItems(forMode(await store.snapshot(), live), cfg.alerts)) : [];
     if (overdue.length) {
       console.log(`  overdue ${overdue.length}: ${[...new Set(overdue.map(o => o.why))].join(', ')}`);
       await notify(overdueText(overdue));

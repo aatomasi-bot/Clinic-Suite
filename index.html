@@ -10948,14 +10948,24 @@ function _signInExpired() {
   try { _sb.auth.signOut({ scope: 'local' }); } catch (e) {}
   showLoginScreen();
 }
-// Safety net if the live connection is down: catch up every 2 minutes while open
-setInterval(() => { if (document.visibilityState === 'visible' && Date.now() - _lastSyncTs > 120000) _resyncNow(); }, 30000);
+// Safety net: catch up every 2 minutes while the live connection is down, every 30 minutes
+// while it works (a full reload downloads ~0.5 MB — Supabase free plan: 5 GB a month)
+const _rtLive = () => _rtStatus === 'SUBSCRIBED';
+setInterval(() => { if (document.visibilityState === 'visible' && Date.now() - _lastSyncTs > (_rtLive() ? 30 * 60e3 : 120000)) _resyncNow(); }, 30000);
+let _hiddenAt = 0;
 function _maybeResync() {
   if (document.visibilityState !== 'visible') return;
   if (Date.now() - _lastSyncTs < 10000) return;   // just synced
+  // Live sync on and the page never left the screen for long (e.g. switching windows on the iMac):
+  // changes already arrived live. Away for a while (phone asleep): the live connection may have dropped.
+  if (_rtLive() && (!_hiddenAt || Date.now() - _hiddenAt < 2 * 60e3) && Date.now() - _lastSyncTs < 30 * 60e3) return;
   _resyncNow();
 }
-document.addEventListener('visibilitychange', _maybeResync);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') { _hiddenAt = Date.now(); return; }
+  _maybeResync();
+  _hiddenAt = 0;
+});
 window.addEventListener('pageshow', e => { if (e.persisted) _maybeResync(); });
 window.addEventListener('focus', _maybeResync);
 window.addEventListener('online', () => { _lastSyncTs = 0; _maybeResync(); });

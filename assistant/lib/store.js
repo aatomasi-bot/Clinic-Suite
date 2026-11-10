@@ -261,6 +261,20 @@ export async function supabaseStore(cfg) {
       }
       return out;
     },
+    // Newest email kept and newest thing you taught Dubbi: a few bytes, so the case brain
+    // reads the emails again only when one of these changed
+    async caseStamp() {
+      const e = await sb.from('dubbi_emails').select('created_at').order('created_at', { ascending: false }).limit(1);
+      const m = await sb.from('dubbi_memory').select('created_at', { count: 'exact' }).order('created_at', { ascending: false }).limit(1);
+      return `${e.data?.[0]?.created_at || ''}|${m.data?.[0]?.created_at || ''}|${m.count ?? ''}`;
+    },
+    // Live "something changed" signals (Supabase Realtime, supabase/2026-11-10_dubbi_live.sql)
+    watch(tables, onChange, onStatus = () => {}) {
+      const ch = sb.channel('dubbi-brain-' + Date.now());
+      for (const t of tables) ch.on('postgres_changes', { event: '*', schema: 'public', table: t }, () => onChange(t));
+      ch.subscribe(s => onStatus(s));
+      return () => sb.removeChannel(ch);
+    },
     async cases() { return must(await sb.from('dubbi_cases').select('file_number,basis,status,updated_at')); },
     async saveCase(row) { must(await sb.from('dubbi_cases').upsert({ ...row, updated_at: new Date().toISOString() }, { onConflict: 'file_number' })); },
     async memory() { const r = await sb.from('dubbi_memory').select('key,value'); return r.error ? [] : r.data; },

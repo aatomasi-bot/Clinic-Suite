@@ -8,8 +8,9 @@ import { replyAllowed } from './lib/classify.js';
 import { normFile } from './lib/match.js';
 
 // Pure enough to test: a fake store and a fake Claude.
-export async function casePass({ store, run, rules, signature = '', maxPerPass = 3, recentDays = 7, now = new Date(), log = console.log }) {
-  const [emails, data, memory, cases] = await Promise.all([store.caseEmails(45), store.brainData(), store.memory(), store.cases()]);
+// data: the brain's copy of patients and cards (saves downloading them again)
+export async function casePass({ store, run, rules, signature = '', maxPerPass = 3, recentDays = 7, now = new Date(), log = console.log, data: given = null }) {
+  const [emails, data, memory, cases] = await Promise.all([store.caseEmails(45), given || store.brainData(), store.memory(), store.cases()]);
   const byFile = new Map();
   for (const e of emails) for (const f of e.file_numbers || []) { const k = normFile(f); if (!byFile.has(k)) byFile.set(k, []); byFile.get(k).push(e); }
   const old = new Map(cases.map(c => [normFile(c.file_number), c]));
