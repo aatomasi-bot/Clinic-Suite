@@ -54,7 +54,7 @@ async function main() {
   // Case brain: each patient's emails read together, once a minute in the background (case-brain.js)
   const caseRun = claudeRunner({ command: ai.command, model: ai.caseModel || ai.model || 'sonnet', system: CASE_SYSTEM, timeoutMs: 150e3 });
   const casesOn = ai.cases !== false && await store.caseTablesReady().catch(() => false);
-  let caseAt = 0, caseBusy = false;
+  let caseAt = 0, caseBusy = false, caseFullAt = 0;
   const tts = ai.voice === false ? null : kokoroVoice();   // null until install-voice.sh has run
   await store.purgeAsks(7).catch(() => {});     // questions are kept a week, then removed
   const until = Date.now() + (Number(process.env.BRAIN_MINUTES) || 20) * 60e3;   // BRAIN_MINUTES: shorter runs for testing
@@ -64,28 +64,51 @@ async function main() {
   const dog = setInterval(() => {
     if (Date.now() - beat > 3 * 60e3 || Date.now() > until + 2 * 60e3) { console.error(`[${new Date().toISOString()}] brain: stuck — restarting`); process.exit(1); }
   }, 15e3);
-  // Patients and open items are refreshed in the background every 15 s, so a question never waits for them
-  let data = null, dataAt = 0, dataBusy = false;
-  const refresh = () => { if (dataBusy) return; dataBusy = true; store.brainData().then(d => { data = d; dataAt = Date.now(); }).catch(e => console.error('brain data:', e.message)).finally(() => { dataBusy = false; }); };
+  // Supabase free plan = 5 GB of downloads a month, so the brain downloads only after a change.
+  // Supabase tells it live (store.watch); polling stays as the backup, slower once live
+  // messages have proved to arrive for that table (supabase/2026-11-10_dubbi_live.sql).
+  let dirty = true, tasksChanged = true, asksLive = false, tasksLive = false, askWake = false;
+  const unwatch = store.watch ? store.watch(['patients', 'email_tasks', 'pending_patients', 'dubbi_cases', 'dubbi_asks'], t => {
+    if (t === 'dubbi_asks') { asksLive = true; askWake = true; return; }
+    dirty = true;
+    if (t === 'email_tasks') { tasksLive = true; tasksChanged = true; }
+  }) : null;
+  // Patients and open items: refreshed in the background after a change (at most every 15 min
+  // without one), and before a question if older than 2 min
+  let data = null, dataAt = 0, dataBusy = null;
+  const refresh = () => {
+    if (dataBusy) return dataBusy;
+    dirty = false;
+    return (dataBusy = store.brainData().then(d => { data = d; dataAt = Date.now(); }).catch(e => { dirty = true; console.error('brain data:', e.message); }).finally(() => { dataBusy = null; }));
+  };
   refresh();
+  let askAt = 0, caseStamp = null;
   while (Date.now() < until) {
     beat = Date.now();
-    if (Date.now() - dataAt > 15e3) refresh();
-    const ask = await store.nextAsk();
-    if (!ask) {
-      // idle: ✨ reply rewrites you asked for start within ~3 s (ai-queue.js every 30 s is the backup)
+    if ((dirty && Date.now() - dataAt > 3000) || Date.now() - dataAt > 15 * 60e3) refresh();
+    // Your next question: at once when Supabase says one arrived, else every 1.5 s (every 15 s once live)
+    if (!askWake && Date.now() - askAt < (asksLive ? 15e3 : 1500)) {
+      // idle: ✨ reply rewrites you asked for — at once when a card changes (ai-queue.js every 30 s is the backup)
       // in the background, so a question you ask meanwhile is not kept waiting
-      if (ai.rewritesInBrain !== false && !aiBusy && Date.now() - aiAt > 3000) {
-        aiAt = Date.now(); aiBusy = true;
+      if (ai.rewritesInBrain !== false && !aiBusy && (tasksChanged || Date.now() - aiAt > (tasksLive ? 60e3 : 10e3))) {
+        aiAt = Date.now(); aiBusy = true; tasksChanged = false;
         aiPass({ store, ai, run: replyRun }).catch(e => console.error('brain ai:', e.message)).finally(() => { aiBusy = false; });
       }
+      // Case brain: once a minute a tiny check for a new email or something you taught Dubbi; reads only then (or every 30 min)
       if (casesOn && !caseBusy && Date.now() - caseAt > 60e3) {
         caseAt = Date.now(); caseBusy = true;
-        casePass({ store, run: caseRun, rules: cfg.rules, signature: (cfg.replies || {}).signature || '', log: m => console.log(`[${new Date().toISOString()}]${m}`) })
-          .catch(e => console.error('brain cases:', e.message)).finally(() => { caseBusy = false; caseAt = Date.now(); });
+        (async () => {
+          const stamp = await store.caseStamp();
+          if (stamp === caseStamp && Date.now() - caseFullAt < 30 * 60e3) return;
+          caseStamp = stamp; caseFullAt = Date.now();
+          await casePass({ store, run: caseRun, rules: cfg.rules, data, signature: (cfg.replies || {}).signature || '', log: m => console.log(`[${new Date().toISOString()}]${m}`) });
+        })().catch(e => { caseStamp = null; console.error('brain cases:', e.message); }).finally(() => { caseBusy = false; caseAt = Date.now(); });
       }
-      await sleep(400); continue;   // look for your next question ~2.5 times a second
+      await sleep(250); continue;
     }
+    askWake = false; askAt = Date.now();
+    const ask = await store.nextAsk();
+    if (!ask) continue;
     if (!(await store.claimAsk(ask.id))) continue;
     // Text Dubbi wrote itself, to be read aloud: just the voice
     if (/^speak-/.test(ask.lang || '')) {
@@ -94,7 +117,8 @@ async function main() {
       continue;
     }
     try {
-      if (!data) { data = await store.brainData(); dataAt = Date.now(); }
+      if (!data || Date.now() - dataAt > 2 * 60e3) await refresh();   // fresh enough to answer
+      if (!data) throw new Error('Patients could not be loaded');
       const history = await store.askHistory(ask.conv, ask.created_at);
       const r = await answerOne({ ask, data, history, run, tts, shareNames, voiceLater: true });
       await store.answerAsk(ask.id, r);   // the text is on your phone now
@@ -109,6 +133,7 @@ async function main() {
     }
   }
   clearInterval(dog);
+  unwatch?.();
   tts?.close?.();
 }
 
