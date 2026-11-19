@@ -15,7 +15,8 @@
     "fake-pdfs": "node make-fake-pdfs.js",
     "test": "node --test test/*.test.js",
     "test-push": "node test-push.js",
-    "summary": "node summary.js"
+    "summary": "node summary.js",
+    "notes-move": "node notes-mover.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.118.0",
