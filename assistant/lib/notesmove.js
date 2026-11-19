@@ -135,80 +135,23 @@ export function planMoves(notes, { now = new Date(), waitDays = 10, skip = () =>
   return { moves, left, months: [...months].sort() };
 }
 
-// A record as its own line (a one-line list item becomes a plain line, as you agreed)
-function asLine(b) {
-  if (b.tag === 'div') return b.html;
-  const inner = b.html.replace(/^<ul[^>]*>\s*<li[^>]*>/i, '').replace(/<\/li>\s*<\/ul>\s*$/i, '');
-  return `<div>${inner}</div>`;
-}
-const BLANK = '<div><br></div>';
-
-// Cut: the record's block and one blank line next to it (so gaps don't pile up)
-export function removeRecords(html, files) {
-  const bs = blocks(html).map(b => ({ ...b, kind: kindOf(b) }));
-  const drop = new Set();
-  bs.forEach((b, i) => {
-    if (b.kind !== 'record' || !files.has(readRecord(b.text)?.file)) return;
-    drop.add(i);
-    if (bs[i - 1]?.kind === 'blank' && bs[i + 1]?.kind === 'blank' && !drop.has(i - 1)) drop.add(i + 1);
-  });
-  return bs.filter((_, i) => !drop.has(i)).map(b => b.html).join('');
-}
-
-// Paste: under the month heading, after the patients with the same projected date (in date order);
-// the heading is added if the note doesn't have it yet
-export function insertRecords(html, title, items) {
-  let bs = blocks(html).map(b => ({ ...b, kind: kindOf(b) }));
-  const period = notePeriod(title) || [];
-  for (const it of [...items].sort((a, b) => dkey(a.date) - dkey(b.date))) {
-    const { y, m } = it.date;
-    // a day heading for that date ("20 March"): under it, after its patients
-    const dh = bs.findIndex(b => b.kind === 'day' && (() => { const x = b.text.match(/^(\d{1,2})\s+([A-Za-zÀ-ÿ]+)/); return +x[1] === it.date.d && month(x[2]) === m; })());
-    if (dh >= 0) {
-      let at = dh + 1;
-      for (let i = dh + 1; i < bs.length && !['day', 'month'].includes(bs[i].kind); i++) if (bs[i].kind === 'record') at = i + 1;
-      if (at === dh + 1) while (at < bs.length && bs[at].kind === 'blank') at++;
-      bs.splice(at, 0, { html: asLine(it.block), tag: 'div', text: it.block.text, kind: 'record' });
-      continue;
-    }
-    // the month's section: its heading … up to the next month heading
-    let h = bs.findIndex(b => b.kind === 'month' && month(b.text.match(/^\d{1,2}\s*([A-Za-zÀ-ÿ]+)/)[1]) === m);
-    if (h < 0) {
-      // add the heading after the earlier months' sections (or after the title)
-      let at = bs.length;
-      const later = bs.findIndex(b => b.kind === 'month' && ym(...yOf(b, period)) > ym(y, m));
-      if (later >= 0) at = later;
-      const add = [{ html: `<h2>${monthHeading(y, m)}</h2>`, tag: 'h2', text: monthHeading(y, m), kind: 'month' }, { html: BLANK, tag: 'div', text: '', kind: 'blank' }];
-      if (at === bs.length && bs.length && bs[bs.length - 1].kind !== 'blank') add.unshift({ html: BLANK, tag: 'div', text: '', kind: 'blank' });
-      bs.splice(at, 0, ...add);
-      h = bs.findIndex(b => b.kind === 'month' && b.text === monthHeading(y, m));
-    }
-    let end = bs.findIndex((b, i) => i > h && b.kind === 'month');
-    if (end < 0) end = bs.length;
-    const line = { html: asLine(it.block), tag: 'div', text: it.block.text, kind: 'record' };
-    const k = dkey(it.date);
-    const recs = [];
-    for (let i = h + 1; i < end; i++) if (bs[i].kind === 'record') { const r = readRecord(bs[i].text); const d = r?.dates[r.dates.length - 1]; recs.push({ i, k: d ? dkey(d) : 0 }); }
-    const same = recs.filter(r => r.k === k);
-    if (same.length) { bs.splice(same[same.length - 1].i + 1, 0, line); continue; }        // with its group
-    const before = recs.filter(r => r.k < k);
-    if (before.length) { bs.splice(before[before.length - 1].i + 1, 0, { html: BLANK, tag: 'div', text: '', kind: 'blank' }, line); continue; }
-    const after = recs[0];
-    if (after) { bs.splice(after.i, 0, line, { html: BLANK, tag: 'div', text: '', kind: 'blank' }); continue; }
-    let at = h + 1;
-    while (at < end && bs[at].kind === 'blank') at++;
-    bs.splice(at, 0, line, { html: BLANK, tag: 'div', text: '', kind: 'blank' });
-  }
-  return bs.map(b => b.html).join('');
-}
-function yOf(b, period) {
-  const m = month(b.text.match(/^\d{1,2}\s*([A-Za-zÀ-ÿ]+)/)[1]);
-  const yy = b.text.match(/(\d{4})\s*$/);
-  return [yy ? +yy[1] : ((period.find(p => p.m === m) || {}).y ?? (period[period.length - 1] || {}).y), m];
-}
-
-// A new note's body: title + its two month headings
-export function newNoteBody(title) {
-  const p = notePeriod(title) || [];
-  return `<h1>${title}</h1>${BLANK}${BLANK}` + p.map(x => `<h2>${monthHeading(x.y, x.m)}</h2>${BLANK}${BLANK}`).join('');
+// Where a record goes in its target note, in words (the mover never edits your notes:
+// Notes' scripting loses colours and font sizes, so you cut and paste by hand)
+const dayOf = b => { const x = b.text.match(/^(\d{1,2})\s+([A-Za-zÀ-ÿ]+)/); return x ? { d: +x[1], m: month(x[2]) } : null; };
+export function whereIn(note, date) {
+  const mon = MONTH_NAMES[date.m];
+  if (!note) return `new note — add a "${mon}" heading, then paste`;
+  const day = note.blocks.find(b => b.kind === 'day' && (x => x && x.d === date.d && x.m === date.m)(dayOf(b)));
+  if (day) return `under "${day.text}"`;
+  const head = note.blocks.find(b => b.kind === 'month' && b.month?.m === date.m);
+  if (!head) return `no "${mon}" heading yet — add one, then paste`;
+  const recs = note.blocks.filter(b => b.kind === 'record' && b.month?.m === date.m && b.month?.y === date.y && b.rec?.dates.length)
+    .map(b => ({ file: b.rec.file, initials: b.rec.initials, k: dkey(b.rec.dates[b.rec.dates.length - 1]) }));
+  const k = dkey(date);
+  const same = recs.filter(r => r.k === k);
+  if (same.length) return `under "${head.text}", with the ${date.d} ${mon} group (after #${same[same.length - 1].file} ${same[same.length - 1].initials})`;
+  const before = recs.filter(r => r.k < k).sort((a, b) => a.k - b.k);
+  if (before.length) { const r = before[before.length - 1]; return `under "${head.text}", after #${r.file} ${r.initials}`; }
+  if (recs.length) return `under "${head.text}", before #${recs[0].file} ${recs[0].initials}`;
+  return `under "${head.text}"`;
 }

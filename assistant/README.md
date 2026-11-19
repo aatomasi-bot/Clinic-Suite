@@ -224,23 +224,22 @@ Medicum gets its subject cleaned before it is sent ("Re: New patient Jean Trembl
 "Re: New patient JT 35037"), using the names in VaPiq for that file and common name patterns.
 The reply card shows the subject exactly as it will be sent.
 
-## 📒 Medicum notes mover (Nov 19, 2026)
+## 📒 Medicum notes mover (Nov 19, 2026 — read-only)
 
 After each visit you add the next projected date at the end of the patient's line in Apple Notes.
-`notes-mover.js` (every morning at 9:00 and at login) moves those lines forward for you:
+`notes-mover.js` (every morning at 9:00 and at login) tells you which lines to move forward.
+**It never edits your notes**: Notes' scripting drops colours (your blue sides), resets font sizes
+and tick lists, so the cut and paste (⌘X / ⌘V in Notes, which keeps all styling) is yours.
 
 - **When:** 10 days after a month ends (October → from 10 November). Only the **iCloud → Medicum**
-  folder, notes named "Medicum, …"; months before October 2026 are never touched.
+  folder, notes named "Medicum, …"; months before October 2026 are skipped.
 - **Where:** the note covering the projected date's month (two months per note: January - February,
-  March - April, …; a missing note is created with your naming), under that month's heading, next to
-  the patients with the same projected date, in date order. A day heading for that date ("26 December")
-  is used when there is one. The line is copied exactly; "no more repeats" lines move too.
-- **Asks first:** a box on the Mac lists every move (file # and initials) and stays until you choose
-  **Do it** · **Pend it** (ask tomorrow) · **Hold it** (not for that month; `npm run notes-move -- --month 2026-10`
-  asks again). `npm run notes-move -- --preview` prints the plan and changes nothing.
+  March - April, …), under that month's heading, next to the patients with the same projected date
+  ("Put it" on the checklist). If the note doesn't exist yet, the checklist says to create it.
+- **Box:** stays until you choose **Show list** (opens a checklist in your browser) · **Pend it** (ask
+  tomorrow) · **Hold it** (not for that month; `npm run notes-move -- --month 2026-10` asks again).
+  Each morning after, it re-reads your notes and says how many are left; when none are, the month is done.
+  `npm run notes-move -- --list` opens the checklist any time; `-- --preview` prints the plan.
 - **Left alone and listed:** no projected date after the month, dates out of order, no dates, a projected
   date already passed, or the same file # already in the target note.
-- **Safe order:** every Medicum note is saved to `state/notes-backup/<time>/` (on this Mac only), lines are
-  pasted and checked in the new note, and only then cut from the old one.
-- Apple Notes rewrites the notes it changes: headings become bold text of the same size, and a
-  one-line tick/bullet list in front of a patient becomes a plain line (agreed Nov 19, 2026).
+- The checklist (file # and initials) is saved in `state/` on this Mac only.

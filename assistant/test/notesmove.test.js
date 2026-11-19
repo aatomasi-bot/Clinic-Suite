@@ -1,7 +1,8 @@
 // Notes mover (lib/notesmove.js): made-up patients only.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { notePeriod, newNoteTitle, parseNote, planMoves, removeRecords, insertRecords, newNoteBody, textOf, blocks, kindOf } from '../lib/notesmove.js';
+import { notePeriod, newNoteTitle, parseNote, planMoves, whereIn, blocks, kindOf } from '../lib/notesmove.js';
+import fs from 'node:fs';
 
 const B = '<div><br></div>';
 const rec = (name, file, dates, extra = '') => `<div><b>${name} ${file}, 30 mg x 2, </b>1 Rue Test, Montréal, QC, H1H 1H1, 514-555-0101, <b>left side, ${dates}${extra}</b></div>`;
@@ -52,21 +53,18 @@ test('waits until 10 days after the month; then plans moves and leaves doubtful 
   assert.equal(planMoves(notes(), { now: new Date(2026, 10, 19), skip: mk => mk === '2026-10' }).moves.length, 0, 'held month');
 });
 
-test('cut and paste: grouped with the same date, in date order, under the right heading', () => {
-  const p = planMoves(notes(), { now: new Date(2026, 10, 19) });
-  const files = new Set(p.moves.map(m => m.file));
-  const src = removeRecords(october, files);
-  assert.ok(!/3000[1245] /.test(textOf(src)) && /30003/.test(textOf(src)) && /30006/.test(textOf(src)) && /154 km/.test(textOf(src)), 'only moved lines cut');
-  assert.ok(!src.includes(B + B + B), 'no piled-up gaps');
+test('the checklist says where each record goes (nothing is written to Notes)', () => {
+  const ns = notes();
+  const p = planMoves(ns, { now: new Date(2026, 10, 19) });
+  const at = f => { const m = p.moves.find(x => x.file === f); return whereIn(ns.find(n => n.title === m.to), m.date); };
+  assert.equal(at('30001'), 'under "26 December"');
+  assert.equal(at('30002'), 'under "01 March to 31 March 2027", after #30007 TE');
+  assert.match(at('30005'), /^new note/);
+  assert.equal(whereIn(ns[1], { d: 13, m: 2, y: 2027 }), 'under "01 March to 31 March 2027", with the 13 March group (after #30007 TE)');
+  assert.match(whereIn(ns[1], { d: 5, m: 3, y: 2027 }), /no "April" heading yet/);
+});
 
-  const toMar = insertRecords(marApr, 'Medicum, March 2027 - April 2027', p.moves.filter(m => m.to.includes('March')));
-  const order = textOf(toMar).match(/3000\d/g);
-  assert.deepEqual(order, ['30007', '30002', '30004', '30008'], '20 March between 13 and 26 March, together');
-  assert.ok(toMar.includes('<div><b>Test BETA 30002'), 'list item became a plain line, formatting kept');
-
-  const toDec = insertRecords(novDec, 'Medicum, November - December 2026', p.moves.filter(m => m.to.includes('December')));
-  assert.ok(textOf(toDec).indexOf('26 December') < textOf(toDec).indexOf('30001'), 'under the "26 December" day heading');
-
-  const may = insertRecords(newNoteBody('Medicum, May 2027 - June 2027'), 'Medicum, May 2027 - June 2027', p.moves.filter(m => m.create));
-  assert.match(textOf(may), /^Medicum, May 2027 - June 2027 01 May to 31 May 2027 Test EPSILON 30005.* 01 June to 30 June 2027$/);
+test('the mover has no way to write to Notes', () => {
+  const src = fs.readFileSync(new URL('../notes-mover.js', import.meta.url), 'utf8');
+  assert.ok(!/set body|make new note|delete note|\bmove\b.*\bnote\b.*\bto\b/i.test(src.replace(/^\s*\/\/.*$/gm, '')), 'no Notes write commands');
 });
