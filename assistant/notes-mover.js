@@ -1,27 +1,31 @@
 #!/usr/bin/env node
-// Notes mover (launchd, every morning and at login): 10 days after a month ends, the records
-// in your Apple Notes "Medicum, …" notes whose projected date belongs in a later month are
-// cut and pasted into that month's note (lib/notesmove.js decides where).
-// It asks first, in a box that stays on screen: Do it · Pend it (ask tomorrow) · Hold it (not
-// for this month — `npm run notes-move -- --month 2026-10` asks again). Records it can't place
-// stay where they are and are listed. Every note is saved to state/notes-backup/ before a change.
+// Notes mover (launchd, every morning and at login): 10 days after a month ends, it works out
+// which records in your Apple Notes "Medicum, …" notes belong in a later month's note
+// (lib/notesmove.js decides where) and gives you a checklist to move them yourself.
+// It ONLY READS your notes. Writing through Notes' scripting loses your colours (blue sides),
+// bold and font sizes, so the cut and paste is yours (⌘X / ⌘V in Notes keeps all styling).
+// Box (stays until you choose): Show list · Pend it (ask tomorrow) · Hold it (not for this month —
+// `npm run notes-move -- --month 2026-10` asks again). Each morning it re-reads and says how
+// many are left; when none are, the month is done.
 //   npm run notes-move                  ask now if a month is due
-//   npm run notes-move -- --preview     print the plan, change nothing
+//   npm run notes-move -- --list        open the checklist now
+//   npm run notes-move -- --preview     print the plan
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { parseNote, planMoves, removeRecords, insertRecords, newNoteBody, textOf, fmtDate, MONTH_NAMES } from './lib/notesmove.js';
+import { parseNote, planMoves, whereIn, fmtDate, MONTH_NAMES } from './lib/notesmove.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const stateDir = path.join(here, 'state');
 const stateFile = path.join(stateDir, 'notes-mover.json');
+const listFile = path.join(stateDir, 'notes-move-list.html');
 const FROM = 2026 * 12 + 9;   // October 2026: the first month the mover looks after
 const ACCOUNT = 'iCloud', FOLDER = 'Medicum';
 
 const osa = (script, args = []) => execFileSync('osascript', ['-e', script, ...args], { encoding: 'utf8', maxBuffer: 64 << 20, timeout: 0 }).replace(/\n$/, '');
 
-// Your "Medicum, …" notes (only the iCloud → Medicum folder)
+// Your "Medicum, …" notes (only the iCloud → Medicum folder) — read only
 function readNotes() {
   const SEP = '\u001e', FS = '\u001f';
   const raw = osa(`tell application "Notes"
@@ -33,64 +37,58 @@ function readNotes() {
   end tell`);
   return raw.split(SEP).filter(Boolean).map(s => { const [id, title, body] = s.split(FS); return { id, title: title.trim(), body }; });
 }
-const writeNote = (id, html) => osa('on run argv\ntell application "Notes" to set body of note id (item 1 of argv) to (item 2 of argv)\nend run', [id, html]);
-const readBody = id => osa('on run argv\ntell application "Notes" to get body of note id (item 1 of argv)\nend run', [id]);
-const createNote = html => osa(`on run argv\ntell application "Notes" to return id of (make new note at folder "${FOLDER}" of account "${ACCOUNT}" with properties {body:(item 1 of argv)})\nend run`, [html]);
 
 // The box that stays until you choose (no time limit)
 function ask(text) {
   try {
-    return osa('on run argv\nwith timeout of 31536000 seconds\nreturn button returned of (display dialog (item 1 of argv) with title "VaPiq · Medicum notes" buttons {"Hold it", "Pend it", "Do it"} default button "Do it" with icon note)\nend timeout\nend run', [text]);
+    return osa('on run argv\nwith timeout of 31536000 seconds\nreturn button returned of (display dialog (item 1 of argv) with title "VaPiq · Medicum notes" buttons {"Hold it", "Pend it", "Show list"} default button "Show list" with icon note)\nend timeout\nend run', [text]);
   } catch { return 'Pend it'; }   // closed some other way: ask again tomorrow
 }
 const notify = (text) => { try { osa('on run argv\ndisplay notification (item 1 of argv) with title "VaPiq · Medicum notes"\nend run', [text]); } catch {} };
 const say = (text) => { try { osa('on run argv\nwith timeout of 31536000 seconds\ndisplay dialog (item 1 of argv) with title "VaPiq · Medicum notes" buttons {"OK"} default button "OK" with icon note\nend timeout\nend run', [text]); } catch {} };
 
-const loadState = () => { try { return JSON.parse(fs.readFileSync(stateFile, 'utf8')); } catch { return { done: {}, held: {}, pendUntil: null }; } };
+const loadState = () => { try { return { done: {}, held: {}, listed: {}, pendUntil: null, ...JSON.parse(fs.readFileSync(stateFile, 'utf8')) }; } catch { return { done: {}, held: {}, listed: {}, pendUntil: null }; } };
 const saveState = s => fs.writeFileSync(stateFile, JSON.stringify(s, null, 2));
 const monthName = mk => { const [y, m] = mk.split('-'); return `${MONTH_NAMES[+m - 1]} ${y}`; };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 function plan(state, only) {
-  const raw = readNotes();
-  const notes = raw.map(n => ({ ...parseNote(n.title, n.body), id: n.id, body: n.body })).filter(n => n.period.length);
+  const notes = readNotes().map(n => ({ ...parseNote(n.title, n.body), id: n.id })).filter(n => n.period.length);
   const skip = mk => only ? mk !== only : !!(state.done[mk] || state.held[mk]);
   return { notes, ...planMoves(notes, { now: new Date(), skip, from: FROM }) };
 }
 
-function summary(p) {
+function summary(p, state) {
   const months = p.months.map(monthName).join(', ');
+  const again = p.months.some(mk => state.listed[mk]);
+  let t = again ? `${months}: ${p.moves.length} record${p.moves.length === 1 ? '' : 's'} still to move.\n`
+    : `${months} is over.\n\n${p.moves.length} record${p.moves.length === 1 ? '' : 's'} should move forward.\n`;
   const by = {};
-  for (const m of p.moves) (by[m.to] ||= []).push(`${m.id} (${m.date.d} ${MONTH_NAMES[m.date.m].slice(0, 3)})`);
-  let t = `${months} is over.\n\nMove ${p.moves.length} record${p.moves.length === 1 ? '' : 's'} forward?\n`;
-  for (const [to, ids] of Object.entries(by)) t += `\n${ids.length} → ${to}${p.moves.find(m => m.to === to).create ? ' (new note)' : ''}\n   ${ids.join(', ')}\n`;
-  if (p.left.length) t += `\n${p.left.length} stay where they are (please check):\n` + p.left.map(l => `   ${l.id} — ${l.why}`).join('\n') + '\n';
-  return t + '\nEvery note is backed up on this Mac before a change.';
+  for (const m of p.moves) by[m.to] = (by[m.to] || 0) + 1;
+  for (const [to, n] of Object.entries(by)) t += `\n   ${n} → ${to}${p.moves.find(m => m.to === to).create ? ' (new note)' : ''}`;
+  if (p.left.length) t += `\n\n${p.left.length} stay where they are (please check — they are on the list).`;
+  return t + '\n\nShow list opens a checklist of where each one goes. Cut and paste them in Notes yourself (⌘X, ⌘V): your colours, bold and sizes stay as they are. The mover never edits your notes.';
 }
 
-// Do it: paste into the target notes, check, then cut from the old notes
-function apply(p) {
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const backup = path.join(stateDir, 'notes-backup', stamp);
-  fs.mkdirSync(backup, { recursive: true });
-  for (const n of p.notes) fs.writeFileSync(path.join(backup, n.title.replace(/[\/:]/g, '-') + '.html'), n.body);
-  const byTarget = {};
-  for (const m of p.moves) (byTarget[m.to] ||= []).push(m);
-  const placed = new Set();
-  for (const [title, items] of Object.entries(byTarget)) {
-    const existing = p.notes.find(n => n.title === title);
-    const html = insertRecords(existing ? existing.body : newNoteBody(title), title, items);
-    const id = existing ? (writeNote(existing.id, html), existing.id) : createNote(html);
-    const back = textOf(readBody(id));
-    for (const it of items) if (back.includes(it.block.text.slice(0, 40))) placed.add(it.file);   // arrived?
-  }
-  // cut only what is now in its new note
-  const bySource = {};
-  for (const m of p.moves) if (placed.has(m.file)) (bySource[m.from] ||= new Set()).add(m.file);
-  for (const [title, files] of Object.entries(bySource)) {
-    const n = p.notes.find(x => x.title === title);
-    writeNote(n.id, removeRecords(n.body, files));
-  }
-  return { moved: placed.size, notPlaced: p.moves.filter(m => !placed.has(m.file)), backup };
+// The checklist page (kept on this Mac only, in state/)
+function writeList(p) {
+  const byTo = {};
+  for (const m of p.moves) (byTo[m.to] ||= []).push(m);
+  const sec = Object.entries(byTo).map(([to, ms]) => {
+    const target = p.notes.find(n => n.title === to);
+    const rows = ms.sort((a, b) => (a.date.y - b.date.y) || (a.date.m - b.date.m) || (a.date.d - b.date.d))
+      .map(m => `<tr><td><input type="checkbox"></td><td><b>#${esc(m.file)}</b> ${esc(m.id.split(' ').slice(1).join(' '))}</td><td>${esc(fmtDate(m.date))}</td><td>${esc(m.from)}</td><td>${esc(whereIn(target, m.date))}</td></tr>`).join('');
+    return `<h2>${esc(to)} <span>${ms.length}</span></h2>${target ? '' : `<p class="new">This note doesn't exist yet — create it in Notes with this name first.</p>`}
+      <table><tr><th></th><th>Patient</th><th>Projected</th><th>Now in</th><th>Put it</th></tr>${rows}</table>`;
+  }).join('');
+  const left = p.left.length ? `<h2>Stay where they are — please check <span>${p.left.length}</span></h2><table><tr><th>Patient</th><th>In</th><th>Why</th></tr>${p.left.map(l => `<tr><td><b>${esc(l.id)}</b></td><td>${esc(l.note)}</td><td>${esc(l.why)}</td></tr>`).join('')}</table>` : '';
+  fs.writeFileSync(listFile, `<!doctype html><meta charset="utf-8"><title>Medicum notes to move</title>
+<style>body{font:15px -apple-system,sans-serif;margin:24px auto;max-width:980px;padding:0 16px;color:#222}h1{font-size:22px}h2{font-size:17px;margin-top:28px}h2 span{background:#5B48A0;color:#fff;border-radius:10px;padding:1px 8px;font-size:13px}
+table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid #ddd;padding:6px 8px;text-align:left;vertical-align:top}th{font-size:12px;color:#666}tr:has(input:checked) td{color:#aaa;text-decoration:line-through}.tip{background:#F0EEF9;border:1px solid #C4B8E8;border-radius:8px;padding:10px 14px}.new{color:#b00}</style>
+<h1>Medicum notes to move — ${esc(p.months.map(monthName).join(', '))}</h1>
+<p class="tip">In Notes: open the "Now in" note, press ⌘F and type the file number, select the whole line, ⌘X. Open the target note, click where "Put it" says, ⌘V. Your colours, bold and sizes stay. Tick the box here as you go (ticks are not saved). Tomorrow morning the mover re-reads your notes and tells you how many are left.</p>
+${sec}${left}<p style="color:#888;font-size:12px">Made ${esc(new Date().toLocaleString())}. The mover only reads your notes.</p>`);
+  execFileSync('open', [listFile]);
 }
 
 async function main() {
@@ -98,32 +96,26 @@ async function main() {
   const args = process.argv.slice(2);
   const only = args.includes('--month') ? args[args.indexOf('--month') + 1] : null;
   const state = loadState();
+  if (args.includes('--preview')) { console.log(summary(plan(state, only), state)); return; }
+  if (args.includes('--list')) { writeList(plan(state, only)); return; }
   if (!only && state.pendUntil && new Date() < new Date(state.pendUntil)) return;
-  let p = plan(state, only);
-  if (args.includes('--preview')) { console.log(summary(p)); return; }
+  const p = plan(state, only);
   if (!p.moves.length) {
-    if (p.left.length && !only) { notify(`${p.left.length} record(s) need checking in ${p.months.map(monthName).join(', ')}`); say(summary(p)); }
-    for (const mk of p.months) state.done[mk] = new Date().toISOString();
-    saveState(state); return;
+    if (!p.months.length) return;
+    const wasListed = p.months.some(mk => state.listed[mk]);
+    for (const mk of p.months) { state.done[mk] = new Date().toISOString(); delete state.listed[mk]; }
+    saveState(state);
+    notify(`${p.months.map(monthName).join(', ')}: all moved${p.left.length ? ` · ${p.left.length} to check` : ''}`);
+    if (p.left.length && !wasListed) { writeList(p); }
+    return;
   }
-  for (;;) {
-    const shown = p.moves.map(m => m.file).sort().join(',');
-    const choice = ask(summary(p));
-    if (choice === 'Pend it') { state.pendUntil = new Date(Date.now() + 20 * 3600e3).toISOString(); saveState(state); console.log('pended'); return; }
-    if (choice === 'Hold it') { for (const mk of p.months) state.held[mk] = new Date().toISOString(); state.pendUntil = null; saveState(state); console.log('held', p.months); return; }
-    // Do it — on the notes as they are now (you may have edited them while the box was open)
-    const fresh = plan(state, only);
-    if (fresh.moves.map(m => m.file).sort().join(',') !== shown) { p = fresh; if (!p.moves.length) return; continue; }
-    p = fresh; break;
-  }
-  const r = apply(p);
-  for (const mk of p.months) { state.done[mk] = new Date().toISOString(); delete state.held[mk]; }
+  const choice = ask(summary(p, state));
+  if (choice === 'Pend it') { state.pendUntil = new Date(Date.now() + 20 * 3600e3).toISOString(); saveState(state); console.log('pended'); return; }
+  if (choice === 'Hold it') { for (const mk of p.months) state.held[mk] = new Date().toISOString(); state.pendUntil = null; saveState(state); console.log('held', p.months); return; }
+  writeList(p);
+  for (const mk of p.months) state.listed[mk] ||= new Date().toISOString();
   state.pendUntil = null; saveState(state);
-  console.log(`[${new Date().toISOString()}] notes: moved ${r.moved}, left ${p.left.length}, not placed ${r.notPlaced.length}; backup ${r.backup}`);
-  notify(`Moved ${r.moved} record${r.moved === 1 ? '' : 's'}${p.left.length ? ` · ${p.left.length} to check` : ''}`);
-  if (p.left.length || r.notPlaced.length) say(`Moved ${r.moved} record(s).\n\n`
-    + (r.notPlaced.length ? `Could not be placed (still in the old note):\n${r.notPlaced.map(m => `   ${m.id} → ${m.to}`).join('\n')}\n\n` : '')
-    + (p.left.length ? `Left where they are, please check:\n${p.left.map(l => `   ${l.id} — ${l.why}`).join('\n')}` : ''));
+  console.log(`[${new Date().toISOString()}] notes: list shown, ${p.moves.length} to move, ${p.left.length} to check`);
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main().catch(e => { console.error('notes mover:', e.message); notify('Notes mover: ' + e.message.slice(0, 120)); process.exit(1); });
