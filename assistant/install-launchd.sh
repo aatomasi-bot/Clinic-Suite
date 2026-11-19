@@ -10,6 +10,8 @@ SLABEL=com.vapiq.summary
 ALABEL=com.vapiq.ai
 BLABEL=com.vapiq.brain
 BPLIST="$HOME/Library/LaunchAgents/$BLABEL.plist"
+NLABEL=com.vapiq.notesmover
+NPLIST="$HOME/Library/LaunchAgents/$NLABEL.plist"
 APLIST="$HOME/Library/LaunchAgents/$ALABEL.plist"
 SPLIST="$HOME/Library/LaunchAgents/$SLABEL.plist"
 DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -19,7 +21,8 @@ launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
 launchctl bootout "gui/$(id -u)/$SLABEL" 2>/dev/null || true
 launchctl bootout "gui/$(id -u)/$ALABEL" 2>/dev/null || true
 launchctl bootout "gui/$(id -u)/$BLABEL" 2>/dev/null || true
-if [[ "$1" == "remove" ]]; then rm -f "$PLIST" "$SPLIST" "$APLIST" "$BPLIST"; echo "Removed."; exit 0; fi
+launchctl bootout "gui/$(id -u)/$NLABEL" 2>/dev/null || true
+if [[ "$1" == "remove" ]]; then rm -f "$PLIST" "$SPLIST" "$APLIST" "$BPLIST" "$NPLIST"; echo "Removed."; exit 0; fi
 
 mkdir -p "$DIR/state" "$HOME/Library/LaunchAgents"
 cat > "$PLIST" <<PL
@@ -86,4 +89,19 @@ cat > "$BPLIST" <<PL
 </dict></plist>
 PL
 launchctl bootstrap "gui/$(id -u)" "$BPLIST"
-echo "Installed: checks mail every 2 minutes; reply suggestions every 30 seconds; Dubbi's brain always on; morning summary at $TIME. Logs: $DIR/state/"
+# Medicum notes mover — every morning at 9:00 and at login; asks before moving anything
+cat > "$NPLIST" <<PL
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>$NLABEL</string>
+  <key>ProgramArguments</key><array><string>$NODE</string><string>$DIR/notes-mover.js</string></array>
+  <key>WorkingDirectory</key><string>$DIR</string>
+  <key>StartCalendarInterval</key><dict><key>Hour</key><integer>9</integer><key>Minute</key><integer>0</integer></dict>
+  <key>RunAtLoad</key><true/>
+  <key>StandardOutPath</key><string>$DIR/state/notes-mover.log</string>
+  <key>StandardErrorPath</key><string>$DIR/state/notes-mover.log</string>
+</dict></plist>
+PL
+launchctl bootstrap "gui/$(id -u)" "$NPLIST"
+echo "Installed: checks mail every 2 minutes; reply suggestions every 30 seconds; Dubbi's brain always on; morning summary at $TIME; Medicum notes mover every morning at 9:00. Logs: $DIR/state/"
