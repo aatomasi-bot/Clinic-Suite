@@ -4908,6 +4908,27 @@ async function copyForNotes(id) {
   }
 }
 
+// Directions. On iPhone/iPad a web Maps link opens Safari's in-app sheet, which hands off to the
+// Google Maps app and is left behind as a blank page when you come back. So open the app itself
+// (comgooglemaps://); if it isn't installed (the page is still showing after a moment), use the web link.
+function openMaps(addr) {
+  const q = encodeURIComponent(addr);
+  const web = 'https://maps.google.com/?q=' + q;
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (!ios) { window.open(web); return; }
+  let left = false;
+  const gone = () => { left = true; };
+  document.addEventListener('visibilitychange', gone, { once: true });
+  window.addEventListener('pagehide', gone, { once: true });
+  const a = document.createElement('a');
+  a.href = 'comgooglemaps://?q=' + q;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => {
+    document.removeEventListener('visibilitychange', gone);
+    window.removeEventListener('pagehide', gone);
+    if (!left && !document.hidden) window.open(web);
+  }, 1500);
+}
 // ── Card interaction handler (attached ONCE at DOMContentLoaded) ──
 // Do NOT call this function manually — it is wired up once at startup.
 // Adding it again would create duplicate listeners causing toggle bugs.
@@ -4943,7 +4964,7 @@ function _handleCardClick(e) {
   const mapBtn = e.target.closest('.js-map');
   if (mapBtn) {
     e.stopPropagation();
-    window.open('https://maps.google.com/?q=' + encodeURIComponent(mapBtn.dataset.addr));
+    openMaps(mapBtn.dataset.addr);
     return;
   }
   const injectBtn = e.target.closest('.js-inject');
