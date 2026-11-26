@@ -2901,6 +2901,37 @@ a:focus:not(:focus-visible) { outline: none; }
 /* Record = round pencil icon (Nov 26, 2026). 38px = the old button's height, so cards keep their height. */
 .record-btn { width: 38px; height: 38px; min-height: 38px; padding: 0; border-radius: 50%; justify-content: center; gap: 0; }
 .record-btn svg { width: 18px; height: 18px; }
+/* Round icon trio — pencil, quick note, copy for Notes (Nov 26, 2026): same 38px circle, soft gradient,
+   glossy top light and a smooth lift. Copy moved from the due row to here so cards keep their height. */
+.record-btn, .note-icon-btn, .copy-notes-btn { position: relative; overflow: visible;
+  transition: transform .35s cubic-bezier(.22,1.4,.36,1), box-shadow .35s ease, filter .35s ease; }
+.record-btn::before, .note-icon-btn::before, .copy-notes-btn::before { content: ''; position: absolute; inset: 1px 1px 50% 1px;
+  border-radius: 50% 50% 45% 45% / 60% 60% 40% 40%; background: linear-gradient(180deg, rgba(255,255,255,.45), rgba(255,255,255,0)); pointer-events: none; }
+.note-icon-btn, .copy-notes-btn { width: 38px; height: 38px; min-width: 38px; min-height: 38px; padding: 0; border-radius: 50%; border: 0; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; }
+.note-icon-btn svg, .copy-notes-btn svg { width: 18px; height: 18px; position: relative; }
+.note-icon-btn { color: var(--teal-dark); background: linear-gradient(145deg, #fff 0%, var(--teal-light) 100%);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--teal) 35%, transparent), 0 3px 10px color-mix(in srgb, var(--teal) 22%, transparent); }
+.note-icon-btn.has-note { color: #fff; background: linear-gradient(145deg, var(--teal-2) 0%, var(--teal) 55%, var(--teal-dark) 100%);
+  box-shadow: 0 3px 12px color-mix(in srgb, var(--teal) 42%, transparent); border: 0; }
+.note-icon-btn.has-note::after { top: 1px; right: 1px; width: 9px; height: 9px; background: #F5A524; border: 2px solid var(--card); }
+.copy-notes-btn { color: #fff; background: linear-gradient(145deg, #9B87D9 0%, #7360BE 55%, #5B48A0 100%);
+  box-shadow: 0 3px 12px rgba(91,72,160,.38), 0 1px 4px rgba(91,72,160,.25); }
+.note-icon-btn:hover, .copy-notes-btn:hover, .record-btn:hover { transform: translateY(-2px) scale(1.06); filter: brightness(1.06); }
+.note-icon-btn:active, .copy-notes-btn:active, .record-btn:active { transform: scale(.9); transition-duration: .12s; }
+[data-theme="dark"] .note-icon-btn:not(.has-note) { color: var(--teal-2); background: linear-gradient(145deg, color-mix(in srgb, var(--teal) 28%, #1b2230), #141a24); }
+[data-theme="dark"] .copy-notes-btn { color: #fff; background: linear-gradient(145deg, #8A76CC 0%, #5B48A0 100%); }
+[data-theme="dark"] .record-btn::before, [data-theme="dark"] .note-icon-btn::before, [data-theme="dark"] .copy-notes-btn::before { opacity: .35; }
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) .note-icon-btn:not(.has-note) { color: var(--teal-2); background: linear-gradient(145deg, color-mix(in srgb, var(--teal) 28%, #1b2230), #141a24); }
+  html:not([data-theme="light"]) .copy-notes-btn { color: #fff; background: linear-gradient(145deg, #8A76CC 0%, #5B48A0 100%); }
+  html:not([data-theme="light"]) .record-btn::before, html:not([data-theme="light"]) .note-icon-btn::before, html:not([data-theme="light"]) .copy-notes-btn::before { opacity: .35; }
+}
+/* Confirmed time pill — readable on every theme, light and dark */
+.card-time { font-size: 9px; font-weight: 700; color: var(--teal-dark); background: var(--teal-light); border: 1px solid color-mix(in srgb, var(--teal) 35%, transparent); border-radius: 4px; padding: 1px 6px; white-space: nowrap; }
+[data-theme="dark"] .card-time { color: var(--teal-2); background: color-mix(in srgb, var(--teal) 22%, transparent); border-color: color-mix(in srgb, var(--teal-2) 45%, transparent); }
+@media (prefers-color-scheme: dark) { html:not([data-theme="light"]) .card-time { color: var(--teal-2); background: color-mix(in srgb, var(--teal) 22%, transparent); border-color: color-mix(in srgb, var(--teal-2) 45%, transparent); } }
+.card-actions { gap: 0.4rem; min-height: 54px; } /* the old 44px note button set this height — keep it */
 </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script>
@@ -4754,9 +4785,8 @@ function renderCard(p, idx) {
       <div class="card-meta">
         <div class="card-due-row">
           <div class="card-due ${dueClass}"><span>📅</span> ${dueDisplay}</div>
-          ${confirmed && apptTime ? `<span style="font-size:9px;background:rgba(45,140,138,.12);color:var(--teal-dark);border:1px solid rgba(45,140,138,.3);border-radius:4px;padding:1px 6px;font-weight:700">✓ ${apptTime}</span>` : ''}
+          ${confirmed && apptTime ? `<span class="card-time">✓ ${apptTime}</span>` : ''}
           ${(apptDate && confirmed && !p['Injection Administered'] && weeks !== '?') ? `<span class="card-next">Next: <b>${formatDateLong(addWeeks(apptDate, parseInt(DOSE_TO_WEEKS[dose]||4)))}</b></span>` : ''}
-          ${copyNotesBtn(p, 'margin-left:auto')}
         </div>
         ${addr ? `<div class="card-addr">${mapSVG}<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(formatAddrDisplay(addr))}</span></div>` : ''}
         ${special ? `<div class="card-flag-strip">
@@ -4781,7 +4811,8 @@ function renderCard(p, idx) {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 2l4 4-10 10-6 2 2-6L18 2z"/><line x1="14" y1="6" x2="18" y2="10"/></svg>
     </button>
     <button class="note-icon-btn ${hasQuickNote(p['File Number'])?'has-note':''}" data-fnum="${esc(p['File Number'])}"
-      title="Quick note" onclick="event.stopPropagation();toggleNoteArea('${esc(p['File Number']||'')}')">📝</button>
+      title="Quick note" aria-label="Quick note" onclick="event.stopPropagation();toggleNoteArea('${esc(p['File Number']||'')}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg></button>
+    ${copyNotesBtn(p)}
     <button class="expand-btn js-expand">&#9660;</button>
   </div>
 
@@ -4874,7 +4905,7 @@ function formatAddrForMaps(addr) { return addr; }
 // x = doses remaining; bold survives the paste into Notes (HTML on the clipboard).
 function copyNotesBtn(p, style = '') {
   return `<button type="button" class="copy-notes-btn" title="Copy for Apple Notes" aria-label="Copy for Apple Notes"
-    onclick="event.stopPropagation();copyForNotes(${p.id})" style="${style}"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg></button>`;
+    onclick="event.stopPropagation();copyForNotes(${p.id})" style="${style}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg></button>`;
 }
 function notesNeedsSign(p) {
   const s = String(p['Special Instructions'] || '');
