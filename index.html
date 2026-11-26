@@ -5868,10 +5868,27 @@ function openSmsModal(id) {
   _smsBuild();
   openModal('smsModal');
 }
+// Adds "💬 Texted 26 Nov (appointment)" to the patient's quick note, so you can see who you've texted.
+// Logged when Messages opens (VaPiq can't know if you pressed Send there). Same day + same kind = logged once.
+function _smsLog() {
+  try {
+    const p = patients.find(x => x.id === _sms.id); if (!p) return;
+    const fnum = String(p['File Number'] || '').trim(); if (!fnum) return;
+    const what = { confirm: 'appointment', remind: 'reminder', book: 'to book' }[_sms.kind] || '';
+    const line = `💬 Texted ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} (${what})`;
+    const cur = String(getQuickNote(fnum) || p._confirmedNote || '');
+    if (cur.includes(line)) return;
+    const val = cur.trim() ? `${cur.replace(/\s+$/, '')}\n${line}` : line;
+    onNoteInput(fnum, val);
+    clearTimeout(_noteTimer); _saveNoteDB(fnum, val.trim());       // save now — Messages takes over the screen
+    const ta = document.querySelector(`#narea-${CSS.escape(fnum)} textarea`); if (ta) ta.value = val;
+  } catch (e) { console.warn('text log', e); }
+}
 function sendSms() {
   if (!_sms.phone) { toast('Choose which number to text first', 'warning'); return; }
   const body = document.getElementById('smsText').value.trim();
   if (!body) { toast('The message is empty', 'warning'); return; }
+  _smsLog();
   const num = _sms.phone.replace(/[^\d+]/g, '');
   const ios = /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent);
   closeModal('smsModal');
