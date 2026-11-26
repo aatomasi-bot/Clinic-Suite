@@ -1257,6 +1257,21 @@ body.mm-select .mm-bar { display: flex; }
 .sms-btn:active { transform: scale(.9); }
 [data-theme="dark"] .sms-btn { color: #7FD3A4; background: rgba(61,154,107,.31); box-shadow: inset 0 0 0 1px rgba(127,211,164,.35); }
 @media (prefers-color-scheme: dark) { html:not([data-theme="light"]) .sms-btn { color: #7FD3A4; background: rgba(61,154,107,.31); box-shadow: inset 0 0 0 1px rgba(127,211,164,.35); } }
+.call-help-btn { color: #1F5FA8; background: linear-gradient(150deg, color-mix(in srgb, #378ADD 21%, #fff) 0%, color-mix(in srgb, #378ADD 33%, #fff) 100%);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #378ADD 38%, transparent), 0 2px 6px rgba(55,138,221,.16); }
+[data-theme="dark"] .call-help-btn { color: #8EC0F2; background: rgba(55,138,221,.31); box-shadow: inset 0 0 0 1px rgba(142,192,242,.35); }
+@media (prefers-color-scheme: dark) { html:not([data-theme="light"]) .call-help-btn { color: #8EC0F2; background: rgba(55,138,221,.31); box-shadow: inset 0 0 0 1px rgba(142,192,242,.35); } }
+.call-script { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; font-size: 15px; line-height: 1.5; color: var(--text); }
+.call-script p { margin: 0 0 8px; }
+.call-script p:last-child { margin-bottom: 0; }
+.call-script .cs-step { display: block; font-size: 10.5px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--text-3); margin-bottom: 2px; }
+.call-vm { border-style: dashed; font-size: 14px; }
+.call-outcomes { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+.call-outcomes button { border: 1.5px solid var(--border); background: var(--bg); color: var(--text); border-radius: 12px; padding: 9px 4px; font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; line-height: 1.25; }
+.call-outcomes .ok { border-color: #3D9A6B; color: #2E7D55; background: color-mix(in srgb, #3D9A6B 14%, transparent); }
+.call-outcomes .na { border-color: #E0A030; color: #A86A12; background: color-mix(in srgb, #E0A030 14%, transparent); }
+.call-outcomes .rs { border-color: #378ADD; color: #1F5FA8; background: color-mix(in srgb, #378ADD 14%, transparent); }
+[data-theme="dark"] .call-outcomes .ok { color: #7FD3A4; } [data-theme="dark"] .call-outcomes .na { color: #F2C46B; } [data-theme="dark"] .call-outcomes .rs { color: #8EC0F2; }
 .sms-row { display: flex; gap: 8px; }
 .sms-row > div { flex: 1; min-width: 0; }
 .sms-row select, .sms-row input { width: 100%; font-size: 16px; }
@@ -4914,6 +4929,7 @@ function renderCard(p, idx) {
       ${p['Archived'] ? '' : `<button class="card-btn card-btn--archive js-archive" data-id="${p.id}" style="flex:0.7">⏸ Hold</button>`}
     </div>
     <div style="margin-top:8px;display:flex;justify-content:flex-end;gap:6px">
+      ${(p['Phone 1'] || p['Phone 2']) ? `<button type="button" class="sms-btn call-help-btn" onclick="event.stopPropagation();openCallModal(${p.id})" title="Call helper" aria-label="Call helper"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/></svg></button>` : ''}
       ${(p['Phone 1'] || p['Phone 2']) ? `<button type="button" class="sms-btn" onclick="event.stopPropagation();openSmsModal(${p.id})" title="Text the patient" aria-label="Text the patient"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-4.6A8 8 0 1 1 21 12z"/><line x1="9" y1="10.5" x2="15" y2="10.5"/><line x1="9" y1="14" x2="13" y2="14"/></svg></button>` : ''}
       <button class="card-btn card-btn--edit" style="flex:0 0 auto;padding:6px 10px;font-size:11px;white-space:nowrap" onclick="openMedicumMail([${p.id}])" title="Email Medicum (reports@medicum.ca) about this patient">✉️ Medicum</button>
       <button class="card-btn card-btn--edit" style="flex:0 0 auto;white-space:nowrap;padding:6px 12px;font-size:11px" onclick="openApptModal(${p.id})">
@@ -5781,8 +5797,11 @@ function _smsDates(iso) {
 }
 // A time slot in your quick note ("9.30-11.30, OK", "09:30 - 11:30", "9h30-11h30") → ["09:30","11:30"]
 function _smsNoteSlot(note) {
-  const m = /(?:^|[^\d])(\d{1,2})(?:[.:hH](\d{2}))?\s*(?:-|–|—|to|à|a)\s*(\d{1,2})(?:[.:hH](\d{2}))?(?!\d)/.exec(String(note || ''));
-  if (!m || (m[2] == null && m[4] == null)) return null;          // need minutes on at least one side (not "2-3 doses")
+  // the LAST slot in the note wins, so a newer "📞 New time … 10:30-12:30" line replaces an older one
+  const all = [...String(note || '').matchAll(/(?:^|[^\d])(\d{1,2})(?:[.:hH](\d{2}))?\s*(?:-|–|—|to|à|a)\s*(\d{1,2})(?:[.:hH](\d{2}))?(?!\d)/g)]
+    .filter(m => m[2] != null || m[4] != null);                    // need minutes on at least one side (not "2-3 doses")
+  const m = all[all.length - 1];
+  if (!m) return null;
   let h1 = +m[1], h2 = +m[3];
   const m1 = +(m[2] || 0), m2 = +(m[4] || 0);
   if (h1 < 6) h1 += 12; if (h2 < 6) h2 += 12;                      // "2.30-4.30" = afternoon
@@ -5804,14 +5823,14 @@ function _smsCompose() {
   const hi = { fr: n ? `Bonjour ${T[0]}${n},` : 'Bonjour,', en: n ? `Hello ${T[1]}${n},` : 'Hello,' };
   let F, E;
   if (_sms.kind === 'confirm') {
-    F = `${hi.fr} votre rendez-vous pour l'injection ${drug} est le ${fr} entre ${slot}. Merci de confirmer.`;
-    E = `${hi.en} your appointment for the injection ${drug} is ${en} between ${slot}. Please confirm.`;
+    F = `${hi.fr} votre rendez-vous pour l'injection ${drug} est le ${fr} entre ${slot}. Veuillez commander votre ${drug} en appelant la pharmacie dès que possible. Merci de confirmer.`;
+    E = `${hi.en} your appointment for the injection ${drug} is ${en} between ${slot}. Please order your ${drug} by calling the pharmacy as soon as possible. Please confirm.`;
   } else if (_sms.kind === 'remind') {
     F = `${hi.fr} petit rappel : votre rendez-vous pour l'injection ${drug} est ${tomorrow ? 'demain, ' : ''}le ${fr} entre ${slot}. Si vous devez changer l'heure, répondez à ce message. À bientôt!`;
     E = `${hi.en} a friendly reminder: your appointment for the injection ${drug} is ${tomorrow ? 'tomorrow, ' : ''}${en} between ${slot}. If you need to change the time, please reply to this message. See you soon!`;
   } else {
-    F = `${hi.fr} votre prochaine injection ${drug} est prévue vers le ${fr}. Merci de répondre avec la journée et l'heure qui vous conviennent.`;
-    E = `${hi.en} your next injection ${drug} is due around ${en}. Please reply with a day and time that suits you.`;
+    F = `${hi.fr} votre prochaine injection ${drug} est prévue vers le ${fr}. Veuillez commander votre ${drug} en appelant la pharmacie dès que possible. Merci de répondre avec la journée et l'heure qui vous conviennent.`;
+    E = `${hi.en} your next injection ${drug} is due around ${en}. Please order your ${drug} by calling the pharmacy as soon as possible. Please reply with a day and time that suits you.`;
   }
   return (_sms.frFirst ? `${F}\n\n${E}` : `${E}\n\n${F}`) + `\n\n${SMS_SIGNATURE}`;
 }
@@ -5920,6 +5939,120 @@ function sendSms() {
 }
 window.openSmsModal = openSmsModal; window.sendSms = sendSms; window._smsBuild = _smsBuild;
 window._smsTitle = _smsTitle; window._smsEdited = _smsEdited; window._smsRewrite = _smsRewrite; window._smsFromChanged = _smsFromChanged; window._smsPick = _smsPick; window._smsSwap = _smsSwap;
+
+// ══ Call helper — Nov 26, 2026 ═══════════════════════════════════════
+// You make the call yourself (tel: link). VaPiq shows what to say in French / English / Spanish,
+// a voicemail script (date and time only — no medication), and after the call one tap writes the result to the quick note.
+let _call = { id: null, phone: '', lang: 'fr', title: 'mr' };
+function _callDatesAll(iso) {
+  const d = new Date(iso + 'T12:00:00');
+  if (isNaN(d)) return { fr: '', en: '', es: '' };
+  const w = l => d.toLocaleDateString(l, { weekday: 'long' }), mo = l => d.toLocaleDateString(l, { month: 'long' });
+  return { fr: `le ${w('fr-CA')} ${d.getDate()} ${mo('fr-CA')} ${d.getFullYear()}`,
+           en: `${w('en-CA')}, ${mo('en-CA')} ${d.getDate()} ${d.getFullYear()}`,
+           es: `el ${w('es')} ${d.getDate()} de ${mo('es')} de ${d.getFullYear()}` };
+}
+function _callTexts() {
+  const p = patients.find(x => x.id === _call.id); if (!p) return null;
+  const n = _smsFull(p['Patient Name']);
+  const T = { mr: { fr: 'M. ', en: 'Mr. ', es: 'el Sr. ' }, mrs: { fr: 'Mme ', en: 'Mrs. ', es: 'la Sra. ' }, none: { fr: '', en: '', es: '' } }[_call.title];
+  const D = _callDatesAll(document.getElementById('callDate').value);
+  const a = document.getElementById('callFrom').value, b = document.getElementById('callTo').value;
+  const appt = !!(p['Appointment Date & Time']) || _call.hasSlot;
+  const drug = 'Eligard';
+  const S = {
+    fr: [['Bonjour', `Bonjour, ici Abdul, de l'équipe infirmière de Medicum. Puis-je parler à ${T.fr}${n}?`],
+         ['Rendez-vous', appt ? `Je vous appelle pour votre injection ${drug} ${D.fr}, entre ${a} et ${b}. Est-ce que ça vous convient?`
+                              : `Votre prochaine injection ${drug} est prévue vers ${D.fr}. Quelle journée et quelle heure vous conviennent?`],
+         ['Pharmacie', `Pensez à commander votre ${drug} en appelant la pharmacie dès que possible.`],
+         ['Fin', 'Merci beaucoup, à bientôt!']],
+    en: [['Hello', `Hello, this is Abdul, your nurse from Medicum. May I speak to ${T.en}${n}?`],
+         ['Appointment', appt ? `I'm calling about your ${drug} injection on ${D.en}, between ${a} and ${b}. Does that work for you?`
+                              : `Your next ${drug} injection is due around ${D.en}. Which day and time suit you?`],
+         ['Pharmacy', `Please order your ${drug} by calling the pharmacy as soon as possible.`],
+         ['Closing', 'Thank you very much, see you soon!']],
+    es: [['Saludo', `Hola, habla Abdul, del equipo de enfermería de Medicum. ¿Puedo hablar con ${T.es}${n}?`],
+         ['Cita', appt ? `Le llamo por su inyección de ${drug} ${D.es}, entre las ${a} y las ${b}. ¿Le conviene?`
+                       : `Su próxima inyección de ${drug} está prevista alrededor de ${D.es}. ¿Qué día y hora le convienen?`],
+         ['Farmacia', `Por favor, pida su ${drug} llamando a la farmacia lo antes posible.`],
+         ['Despedida', '¡Muchas gracias, hasta pronto!']]
+  }[_call.lang];
+  // Voicemail: date and time only (anyone at home may hear it) — no name, no medication
+  const vm = appt
+    ? [`Bonjour, ici Abdul, de l'équipe infirmière de Medicum. Votre visite est prévue ${D.fr}, entre ${a} et ${b}. Merci de me rappeler pour confirmer.`,
+       `Hello, this is Abdul, your nurse from Medicum. Your visit is on ${D.en}, between ${a} and ${b}. Please call me back to confirm.`]
+    : [`Bonjour, ici Abdul, de l'équipe infirmière de Medicum. Merci de me rappeler pour fixer votre prochaine visite.`,
+       `Hello, this is Abdul, your nurse from Medicum. Please call me back to book your next visit.`];
+  return { S, vm };
+}
+function _callBuild() {
+  document.querySelectorAll('#callPhones .mm-chip').forEach(c => c.classList.toggle('on', c.dataset.v === _call.phone));
+  document.querySelectorAll('#callLangs .mm-chip').forEach(c => c.classList.toggle('on', c.dataset.v === _call.lang));
+  document.querySelectorAll('#callTitles .mm-chip').forEach(c => c.classList.toggle('on', c.dataset.v === _call.title));
+  const t = _callTexts(); if (!t) return;
+  document.getElementById('callScript').innerHTML = t.S.map(([h, x]) => `<p><span class="cs-step">${esc(h)}</span>${esc(x)}</p>`).join('');
+  document.getElementById('callVm').innerHTML = t.vm.map(x => `<p>${esc(x)}</p>`).join('');
+}
+function _callFromChanged() {
+  const from = document.getElementById('callFrom').value;
+  _smsTimeOptions(document.getElementById('callTo'), _smsHHMM(Math.min(_smsMin(from) + 120, 23 * 60 + 45)));
+  _callBuild();
+}
+function _callPick(k, v) { _call[k] = v; _callBuild(); }
+function openCallModal(id) {
+  const p = patients.find(x => x.id === id); if (!p) return;
+  const phones = [['Phone 1', p['Phone 1']], ['Phone 2', p['Phone 2']]].filter(([, v]) => String(v || '').trim());
+  if (!phones.length) { toast('No phone number for this patient', 'warning'); return; }
+  const fnum = String(p['File Number'] || '').trim();
+  const appt = p['Appointment Date & Time'] || '', apptDay = appt.split('T')[0];
+  const due = /^\d{4}-\d{2}-\d{2}$/.test(p['Due Date'] || '') ? p['Due Date'] : '';
+  const note = (typeof getQuickNote === 'function' && getQuickNote(fnum)) || p._confirmedNote || '';
+  const slot = _smsNoteSlot(note), tm = /T(\d{2}):(\d{2})/.exec(appt);
+  _call = { id, phone: phones.length === 1 ? String(phones[0][1]).trim() : '', lang: 'fr', title: _smsTitleGet(fnum), hasSlot: !!slot };
+  document.getElementById('callWho').textContent = `${p['Patient Name'] || ''} · #${fnum}`;
+  document.getElementById('callPhones').innerHTML = phones.map(([k, v]) =>
+    `<button type="button" class="mm-chip" data-v="${esc(String(v).trim())}" onclick="_callPick('phone', this.dataset.v)">${k} · ${esc(String(v).trim())}</button>`).join('');
+  document.getElementById('callLangs').innerHTML = [['fr', 'Français'], ['en', 'English'], ['es', 'Español']].map(([k, l]) =>
+    `<button type="button" class="mm-chip" data-v="${k}" onclick="_callPick('lang','${k}')">${l}</button>`).join('');
+  document.getElementById('callTitles').innerHTML = [['mr', 'M./Mr.'], ['mrs', 'Mme/Mrs.'], ['none', 'No title']].map(([k, l]) =>
+    `<button type="button" class="mm-chip" data-v="${k}" onclick="_callPick('title','${k}')">${l}</button>`).join('');
+  document.getElementById('callDate').value = apptDay || due;
+  const from = slot ? slot[0] : tm ? `${tm[1]}:${tm[2]}` : '08:30';
+  _smsTimeOptions(document.getElementById('callFrom'), from);
+  _smsTimeOptions(document.getElementById('callTo'), slot ? slot[1] : _smsHHMM(Math.min(_smsMin(from) + 120, 23 * 60 + 45)));
+  const src = document.getElementById('callSlotSrc');
+  src.innerHTML = slot ? `🕘 Time from your quick note: <b>${esc(note.length > 40 ? note.slice(0, 38) + '…' : note)}</b>`
+    : 'No time in your quick note — choose the time above.';
+  src.className = 'sms-src' + (slot ? ' on' : '');
+  _callBuild();
+  openModal('callModal');
+}
+function _callDial() {
+  if (!_call.phone) { toast('Choose which number to call first', 'warning'); return; }
+  location.href = 'tel:' + _call.phone.replace(/[^\d+]/g, '');   // the sheet stays open for the script and the result
+}
+function _callOutcome(kind) {
+  const p = patients.find(x => x.id === _call.id); if (!p) return;
+  const fnum = String(p['File Number'] || '').trim(); if (!fnum) return;
+  const today = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  const day = document.getElementById('callDate').value;
+  const dd = day ? new Date(day + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) : '';
+  const slot = `${document.getElementById('callFrom').value}-${document.getElementById('callTo').value}`;
+  const line = kind === 'ok' ? `📞 Confirmed ${today} · ${dd} ${slot}`
+    : kind === 'na' ? `📞 No answer ${today} · message left`
+    : `📞 New time ${today} → ${dd} ${slot}`;
+  const cur = String(getQuickNote(fnum) || p._confirmedNote || '');
+  if (!cur.includes(line)) {
+    const val = cur.trim() ? `${cur.replace(/\s+$/, '')}\n${line}` : line;
+    onNoteInput(fnum, val);
+    clearTimeout(_noteTimer); _saveNoteDB(fnum, val.trim());
+    const ta = document.querySelector(`#narea-${CSS.escape(fnum)} textarea`); if (ta) ta.value = val;
+  }
+  closeModal('callModal');
+  toast(line.replace('📞 ', ''), 'success', '📞', 'Saved to the quick note');
+}
+window.openCallModal = openCallModal; window._callBuild = _callBuild; window._callFromChanged = _callFromChanged;
+window._callPick = _callPick; window._callDial = _callDial; window._callOutcome = _callOutcome;
 
 function openModal(id) {
   const el = document.getElementById(id);
@@ -12734,6 +12867,47 @@ window.stripTimeWindow     = stripTimeWindow;
     <div class="modal-footer" style="flex-shrink:0;display:flex;gap:10px">
       <button class="btn-secondary" style="flex:1" onclick="closeModal('smsModal')">Cancel</button>
       <button class="btn-primary" style="flex:2;background:linear-gradient(135deg,#3D9A6B,#2E7D55);color:#fff;border:none" onclick="sendSms()">💬 Open in Messages</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="callModal">
+  <div class="modal" style="max-height:92vh;display:flex;flex-direction:column">
+    <div class="modal-handle"></div>
+    <div class="modal-header" style="flex-shrink:0">
+      <div>
+        <div class="modal-title">📞 Call helper</div>
+        <div style="font-size:12px;color:var(--text-2);margin-top:2px" id="callWho"></div>
+      </div>
+      <button class="modal-close" onclick="closeModal('callModal')">✕</button>
+    </div>
+    <div class="modal-body" style="flex:1;overflow-y:auto">
+      <div class="mm-label" style="margin-top:0">Call</div>
+      <div class="mm-chips" id="callPhones"></div>
+      <div class="mm-label">Language · Greeting</div>
+      <div class="mm-chips"><span id="callLangs" class="mm-chips"></span><span id="callTitles" class="mm-chips"></span></div>
+      <div class="sms-row" style="margin-top:10px">
+        <div><div class="mm-label" style="margin-top:0">Date</div><input type="date" id="callDate" class="form-control" onchange="_callBuild()"></div>
+      </div>
+      <div class="sms-row" style="margin-top:10px">
+        <div><div class="mm-label" style="margin-top:0">From</div><select id="callFrom" class="form-control" onchange="_callFromChanged()"></select></div>
+        <div><div class="mm-label" style="margin-top:0">To</div><select id="callTo" class="form-control" onchange="_callBuild()"></select></div>
+      </div>
+      <div id="callSlotSrc" class="sms-src"></div>
+      <div class="mm-label">What to say</div>
+      <div class="call-script" id="callScript"></div>
+      <div class="mm-label">If no answer — voicemail (French, then English)</div>
+      <div class="call-script call-vm" id="callVm"></div>
+      <div class="mm-label">After the call — saves to the quick note</div>
+      <div class="call-outcomes">
+        <button type="button" class="ok" onclick="_callOutcome('ok')">✅ Confirmed</button>
+        <button type="button" class="na" onclick="_callOutcome('na')">📭 No answer<br>message left</button>
+        <button type="button" class="rs" onclick="_callOutcome('rs')">🔁 New time<br>(date above)</button>
+      </div>
+    </div>
+    <div class="modal-footer" style="flex-shrink:0;display:flex;gap:10px">
+      <button class="btn-secondary" style="flex:1" onclick="closeModal('callModal')">Close</button>
+      <button class="btn-primary" style="flex:2;background:linear-gradient(135deg,#378ADD,#1F5FA8);color:#fff;border:none" onclick="_callDial()">📞 Call now</button>
     </div>
   </div>
 </div>
