@@ -29,8 +29,8 @@
 <script>
 /* VaPiq theme — reuses the accent picked in the Clinical Suite when hosted on the same site */
 (function(){
-  var T={teal:['#2D8C8A','#1E6665'],ocean:['#135c84','#0e4466'],navy:['#2d5080','#1e3a60'],forest:['#455b55','#2e3e39'],
-         sienna:['#a3512f','#7a3d22'],gold:['#b8863a','#8a6225'],emerald:['#009f8b','#007a6a']};
+  var T={ocean:['#135c84','#0e4466'],navy:['#2d5080','#1e3a60'],forest:['#455b55','#2e3e39'],gold:['#b8863a','#8a6225'],
+         indigo:['#4b4fc4','#3730a3'],cyan:['#0b7fa3','#08617d'],plum:['#7b3f8f','#5a2b6a'],rose:['#b24a6b','#8a3651'],slate:['#4a5d78','#33435a']};
   try{var t=T[localStorage.getItem('vapiq_theme')]; if(t){var r=document.documentElement;
     r.style.setProperty('--accent',t[0]); r.style.setProperty('--accent-dark',t[1]);}}catch(e){}
 })();

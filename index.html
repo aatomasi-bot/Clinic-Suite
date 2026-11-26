@@ -19,16 +19,18 @@
    ═══════════════════════════════════════════════════════════ */
 (function(){
   var T={
-    teal:   {a:'#2D8C8A',a2:'#3AA8A5',ad:'#1E6665',as:'#E6F4F4',asd:'rgba(45,140,138,.16)',s:'#1B2638',sm:'#243047'},
     ocean:  {a:'#135c84',a2:'#1a7aac',ad:'#0e4466',as:'#deedf7',asd:'rgba(19,92,132,.18)',s:'#0a2236',sm:'#122f4a'},
     navy:   {a:'#2d5080',a2:'#3a6aaa',ad:'#1e3a60',as:'#e4ebf5',asd:'rgba(45,80,128,.18)',s:'#111e30',sm:'#1a2d47'},
     forest: {a:'#455b55',a2:'#5a7870',ad:'#2e3e39',as:'#e3ebe8',asd:'rgba(69,91,85,.18)',s:'#1a2824',sm:'#243530'},
-    sienna: {a:'#a3512f',a2:'#c4663a',ad:'#7a3d22',as:'#f5ede6',asd:'rgba(163,81,47,.18)',s:'#1e1008',sm:'#2e1a10'},
     gold:   {a:'#b8863a',a2:'#d2a655',ad:'#8a6225',as:'#fdf4e3',asd:'rgba(184,134,58,.18)',s:'#1e160a',sm:'#2e2010'},
-    emerald:{a:'#009f8b',a2:'#00c4ad',ad:'#007a6a',as:'#e0f7f5',asd:'rgba(0,159,139,.18)',s:'#002a25',sm:'#003d36'}
+    indigo: {a:'#4b4fc4',a2:'#6366f1',ad:'#3730a3',as:'#eceefe',asd:'rgba(75,79,196,.18)',s:'#14143a',sm:'#1e1f52'},
+    cyan:   {a:'#0b7fa3',a2:'#1ea3c9',ad:'#08617d',as:'#e0f4fa',asd:'rgba(11,127,163,.18)',s:'#06202c',sm:'#0b3040'},
+    plum:   {a:'#7b3f8f',a2:'#9a58ad',ad:'#5a2b6a',as:'#f4ecf7',asd:'rgba(123,63,143,.18)',s:'#1f1028',sm:'#2d1838'},
+    rose:   {a:'#b24a6b',a2:'#d0688a',ad:'#8a3651',as:'#fbebf0',asd:'rgba(178,74,107,.18)',s:'#241019',sm:'#341826'},
+    slate:  {a:'#4a5d78',a2:'#64799a',ad:'#33435a',as:'#e8edf3',asd:'rgba(74,93,120,.18)',s:'#141b26',sm:'#1f2938'}
   };
   function applyTokens(key,dark){
-    var t=T[key]||T.teal, r=document.documentElement;
+    var t=T[key]||T.ocean, r=document.documentElement;
     var soft=dark?t.asd:t.as;
     r.style.setProperty('--teal',t.a);
     r.style.setProperty('--teal-2',t.a2);
@@ -41,7 +43,7 @@
     r.style.setProperty('--sidebar-bg',t.s);
   }
   try{
-    var k=localStorage.getItem('vapiq_theme')||'teal';
+    var k=localStorage.getItem('vapiq_theme'); if(!T[k]) k='ocean';
     var d=document.documentElement;
     var dark=d.getAttribute('data-theme')==='dark'||
              (!d.getAttribute('data-theme')&&window.matchMedia('(prefers-color-scheme:dark)').matches);
@@ -2699,7 +2701,7 @@ a:focus:not(:focus-visible) { outline: none; }
 .drawer-scheduler-btn { background: var(--teal-light); }
 
 /* Dark mode: direct rgba — bypasses CSS variable cascade entirely */
-[data-theme="dark"] .drawer-scheduler-btn                      { background: rgba(45,140,138,.13)  !important; }
+[data-theme="dark"] .drawer-scheduler-btn                      { background: var(--teal-light)  !important; }
 [data-theme="dark"] body.theme-ocean   .drawer-scheduler-btn  { background: rgba(19,92,132,.15)   !important; }
 [data-theme="dark"] body.theme-navy    .drawer-scheduler-btn  { background: rgba(45,80,128,.15)   !important; }
 [data-theme="dark"] body.theme-forest  .drawer-scheduler-btn  { background: rgba(69,91,85,.15)    !important; }
@@ -2888,6 +2890,58 @@ a:focus:not(:focus-visible) { outline: none; }
   }
   [data-theme="dark"] .bottom-nav::before { opacity: .7; }
   [data-theme="dark"] .nav-badge { border-color: rgba(20,28,42,.9) !important; }
+}
+
+/* ════════════════════════════════════════════════════════════
+   DEPTH (Nov 26, 2026) — looks only: a raised card, glossy round
+   buttons and Record as a round pencil (38px = the old button's
+   height, so cards keep their height). No layout/logic change.
+   ════════════════════════════════════════════════════════════ */
+.patient-card {
+  background: linear-gradient(170deg, #ffffff 0%, #F6F9FD 100%);
+  border-color: #E1E7F0;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.9), inset 0 -2px 0 rgba(27,38,56,.04),
+              0 2px 4px rgba(27,38,56,.06), 0 8px 22px color-mix(in srgb, var(--teal) 13%, transparent);
+}
+.patient-card:hover {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.9), 0 3px 6px rgba(27,38,56,.08),
+              0 12px 28px color-mix(in srgb, var(--teal) 18%, transparent);
+}
+.action-circle {
+  background: radial-gradient(circle at 35% 30%, #ffffff 0%, var(--card) 55%, #E6ECF3 100%);
+  box-shadow: inset 0 1px 0 #fff, 0 3px 6px rgba(27,38,56,.14);
+}
+.action-circle--phone {
+  background: radial-gradient(circle at 35% 30%, #ffffff 0%, var(--green-bg) 60%, #CFEEDD 100%);
+  box-shadow: inset 0 1px 0 #fff, 0 3px 6px rgba(61,154,107,.25);
+}
+.action-circle:active { box-shadow: inset 0 2px 4px rgba(27,38,56,.18); }
+.record-btn {
+  width: 38px; height: 38px; min-height: 38px; padding: 0;
+  border-radius: 50%; justify-content: center; gap: 0;
+  background: radial-gradient(circle at 35% 28%, var(--teal-2) 0%, var(--teal) 55%, var(--teal-dark) 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.35), inset 0 -2px 3px rgba(0,0,0,.25),
+              0 4px 10px color-mix(in srgb, var(--teal) 45%, transparent);
+}
+.record-btn:hover {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.35), inset 0 -2px 3px rgba(0,0,0,.25),
+              0 6px 16px color-mix(in srgb, var(--teal) 55%, transparent);
+}
+.record-btn:active { transform: scale(.92); box-shadow: inset 0 2px 5px rgba(0,0,0,.3); }
+.record-btn svg { width: 18px; height: 18px; }
+.card-dose-badge, .card-doses-compact {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.85), 0 1px 2px rgba(27,38,56,.10);
+}
+[data-theme="dark"] .patient-card {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 2px 4px rgba(0,0,0,.3), 0 10px 24px rgba(0,0,0,.35) !important;
+}
+[data-theme="dark"] .action-circle { box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 3px 6px rgba(0,0,0,.35); }
+[data-theme="dark"] .card-dose-badge, [data-theme="dark"] .card-doses-compact { box-shadow: 0 1px 2px rgba(0,0,0,.3); }
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) .patient-card {
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 2px 4px rgba(0,0,0,.3), 0 10px 24px rgba(0,0,0,.35) !important;
+  }
+  html:not([data-theme="light"]) .action-circle { box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 3px 6px rgba(0,0,0,.35); }
 }
 </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
@@ -3562,13 +3616,15 @@ a:focus:not(:focus-visible) { outline: none; }
   <div class="drawer-section" style="border-top:1px solid var(--border);padding:14px 16px 18px">
     <h4 style="font-size:10px;font-weight:800;color:var(--teal-dark);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px">🎨 Colour Theme</h4>
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">
-      <button onclick="setTheme('teal')"    data-theme="teal"    title="Signature Teal"  class="theme-swatch" style="width:30px;height:30px;border-radius:50%;background:#2D8C8A;border:3px solid transparent;cursor:pointer;transition:transform .2s,box-shadow .2s;flex-shrink:0"></button>
       <button onclick="setTheme('ocean')"   data-theme="ocean"   title="Ocean Blue ★"    class="theme-swatch" style="width:30px;height:30px;border-radius:50%;background:#135c84;border:3px solid transparent;cursor:pointer;transition:transform .2s,box-shadow .2s;flex-shrink:0"></button>
       <button onclick="setTheme('navy')"    data-theme="navy"    title="Midnight Navy"   class="theme-swatch" style="width:30px;height:30px;border-radius:50%;background:#213a5c;border:3px solid transparent;cursor:pointer;transition:transform .2s,box-shadow .2s;flex-shrink:0"></button>
       <button onclick="setTheme('forest')"  data-theme="forest"  title="Forest Sage"     class="theme-swatch" style="width:30px;height:30px;border-radius:50%;background:#455b55;border:3px solid transparent;cursor:pointer;transition:transform .2s,box-shadow .2s;flex-shrink:0"></button>
-      <button onclick="setTheme('sienna')"  data-theme="sienna"  title="Burnt Sienna"    class="theme-swatch" style="width:30px;height:30px;border-radius:50%;background:#a3512f;border:3px solid transparent;cursor:pointer;transition:transform .2s,box-shadow .2s;flex-shrink:0"></button>
       <button onclick="setTheme('gold')"    data-theme="gold"    title="Golden Sand"     class="theme-swatch" style="width:30px;height:30px;border-radius:50%;background:#d2a665;border:3px solid transparent;cursor:pointer;transition:transform .2s,box-shadow .2s;flex-shrink:0"></button>
-      <button onclick="setTheme('emerald')" data-theme="emerald" title="Emerald"         class="theme-swatch" style="width:30px;height:30px;border-radius:50%;background:#009f8b;border:3px solid transparent;cursor:pointer;transition:transform .2s,box-shadow .2s;flex-shrink:0"></button>
+      <button onclick="setTheme('indigo')" data-theme="indigo"  title="Royal Indigo"    class="theme-swatch" style="width:30px;height:30px;border-radius:50%;background:#4b4fc4;border:3px solid transparent;cursor:pointer;transition:transform .2s,box-shadow .2s;flex-shrink:0"></button>
+      <button onclick="setTheme('cyan')" data-theme="cyan"    title="Arctic Cyan"    class="theme-swatch" style="width:30px;height:30px;border-radius:50%;background:#0b7fa3;border:3px solid transparent;cursor:pointer;transition:transform .2s,box-shadow .2s;flex-shrink:0"></button>
+      <button onclick="setTheme('plum')" data-theme="plum"    title="Plum Velvet"    class="theme-swatch" style="width:30px;height:30px;border-radius:50%;background:#7b3f8f;border:3px solid transparent;cursor:pointer;transition:transform .2s,box-shadow .2s;flex-shrink:0"></button>
+      <button onclick="setTheme('rose')" data-theme="rose"    title="Rose Quartz"    class="theme-swatch" style="width:30px;height:30px;border-radius:50%;background:#b24a6b;border:3px solid transparent;cursor:pointer;transition:transform .2s,box-shadow .2s;flex-shrink:0"></button>
+      <button onclick="setTheme('slate')" data-theme="slate"   title="Steel Slate"    class="theme-swatch" style="width:30px;height:30px;border-radius:50%;background:#4a5d78;border:3px solid transparent;cursor:pointer;transition:transform .2s,box-shadow .2s;flex-shrink:0"></button>
     </div>
     <div style="font-size:11px;color:var(--text-2);font-weight:600;margin-top:4px" id="themeLabel"></div>
     <div style="font-size:10px;color:var(--text-3);margin-top:3px">★ Ocean Blue recommended for clinical use</div>
@@ -4763,9 +4819,8 @@ function renderCard(p, idx) {
   <div class="card-actions">
     ${phoneBtn1}${phoneBtn2}${mapBtn}
     <div class="action-spacer"></div>
-    <button class="record-btn js-inject" data-id="${p.id}">
+    <button class="record-btn js-inject" data-id="${p.id}" aria-label="Record injection" title="Record injection">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 2l4 4-10 10-6 2 2-6L18 2z"/><line x1="14" y1="6" x2="18" y2="10"/></svg>
-      Record
     </button>
     <button class="note-icon-btn ${hasQuickNote(p['File Number'])?'has-note':''}" data-fnum="${esc(p['File Number'])}"
       title="Quick note" onclick="event.stopPropagation();toggleNoteArea('${esc(p['File Number']||'')}')">📝</button>
@@ -7348,7 +7403,7 @@ function toggleDark() {
   const btn = document.getElementById('darkToggle');
   if (btn) btn.textContent = (root.getAttribute('data-theme')||'') === 'light' ? '☀️' : '🌙';
   // Re-apply theme tokens with new dark state
-  const key = localStorage.getItem('vapiq_theme') || 'teal';
+  const key = _themeKey(localStorage.getItem('vapiq_theme'));
   _applyThemeTokens(key, _isDarkMode());
 }
 
@@ -11180,13 +11235,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 // ════════════════════════════════════════════════════════════════
 
 const VAPIQ_TOKENS = {
-  teal:    { a:'#2D8C8A', a2:'#3AA8A5', ad:'#1E6665', as:'#E6F4F4',  asd:'rgba(45,140,138,.16)',  s:'#1B2638', sm:'#243047' },
   ocean:   { a:'#135c84', a2:'#1a7aac', ad:'#0e4466', as:'#deedf7',  asd:'rgba(19,92,132,.18)',   s:'#0a2236', sm:'#122f4a' },
   navy:    { a:'#2d5080', a2:'#3a6aaa', ad:'#1e3a60', as:'#e4ebf5',  asd:'rgba(45,80,128,.18)',   s:'#111e30', sm:'#1a2d47' },
   forest:  { a:'#455b55', a2:'#5a7870', ad:'#2e3e39', as:'#e3ebe8',  asd:'rgba(69,91,85,.18)',    s:'#1a2824', sm:'#243530' },
-  sienna:  { a:'#a3512f', a2:'#c4663a', ad:'#7a3d22', as:'#f5ede6',  asd:'rgba(163,81,47,.18)',   s:'#1e1008', sm:'#2e1a10' },
   gold:    { a:'#b8863a', a2:'#d2a655', ad:'#8a6225', as:'#fdf4e3',  asd:'rgba(184,134,58,.18)',  s:'#1e160a', sm:'#2e2010' },
-  emerald: { a:'#009f8b', a2:'#00c4ad', ad:'#007a6a', as:'#e0f7f5',  asd:'rgba(0,159,139,.18)',   s:'#002a25', sm:'#003d36' },
+  indigo:  { a:'#4b4fc4', a2:'#6366f1', ad:'#3730a3', as:'#eceefe',  asd:'rgba(75,79,196,.18)',   s:'#14143a', sm:'#1e1f52' },
+  cyan:    { a:'#0b7fa3', a2:'#1ea3c9', ad:'#08617d', as:'#e0f4fa',  asd:'rgba(11,127,163,.18)',   s:'#06202c', sm:'#0b3040' },
+  plum:    { a:'#7b3f8f', a2:'#9a58ad', ad:'#5a2b6a', as:'#f4ecf7',  asd:'rgba(123,63,143,.18)',   s:'#1f1028', sm:'#2d1838' },
+  rose:    { a:'#b24a6b', a2:'#d0688a', ad:'#8a3651', as:'#fbebf0',  asd:'rgba(178,74,107,.18)',   s:'#241019', sm:'#341826' },
+  slate:   { a:'#4a5d78', a2:'#64799a', ad:'#33435a', as:'#e8edf3',  asd:'rgba(74,93,120,.18)',   s:'#141b26', sm:'#1f2938' },
 };
 
 /**
@@ -11195,7 +11252,7 @@ const VAPIQ_TOKENS = {
  * Called on: init, theme change, dark mode toggle.
  */
 function _applyThemeTokens(key, isDark) {
-  const t    = VAPIQ_TOKENS[key] || VAPIQ_TOKENS.teal;
+  const t    = VAPIQ_TOKENS[key] || VAPIQ_TOKENS.ocean;
   const root = document.documentElement;
   const soft = isDark ? t.asd : t.as;
 
@@ -11215,7 +11272,7 @@ function _applyThemeTokens(key, isDark) {
 
 /** Call whenever dark mode state changes */
 function _reapplyTheme() {
-  const key    = localStorage.getItem('vapiq_theme') || 'teal';
+  const key    = _themeKey(localStorage.getItem('vapiq_theme'));
   const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
   _applyThemeTokens(key, isDark);
 }
@@ -11228,10 +11285,6 @@ function _reapplyTheme() {
 //  Inline styles on :root beat ALL CSS rules — no cascade issues
 // ══════════════════════════════════════════════════════════════
 const VAPIQ_THEMES = {
-  teal:   {name:'Signature Teal', color:'#2D8C8A',
-    accent:'#2D8C8A', accent2:'#3AA8A5', accentDark:'#1E6665',
-    accentSoft:'#E6F4F4', accentSoftDark:'rgba(45,140,138,.16)',
-    sidebar:'#1B2638', sidebarMid:'#243047'},
   ocean:  {name:'Ocean Blue',     color:'#135c84',
     accent:'#135c84', accent2:'#1a7aac', accentDark:'#0e4466',
     accentSoft:'#deedf7', accentSoftDark:'rgba(19,92,132,.18)',
@@ -11244,23 +11297,35 @@ const VAPIQ_THEMES = {
     accent:'#455b55', accent2:'#5a7870', accentDark:'#2e3e39',
     accentSoft:'#e3ebe8', accentSoftDark:'rgba(69,91,85,.18)',
     sidebar:'#1a2824', sidebarMid:'#243530'},
-  sienna: {name:'Burnt Sienna',   color:'#a3512f',
-    accent:'#a3512f', accent2:'#c4663a', accentDark:'#7a3d22',
-    accentSoft:'#f5ede6', accentSoftDark:'rgba(163,81,47,.18)',
-    sidebar:'#1e1008', sidebarMid:'#2e1a10'},
   gold:   {name:'Golden Sand',    color:'#d2a665',
     accent:'#b8863a', accent2:'#d2a655', accentDark:'#8a6225',
     accentSoft:'#fdf4e3', accentSoftDark:'rgba(184,134,58,.18)',
     sidebar:'#1e160a', sidebarMid:'#2e2010'},
-  emerald:{name:'Emerald',        color:'#009f8b',
-    accent:'#009f8b', accent2:'#00c4ad', accentDark:'#007a6a',
-    accentSoft:'#e0f7f5', accentSoftDark:'rgba(0,159,139,.18)',
-    sidebar:'#002a25', sidebarMid:'#003d36'},
+  indigo: {name:'Royal Indigo', color:'#4b4fc4',
+    accent:'#4b4fc4', accent2:'#6366f1', accentDark:'#3730a3',
+    accentSoft:'#eceefe', accentSoftDark:'rgba(75,79,196,.18)',
+    sidebar:'#14143a', sidebarMid:'#1e1f52'},
+  cyan:   {name:'Arctic Cyan', color:'#0b7fa3',
+    accent:'#0b7fa3', accent2:'#1ea3c9', accentDark:'#08617d',
+    accentSoft:'#e0f4fa', accentSoftDark:'rgba(11,127,163,.18)',
+    sidebar:'#06202c', sidebarMid:'#0b3040'},
+  plum:   {name:'Plum Velvet', color:'#7b3f8f',
+    accent:'#7b3f8f', accent2:'#9a58ad', accentDark:'#5a2b6a',
+    accentSoft:'#f4ecf7', accentSoftDark:'rgba(123,63,143,.18)',
+    sidebar:'#1f1028', sidebarMid:'#2d1838'},
+  rose:   {name:'Rose Quartz', color:'#b24a6b',
+    accent:'#b24a6b', accent2:'#d0688a', accentDark:'#8a3651',
+    accentSoft:'#fbebf0', accentSoftDark:'rgba(178,74,107,.18)',
+    sidebar:'#241019', sidebarMid:'#341826'},
+  slate:  {name:'Steel Slate', color:'#4a5d78',
+    accent:'#4a5d78', accent2:'#64799a', accentDark:'#33435a',
+    accentSoft:'#e8edf3', accentSoftDark:'rgba(74,93,120,.18)',
+    sidebar:'#141b26', sidebarMid:'#1f2938'},
 };
 
 /* Central token applicator — THE single source of truth */
 function _applyThemeTokens(key, isDark) {
-  const t    = VAPIQ_THEMES[key] || VAPIQ_THEMES.teal;
+  const t    = VAPIQ_THEMES[key] || VAPIQ_THEMES.ocean;
   const root = document.documentElement;
   const soft = isDark ? t.accentSoftDark : t.accentSoft;
   // Inline styles on :root — maximum priority, beats all CSS classes
@@ -11277,6 +11342,9 @@ function _applyThemeTokens(key, isDark) {
   try { localStorage.setItem('vapiq_theme', key); } catch(e) {}
 }
 
+/* Removed themes (Signature Teal, Burnt Sienna, Emerald) or none saved → Ocean Blue */
+function _themeKey(k) { return ['ocean','navy','forest','gold','indigo','cyan','plum','rose','slate'].includes(k) ? k : 'ocean'; }
+
 function _isDarkMode() {
   const attr = document.documentElement.getAttribute('data-theme');
   if (attr === 'dark')  return true;
@@ -11285,20 +11353,24 @@ function _isDarkMode() {
 }
 
 const THEMES = {
-  teal:    { name: 'Signature Teal', color: '#2D8C8A' },
   ocean:   { name: 'Ocean Blue',     color: '#135c84' },
   navy:    { name: 'Midnight Navy',  color: '#213a5c' },
   forest:  { name: 'Forest Sage',    color: '#455b55' },
-  sienna:  { name: 'Burnt Sienna',   color: '#a3512f' },
   gold:    { name: 'Golden Sand',    color: '#d2a665' },
-  emerald: { name: 'Emerald',        color: '#009f8b' },
+  indigo:  { name: 'Royal Indigo', color: '#4b4fc4' },
+  cyan:    { name: 'Arctic Cyan', color: '#0b7fa3' },
+  plum:    { name: 'Plum Velvet', color: '#7b3f8f' },
+  rose:    { name: 'Rose Quartz', color: '#b24a6b' },
+  slate:   { name: 'Steel Slate', color: '#4a5d78' },
 };
 function setTheme(key) {
   // NO body classes — tokens go directly on :root via JS
   document.body.classList.remove(
     'theme-teal','theme-ocean','theme-navy','theme-forest',
-    'theme-sienna','theme-gold','theme-emerald'
+    'theme-sienna','theme-gold','theme-emerald',
+    'theme-indigo','theme-cyan','theme-plum','theme-rose','theme-slate'
   );
+  key = _themeKey(key);
   _applyThemeTokens(key, _isDarkMode());
   // Update swatch UI
   document.querySelectorAll('.theme-swatch').forEach(el => {
@@ -11308,11 +11380,11 @@ function setTheme(key) {
     el.style.boxShadow   = active ? '0 0 0 2px var(--teal)' : 'none';
   });
   const labelEl = document.getElementById('themeLabel');
-  if (labelEl) labelEl.textContent = VAPIQ_THEMES[key]?.name || 'Signature Teal';
+  if (labelEl) labelEl.textContent = VAPIQ_THEMES[key]?.name || 'Ocean Blue';
 }
 function initTheme() {
   try {
-    const key = localStorage.getItem('vapiq_theme') || 'teal';
+    const key = _themeKey(localStorage.getItem('vapiq_theme'));
     _applyThemeTokens(key, _isDarkMode());
     setTimeout(() => {
       document.querySelectorAll('.theme-swatch').forEach(el => {
@@ -11322,7 +11394,7 @@ function initTheme() {
         el.style.boxShadow   = active ? '0 0 0 2px var(--teal)' : 'none';
       });
       const labelEl = document.getElementById('themeLabel');
-      if (labelEl) labelEl.textContent = VAPIQ_THEMES[key]?.name || 'Signature Teal';
+      if (labelEl) labelEl.textContent = VAPIQ_THEMES[key]?.name || 'Ocean Blue';
     }, 80);
   } catch(e) {}
 }
