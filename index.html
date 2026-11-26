@@ -10557,8 +10557,11 @@ const SITE_PATTERNS = [
   { re: /left\s*side\b/i,         label: 'Left Side'   },
   { re: /right\s*hip\b/i,         label: 'Right Side'  },
   { re: /left\s*hip\b/i,          label: 'Left Side'   },
-  { re: /\bright\b(?!\s*side)/i,   label: 'Right Glute' },
-  { re: /\bleft\b(?!\s*side)/i,    label: 'Left Glute'  },
+  // A bare "left"/"right" only counts when it stands alone as an entry — start of the note or after , ; . or a
+  // new line, and followed by the end, , ; . or a new line (e.g. "Left, hot flashes"). So "3 doses left",
+  // "left a message" or "right away" are NOT read as a site. (Nov 26, 2026)
+  { re: /(?:^|[\n,;.])\s*right\s*(?=$|[\n,;.])/i, label: 'Right Glute' },
+  { re: /(?:^|[\n,;.])\s*left\s*(?=$|[\n,;.])/i,  label: 'Left Glute'  },
 ];
 
 const ADVERSE_KEYWORDS = [
@@ -10605,10 +10608,13 @@ function _parseSpecialInstructions(text) {
 }
 
 function _parseInjectionSite(text) {
-  // Use last valid mention so later overrides win
-  let last = null;
+  // Use the mention written LAST in the note, so a later correction wins
+  // (before Nov 26, 2026 the order of this list decided, not the order in your note)
+  let last = null, at = -1;
   for (const { re, label } of SITE_PATTERNS) {
-    if (re.test(text)) last = label;
+    for (const m of String(text).matchAll(new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g'))) {
+      if (m.index >= at) { at = m.index; last = label; }
+    }
   }
   return last;
 }
@@ -10621,7 +10627,9 @@ function _parseAdverseEffects(text) {
       found.add(kw.charAt(0).toUpperCase() + kw.slice(1));
     }
   }
-  return [...found];
+  // "hot flashes" also contains "hot flash" — keep only the longer one
+  const all = [...found];
+  return all.filter(k => !all.some(o => o !== k && o.toLowerCase().includes(k.toLowerCase())));
 }
 
 function _parseIsNMR(text) {
