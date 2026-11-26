@@ -5800,7 +5800,8 @@ function _smsCompose() {
   const drug = document.getElementById('smsDrug').value.trim() || 'Eligard';
   const { en, fr, tomorrow } = _smsDates(document.getElementById('smsDate').value);
   const slot = `${document.getElementById('smsFrom').value}-${document.getElementById('smsTo').value}`;
-  const hi = { fr: n ? `Bonjour M. ${n},` : 'Bonjour,', en: n ? `Hello Mr. ${n},` : 'Hello,' };
+  const T = { mr: ['M. ', 'Mr. '], mrs: ['Mme ', 'Mrs. '], none: ['', ''] }[_sms.title] || ['M. ', 'Mr. '];
+  const hi = { fr: n ? `Bonjour ${T[0]}${n},` : 'Bonjour,', en: n ? `Hello ${T[1]}${n},` : 'Hello,' };
   let F, E;
   if (_sms.kind === 'confirm') {
     F = `${hi.fr} votre rendez-vous pour l'injection ${drug} est le ${fr} entre ${slot}. Merci de confirmer.`;
@@ -5817,6 +5818,7 @@ function _smsCompose() {
 function _smsBuild() {
   document.querySelectorAll('#smsPhones .mm-chip').forEach(c => c.classList.toggle('on', c.dataset.v === _sms.phone));
   document.querySelectorAll('#smsKinds .mm-chip').forEach(c => c.classList.toggle('on', c.dataset.v === _sms.kind));
+  document.querySelectorAll('#smsTitles .mm-chip').forEach(c => c.classList.toggle('on', c.dataset.v === _sms.title));
   document.getElementById('smsTimes').style.display = _sms.kind === 'book' ? 'none' : 'flex';
   document.getElementById('smsSlotSrc').style.display = _sms.kind === 'book' ? 'none' : 'block';
   document.getElementById('smsSwap').textContent = _sms.frFirst ? '⇅ English first' : '⇅ French first';
@@ -5848,6 +5850,15 @@ function _smsPick(kind, v) {
   }
   _smsBuild();
 }
+// Mr./Mrs. is remembered per file number on this device only
+const _smsTitleKey = 'vapiq_sms_title';
+function _smsTitleGet(fnum) { try { return JSON.parse(localStorage.getItem(_smsTitleKey) || '{}')[fnum] || 'mr'; } catch { return 'mr'; } }
+function _smsTitle(v) {
+  _sms.title = v;
+  const p = patients.find(x => x.id === _sms.id), fnum = String(p?.['File Number'] || '').trim();
+  try { const m = JSON.parse(localStorage.getItem(_smsTitleKey) || '{}'); if (v === 'mr') delete m[fnum]; else m[fnum] = v; localStorage.setItem(_smsTitleKey, JSON.stringify(m)); } catch {}
+  _smsBuild();
+}
 function _smsSwap() { _sms.frFirst = !_sms.frFirst; _smsBuild(); }
 function openSmsModal(id) {
   const p = patients.find(x => x.id === id); if (!p) return;
@@ -5857,11 +5868,13 @@ function openSmsModal(id) {
   const apptDay = appt.split('T')[0];
   const due = /^\d{4}-\d{2}-\d{2}$/.test(p['Due Date'] || '') ? p['Due Date'] : '';
   const tomorrow = apptDay && _smsDates(apptDay).tomorrow;
-  _sms = { id, phone: '', kind: !apptDay ? 'book' : tomorrow ? 'remind' : 'confirm', frFirst: true, edited: false };
+  _sms = { id, phone: '', kind: !apptDay ? 'book' : tomorrow ? 'remind' : 'confirm', frFirst: true, edited: false, title: _smsTitleGet(String(p['File Number'] || '').trim()) };
   document.getElementById('smsWho').textContent = `${p['Patient Name'] || ''} · #${String(p['File Number'] || '').trim()}`;
   // No number chosen until you tap one — you always pick who gets it
   document.getElementById('smsPhones').innerHTML = phones.map(([k, v]) =>
     `<button type="button" class="mm-chip" data-v="${esc(String(v).trim())}" onclick="_smsPick('phone', this.dataset.v)">${k} · ${esc(String(v).trim())}</button>`).join('');
+  document.getElementById('smsTitles').innerHTML = [['mr', 'M. / Mr.'], ['mrs', 'Mme / Mrs.'], ['none', 'No title']].map(([k, label]) =>
+    `<button type="button" class="mm-chip" data-v="${k}" onclick="_smsTitle('${k}')">${label}</button>`).join('');
   document.getElementById('smsKinds').innerHTML = SMS_KINDS.map(([k, label]) =>
     `<button type="button" class="mm-chip" data-v="${k}" onclick="_smsPick('kind','${k}')">${label}</button>`).join('');
   document.getElementById('smsDate').value = _sms.kind === 'book' ? (due || apptDay) : apptDay;
@@ -5906,7 +5919,7 @@ function sendSms() {
   location.href = `sms:${num}${ios ? '&' : '?'}body=${encodeURIComponent(body)}`;
 }
 window.openSmsModal = openSmsModal; window.sendSms = sendSms; window._smsBuild = _smsBuild;
-window._smsEdited = _smsEdited; window._smsRewrite = _smsRewrite; window._smsFromChanged = _smsFromChanged; window._smsPick = _smsPick; window._smsSwap = _smsSwap;
+window._smsTitle = _smsTitle; window._smsEdited = _smsEdited; window._smsRewrite = _smsRewrite; window._smsFromChanged = _smsFromChanged; window._smsPick = _smsPick; window._smsSwap = _smsSwap;
 
 function openModal(id) {
   const el = document.getElementById(id);
@@ -12700,6 +12713,8 @@ window.stripTimeWindow     = stripTimeWindow;
     <div class="modal-body" style="flex:1;overflow-y:auto">
       <div class="mm-label" style="margin-top:0">Send to</div>
       <div class="mm-chips" id="smsPhones"></div>
+      <div class="mm-label">Greeting</div>
+      <div class="mm-chips" id="smsTitles"></div>
       <div class="mm-label">Message</div>
       <div class="mm-chips" id="smsKinds"></div>
       <div class="sms-row" style="margin-top:10px">
