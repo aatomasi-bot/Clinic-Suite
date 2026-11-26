@@ -1248,6 +1248,19 @@ body.mm-select .mm-bar { display: flex; }
 .mm-pats div:last-child { border-bottom: 0; }
 .mm-pats span { margin-left: auto; color: var(--text-3); cursor: pointer; font-size: 15px; }
 .mm-preview { white-space: pre-wrap; font-size: 12.5px; line-height: 1.5; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; color: var(--text); }
+/* ── Text the patient (bilingual SMS) — Nov 26, 2026 ── */
+.sms-btn { width: 32px; height: 32px; flex: 0 0 32px; border-radius: 50%; border: 0; padding: 0; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  color: #2E8B57; background: linear-gradient(150deg, #fff 0%, color-mix(in srgb, #3D9A6B 14%, #fff) 100%);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #3D9A6B 32%, transparent), 0 2px 6px rgba(61,154,107,.14);
+  transition: transform .35s cubic-bezier(.22,1.4,.36,1); align-self: center; }
+.sms-btn svg { width: 16px; height: 16px; }
+.sms-btn:active { transform: scale(.9); }
+[data-theme="dark"] .sms-btn { color: #7FD3A4; background: rgba(61,154,107,.14); box-shadow: inset 0 0 0 1px rgba(127,211,164,.35); }
+@media (prefers-color-scheme: dark) { html:not([data-theme="light"]) .sms-btn { color: #7FD3A4; background: rgba(61,154,107,.14); box-shadow: inset 0 0 0 1px rgba(127,211,164,.35); } }
+.sms-row { display: flex; gap: 8px; }
+.sms-row > div { flex: 1; min-width: 0; }
+.sms-row select, .sms-row input { width: 100%; font-size: 16px; }
+.sms-hint { font-size: 11px; color: var(--text-3); margin-top: 6px; }
 .mm-label { font-size: 11px; font-weight: 800; color: var(--text-2); text-transform: uppercase; letter-spacing: .05em; margin: 12px 0 6px; }
 .card-btn {
   flex: 1;
@@ -2926,6 +2939,34 @@ a:focus:not(:focus-visible) { outline: none; }
   html:not([data-theme="light"]) .note-icon-btn:not(.has-note) { color: var(--teal-2); background: linear-gradient(145deg, color-mix(in srgb, var(--teal) 28%, #1b2230), #141a24); }
   html:not([data-theme="light"]) .copy-notes-btn { color: #fff; background: linear-gradient(145deg, #8A76CC 0%, #5B48A0 100%); }
   html:not([data-theme="light"]) .record-btn::before, html:not([data-theme="light"]) .note-icon-btn::before, html:not([data-theme="light"]) .copy-notes-btn::before { opacity: .35; }
+}
+/* Subtle icons (Nov 26, 2026): soft tint, coloured icon, thin ring, light shadow — no heavy fills.
+   Pencil = theme colour · Quick note = warm amber · Copy = lavender. */
+.record-btn, .note-icon-btn, .copy-notes-btn { --ic: var(--teal); --ic-ink: var(--teal-dark); --ic-ink-dk: var(--teal-2); }
+.note-icon-btn { --ic: #E0A030; --ic-ink: #A86A12; --ic-ink-dk: #F2C46B; }
+.copy-notes-btn { --ic: #7B68C8; --ic-ink: #5B48A0; --ic-ink-dk: #C4B8E8; }
+.record-btn, .note-icon-btn, .copy-notes-btn, .note-icon-btn.has-note {
+  color: var(--ic-ink); border: 0;
+  background: linear-gradient(150deg, #fff 0%, color-mix(in srgb, var(--ic) 13%, #fff) 100%);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ic) 30%, transparent), 0 2px 6px color-mix(in srgb, var(--ic) 14%, transparent); }
+.record-btn::before, .note-icon-btn::before, .copy-notes-btn::before { opacity: .6; }
+.note-icon-btn.has-note { background: linear-gradient(150deg, color-mix(in srgb, var(--ic) 10%, #fff) 0%, color-mix(in srgb, var(--ic) 26%, #fff) 100%);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--ic) 55%, transparent), 0 2px 6px color-mix(in srgb, var(--ic) 18%, transparent); }
+.note-icon-btn.has-note::after { background: var(--ic); }
+[data-theme="dark"] .note-icon-btn:not(.has-note) { background: color-mix(in srgb, var(--ic) 8%, transparent) !important; }
+@media (prefers-color-scheme: dark) { html:not([data-theme="light"]) .note-icon-btn:not(.has-note) { background: color-mix(in srgb, var(--ic) 8%, transparent) !important; } }
+.record-btn:hover, .note-icon-btn:hover, .copy-notes-btn:hover { filter: none; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ic) 45%, transparent), 0 4px 10px color-mix(in srgb, var(--ic) 20%, transparent); }
+[data-theme="dark"] .record-btn, [data-theme="dark"] .note-icon-btn, [data-theme="dark"] .copy-notes-btn, [data-theme="dark"] .note-icon-btn:not(.has-note), [data-theme="dark"] .note-icon-btn.has-note {
+  color: var(--ic-ink-dk); background: color-mix(in srgb, var(--ic) 14%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ic-ink-dk) 35%, transparent); }
+[data-theme="dark"] .note-icon-btn.has-note { background: color-mix(in srgb, var(--ic) 24%, transparent); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--ic-ink-dk) 60%, transparent); }
+[data-theme="dark"] .record-btn::before, [data-theme="dark"] .note-icon-btn::before, [data-theme="dark"] .copy-notes-btn::before { opacity: .12; }
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) .record-btn, html:not([data-theme="light"]) .note-icon-btn, html:not([data-theme="light"]) .copy-notes-btn, html:not([data-theme="light"]) .note-icon-btn:not(.has-note), html:not([data-theme="light"]) .note-icon-btn.has-note {
+    color: var(--ic-ink-dk); background: color-mix(in srgb, var(--ic) 14%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ic-ink-dk) 35%, transparent); }
+  html:not([data-theme="light"]) .note-icon-btn.has-note { background: color-mix(in srgb, var(--ic) 24%, transparent); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--ic-ink-dk) 60%, transparent); }
+  html:not([data-theme="light"]) .record-btn::before, html:not([data-theme="light"]) .note-icon-btn::before, html:not([data-theme="light"]) .copy-notes-btn::before { opacity: .12; }
 }
 /* Confirmed time pill — readable on every theme, light and dark */
 .card-time { font-size: 9px; font-weight: 700; color: var(--teal-dark); background: var(--teal-light); border: 1px solid color-mix(in srgb, var(--teal) 35%, transparent); border-radius: 4px; padding: 1px 6px; white-space: nowrap; }
@@ -4870,6 +4911,7 @@ function renderCard(p, idx) {
       ${p['Archived'] ? '' : `<button class="card-btn card-btn--archive js-archive" data-id="${p.id}" style="flex:0.7">⏸ Hold</button>`}
     </div>
     <div style="margin-top:8px;display:flex;justify-content:flex-end;gap:6px">
+      ${(p['Phone 1'] || p['Phone 2']) ? `<button type="button" class="sms-btn" onclick="event.stopPropagation();openSmsModal(${p.id})" title="Text the patient" aria-label="Text the patient"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-4.6A8 8 0 1 1 21 12z"/><line x1="9" y1="10.5" x2="15" y2="10.5"/><line x1="9" y1="14" x2="13" y2="14"/></svg></button>` : ''}
       <button class="card-btn card-btn--edit" style="flex:0 0 auto;padding:6px 10px;font-size:11px;white-space:nowrap" onclick="openMedicumMail([${p.id}])" title="Email Medicum (reports@medicum.ca) about this patient">✉️ Medicum</button>
       <button class="card-btn card-btn--edit" style="flex:0 0 auto;white-space:nowrap;padding:6px 12px;font-size:11px" onclick="openApptModal(${p.id})">
         📅 ${confirmed ? 'Edit Appointment' : 'Set Appointment'}
@@ -5709,6 +5751,113 @@ function _mmGo() { openMedicumMail([..._mmPicked]); }
 function _mmRemove(id) { _mmIds = _mmIds.filter(x => x !== id); _mmRenderPats(); _mmPreview(); }
 window._mmGo = _mmGo; window._mmRemove = _mmRemove;
 window.sendMedicumMail = sendMedicumMail; window._mmReason = _mmReason; window._mmPreview = _mmPreview; window._mmRenderPats = _mmRenderPats;
+
+// ══ Text the patient (bilingual SMS) — Nov 26, 2026 ══════════════════
+// Opens the phone's own Messages app with the text filled in; you press Send there. Nothing is sent by VaPiq.
+const SMS_KINDS = [['confirm', 'Appointment'], ['remind', 'Reminder'], ['book', 'Please book']];
+let _sms = { id: null, phone: '', kind: 'confirm', frFirst: true };
+const _smsPad = n => String(n).padStart(2, '0');
+const _smsMin = t => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+const _smsHHMM = m => `${_smsPad(Math.floor(m / 60) % 24)}:${_smsPad(m % 60)}`;
+function _smsFirst(name) {
+  const n = String(name || '').trim();
+  const f = n.includes(',') ? n.split(',')[1].trim().split(/\s+/)[0] : n.split(/\s+/)[0];
+  return f ? f.charAt(0).toUpperCase() + f.slice(1).toLowerCase() : '';
+}
+function _smsDates(iso) {
+  const d = new Date(iso + 'T12:00:00');
+  if (isNaN(d)) return { en: '', fr: '', tomorrow: false };
+  const en = `${d.toLocaleDateString('en-CA', { weekday: 'long' })}, ${d.toLocaleDateString('en-CA', { month: 'long' })} ${d.getDate()} ${d.getFullYear()}`;
+  const fr = `${d.toLocaleDateString('fr-CA', { weekday: 'long' })} ${d.getDate()} ${d.toLocaleDateString('fr-CA', { month: 'long' })} ${d.getFullYear()}`;
+  const t = new Date(); t.setDate(t.getDate() + 1);
+  return { en, fr, tomorrow: t.toDateString() === d.toDateString() };
+}
+function _smsTimeOptions(sel, val) {
+  const opts = []; for (let m = 6 * 60; m <= 21 * 60; m += 15) opts.push(_smsHHMM(m));
+  if (val && !opts.includes(val)) { opts.push(val); opts.sort(); }
+  sel.innerHTML = opts.map(o => `<option value="${o}"${o === val ? ' selected' : ''}>${o}</option>`).join('');
+}
+function _smsCompose() {
+  const p = patients.find(x => x.id === _sms.id); if (!p) return '';
+  const n = _smsFirst(p['Patient Name']);
+  const drug = document.getElementById('smsDrug').value.trim() || 'Eligard';
+  const { en, fr, tomorrow } = _smsDates(document.getElementById('smsDate').value);
+  const slot = `${document.getElementById('smsFrom').value}-${document.getElementById('smsTo').value}`;
+  const hi = { fr: n ? `Bonjour ${n},` : 'Bonjour,', en: n ? `Hello ${n},` : 'Hello,' };
+  let F, E;
+  if (_sms.kind === 'confirm') {
+    F = `${hi.fr} votre rendez-vous pour l'injection ${drug} est le ${fr} entre ${slot}. Merci de confirmer.`;
+    E = `${hi.en} your appointment for the injection ${drug} is ${en} between ${slot}. Please confirm.`;
+  } else if (_sms.kind === 'remind') {
+    F = `${hi.fr} petit rappel : votre rendez-vous pour l'injection ${drug} est ${tomorrow ? 'demain, ' : ''}le ${fr} entre ${slot}. Si vous devez changer l'heure, répondez à ce message. À bientôt!`;
+    E = `${hi.en} a friendly reminder: your appointment for the injection ${drug} is ${tomorrow ? 'tomorrow, ' : ''}${en} between ${slot}. If you need to change the time, please reply to this message. See you soon!`;
+  } else {
+    F = `${hi.fr} votre prochaine injection ${drug} est prévue vers le ${fr}. Merci de répondre avec la journée et l'heure qui vous conviennent.`;
+    E = `${hi.en} your next injection ${drug} is due around ${en}. Please reply with a day and time that suits you.`;
+  }
+  return _sms.frFirst ? `${F}\n\n${E}` : `${E}\n\n${F}`;
+}
+function _smsBuild() {
+  document.querySelectorAll('#smsPhones .mm-chip').forEach(c => c.classList.toggle('on', c.dataset.v === _sms.phone));
+  document.querySelectorAll('#smsKinds .mm-chip').forEach(c => c.classList.toggle('on', c.dataset.v === _sms.kind));
+  document.getElementById('smsTimes').style.display = _sms.kind === 'book' ? 'none' : 'flex';
+  document.getElementById('smsSwap').textContent = _sms.frFirst ? '⇅ English first' : '⇅ French first';
+  document.getElementById('smsText').value = _smsCompose();
+}
+function _smsFromChanged() {
+  const from = document.getElementById('smsFrom').value;
+  _smsTimeOptions(document.getElementById('smsTo'), _smsHHMM(Math.min(_smsMin(from) + 120, 23 * 60 + 45)));
+  _smsBuild();
+}
+function _smsPick(kind, v) {
+  if (kind === 'phone') _sms.phone = v;
+  else {
+    const p = patients.find(x => x.id === _sms.id);
+    // "Please book" talks about the due date; the others about the appointment day
+    if ((v === 'book') !== (_sms.kind === 'book')) {
+      const appt = (p['Appointment Date & Time'] || '').split('T')[0];
+      const due = /^\d{4}-\d{2}-\d{2}$/.test(p['Due Date'] || '') ? p['Due Date'] : '';
+      document.getElementById('smsDate').value = v === 'book' ? (due || appt) : (appt || due);
+    }
+    _sms.kind = v;
+  }
+  _smsBuild();
+}
+function _smsSwap() { _sms.frFirst = !_sms.frFirst; _smsBuild(); }
+function openSmsModal(id) {
+  const p = patients.find(x => x.id === id); if (!p) return;
+  const phones = [['Phone 1', p['Phone 1']], ['Phone 2', p['Phone 2']]].filter(([, v]) => String(v || '').trim());
+  if (!phones.length) { toast('No phone number for this patient', 'warning'); return; }
+  const appt = p['Appointment Date & Time'] || '';
+  const apptDay = appt.split('T')[0];
+  const due = /^\d{4}-\d{2}-\d{2}$/.test(p['Due Date'] || '') ? p['Due Date'] : '';
+  const tomorrow = apptDay && _smsDates(apptDay).tomorrow;
+  _sms = { id, phone: '', kind: !apptDay ? 'book' : tomorrow ? 'remind' : 'confirm', frFirst: true };
+  document.getElementById('smsWho').textContent = `${p['Patient Name'] || ''} · #${String(p['File Number'] || '').trim()}`;
+  // No number chosen until you tap one — you always pick who gets it
+  document.getElementById('smsPhones').innerHTML = phones.map(([k, v]) =>
+    `<button type="button" class="mm-chip" data-v="${esc(String(v).trim())}" onclick="_smsPick('phone', this.dataset.v)">${k} · ${esc(String(v).trim())}</button>`).join('');
+  document.getElementById('smsKinds').innerHTML = SMS_KINDS.map(([k, label]) =>
+    `<button type="button" class="mm-chip" data-v="${k}" onclick="_smsPick('kind','${k}')">${label}</button>`).join('');
+  document.getElementById('smsDate').value = _sms.kind === 'book' ? (due || apptDay) : apptDay;
+  const t = /T(\d{2}):(\d{2})/.exec(appt);
+  const from = t ? `${t[1]}:${t[2]}` : '08:30';
+  _smsTimeOptions(document.getElementById('smsFrom'), from);
+  _smsTimeOptions(document.getElementById('smsTo'), _smsHHMM(Math.min(_smsMin(from) + 120, 23 * 60 + 45)));
+  _smsBuild();
+  openModal('smsModal');
+}
+function sendSms() {
+  if (!_sms.phone) { toast('Choose which number to text first', 'warning'); return; }
+  const body = document.getElementById('smsText').value.trim();
+  if (!body) { toast('The message is empty', 'warning'); return; }
+  const num = _sms.phone.replace(/[^\d+]/g, '');
+  const ios = /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent);
+  closeModal('smsModal');
+  location.href = `sms:${num}${ios ? '&' : '?'}body=${encodeURIComponent(body)}`;
+}
+window.openSmsModal = openSmsModal; window.sendSms = sendSms; window._smsBuild = _smsBuild;
+window._smsFromChanged = _smsFromChanged; window._smsPick = _smsPick; window._smsSwap = _smsSwap;
 
 function openModal(id) {
   const el = document.getElementById(id);
@@ -12485,6 +12634,41 @@ window.stripTimeWindow     = stripTimeWindow;
     <div class="modal-footer" style="flex-shrink:0;display:flex;gap:10px">
       <button class="btn-secondary" style="flex:1" onclick="closeModal('medicumMailModal')">Cancel</button>
       <button class="btn-primary" id="mmSend" style="flex:2;background:linear-gradient(135deg,var(--teal),var(--teal-dark));color:#fff;border:none" onclick="sendMedicumMail()">✉️ Send</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="smsModal">
+  <div class="modal" style="max-height:92vh;display:flex;flex-direction:column">
+    <div class="modal-handle"></div>
+    <div class="modal-header" style="flex-shrink:0">
+      <div>
+        <div class="modal-title">💬 Text the patient</div>
+        <div style="font-size:12px;color:var(--text-2);margin-top:2px" id="smsWho"></div>
+      </div>
+      <button class="modal-close" onclick="closeModal('smsModal')">✕</button>
+    </div>
+    <div class="modal-body" style="flex:1;overflow-y:auto">
+      <div class="mm-label" style="margin-top:0">Send to</div>
+      <div class="mm-chips" id="smsPhones"></div>
+      <div class="mm-label">Message</div>
+      <div class="mm-chips" id="smsKinds"></div>
+      <div class="sms-row" style="margin-top:10px">
+        <div><div class="mm-label" style="margin-top:0">Date</div><input type="date" id="smsDate" class="form-control" onchange="_smsBuild()"></div>
+        <div><div class="mm-label" style="margin-top:0">Injection</div><input type="text" id="smsDrug" class="form-control" value="Eligard" oninput="_smsBuild()"></div>
+      </div>
+      <div class="sms-row" id="smsTimes" style="margin-top:10px">
+        <div><div class="mm-label" style="margin-top:0">From</div><select id="smsFrom" class="form-control" onchange="_smsFromChanged()"></select></div>
+        <div><div class="mm-label" style="margin-top:0">To</div><select id="smsTo" class="form-control" onchange="_smsBuild()"></select></div>
+      </div>
+      <div class="mm-label" style="display:flex;align-items:center">Text <span style="margin-left:auto;text-transform:none;letter-spacing:0">
+        <button type="button" class="mm-chip" id="smsSwap" onclick="_smsSwap()"></button></span></div>
+      <textarea id="smsText" class="form-control" rows="9" style="font-size:15px;line-height:1.45"></textarea>
+      <div class="sms-hint">You can edit the text. Changing a choice above writes it again. Messages opens with this text; you press Send there.</div>
+    </div>
+    <div class="modal-footer" style="flex-shrink:0;display:flex;gap:10px">
+      <button class="btn-secondary" style="flex:1" onclick="closeModal('smsModal')">Cancel</button>
+      <button class="btn-primary" style="flex:2;background:linear-gradient(135deg,#3D9A6B,#2E7D55);color:#fff;border:none" onclick="sendSms()">💬 Open in Messages</button>
     </div>
   </div>
 </div>
