@@ -5762,10 +5762,14 @@ let _sms = { id: null, phone: '', kind: 'confirm', frFirst: true };
 const _smsPad = n => String(n).padStart(2, '0');
 const _smsMin = t => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
 const _smsHHMM = m => `${_smsPad(Math.floor(m / 60) % 24)}:${_smsPad(m % 60)}`;
-function _smsFirst(name) {
-  const n = String(name || '').trim();
-  const f = n.includes(',') ? n.split(',')[1].trim().split(/\s+/)[0] : n.split(/\s+/)[0];
-  return f ? f.charAt(0).toUpperCase() + f.slice(1).toLowerCase() : '';
+const SMS_SIGNATURE = 'Abdul, Nurse Medicum';
+// Full name, first name first: "ALLARD, ANDRE" / "allard, andre" → "Andre Allard"; mixed case is kept as typed
+function _smsFull(name) {
+  let n = String(name || '').trim().replace(/\s+/g, ' ');
+  if (n.includes(',')) { const [last, ...rest] = n.split(','); n = `${rest.join(' ').trim()} ${last.trim()}`.trim(); }
+  if (n === n.toUpperCase() || n === n.toLowerCase())
+    n = n.toLowerCase().replace(/(^|[\s'’-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase());
+  return n;
 }
 function _smsDates(iso) {
   const d = new Date(iso + 'T12:00:00');
@@ -5792,11 +5796,11 @@ function _smsTimeOptions(sel, val) {
 }
 function _smsCompose() {
   const p = patients.find(x => x.id === _sms.id); if (!p) return '';
-  const n = _smsFirst(p['Patient Name']);
+  const n = _smsFull(p['Patient Name']);
   const drug = document.getElementById('smsDrug').value.trim() || 'Eligard';
   const { en, fr, tomorrow } = _smsDates(document.getElementById('smsDate').value);
   const slot = `${document.getElementById('smsFrom').value}-${document.getElementById('smsTo').value}`;
-  const hi = { fr: n ? `Bonjour ${n},` : 'Bonjour,', en: n ? `Hello ${n},` : 'Hello,' };
+  const hi = { fr: n ? `Bonjour M. ${n},` : 'Bonjour,', en: n ? `Hello Mr. ${n},` : 'Hello,' };
   let F, E;
   if (_sms.kind === 'confirm') {
     F = `${hi.fr} votre rendez-vous pour l'injection ${drug} est le ${fr} entre ${slot}. Merci de confirmer.`;
@@ -5808,7 +5812,7 @@ function _smsCompose() {
     F = `${hi.fr} votre prochaine injection ${drug} est prévue vers le ${fr}. Merci de répondre avec la journée et l'heure qui vous conviennent.`;
     E = `${hi.en} your next injection ${drug} is due around ${en}. Please reply with a day and time that suits you.`;
   }
-  return _sms.frFirst ? `${F}\n\n${E}` : `${E}\n\n${F}`;
+  return (_sms.frFirst ? `${F}\n\n${E}` : `${E}\n\n${F}`) + `\n\n${SMS_SIGNATURE}`;
 }
 function _smsBuild() {
   document.querySelectorAll('#smsPhones .mm-chip').forEach(c => c.classList.toggle('on', c.dataset.v === _sms.phone));
@@ -5816,8 +5820,15 @@ function _smsBuild() {
   document.getElementById('smsTimes').style.display = _sms.kind === 'book' ? 'none' : 'flex';
   document.getElementById('smsSlotSrc').style.display = _sms.kind === 'book' ? 'none' : 'block';
   document.getElementById('smsSwap').textContent = _sms.frFirst ? '⇅ English first' : '⇅ French first';
-  document.getElementById('smsText').value = _smsCompose();
+  // Once you edit the text, your version is kept (and is what goes to Messages) until you tap Rewrite
+  if (!_sms.edited) document.getElementById('smsText').value = _smsCompose();
+  document.getElementById('smsRewrite').style.display = _sms.edited ? '' : 'none';
+  document.getElementById('smsHint').textContent = _sms.edited
+    ? 'Your edited text is kept and is what Messages gets. Tap ↺ Rewrite to use the choices above again.'
+    : 'You can edit the text. Messages opens with exactly what is in this box; you press Send there.';
 }
+function _smsEdited() { if (!_sms.edited) { _sms.edited = true; _smsBuild(); } }
+function _smsRewrite() { _sms.edited = false; _smsBuild(); }
 function _smsFromChanged() {
   const from = document.getElementById('smsFrom').value;
   _smsTimeOptions(document.getElementById('smsTo'), _smsHHMM(Math.min(_smsMin(from) + 120, 23 * 60 + 45)));
@@ -5846,7 +5857,7 @@ function openSmsModal(id) {
   const apptDay = appt.split('T')[0];
   const due = /^\d{4}-\d{2}-\d{2}$/.test(p['Due Date'] || '') ? p['Due Date'] : '';
   const tomorrow = apptDay && _smsDates(apptDay).tomorrow;
-  _sms = { id, phone: '', kind: !apptDay ? 'book' : tomorrow ? 'remind' : 'confirm', frFirst: true };
+  _sms = { id, phone: '', kind: !apptDay ? 'book' : tomorrow ? 'remind' : 'confirm', frFirst: true, edited: false };
   document.getElementById('smsWho').textContent = `${p['Patient Name'] || ''} · #${String(p['File Number'] || '').trim()}`;
   // No number chosen until you tap one — you always pick who gets it
   document.getElementById('smsPhones').innerHTML = phones.map(([k, v]) =>
@@ -5895,7 +5906,7 @@ function sendSms() {
   location.href = `sms:${num}${ios ? '&' : '?'}body=${encodeURIComponent(body)}`;
 }
 window.openSmsModal = openSmsModal; window.sendSms = sendSms; window._smsBuild = _smsBuild;
-window._smsFromChanged = _smsFromChanged; window._smsPick = _smsPick; window._smsSwap = _smsSwap;
+window._smsEdited = _smsEdited; window._smsRewrite = _smsRewrite; window._smsFromChanged = _smsFromChanged; window._smsPick = _smsPick; window._smsSwap = _smsSwap;
 
 function openModal(id) {
   const el = document.getElementById(id);
@@ -12701,9 +12712,9 @@ window.stripTimeWindow     = stripTimeWindow;
         <div><div class="mm-label" style="margin-top:0">To</div><select id="smsTo" class="form-control" onchange="_smsBuild()"></select></div>
       </div>
       <div class="mm-label" style="display:flex;align-items:center">Text <span style="margin-left:auto;text-transform:none;letter-spacing:0">
-        <button type="button" class="mm-chip" id="smsSwap" onclick="_smsSwap()"></button></span></div>
-      <textarea id="smsText" class="form-control" rows="9" style="font-size:15px;line-height:1.45"></textarea>
-      <div class="sms-hint">You can edit the text. Changing a choice above writes it again. Messages opens with this text; you press Send there.</div>
+        <button type="button" class="mm-chip" id="smsRewrite" onclick="_smsRewrite()" style="display:none;margin-right:6px">↺ Rewrite</button><button type="button" class="mm-chip" id="smsSwap" onclick="_smsSwap()"></button></span></div>
+      <textarea id="smsText" class="form-control" rows="11" style="font-size:15px;line-height:1.45" oninput="_smsEdited()"></textarea>
+      <div class="sms-hint" id="smsHint"></div>
     </div>
     <div class="modal-footer" style="flex-shrink:0;display:flex;gap:10px">
       <button class="btn-secondary" style="flex:1" onclick="closeModal('smsModal')">Cancel</button>
