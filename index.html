@@ -1250,16 +1250,19 @@ body.mm-select .mm-bar { display: flex; }
 .mm-preview { white-space: pre-wrap; font-size: 12.5px; line-height: 1.5; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; color: var(--text); }
 /* ── Text the patient (bilingual SMS) — Nov 26, 2026 ── */
 .sms-btn { width: 32px; height: 32px; flex: 0 0 32px; border-radius: 50%; border: 0; padding: 0; cursor: pointer; display: flex; align-items: center; justify-content: center;
-  color: #2E8B57; background: linear-gradient(150deg, #fff 0%, color-mix(in srgb, #3D9A6B 14%, #fff) 100%);
+  color: #2E7D55; background: linear-gradient(150deg, color-mix(in srgb, #3D9A6B 21%, #fff) 0%, color-mix(in srgb, #3D9A6B 33%, #fff) 100%);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, #3D9A6B 32%, transparent), 0 2px 6px rgba(61,154,107,.14);
   transition: transform .35s cubic-bezier(.22,1.4,.36,1); align-self: center; }
 .sms-btn svg { width: 16px; height: 16px; }
 .sms-btn:active { transform: scale(.9); }
-[data-theme="dark"] .sms-btn { color: #7FD3A4; background: rgba(61,154,107,.14); box-shadow: inset 0 0 0 1px rgba(127,211,164,.35); }
-@media (prefers-color-scheme: dark) { html:not([data-theme="light"]) .sms-btn { color: #7FD3A4; background: rgba(61,154,107,.14); box-shadow: inset 0 0 0 1px rgba(127,211,164,.35); } }
+[data-theme="dark"] .sms-btn { color: #7FD3A4; background: rgba(61,154,107,.31); box-shadow: inset 0 0 0 1px rgba(127,211,164,.35); }
+@media (prefers-color-scheme: dark) { html:not([data-theme="light"]) .sms-btn { color: #7FD3A4; background: rgba(61,154,107,.31); box-shadow: inset 0 0 0 1px rgba(127,211,164,.35); } }
 .sms-row { display: flex; gap: 8px; }
 .sms-row > div { flex: 1; min-width: 0; }
 .sms-row select, .sms-row input { width: 100%; font-size: 16px; }
+.sms-src { font-size: 12px; color: var(--text-2); margin-top: 10px; padding: 7px 10px; border-radius: 8px; background: var(--bg); border: 1px dashed var(--border); }
+.sms-src.on { color: var(--teal-dark); background: var(--teal-light); border: 1px solid color-mix(in srgb, var(--teal) 35%, transparent); }
+[data-theme="dark"] .sms-src.on { color: var(--teal-2); background: color-mix(in srgb, var(--teal) 18%, transparent); }
 .sms-hint { font-size: 11px; color: var(--text-3); margin-top: 6px; }
 .mm-label { font-size: 11px; font-weight: 800; color: var(--text-2); text-transform: uppercase; letter-spacing: .05em; margin: 12px 0 6px; }
 .card-btn {
@@ -2947,25 +2950,25 @@ a:focus:not(:focus-visible) { outline: none; }
 .copy-notes-btn { --ic: #7B68C8; --ic-ink: #5B48A0; --ic-ink-dk: #C4B8E8; }
 .record-btn, .note-icon-btn, .copy-notes-btn, .note-icon-btn.has-note {
   color: var(--ic-ink); border: 0;
-  background: linear-gradient(150deg, #fff 0%, color-mix(in srgb, var(--ic) 13%, #fff) 100%);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ic) 30%, transparent), 0 2px 6px color-mix(in srgb, var(--ic) 14%, transparent); }
+  background: linear-gradient(150deg, color-mix(in srgb, var(--ic) 21%, #fff) 0%, color-mix(in srgb, var(--ic) 33%, #fff) 100%);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ic) 38%, transparent), 0 2px 6px color-mix(in srgb, var(--ic) 16%, transparent); }
 .record-btn::before, .note-icon-btn::before, .copy-notes-btn::before { opacity: .6; }
-.note-icon-btn.has-note { background: linear-gradient(150deg, color-mix(in srgb, var(--ic) 10%, #fff) 0%, color-mix(in srgb, var(--ic) 26%, #fff) 100%);
+.note-icon-btn.has-note { background: linear-gradient(150deg, color-mix(in srgb, var(--ic) 35%, #fff) 0%, color-mix(in srgb, var(--ic) 47%, #fff) 100%);
   box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--ic) 55%, transparent), 0 2px 6px color-mix(in srgb, var(--ic) 18%, transparent); }
 .note-icon-btn.has-note::after { background: var(--ic); }
-[data-theme="dark"] .note-icon-btn:not(.has-note) { background: color-mix(in srgb, var(--ic) 8%, transparent) !important; }
-@media (prefers-color-scheme: dark) { html:not([data-theme="light"]) .note-icon-btn:not(.has-note) { background: color-mix(in srgb, var(--ic) 8%, transparent) !important; } }
+[data-theme="dark"] .note-icon-btn:not(.has-note) { background: color-mix(in srgb, var(--ic) 25%, transparent) !important; }
+@media (prefers-color-scheme: dark) { html:not([data-theme="light"]) .note-icon-btn:not(.has-note) { background: color-mix(in srgb, var(--ic) 25%, transparent) !important; } }
 .record-btn:hover, .note-icon-btn:hover, .copy-notes-btn:hover { filter: none; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ic) 45%, transparent), 0 4px 10px color-mix(in srgb, var(--ic) 20%, transparent); }
 [data-theme="dark"] .record-btn, [data-theme="dark"] .note-icon-btn, [data-theme="dark"] .copy-notes-btn, [data-theme="dark"] .note-icon-btn:not(.has-note), [data-theme="dark"] .note-icon-btn.has-note {
-  color: var(--ic-ink-dk); background: color-mix(in srgb, var(--ic) 14%, transparent);
+  color: var(--ic-ink-dk); background: color-mix(in srgb, var(--ic) 31%, transparent);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ic-ink-dk) 35%, transparent); }
-[data-theme="dark"] .note-icon-btn.has-note { background: color-mix(in srgb, var(--ic) 24%, transparent); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--ic-ink-dk) 60%, transparent); }
+[data-theme="dark"] .note-icon-btn.has-note { background: color-mix(in srgb, var(--ic) 43%, transparent); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--ic-ink-dk) 60%, transparent); }
 [data-theme="dark"] .record-btn::before, [data-theme="dark"] .note-icon-btn::before, [data-theme="dark"] .copy-notes-btn::before { opacity: .12; }
 @media (prefers-color-scheme: dark) {
   html:not([data-theme="light"]) .record-btn, html:not([data-theme="light"]) .note-icon-btn, html:not([data-theme="light"]) .copy-notes-btn, html:not([data-theme="light"]) .note-icon-btn:not(.has-note), html:not([data-theme="light"]) .note-icon-btn.has-note {
-    color: var(--ic-ink-dk); background: color-mix(in srgb, var(--ic) 14%, transparent);
+    color: var(--ic-ink-dk); background: color-mix(in srgb, var(--ic) 31%, transparent);
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ic-ink-dk) 35%, transparent); }
-  html:not([data-theme="light"]) .note-icon-btn.has-note { background: color-mix(in srgb, var(--ic) 24%, transparent); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--ic-ink-dk) 60%, transparent); }
+  html:not([data-theme="light"]) .note-icon-btn.has-note { background: color-mix(in srgb, var(--ic) 43%, transparent); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--ic-ink-dk) 60%, transparent); }
   html:not([data-theme="light"]) .record-btn::before, html:not([data-theme="light"]) .note-icon-btn::before, html:not([data-theme="light"]) .copy-notes-btn::before { opacity: .12; }
 }
 /* Confirmed time pill — readable on every theme, light and dark */
@@ -5772,6 +5775,16 @@ function _smsDates(iso) {
   const t = new Date(); t.setDate(t.getDate() + 1);
   return { en, fr, tomorrow: t.toDateString() === d.toDateString() };
 }
+// A time slot in your quick note ("9.30-11.30, OK", "09:30 - 11:30", "9h30-11h30") → ["09:30","11:30"]
+function _smsNoteSlot(note) {
+  const m = /(?:^|[^\d])(\d{1,2})(?:[.:hH](\d{2}))?\s*(?:-|–|—|to|à|a)\s*(\d{1,2})(?:[.:hH](\d{2}))?(?!\d)/.exec(String(note || ''));
+  if (!m || (m[2] == null && m[4] == null)) return null;          // need minutes on at least one side (not "2-3 doses")
+  let h1 = +m[1], h2 = +m[3];
+  const m1 = +(m[2] || 0), m2 = +(m[4] || 0);
+  if (h1 < 6) h1 += 12; if (h2 < 6) h2 += 12;                      // "2.30-4.30" = afternoon
+  if (h1 > 23 || h2 > 23 || m1 > 59 || m2 > 59 || h2 * 60 + m2 <= h1 * 60 + m1) return null;
+  return [_smsHHMM(h1 * 60 + m1), _smsHHMM(h2 * 60 + m2)];
+}
 function _smsTimeOptions(sel, val) {
   const opts = []; for (let m = 6 * 60; m <= 21 * 60; m += 15) opts.push(_smsHHMM(m));
   if (val && !opts.includes(val)) { opts.push(val); opts.sort(); }
@@ -5801,6 +5814,7 @@ function _smsBuild() {
   document.querySelectorAll('#smsPhones .mm-chip').forEach(c => c.classList.toggle('on', c.dataset.v === _sms.phone));
   document.querySelectorAll('#smsKinds .mm-chip').forEach(c => c.classList.toggle('on', c.dataset.v === _sms.kind));
   document.getElementById('smsTimes').style.display = _sms.kind === 'book' ? 'none' : 'flex';
+  document.getElementById('smsSlotSrc').style.display = _sms.kind === 'book' ? 'none' : 'block';
   document.getElementById('smsSwap').textContent = _sms.frFirst ? '⇅ English first' : '⇅ French first';
   document.getElementById('smsText').value = _smsCompose();
 }
@@ -5841,9 +5855,16 @@ function openSmsModal(id) {
     `<button type="button" class="mm-chip" data-v="${k}" onclick="_smsPick('kind','${k}')">${label}</button>`).join('');
   document.getElementById('smsDate').value = _sms.kind === 'book' ? (due || apptDay) : apptDay;
   const t = /T(\d{2}):(\d{2})/.exec(appt);
-  const from = t ? `${t[1]}:${t[2]}` : '08:30';
+  // Your quick note wins if it has a time slot; otherwise the appointment time + 2 h
+  const note = (typeof getQuickNote === 'function' && getQuickNote(p['File Number'])) || p._confirmedNote || '';
+  const slot = _smsNoteSlot(note);
+  const from = slot ? slot[0] : t ? `${t[1]}:${t[2]}` : '08:30';
   _smsTimeOptions(document.getElementById('smsFrom'), from);
-  _smsTimeOptions(document.getElementById('smsTo'), _smsHHMM(Math.min(_smsMin(from) + 120, 23 * 60 + 45)));
+  _smsTimeOptions(document.getElementById('smsTo'), slot ? slot[1] : _smsHHMM(Math.min(_smsMin(from) + 120, 23 * 60 + 45)));
+  const src = document.getElementById('smsSlotSrc');
+  src.innerHTML = slot ? `🕘 Time from your quick note: <b>${esc(note.length > 40 ? note.slice(0, 38) + '…' : note)}</b>`
+    : 'No time in your quick note — choose the time below.';
+  src.className = 'sms-src' + (slot ? ' on' : '');
   _smsBuild();
   openModal('smsModal');
 }
@@ -12657,6 +12678,7 @@ window.stripTimeWindow     = stripTimeWindow;
         <div><div class="mm-label" style="margin-top:0">Date</div><input type="date" id="smsDate" class="form-control" onchange="_smsBuild()"></div>
         <div><div class="mm-label" style="margin-top:0">Injection</div><input type="text" id="smsDrug" class="form-control" value="Eligard" oninput="_smsBuild()"></div>
       </div>
+      <div id="smsSlotSrc" class="sms-src"></div>
       <div class="sms-row" id="smsTimes" style="margin-top:10px">
         <div><div class="mm-label" style="margin-top:0">From</div><select id="smsFrom" class="form-control" onchange="_smsFromChanged()"></select></div>
         <div><div class="mm-label" style="margin-top:0">To</div><select id="smsTo" class="form-control" onchange="_smsBuild()"></select></div>
