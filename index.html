@@ -5804,14 +5804,14 @@ function _smsCompose() {
   const hi = { fr: n ? `Bonjour ${T[0]}${n},` : 'Bonjour,', en: n ? `Hello ${T[1]}${n},` : 'Hello,' };
   let F, E;
   if (_sms.kind === 'confirm') {
-    F = `${hi.fr} votre rendez-vous pour l'injection ${drug} est le ${fr} entre ${slot}. Merci de confirmer.`;
-    E = `${hi.en} your appointment for the injection ${drug} is ${en} between ${slot}. Please confirm.`;
+    F = `${hi.fr} votre rendez-vous pour l'injection ${drug} est le ${fr} entre ${slot}. Veuillez commander votre ${drug} en appelant la pharmacie dès que possible. Merci de confirmer.`;
+    E = `${hi.en} your appointment for the injection ${drug} is ${en} between ${slot}. Please order your ${drug} by calling the pharmacy as soon as possible. Please confirm.`;
   } else if (_sms.kind === 'remind') {
     F = `${hi.fr} petit rappel : votre rendez-vous pour l'injection ${drug} est ${tomorrow ? 'demain, ' : ''}le ${fr} entre ${slot}. Si vous devez changer l'heure, répondez à ce message. À bientôt!`;
     E = `${hi.en} a friendly reminder: your appointment for the injection ${drug} is ${tomorrow ? 'tomorrow, ' : ''}${en} between ${slot}. If you need to change the time, please reply to this message. See you soon!`;
   } else {
-    F = `${hi.fr} votre prochaine injection ${drug} est prévue vers le ${fr}. Merci de répondre avec la journée et l'heure qui vous conviennent.`;
-    E = `${hi.en} your next injection ${drug} is due around ${en}. Please reply with a day and time that suits you.`;
+    F = `${hi.fr} votre prochaine injection ${drug} est prévue vers le ${fr}. Veuillez commander votre ${drug} en appelant la pharmacie dès que possible. Merci de répondre avec la journée et l'heure qui vous conviennent.`;
+    E = `${hi.en} your next injection ${drug} is due around ${en}. Please order your ${drug} by calling the pharmacy as soon as possible. Please reply with a day and time that suits you.`;
   }
   return (_sms.frFirst ? `${F}\n\n${E}` : `${E}\n\n${F}`) + `\n\n${SMS_SIGNATURE}`;
 }
